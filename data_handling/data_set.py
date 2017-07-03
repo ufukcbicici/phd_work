@@ -3,12 +3,9 @@ from auxillary.constants import DatasetTypes
 
 class DataSet:
     def __init__(self):
-        self.trainingSampleCount = None
-        self.testSampleCount = None
-        self.validationSampleCount = None
         self.dataShape = None
         self.targetShape = None
-        self.currentDataSet = DatasetTypes.training
+        self.currentDataSetType = None
         self.currentIndex = 0
 
     def load_dataset(self):
@@ -18,16 +15,16 @@ class DataSet:
         pass
 
     def reset(self):
-        self.currentIndex = 0
+        pass
+
+    def set_current_data_set_type(self, dataset_type):
+        pass
 
     def get_current_sample_count(self):
-        if self.currentDataSet == DatasetTypes.training:
-            return self.trainingSampleCount
-        elif self.currentDataSet == DatasetTypes.test:
-            return self.testSampleCount
-        elif self.currentDataSet == DatasetTypes.validation:
-            return self.validationSampleCount
-        else:
-            raise Exception("Unknown dataset type.")
+        pass
 
+    def get_label_count(self):
+        pass
 
+    def visualize_sample(self, sample_index):
+        pass
