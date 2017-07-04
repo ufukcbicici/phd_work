@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 
 
 class MnistDataSet(DataSet):
+    MNIST_SIZE = 28
+
     def __init__(self, validation_sample_count):
         super().__init__()
         self.testImagesPath = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-images-idx3-ubyte")
@@ -37,7 +39,29 @@ class MnistDataSet(DataSet):
         self.validationLabels = self.trainingLabels[random_indices]
 
     def get_next_batch(self, batch_size):
-        pass
+        num_of_samples = self.get_current_sample_count()
+        curr_end_index = self.currentIndex + batch_size - 1
+        # Check if the interval [curr_start_index, curr_end_index] is inside data boundaries.
+        if 0 <= self.currentIndex and curr_end_index < num_of_samples:
+            indices_list = self.currentIndices[self.currentIndex:curr_end_index + 1]
+        elif self.currentIndex < num_of_samples <= curr_end_index:
+            indices_list = self.currentIndices[self.currentIndex:num_of_samples]
+            curr_end_index = curr_end_index % num_of_samples
+            indices_list.extend(self.currentIndices[0:curr_end_index + 1])
+        else:
+            raise Exception("Invalid index positions: self.currentIndex={0} - curr_end_index={1}"
+                            .format(self.currentIndex, curr_end_index))
+        samples = self.currentSamples[indices_list]
+        labels = self.currentLabels[indices_list]
+        self.currentIndex = self.currentIndex + batch_size
+        if num_of_samples <= self.currentIndex:
+            self.currentEpoch += 1
+            self.isNewEpoch = True
+            np.random.shuffle(self.currentIndices)
+            self.currentIndex = self.currentIndex % num_of_samples
+        else:
+            self.isNewEpoch = False
+        return samples, labels, indices_list
 
     def reset(self):
         self.currentIndex = 0
@@ -108,4 +132,8 @@ class MnistDataSet(DataSet):
         for i in range(size):
             images[i][:] = image_data[i * rows * cols:(i + 1) * rows * cols]
 
-        return np.array(images), np.array(labels)
+        np_images = np.array(images).reshape((len(images), MnistDataSet.MNIST_SIZE, MnistDataSet.MNIST_SIZE)).astype(
+            float)
+        np_images /= 255.0
+        np_labels = np.array(labels)
+        return np_images, np_labels

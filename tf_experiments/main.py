@@ -6,6 +6,14 @@ from data_handling.mnist_data_set import MnistDataSet
 
 dataset = MnistDataSet(validation_sample_count=5000)
 dataset.load_dataset()
+total_samples_seen = 0
+while True:
+    samples, labels, indices = dataset.get_next_batch(batch_size=1000)
+    total_samples_seen += 1000
+    if dataset.isNewEpoch:
+        break
+
+print("X")
 
 
 

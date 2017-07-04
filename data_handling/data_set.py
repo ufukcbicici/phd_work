@@ -7,6 +7,8 @@ class DataSet:
         self.targetShape = None
         self.currentDataSetType = None
         self.currentIndex = 0
+        self.currentEpoch = 0
+        self.isNewEpoch = True
 
     def load_dataset(self):
         pass
