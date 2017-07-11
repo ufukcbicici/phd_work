@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from auxillary.constants import OperationNames, InitType, OperationTypes, ActivationType, PoolingType, ArgumentTypes
+from auxillary.constants import InputNames, InitType, OperationTypes, ActivationType, PoolingType, ArgumentTypes
 
 
 class TfLayerFactory:
@@ -27,13 +27,13 @@ class TfLayerFactory:
             op=tf.nn.conv2d(input_tensor, W, strides=conv_stride_shape, padding=conv_padding,
                             name="conv{0}_intermediate".format(post_fix)))
         conv = channel.add_operation(op=conv_intermediate + b)
-        if activation_type == ActivationType.relu:
-            relu = channel.add_operation(op=tf.nn.relu(conv, name="relu{0}".format(post_fix)))
-        else:
-            raise NotImplementedError()
+        # Nonlinearity
+        nonlinear = TfLayerFactory.apply_nonlinearity(channel=channel, input_tensor=conv,
+                                                      activation_type=activation_type, post_fix=post_fix)
+        # Pooling
         if pooling_type == PoolingType.max:
             pool = channel.add_operation(
-                op=tf.nn.max_pool(relu, ksize=pooling_shape, strides=pooling_stride_shape, padding=pooling_padding,
+                op=tf.nn.max_pool(nonlinear, ksize=pooling_shape, strides=pooling_stride_shape, padding=pooling_padding,
                                   name="maxpool{0}".format(post_fix)))
         else:
             raise NotImplementedError()
@@ -57,8 +57,19 @@ class TfLayerFactory:
         # Operations
         matmul = channel.add_operation(op=tf.matmul(input_tensor, W, name="matmul{0}".format(post_fix)))
         fc = channel.add_operation(op=matmul + b)
+        # Nonlinearity
+        nonlinear = TfLayerFactory.apply_nonlinearity(channel=channel, input_tensor=fc,
+                                                      activation_type=activation_type, post_fix=post_fix)
+        return nonlinear
+
+    @staticmethod
+    def apply_nonlinearity(channel, input_tensor, activation_type, post_fix):
         if activation_type == ActivationType.relu:
-            relu = channel.add_operation(op=tf.nn.relu(fc, name="relu{0}".format(post_fix)))
+            output_tensor = channel.add_operation(op=tf.nn.relu(input_tensor, name="relu{0}".format(post_fix)))
+        elif activation_type == ActivationType.tanh:
+            output_tensor = channel.add_operation(op=tf.nn.tanh(input_tensor, name="tanh{0}".format(post_fix)))
+        elif activation_type == ActivationType.no_activation:
+            output_tensor = input_tensor
         else:
             raise NotImplementedError()
-        return relu
+        return output_tensor

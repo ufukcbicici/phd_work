@@ -20,16 +20,20 @@ class OperationTypes(Enum):
     input = "input"
     f_operator = "FOperator"
     h_operator = "HOperator"
+    ancestor_activation = "AncestorActivation"
     decision = "Decision"
     loss = "loss"
 
 
-class OperationNames(Enum):
+class InputNames(Enum):
     data_input = "DataInput"
+    label_input = "LabelInput"
 
 
 class ActivationType(Enum):
     relu = 0
+    tanh = 1
+    no_activation = 2
 
 
 class PoolingType(Enum):
@@ -38,3 +42,13 @@ class PoolingType(Enum):
 
 class InitType(Enum):
     xavier = 0
+
+
+class TreeType(Enum):
+    hard = 0
+    soft = 1
+
+
+class ProblemType(Enum):
+    classification = 0
+    regression = 1

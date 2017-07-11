@@ -28,6 +28,7 @@ class MnistDataSet(DataSet):
         self.validationSampleCount = validation_sample_count
         self.load_dataset()
         self.set_current_data_set_type(dataset_type=DatasetTypes.training)
+        self.labelCount = None
 
     # PUBLIC METHODS
     def load_dataset(self):
@@ -96,15 +97,16 @@ class MnistDataSet(DataSet):
         plt.show()
 
     def get_label_count(self):
-        label_set_count = self.testLabels.shape[0]
-        label_dict = {}
-        for i in range(0, label_set_count):
-            label = self.testLabels[i]
-            if not (label in label_dict):
-                label_dict[label] = 0
-            label_dict[label] += 1
-        label_count = len(label_dict)
-        return label_count
+        if self.labelCount is None:
+            label_set_count = self.testLabels.shape[0]
+            label_dict = {}
+            for i in range(0, label_set_count):
+                label = self.testLabels[i]
+                if not (label in label_dict):
+                    label_dict[label] = 0
+                label_dict[label] += 1
+            self.labelCount = len(label_dict)
+        return self.labelCount
 
     # PRIVATE METHODS
     # Load method taken from https://github.com/sorki/python-mnist/blob/master/mnist/loader.py

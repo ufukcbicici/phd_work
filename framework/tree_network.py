@@ -3,16 +3,19 @@ from framework.network_node import NetworkNode
 
 
 class TreeNetwork(Network):
-    def __init__(self, run_id, dataset, parameter_file, tree_degree, list_of_node_builder_functions):
-        super().__init__(run_id, dataset, parameter_file)
+    def __init__(self, run_id, dataset, parameter_file, problem_type,
+                 tree_degree, tree_type, list_of_node_builder_functions):
+        super().__init__(run_id, dataset, parameter_file, problem_type)
         self.treeDegree = tree_degree
         self.treeDepth = len(list_of_node_builder_functions)
         self.depthsToNodesDict = {}
         self.nodesToDepthsDict = {}
         self.nodeBuilderFunctions = list_of_node_builder_functions
+        self.treeType = tree_type
 
     def build_network(self):
         curr_index = 0
+        # Step 1:
         # Topologically build the node ordering
         for depth in range(0, self.treeDepth):
             node_count_in_depth = pow(self.treeDegree, depth)
@@ -32,10 +35,17 @@ class TreeNetwork(Network):
                     self.dag.add_node(node=node)
                 curr_index += 1
         self.topologicalSortedNodes = self.dag.get_topological_sort()
+        # Step 2:
         # Build the symbolic graphs of the nodes
         for node in self.topologicalSortedNodes:
             node_depth = self.nodesToDepthsDict[node]
             self.nodeBuilderFunctions[node_depth](node=node)
+        # Step 3:
+        # Build the complete symbolic graph: Connect nodes, attach decision and loss mechanisms.
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                node.attach_loss()
+
 
     # Private methods
     def get_parent_index(self, node_index):

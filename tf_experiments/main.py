@@ -3,7 +3,8 @@ import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 import matplotlib.pyplot as plt
 
-from auxillary.constants import OperationTypes, OperationNames, InitType, ActivationType, PoolingType
+from auxillary.constants import OperationTypes, InputNames, InitType, ActivationType, PoolingType, TreeType, \
+    ProblemType
 from auxillary.tf_layer_factory import TfLayerFactory
 from data_handling.mnist_data_set import MnistDataSet
 from framework.network_channel import NetworkChannel
@@ -12,9 +13,12 @@ from framework.tree_network import TreeNetwork
 
 def baseline_network(node):
     with tf.variable_scope(node.indicatorText):
+        # Input channel
+        with NetworkChannel(channel_name=OperationTypes.input.value, node=node) as input_channel:
+            x = input_channel.add_operation(op=tf.placeholder(tf.float32, name=InputNames.data_input.value))
+            y = input_channel.add_operation(op=tf.placeholder(tf.int32, name=InputNames.label_input.value))
         # F channel
         with NetworkChannel(channel_name=OperationTypes.f_operator.value, node=node) as f_channel:
-            x = f_channel.add_operation(op=tf.placeholder(tf.float32, name=OperationNames.data_input.value))
             # Convolution Filter 1
             conv_1_feature_map_count = 20
             conv_layer_1 = TfLayerFactory.create_convolutional_layer(
@@ -35,17 +39,23 @@ def baseline_network(node):
             fc_unit_count = 500
             flattened_conv = f_channel.add_operation(
                 op=tf.reshape(conv_layer_2, [-1, 7 * 7 * conv_2_feature_map_count]))
-            fc_layer_1 = TfLayerFactory.create_fc_layer(node=node, channel=f_channel, input_tensor=flattened_conv,
-                                                        fc_shape=[7 * 7 * conv_2_feature_map_count, fc_unit_count],
-                                                        init_type=InitType.xavier, activation_type=ActivationType.relu,
-                                                        post_fix="3")
-    print("X")
+            TfLayerFactory.create_fc_layer(node=node, channel=f_channel, input_tensor=flattened_conv,
+                                           fc_shape=[7 * 7 * conv_2_feature_map_count, fc_unit_count],
+                                           init_type=InitType.xavier, activation_type=ActivationType.relu,
+                                           post_fix="3")
 
 
 def main():
     dataset = MnistDataSet(validation_sample_count=5000)
     dataset.load_dataset()
-    cnn_lenet = TreeNetwork(run_id=0, dataset=dataset, parameter_file=None, tree_degree=2,
+    # t1 = [[1, 2, 3], [4, 5, 6]]
+    # t2 = [[7, 8, 9, 20], [10, 11, 12, 30]]
+    # conc = tf.concat([t1, t2], 1)
+    # sess = tf.Session()
+    # conc_res = sess.run([conc])
+    # print("X")
+    cnn_lenet = TreeNetwork(run_id=0, dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
+                            problem_type=ProblemType.classification,
                             list_of_node_builder_functions=[baseline_network])
     cnn_lenet.build_network()
 
