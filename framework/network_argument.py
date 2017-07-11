@@ -1,7 +1,11 @@
+import tensorflow as tf
+import numpy as np
+
+
 class NetworkArgument:
-    def __init__(self, name, network_object, container_node, needs_gradient, arg_type):
+    def __init__(self, name, symbolic_network_object, container_node, needs_gradient, arg_type):
         self.name = name
-        self.networkObject = network_object
+        self.networkObject = symbolic_network_object
         self.containerNode = container_node
         self.needsGradient = needs_gradient
         self.valueArray = None

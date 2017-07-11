@@ -14,3 +14,27 @@ class ArgumentTypes(Enum):
     label = 3
     decision_tolerance = 4
     output = 5
+
+
+class OperationTypes(Enum):
+    input = "input"
+    f_operator = "FOperator"
+    h_operator = "HOperator"
+    decision = "Decision"
+    loss = "loss"
+
+
+class OperationNames(Enum):
+    data_input = "DataInput"
+
+
+class ActivationType(Enum):
+    relu = 0
+
+
+class PoolingType(Enum):
+    max = 0
+
+
+class InitType(Enum):
+    xavier = 0

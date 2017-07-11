@@ -9,3 +9,7 @@ class Network:
         self.dataset = dataset
         self.parameterFile = parameter_file
         self.dag = Dag()
+        self.topologicalSortedNodes = []
+
+    def build_network(self):
+        pass
