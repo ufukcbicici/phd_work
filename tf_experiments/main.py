@@ -11,12 +11,14 @@ from framework.network_channel import NetworkChannel
 from framework.tree_network import TreeNetwork
 
 
-def baseline_network(node):
+def baseline_network(network, node):
+    # Data Input
+    x = network.add_input(producer_node=None, producer_channel=OperationTypes.data_input, producer_channel_index=0,
+                          dest_node=node)
+    # Label Input
+    y = network.add_input(producer_node=None, producer_channel=OperationTypes.label_input, producer_channel_index=0,
+                          dest_node=node)
     with tf.variable_scope(node.indicatorText):
-        # Input channel
-        with NetworkChannel(channel_name=OperationTypes.input.value, node=node) as input_channel:
-            x = input_channel.add_operation(op=tf.placeholder(tf.float32, name=InputNames.data_input.value))
-            y = input_channel.add_operation(op=tf.placeholder(tf.int32, name=InputNames.label_input.value))
         # F channel
         with NetworkChannel(channel_name=OperationTypes.f_operator.value, node=node) as f_channel:
             # Convolution Filter 1
@@ -48,12 +50,6 @@ def baseline_network(node):
 def main():
     dataset = MnistDataSet(validation_sample_count=5000)
     dataset.load_dataset()
-    # t1 = [[1, 2, 3], [4, 5, 6]]
-    # t2 = [[7, 8, 9, 20], [10, 11, 12, 30]]
-    # conc = tf.concat([t1, t2], 1)
-    # sess = tf.Session()
-    # conc_res = sess.run([conc])
-    # print("X")
     cnn_lenet = TreeNetwork(run_id=0, dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
                             problem_type=ProblemType.classification,
                             list_of_node_builder_functions=[baseline_network])

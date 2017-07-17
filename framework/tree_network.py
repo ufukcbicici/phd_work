@@ -2,7 +2,8 @@ import tensorflow as tf
 from auxillary.constants import OperationTypes, InputNames
 from framework.network import Network
 from framework.network_channel import NetworkChannel
-from framework.network_node import NetworkNode, NetworkInput
+from framework.network_node import NetworkNode
+from framework.node_input_outputs import NetworkInput
 
 
 class TreeNetwork(Network):
@@ -23,7 +24,6 @@ class TreeNetwork(Network):
     # in between the path (ancestor, current_node). Each intermediate node, inductively takes the input from its parent,
     # applies decision to it and propagate to the its child. In that case the node producing the output and the interme-
     # diate node are different and this is the only case that happens.
-
     def add_input(self, producer_node, producer_channel, producer_channel_index, dest_node):
         producer_triple = (producer_node, producer_channel, producer_channel_index)
         # Data or label input
@@ -118,18 +118,13 @@ class TreeNetwork(Network):
                 curr_index += 1
         self.topologicalSortedNodes = self.dag.get_topological_sort()
         # Step 2:
-        # Build the symbolic graphs of the nodes
+        # Build the complete symbolic graph by building and connectiong the symbolic graphs of the nodes
         for node in self.topologicalSortedNodes:
             node_depth = self.nodesToDepthsDict[node]
-            # Add standard operations, shared by all nodes of the given type, regardless of the customized content.
-            self.add_standard_ops_to_node(node=node)
             # Add customized operations on the top.
             self.nodeBuilderFunctions[node_depth](node=node)
-        # Step 3:
-        # Build the complete symbolic graph: Connect nodes, attach decision and loss mechanisms.
-        for node in self.topologicalSortedNodes:
             if node.isLeaf:
-                node.attach_loss()
+                node.attach_loss_eval_channels()
 
     # Private methods
     def get_parent_index(self, node_index):

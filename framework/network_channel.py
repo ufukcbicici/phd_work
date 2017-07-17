@@ -2,7 +2,7 @@ import tensorflow as tf
 
 # Tensorflow specific code (This should be isolated at some point in future)
 from auxillary.constants import OperationTypes
-from framework.network_node import NetworkOutput
+from framework.node_input_outputs import NetworkOutput
 
 
 class NetworkChannel:
@@ -26,6 +26,7 @@ class NetworkChannel:
     def __enter__(self):
         return self
 
+    # Tensorflow specific code (This should be isolated at some point in future)
     def __exit__(self, type, value, traceback):
         output_tensor = tf.get_collection(key=self.channelName, scope=self.parentNode.self.indicatorText)
         self.parentNode.outputs[self.producerTriple] = NetworkOutput(node=self.parentNode, channel=self.channelName,
