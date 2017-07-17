@@ -61,6 +61,7 @@ def main():
 
 
 main()
+
 # dataset = MnistDataSet(validation_sample_count=5000)
 # dataset.load_dataset()
 # total_samples_seen = 0

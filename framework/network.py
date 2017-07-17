@@ -16,6 +16,13 @@ class Network:
         self.problemType = problem_type
         self.lossLayerInit = loss_layer_init
         self.lossLayerActivation = loss_activation
+        self.variablesToFeed = {}
 
     def build_network(self):
+        pass
+
+    def add_input(self, producer_node, producer_channel, producer_channel_index, dest_node):
+        pass
+
+    def apply_decision(self, node, channel, channel_index):
         pass

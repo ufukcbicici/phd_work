@@ -17,12 +17,15 @@ class ArgumentTypes(Enum):
 
 
 class OperationTypes(Enum):
-    input = "input"
+    data_input = "DataInput"
+    label_input = "LabelInput"
     f_operator = "FOperator"
     h_operator = "HOperator"
     ancestor_activation = "AncestorActivation"
     decision = "Decision"
+    pre_loss = "PreLoss"
     loss = "loss"
+    evaluation = "Evaluation"
 
 
 class InputNames(Enum):
