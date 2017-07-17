@@ -53,27 +53,15 @@ class HardTreeNode(NetworkNode):
                     softmax_cross_entropy = loss_channel.add_operation(
                         op=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_tensor, logits=logits,
                                                                           name="softmax_cross_entropy"))
-                    mean_softmax_cross_entropy = loss_channel.add_operation(
+                    loss_channel.add_operation(
                         op=tf.reduce_mean(input_tensor=softmax_cross_entropy, name="reduce_mean_softmax_cross_entropy"))
                 # Evaluation channel
                 with NetworkChannel(channel_name=OperationTypes.evaluation.value, node=self) as eval_channel:
-                    softmax = eval_channel.add_operation(op=tf.nn.softmax(logits=logits, name="softmax_eval"))
-                    correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
-
-
-
-                    # input_channel = tf.get_collection(key=OperationTypes.input.value, scope=self.indicatorText)
-                    # label_tensor = None
-                    # for input_tensor in input_channel:
-                    #     if InputNames.label_input.value in input_tensor.name:
-                    #         label_tensor = input_tensor
-                    #         break
-                    # if label_tensor is None:
-                    #     raise Exception("No label input in Node {0}".format(self.index))
-                    # # Apply softmax
-                    # softmax = loss_channel.add_operation(
-                    #     op=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_tensor, logits=logits,
-                    #                                                       name="softmax"))
-                    # cross_entropy = loss_channel.add_operation(op=tf.reduce_mean(softmax, name="cross_entropy"))
+                    posterior_probs = eval_channel.add_operation(op=tf.nn.softmax(logits=logits, name="softmax_eval"))
+                    argmax_label_prediction = eval_channel.add_operation(op=tf.argmax(posterior_probs, 1))
+                    comparison_with_labels = eval_channel.add_operation(
+                        op=tf.equal(x=argmax_label_prediction, y=label_tensor))
+                    comparison_cast = eval_channel.add_operation(op=tf.cast(comparison_with_labels, tf.float32))
+                    eval_channel.add_operation(op=tf.reduce_mean(input_tensor=comparison_cast, name="accuracy"))
         else:
             raise NotImplementedError()

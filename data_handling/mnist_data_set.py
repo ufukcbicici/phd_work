@@ -1,5 +1,6 @@
 import struct
 import os
+import platform
 import numpy as np
 from array import array
 from auxillary.constants import DatasetTypes
@@ -12,6 +13,7 @@ class MnistDataSet(DataSet):
 
     def __init__(self, validation_sample_count):
         super().__init__()
+        os_name = platform.system()
         self.testImagesPath = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-images-idx3-ubyte")
         self.testLabelsPath = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-labels-idx1-ubyte")
         self.trainImagesPath = os.path.join(os.getcwd(), "..\\data\\mnist\\train-images-idx3-ubyte")
