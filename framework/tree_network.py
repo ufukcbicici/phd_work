@@ -1,5 +1,6 @@
 import tensorflow as tf
-from auxillary.constants import OperationTypes, InputNames
+from auxillary.constants import OperationTypes, InputNames, TreeType
+from framework.hard_tree_node import HardTreeNode
 from framework.network import Network
 from framework.network_channel import NetworkChannel
 from framework.network_node import NetworkNode
@@ -30,16 +31,21 @@ class TreeNetwork(Network):
         if producer_node is None:
             if producer_channel == OperationTypes.data_input or producer_channel == OperationTypes.label_input:
                 input_name = "{0}Node{1}".format(producer_channel.value, dest_node.index)
-                with tf.variable_scope(dest_node.indicatorText):
-                    with NetworkChannel(channel_name=producer_channel, node=self) as input_channel:
+                tensor = None
+                with NetworkChannel(node=dest_node, channel=producer_channel) as input_channel:
+                    if producer_channel == OperationTypes.data_input:
                         tensor = input_channel.add_operation(op=tf.placeholder(tf.float32, name=input_name))
-                        self.variablesToFeed.add(tensor)
-                        dest_node.inputs[(producer_node, producer_channel, producer_channel_index)] \
-                            = NetworkInput(source_node=None, source_channel=producer_channel,
-                                           source_channel_index=producer_channel_index, input_object=tensor,
-                                           producer_node=None, producer_channel=producer_channel,
-                                           producer_channel_index=producer_channel_index)
-                        return tensor
+                    elif producer_channel == OperationTypes.label_input:
+                        tensor = input_channel.add_operation(op=tf.placeholder(tf.int64, name=input_name))
+                    else:
+                        raise NotImplementedError()
+                    self.variablesToFeed.add(tensor)
+                    dest_node.inputs[(producer_node, producer_channel, producer_channel_index)] \
+                        = NetworkInput(source_node=None, source_channel=producer_channel,
+                                       source_channel_index=producer_channel_index, input_object=tensor,
+                                       producer_node=None, producer_channel=producer_channel,
+                                       producer_channel_index=producer_channel_index)
+                return tensor
             else:
                 raise Exception("Only data or label inputs can have no source node.")
         # An input either from a 1)directly from a parent node 2)from an ancestor node.
@@ -49,7 +55,7 @@ class TreeNetwork(Network):
             last_output = None
             # Assume the path starts from the ancestor to the node
             # Since it is a tree, only a single path exists between the ancestor and the node.
-            if len(path) == 0:
+            if len(path) <= 1:
                 raise Exception("No path has been found between source node {0} and destination node {1}".
                                 format(producer_node.index, dest_node.index))
             for path_node in path:
@@ -104,8 +110,11 @@ class TreeNetwork(Network):
             for i in range(0, node_count_in_depth):
                 is_root = depth == 0
                 is_leaf = depth == (self.treeDepth - 1)
-                node = NetworkNode(index=curr_index, containing_network=self, is_root=is_root,
-                                   is_leaf=is_leaf)
+                if self.treeType == TreeType.hard:
+                    node = HardTreeNode(index=curr_index, containing_network=self, is_root=is_root,
+                                        is_leaf=is_leaf)
+                else:
+                    raise NotImplementedError()
                 self.nodes[node.index] = node
                 if is_leaf:
                     self.leafNodes.append(node)
@@ -122,9 +131,10 @@ class TreeNetwork(Network):
         for node in self.topologicalSortedNodes:
             node_depth = self.nodesToDepthsDict[node]
             # Add customized operations on the top.
-            self.nodeBuilderFunctions[node_depth](node=node)
-            if node.isLeaf:
-                node.attach_loss_eval_channels()
+            with tf.variable_scope(node.indicatorText):
+                self.nodeBuilderFunctions[node_depth](network=self, node=node)
+                if node.isLeaf:
+                    node.attach_loss_eval_channels()
 
     # Private methods
     def get_parent_index(self, node_index):

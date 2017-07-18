@@ -13,7 +13,7 @@ class MnistDataSet(DataSet):
 
     def __init__(self, validation_sample_count):
         super().__init__()
-        os_name = platform.system()
+        # os_name = platform.system()
         self.testImagesPath = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-images-idx3-ubyte")
         self.testLabelsPath = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-labels-idx1-ubyte")
         self.trainImagesPath = os.path.join(os.getcwd(), "..\\data\\mnist\\train-images-idx3-ubyte")
@@ -139,5 +139,5 @@ class MnistDataSet(DataSet):
         np_images = np.array(images).reshape((len(images), MnistDataSet.MNIST_SIZE, MnistDataSet.MNIST_SIZE)).astype(
             float)
         np_images /= 255.0
-        np_labels = np.array(labels)
+        np_labels = np.array(labels).astype(np.int64)
         return np_images, np_labels

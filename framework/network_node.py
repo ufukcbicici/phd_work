@@ -32,13 +32,11 @@ class NetworkNode:
         return variable_object
 
     def create_transfer_channel(self, producer_node, producer_channel, producer_channel_index):
-        with tf.variable_scope(self.indicatorText):
-            with NetworkChannel(channel_name=producer_channel, node=self,
-                                producer_node=producer_node, producer_channel=producer_channel,
-                                producer_channel_index=producer_channel_index) as transfer_channel:
-                output_tensor = self.parentNetwork.apply_decision(node=self, channel=producer_channel,
-                                                                  channel_index=transfer_channel.channelIndex)
-                transfer_channel.add_operation(op=output_tensor)
+        with NetworkChannel(node=self, channel=producer_channel, producer_node=producer_node,
+                            producer_channel=producer_channel, producer_channel_index=producer_channel_index) as transfer_channel:
+            output_tensor = self.parentNetwork.apply_decision(node=self, channel=producer_channel,
+                                                              channel_index=transfer_channel.channelIndex)
+            transfer_channel.add_operation(op=output_tensor)
 
     def get_input(self, producer_node, channel, channel_index):
         if (producer_node, channel, channel_index) not in self.inputs:

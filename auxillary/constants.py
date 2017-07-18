@@ -55,3 +55,11 @@ class TreeType(Enum):
 class ProblemType(Enum):
     classification = 0
     regression = 1
+
+
+class SpecialNodeTypes(Enum):
+    data_provider = 0
+
+
+class SpecialChannelIndices(Enum):
+    data_provider_index = 0
