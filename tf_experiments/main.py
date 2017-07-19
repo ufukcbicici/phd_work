@@ -20,10 +20,12 @@ def baseline_network(network, node):
                           dest_node=node)
     # F channel
     with NetworkChannel(node=node, channel=OperationTypes.f_operator) as f_channel:
+        # Reshape x for convolutions
+        x_image = tf.reshape(x, [-1, MnistDataSet.MNIST_SIZE, MnistDataSet.MNIST_SIZE, 1])
         # Convolution Filter 1
         conv_1_feature_map_count = 20
         conv_layer_1 = TfLayerFactory.create_convolutional_layer(
-            node=node, channel=f_channel, input_tensor=x,
+            node=node, channel=f_channel, input_tensor=x_image,
             conv_filter_shape=[5, 5, 1, conv_1_feature_map_count],
             conv_stride_shape=[1, 1, 1, 1], pooling_shape=[1, 2, 2, 1], conv_padding="SAME",
             pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
