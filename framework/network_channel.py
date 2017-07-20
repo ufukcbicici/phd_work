@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 # Tensorflow specific code (This should be isolated at some point in future)
-from auxillary.constants import OperationTypes
+from auxillary.constants import ChannelTypes
 from framework.node_input_outputs import NetworkOutput
 
 

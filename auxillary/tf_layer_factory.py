@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from auxillary.constants import InputNames, InitType, OperationTypes, ActivationType, PoolingType, ArgumentTypes
+from auxillary.constants import GlobalInputNames, InitType, ChannelTypes, ActivationType, PoolingType, ArgumentTypes
 
 
 class TfLayerFactory:

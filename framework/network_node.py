@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from auxillary.constants import ProblemType, OperationTypes
+from auxillary.constants import ProblemType, ChannelTypes
 from auxillary.tf_layer_factory import TfLayerFactory
 from framework.network_argument import NetworkArgument
 from framework.network_channel import NetworkChannel
@@ -17,6 +17,7 @@ class NetworkNode:
         self.networkChannels = {}
         self.inputs = {}
         self.outputs = {}
+        self.losses = {}
 
     # Tensorflow specific code (This should be isolated at some point in future)
     def create_variable(self, name, shape, initializer, needs_gradient, dtype, arg_type, channel):

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from auxillary.constants import OperationTypes, InputNames, TreeType
+from auxillary.constants import ChannelTypes, GlobalInputNames, TreeType
 from framework.hard_tree_node import HardTreeNode
 from framework.network import Network
 from framework.network_channel import NetworkChannel
@@ -17,6 +17,7 @@ class TreeNetwork(Network):
         self.nodesToDepthsDict = {}
         self.nodeBuilderFunctions = list_of_node_builder_functions
         self.treeType = tree_type
+        self.indicatorText = "TreeNetwork"
 
     # Tensorflow specific code (This should be isolated at some point in future)
     # A node can take from an input from any ancestor node. If the ancestor is its parent, it is directly connected
@@ -25,21 +26,22 @@ class TreeNetwork(Network):
     # in between the path (ancestor, current_node). Each intermediate node, inductively takes the input from its parent,
     # applies decision to it and propagate to the its child. In that case the node producing the output and the interme-
     # diate node are different and this is the only case that happens.
-    def add_input(self, producer_node, producer_channel, producer_channel_index, dest_node):
+    def add_nodewise_input(self, producer_node, producer_channel, producer_channel_index, dest_node):
         producer_triple = (producer_node, producer_channel, producer_channel_index)
         # Data or label input
         if producer_node is None:
-            if producer_channel == OperationTypes.data_input or producer_channel == OperationTypes.label_input:
+            if producer_channel == ChannelTypes.data_input or producer_channel == ChannelTypes.label_input:
                 input_name = "{0}Node{1}".format(producer_channel.value, dest_node.index)
                 tensor = None
                 with NetworkChannel(node=dest_node, channel=producer_channel) as input_channel:
-                    if producer_channel == OperationTypes.data_input:
+                    if producer_channel == ChannelTypes.data_input:
                         tensor = input_channel.add_operation(op=tf.placeholder(tf.float32, name=input_name))
-                    elif producer_channel == OperationTypes.label_input:
+                        self.variablesToFeed[GlobalInputNames.data_input] = tensor
+                    elif producer_channel == ChannelTypes.label_input:
                         tensor = input_channel.add_operation(op=tf.placeholder(tf.int64, name=input_name))
+                        self.variablesToFeed[GlobalInputNames.label_input] = tensor
                     else:
                         raise NotImplementedError()
-                    self.variablesToFeed.add(tensor)
                     dest_node.inputs[(producer_node, producer_channel, producer_channel_index)] \
                         = NetworkInput(source_node=None, source_channel=producer_channel,
                                        source_channel_index=producer_channel_index, input_object=tensor,
@@ -101,6 +103,12 @@ class TreeNetwork(Network):
     def apply_decision(self, node, channel, channel_index):
         raise NotImplementedError()
 
+    def add_networkwise_inputs(self):
+        with tf.variable_scope(self.indicatorText):
+            # 1): Regularizer Strength
+            regularizer_coeff_tensor = tf.placeholder(tf.float32, name=GlobalInputNames.regularizer_strength.value)
+            self.variablesToFeed[GlobalInputNames.regularizer_strength] = regularizer_coeff_tensor
+
     def build_network(self):
         curr_index = 0
         # Step 1:
@@ -127,6 +135,10 @@ class TreeNetwork(Network):
                 curr_index += 1
         self.topologicalSortedNodes = self.dag.get_topological_sort()
         # Step 2:
+        # Create network wise constant inputs, which won't partake in the branching mechanisms and will be used as
+        # they are
+        self.add_networkwise_inputs()
+        # Step 3:
         # Build the complete symbolic graph by building and connectiong the symbolic graphs of the nodes
         for node in self.topologicalSortedNodes:
             node_depth = self.nodesToDepthsDict[node]

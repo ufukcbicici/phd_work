@@ -16,7 +16,7 @@ class ArgumentTypes(Enum):
     output = 5
 
 
-class OperationTypes(Enum):
+class ChannelTypes(Enum):
     data_input = "DataInput"
     label_input = "LabelInput"
     f_operator = "FOperator"
@@ -26,11 +26,13 @@ class OperationTypes(Enum):
     pre_loss = "PreLoss"
     loss = "loss"
     evaluation = "Evaluation"
+    constant = "constant"
 
 
-class InputNames(Enum):
+class GlobalInputNames(Enum):
     data_input = "DataInput"
     label_input = "LabelInput"
+    regularizer_strength = "RegularizerStrength"
 
 
 class ActivationType(Enum):

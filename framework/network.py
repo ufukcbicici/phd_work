@@ -1,5 +1,5 @@
 from auxillary.dag_utilities import Dag
-from auxillary.constants import OperationTypes, InputNames, InitType, ActivationType, PoolingType, TreeType, \
+from auxillary.constants import ChannelTypes, GlobalInputNames, InitType, ActivationType, PoolingType, TreeType, \
     ProblemType
 
 
@@ -16,12 +16,16 @@ class Network:
         self.problemType = problem_type
         self.lossLayerInit = loss_layer_init
         self.lossLayerActivation = loss_activation
-        self.variablesToFeed = set()
+        self.variablesToFeed = {}
+        self.indicatorText = None
 
     def build_network(self):
         pass
 
-    def add_input(self, producer_node, producer_channel, producer_channel_index, dest_node):
+    def add_nodewise_input(self, producer_node, producer_channel, producer_channel_index, dest_node):
+        pass
+
+    def add_networkwise_inputs(self):
         pass
 
     def apply_decision(self, node, channel, channel_index):

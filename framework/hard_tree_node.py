@@ -1,8 +1,9 @@
 import tensorflow as tf
-from auxillary.constants import ProblemType, OperationTypes
+from auxillary.constants import ProblemType, ChannelTypes
 from auxillary.tf_layer_factory import TfLayerFactory
 from framework.network_channel import NetworkChannel
 from framework.network_node import NetworkNode
+from losses.cross_entropy_loss import CrossEntropyLoss
 
 
 class HardTreeNode(NetworkNode):
@@ -16,8 +17,8 @@ class HardTreeNode(NetworkNode):
             # Shapes are constrained to be 2 dimensional. Else, it will raise exception. We have to flatten all tensors
             # before the loss operation.
             tensor_list = []
-            relevant_channels = {OperationTypes.f_operator, OperationTypes.h_operator,
-                                 OperationTypes.ancestor_activation}
+            relevant_channels = {ChannelTypes.f_operator, ChannelTypes.h_operator,
+                                 ChannelTypes.ancestor_activation}
             for output in self.outputs.values():
                 if output.currentChannel not in relevant_channels:
                     continue
@@ -30,36 +31,21 @@ class HardTreeNode(NetworkNode):
             # Get the label tensor
             root_node = self.parentNetwork.nodes[0]
             if self == root_node:
-                label_tensor = self.get_input(producer_node=None, channel=OperationTypes.label_input, channel_index=0)
+                label_tensor = self.get_input(producer_node=None, channel=ChannelTypes.label_input, channel_index=0)
             else:
-                label_tensor = self.parentNetwork.add_input(producer_node=root_node,
-                                                            producer_channel=OperationTypes.label_input,
-                                                            producer_channel_index=0, dest_node=self)
+                label_tensor = self.parentNetwork.add_nodewise_input(producer_node=root_node,
+                                                                     producer_channel=ChannelTypes.label_input,
+                                                                     producer_channel_index=0, dest_node=self)
             class_count = self.parentNetwork.dataset.get_label_count()
-            # Pre-Loss channel
-            with NetworkChannel(node=self, channel=OperationTypes.pre_loss) as pre_loss_channel:
-                final_feature = pre_loss_channel.add_operation(
-                    op=tf.concat(values=tensor_list, axis=1))
-                final_dimension = final_feature.shape[1].value
-                logits = TfLayerFactory.create_fc_layer(node=self, channel=pre_loss_channel,
-                                                        input_tensor=final_feature,
-                                                        fc_shape=[final_dimension, class_count],
-                                                        init_type=self.parentNetwork.lossLayerInit,
-                                                        activation_type=self.parentNetwork.lossLayerActivation,
-                                                        post_fix="pre_loss")
+            cross_entropy_loss = CrossEntropyLoss(parent_node=self, feature_list=tensor_list, label_tensor=label_tensor,
+                                                  class_count=class_count)
+
             # Loss channel
-            with NetworkChannel(node=self, channel=OperationTypes.loss) as loss_channel:
-                softmax_cross_entropy = loss_channel.add_operation(
-                    op=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_tensor, logits=logits))
-                loss_channel.add_operation(
-                    op=tf.reduce_mean(input_tensor=softmax_cross_entropy))
+            cross_entropy_loss.build_training_network()
             # Evaluation channel
-            with NetworkChannel(node=self, channel=OperationTypes.evaluation) as eval_channel:
-                posterior_probs = eval_channel.add_operation(op=tf.nn.softmax(logits=logits))
-                argmax_label_prediction = eval_channel.add_operation(op=tf.argmax(posterior_probs, 1))
-                comparison_with_labels = eval_channel.add_operation(
-                    op=tf.equal(x=argmax_label_prediction, y=label_tensor))
-                comparison_cast = eval_channel.add_operation(op=tf.cast(comparison_with_labels, tf.float32))
-                eval_channel.add_operation(op=tf.reduce_mean(input_tensor=comparison_cast))
+            cross_entropy_loss.build_evaluation_network()
+            # Finalize, clean up
+            cross_entropy_loss.finalize()
+
         else:
             raise NotImplementedError()

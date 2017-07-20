@@ -3,7 +3,7 @@ import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 import matplotlib.pyplot as plt
 
-from auxillary.constants import OperationTypes, InputNames, InitType, ActivationType, PoolingType, TreeType, \
+from auxillary.constants import ChannelTypes, GlobalInputNames, InitType, ActivationType, PoolingType, TreeType, \
     ProblemType
 from auxillary.tf_layer_factory import TfLayerFactory
 from data_handling.mnist_data_set import MnistDataSet
@@ -13,13 +13,13 @@ from framework.tree_network import TreeNetwork
 
 def baseline_network(network, node):
     # Data Input
-    x = network.add_input(producer_node=None, producer_channel=OperationTypes.data_input, producer_channel_index=0,
-                          dest_node=node)
+    x = network.add_nodewise_input(producer_node=None, producer_channel=ChannelTypes.data_input, producer_channel_index=0,
+                                   dest_node=node)
     # Label Input
-    y = network.add_input(producer_node=None, producer_channel=OperationTypes.label_input, producer_channel_index=0,
-                          dest_node=node)
+    y = network.add_nodewise_input(producer_node=None, producer_channel=ChannelTypes.label_input, producer_channel_index=0,
+                                   dest_node=node)
     # F channel
-    with NetworkChannel(node=node, channel=OperationTypes.f_operator) as f_channel:
+    with NetworkChannel(node=node, channel=ChannelTypes.f_operator) as f_channel:
         # Reshape x for convolutions
         x_image = tf.reshape(x, [-1, MnistDataSet.MNIST_SIZE, MnistDataSet.MNIST_SIZE, 1])
         # Convolution Filter 1
