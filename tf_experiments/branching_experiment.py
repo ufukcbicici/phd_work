@@ -86,60 +86,100 @@ sess.run(init)
 initial_C, initial_b_c, initial_W, initial_b = sess.run([C, b_c, W, b], {x: samples})
 value_dict = {"C": initial_C, "b_c": initial_b_c, "W": initial_W, "b": initial_b}
 tensor_dict = {"C": C, "b_c": b_c, "W": W, "b": b}
-results = sess.run([summation, grads], {x: samples})
+eval_list = [summation, grads]
+eval_list.extend(branched_indices_list)
+results = sess.run(eval_list, {x: samples, indices: index_list})
 original_loss = results[0]
 tf_grads_dict = {"C": results[1][0], "b_c": results[1][1], "W": results[1][2], "b": results[1][3]}
 print("Tf Mean={0}".format(results[0]))
 tf_grads = results[1]
-eval_list = [summation]
-eval_list.extend(branched_indices_list)
-for arr_name, arr in value_dict.items():
-    print("Array Name:{0}".format(arr_name))
-    it = np.nditer(arr, flags=['multi_index'])
-    while not it.finished:
-        real_grad = tf_grads_dict[arr_name][it.multi_index]
-        calc_grad_list = []
-        original_value = arr[it.multi_index]
-        print("********************************")
-        # loss_list = []
-        # for trial1 in range(10000):
-        #     res_m = sess.run(eval_list, {x: samples, indices: index_list})
-        #     loss_list.append(res_m[0])
-        for trial2 in range(100):
-            tensor = tensor_dict[arr_name]
-            # Delta Plus
-            arr[it.multi_index] = original_value + epsilon
-            res_p = sess.run(eval_list, {x: samples, indices: index_list, tensor: arr})
-            val_p = res_p[0]
-            # Delta Minus
-            arr[it.multi_index] = original_value - epsilon
-            res_m = sess.run(eval_list, {x: samples, indices: index_list, tensor: arr})
-            val_m = res_m[0]
-            # Check if the indices are the same.
-            for i in range(k):
-                if len(res_p[i + 1]) != len(res_m[i + 1]):
-                    raise Exception("Index lengths are different")
-                for j in range(len(res_p[i + 1])):
-                    if res_p[i + 1][j] != res_m[i + 1][j]:
-                        raise Exception("Different indices")
-            # print("value:{0}".format(original_loss))
-            # print("val_p:{0}".format(val_p))
-            # print("val_m:{0}".format(val_m))
-            # print("real_grad:{0}".format(real_grad))
-            calc_grad = (val_p - val_m) / (2.0 * epsilon)
-            calc_grad_list.append(calc_grad)
-            # Restore back
-            arr[it.multi_index] = original_value
-        mean_calc_grad = np.array(calc_grad_list).mean()
-        print("Array:{0} Entry:<{1}>".format(arr_name, it.multi_index))
-        print("value:{0}".format(original_value))
-        print("real_grad:{0}".format(real_grad))
-        print("mean_calc_grad:{0}".format(mean_calc_grad))
-        relative_difference = np.abs(real_grad - mean_calc_grad) / max(np.abs(mean_calc_grad), np.abs(real_grad))
-        print("relative_difference={0}".format(relative_difference))
-        print("********************************")
-        it.iternext()
+
+sample_histograms_per_branch = {}
+for i in range(k):
+    i_list = results[2 + i]
+    for index in i_list:
+        if index not in sample_histograms_per_branch:
+            sample_histograms_per_branch[index] = 0
+        sample_histograms_per_branch[index] += 1
+# Calculate the gradients of convolution filters (C), strides assumed to be [1, 1, 1, 1]
+# filter_size = 5
+# manual_grad_C = np.zeros(shape=(filter_size, filter_size, 1, feature_count))
+# for index in range(batch_size):
+#     count = sample_histograms_per_branch[index]
+#     image = samples[index]
+#     print("index={0}".format(index))
+#     for r in range(MnistDataSet.MNIST_SIZE):
+#         for c in range(MnistDataSet.MNIST_SIZE):
+#             for feature_index in range(feature_count):
+#                 for ii in range(-int(filter_size / 2), int(filter_size / 2) + 1):
+#                     for jj in range(-int(filter_size / 2), int(filter_size / 2) + 1):
+#                         r_index = r + ii
+#                         c_index = c + jj
+#                         if (r_index < 0 or r_index >= MnistDataSet.MNIST_SIZE) or (
+#                                 c_index < 0 or c_index >= MnistDataSet.MNIST_SIZE):
+#                             manual_grad_C[ii + int(filter_size / 2), jj + int(
+#                                 filter_size / 2), 0, feature_index] += 0.0
+#                         else:
+#                             manual_grad_C[ii + int(filter_size / 2), jj + int(
+#                                 filter_size / 2), 0, feature_index] += float(count) * image[r_index][c_index]
+# Calculate the gradients of hyperplanes (W)
+manual_grad_W = np.zeros(shape=(D, k))
+for index in range(batch_size):
+    count = sample_histograms_per_branch[index]
+    image = samples[index].reshape(D, 1)
+    manual_grad_W += (float(count) * image)
+
+
+
+# for arr_name, arr in value_dict.items():
+#     print("Array Name:{0}".format(arr_name))
+#     it = np.nditer(arr, flags=['multi_index'])
+#     while not it.finished:
+#         real_grad = tf_grads_dict[arr_name][it.multi_index]
+#         calc_grad_list = []
+#         original_value = arr[it.multi_index]
+#         print("********************************")
+#         # loss_list = []
+#         # for trial1 in range(10000):
+#         #     res_m = sess.run(eval_list, {x: samples, indices: index_list})
+#         #     loss_list.append(res_m[0])
+#         for trial2 in range(100):
+#             tensor = tensor_dict[arr_name]
+#             # Delta Plus
+#             arr[it.multi_index] = original_value + epsilon
+#             res_p = sess.run(eval_list, {x: samples, indices: index_list, tensor: arr})
+#             val_p = res_p[0]
+#             # Delta Minus
+#             arr[it.multi_index] = original_value - epsilon
+#             res_m = sess.run(eval_list, {x: samples, indices: index_list, tensor: arr})
+#             val_m = res_m[0]
+#             # Check if the indices are the same.
+#             for i in range(k):
+#                 if len(res_p[i + 1]) != len(res_m[i + 1]):
+#                     raise Exception("Index lengths are different")
+#                 for j in range(len(res_p[i + 1])):
+#                     if res_p[i + 1][j] != res_m[i + 1][j]:
+#                         raise Exception("Different indices")
+#             # print("value:{0}".format(original_loss))
+#             # print("val_p:{0}".format(val_p))
+#             # print("val_m:{0}".format(val_m))
+#             # print("real_grad:{0}".format(real_grad))
+#             calc_grad = (val_p - val_m) / (2.0 * epsilon)
+#             calc_grad_list.append(calc_grad)
+#             # Restore back
+#             arr[it.multi_index] = original_value
+#         mean_calc_grad = np.array(calc_grad_list).mean()
+#         print("Array:{0} Entry:<{1}>".format(arr_name, it.multi_index))
+#         print("value:{0}".format(original_value))
+#         print("real_grad:{0}".format(real_grad))
+#         print("mean_calc_grad:{0}".format(mean_calc_grad))
+#         relative_difference = np.abs(real_grad - mean_calc_grad) / max(np.abs(mean_calc_grad), np.abs(real_grad))
+#         print("relative_difference={0}".format(relative_difference))
+#         print("********************************")
+#         it.iternext()
 print("X")
+
+
 
 
 
