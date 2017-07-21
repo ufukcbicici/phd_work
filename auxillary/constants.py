@@ -24,9 +24,10 @@ class ChannelTypes(Enum):
     ancestor_activation = "AncestorActivation"
     decision = "Decision"
     pre_loss = "PreLoss"
-    loss = "loss"
+    loss = "Loss"
+    gradient = "Gradient"
     evaluation = "Evaluation"
-    constant = "constant"
+    constant = "Constant"
 
 
 class GlobalInputNames(Enum):

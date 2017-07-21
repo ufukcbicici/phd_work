@@ -17,7 +17,6 @@ class CrossEntropyLoss(GenericLoss):
         self.featureList = feature_list
         self.labelTensor = label_tensor
         self.classCount = class_count
-        self.parentNode.losses[CrossEntropyLoss.Name] = self
         # Pre-Loss channel
         with NetworkChannel(node=self.parentNode, channel=ChannelTypes.pre_loss) as pre_loss_channel:
             if len(self.featureList) > 1:
@@ -27,7 +26,7 @@ class CrossEntropyLoss(GenericLoss):
             else:
                 raise Exception("No features have been passed to cross entropy loss.")
             final_dimension = final_feature.shape[1].value
-            self.logitTensor = TfLayerFactory.create_fc_layer(node=self, channel=pre_loss_channel,
+            self.logitTensor = TfLayerFactory.create_fc_layer(node=self.parentNode, channel=pre_loss_channel,
                                                               input_tensor=final_feature,
                                                               fc_shape=[final_dimension, self.classCount],
                                                               init_type=self.parentNode.parentNetwork.lossLayerInit,
@@ -54,6 +53,7 @@ class CrossEntropyLoss(GenericLoss):
                 op=tf.equal(x=argmax_label_prediction, y=self.labelTensor))
             comparison_cast = eval_channel.add_operation(op=tf.cast(comparison_with_labels, tf.float32))
             self.evalOutput = eval_channel.add_operation(op=tf.reduce_mean(input_tensor=comparison_cast))
+            # TODO: Return only the number of correct samples and return the number of all samples in this node as well
 
     def finalize(self):
         super().finalize()

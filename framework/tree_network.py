@@ -31,14 +31,13 @@ class TreeNetwork(Network):
         # Data or label input
         if producer_node is None:
             if producer_channel == ChannelTypes.data_input or producer_channel == ChannelTypes.label_input:
-                input_name = "{0}Node{1}".format(producer_channel.value, dest_node.index)
                 tensor = None
                 with NetworkChannel(node=dest_node, channel=producer_channel) as input_channel:
                     if producer_channel == ChannelTypes.data_input:
-                        tensor = self.add_networkwise_input(name=input_name, channel=input_channel,
+                        tensor = self.add_networkwise_input(name=ChannelTypes.data_input.value, channel=input_channel,
                                                             tensor_type=tf.float32)
                     elif producer_channel == ChannelTypes.label_input:
-                        tensor = self.add_networkwise_input(name=input_name, channel=input_channel,
+                        tensor = self.add_networkwise_input(name=ChannelTypes.label_input.value, channel=input_channel,
                                                             tensor_type=tf.int64)
                     else:
                         raise NotImplementedError()
@@ -127,6 +126,12 @@ class TreeNetwork(Network):
                 else:
                     self.dag.add_node(node=node)
                 curr_index += 1
+        # Add a final, accumulation node, which combines all the losses from all parent nodes.
+        accumulation_node = HardTreeNode(index=curr_index, containing_network=self, is_root=False, is_leaf=False)
+        self.add_node_to_depth(depth=self.treeDepth, node=accumulation_node)
+        for node in self.nodes.values():
+            if node.isLeaf:
+                self.dag.add_edge(parent=node, child=accumulation_node)
         self.topologicalSortedNodes = self.dag.get_topological_sort()
         # Step 2:
         # Build the complete symbolic graph by building and connectiong the symbolic graphs of the nodes
@@ -135,11 +140,13 @@ class TreeNetwork(Network):
             # Add customized operations on the top.
             with tf.variable_scope(node.indicatorText):
                 # Build the node-wise ops
-                self.nodeBuilderFunctions[node_depth](network=self, node=node)
-                # Build weight shrinkage losses.
-                node.attach_shrinkage_losses()
-                # If node is leaf, apply the actual loss function.
-                if node.isLeaf:
+                if not node.isAccumulation:
+                    self.nodeBuilderFunctions[node_depth](network=self, node=node)
+                    # Build weight shrinkage losses.
+                    node.attach_shrinkage_losses()
+                # If node is leaf, apply the actual loss function. If accumulation, fetch all losses from all nodes
+                # in the graph, apply gradient calculations, etc.
+                if node.isLeaf or node.isAccumulation:
                     node.attach_loss_eval_channels()
 
     # Private methods

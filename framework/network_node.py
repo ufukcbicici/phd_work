@@ -8,13 +8,14 @@ from losses.l2_loss import L2Loss
 
 
 class NetworkNode:
-    def __init__(self, index, containing_network, is_root, is_leaf):
+    def __init__(self, index, containing_network, is_root, is_leaf, is_accumulation):
         self.index = index
         self.indicatorText = "Node_{0}".format(self.index)
         self.argumentsDict = {}
         self.parentNetwork = containing_network
         self.isRoot = is_root
         self.isLeaf = is_leaf
+        self.isAccumulation = is_accumulation
         self.networkChannels = {}
         self.inputs = {}
         self.outputs = {}
@@ -45,15 +46,6 @@ class NetworkNode:
             raise Exception("Input node found.")
         return self.inputs[(producer_node, channel, channel_index)].inputObject
 
-    @staticmethod
-    def apply_loss(loss):
-        # Loss channel
-        loss.build_training_network()
-        # Evaluation channel
-        loss.build_evaluation_network()
-        # Finalize, clean up
-        loss.finalize()
-
     def attach_loss_eval_channels(self):
         pass
 
@@ -66,3 +58,12 @@ class NetworkNode:
                     NetworkNode.apply_loss(loss=l2_loss)
         else:
             raise NotImplementedError()
+
+    @staticmethod
+    def apply_loss(loss):
+        # Loss channel
+        loss.build_training_network()
+        # Evaluation channel
+        loss.build_evaluation_network()
+        # Finalize, clean up
+        loss.finalize()

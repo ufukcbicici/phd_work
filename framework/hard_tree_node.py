@@ -1,5 +1,5 @@
 import tensorflow as tf
-from auxillary.constants import ProblemType, ChannelTypes
+from auxillary.constants import ProblemType, ChannelTypes, ArgumentTypes
 from auxillary.tf_layer_factory import TfLayerFactory
 from framework.network_channel import NetworkChannel
 from framework.network_node import NetworkNode
@@ -7,11 +7,26 @@ from losses.cross_entropy_loss import CrossEntropyLoss
 
 
 class HardTreeNode(NetworkNode):
-    def __init__(self, index, containing_network, is_root, is_leaf):
-        super().__init__(index, containing_network, is_root, is_leaf)
+    def __init__(self, index, containing_network, is_root, is_leaf, is_accumulation):
+        super().__init__(index, containing_network, is_root, is_leaf, is_accumulation=is_accumulation)
 
     # Tensorflow specific code (This should be isolated at some point in future)
     def attach_loss_eval_channels(self):
+        if self.isLeaf and not self.isAccumulation:
+            self.attach_leaf_node_loss_eval_channels()
+        elif not self.isLeaf and self.isAccumulation:
+            self.attach_acc_node_loss_eval_channels()
+        else:
+            raise Exception(
+                "attach_loss_eval_channels has been called on an invalid node. "
+                "self.isLeaf:{0} and self.isAccumulation:{1}".format(
+                    self.isLeaf, self.isAccumulation))
+
+    def attach_shrinkage_losses(self):
+        super().attach_shrinkage_losses()
+
+    # Private methods
+    def attach_leaf_node_loss_eval_channels(self):
         if self.parentNetwork.problemType == ProblemType.classification:
             # Get f, h and ancestor channels, concatenate the outputs
             # Shapes are constrained to be 2 dimensional. Else, it will raise exception. We have to flatten all tensors
@@ -42,3 +57,32 @@ class HardTreeNode(NetworkNode):
             NetworkNode.apply_loss(loss=cross_entropy_loss)
         else:
             raise NotImplementedError()
+
+    def attach_acc_node_loss_eval_channels(self):
+        # Step 1) Build the final loss layer.
+        # Accumulate all losses from all nodes.
+        loss_list = []
+        for node in self.parentNetwork.nodes.values():
+            if node == self:
+                continue
+            for output in node.outputs.values():
+                if output.currentChannel != ChannelTypes.loss:
+                    continue
+                loss_list.append(output.outputObject)
+        # Accumulate all learnable parameters from all nodes.
+        learnable_parameters = []
+        for node in self.parentNetwork.nodes.values():
+            if node == self:
+                continue
+            for argument in node.argumentsDict.values():
+                if argument.argumentType == ArgumentTypes.learnable_parameter:
+                    argument.gradientIndex = len(learnable_parameters)
+                    learnable_parameters.append(argument.tensor)
+        # Add them together and calculate the gradient of the total loss with respect to all learnable parameters.
+        with NetworkChannel(node=self, channel=ChannelTypes.loss) as loss_channel:
+            total_loss = loss_channel.add_operation(op=tf.add_n(loss_list))
+        with NetworkChannel(node=self, channel=ChannelTypes.gradient) as gradient_channel:
+            gradient_channel.add_operation(op=tf.gradients(total_loss, learnable_parameters))
+        # Step 2) Build the final evaluation layer.
+
+
