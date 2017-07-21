@@ -39,13 +39,6 @@ class HardTreeNode(NetworkNode):
             class_count = self.parentNetwork.dataset.get_label_count()
             cross_entropy_loss = CrossEntropyLoss(parent_node=self, feature_list=tensor_list, label_tensor=label_tensor,
                                                   class_count=class_count)
-
-            # Loss channel
-            cross_entropy_loss.build_training_network()
-            # Evaluation channel
-            cross_entropy_loss.build_evaluation_network()
-            # Finalize, clean up
-            cross_entropy_loss.finalize()
-
+            NetworkNode.apply_loss(loss=cross_entropy_loss)
         else:
             raise NotImplementedError()

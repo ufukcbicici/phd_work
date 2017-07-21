@@ -6,7 +6,8 @@ from framework.node_input_outputs import NetworkOutput
 
 
 class NetworkChannel:
-    def __init__(self, node, channel, producer_node=None, producer_channel=None, producer_channel_index=None):
+    def __init__(self, node, channel, producer_node=None, producer_channel=None, producer_channel_index=None,
+                 channel_name=None):
         self.parentNode = node
         self.channel = channel
         if channel not in self.parentNode.networkChannels:
@@ -22,6 +23,10 @@ class NetworkChannel:
             self.producerChannelIndex = producer_channel_index
         self.parentNode.networkChannels[channel].append(self)
         self.producerTriple = (self.producerNode, self.producerChannel, self.producerChannelIndex)
+        if channel_name is None:
+            self.channelName = "{0}_{1}".format(self.channel.value, self.channelIndex)
+        else:
+            self.channelName = channel_name
 
     def __enter__(self):
         return self

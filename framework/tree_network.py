@@ -35,11 +35,11 @@ class TreeNetwork(Network):
                 tensor = None
                 with NetworkChannel(node=dest_node, channel=producer_channel) as input_channel:
                     if producer_channel == ChannelTypes.data_input:
-                        tensor = input_channel.add_operation(op=tf.placeholder(tf.float32, name=input_name))
-                        self.variablesToFeed[GlobalInputNames.data_input] = tensor
+                        tensor = self.add_networkwise_input(name=input_name, channel=input_channel,
+                                                            tensor_type=tf.float32)
                     elif producer_channel == ChannelTypes.label_input:
-                        tensor = input_channel.add_operation(op=tf.placeholder(tf.int64, name=input_name))
-                        self.variablesToFeed[GlobalInputNames.label_input] = tensor
+                        tensor = self.add_networkwise_input(name=input_name, channel=input_channel,
+                                                            tensor_type=tf.int64)
                     else:
                         raise NotImplementedError()
                     dest_node.inputs[(producer_node, producer_channel, producer_channel_index)] \
@@ -103,12 +103,6 @@ class TreeNetwork(Network):
     def apply_decision(self, node, channel, channel_index):
         raise NotImplementedError()
 
-    def add_networkwise_inputs(self):
-        with tf.variable_scope(self.indicatorText):
-            # 1): Regularizer Strength
-            regularizer_coeff_tensor = tf.placeholder(tf.float32, name=GlobalInputNames.regularizer_strength.value)
-            self.variablesToFeed[GlobalInputNames.regularizer_strength] = regularizer_coeff_tensor
-
     def build_network(self):
         curr_index = 0
         # Step 1:
@@ -135,16 +129,16 @@ class TreeNetwork(Network):
                 curr_index += 1
         self.topologicalSortedNodes = self.dag.get_topological_sort()
         # Step 2:
-        # Create network wise constant inputs, which won't partake in the branching mechanisms and will be used as
-        # they are
-        self.add_networkwise_inputs()
-        # Step 3:
         # Build the complete symbolic graph by building and connectiong the symbolic graphs of the nodes
         for node in self.topologicalSortedNodes:
             node_depth = self.nodesToDepthsDict[node]
             # Add customized operations on the top.
             with tf.variable_scope(node.indicatorText):
+                # Build the node-wise ops
                 self.nodeBuilderFunctions[node_depth](network=self, node=node)
+                # Build weight shrinkage losses.
+                node.attach_shrinkage_losses()
+                # If node is leaf, apply the actual loss function.
                 if node.isLeaf:
                     node.attach_loss_eval_channels()
 

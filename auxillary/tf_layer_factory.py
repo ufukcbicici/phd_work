@@ -16,10 +16,10 @@ class TfLayerFactory:
         else:
             raise NotImplementedError()
         # Filters and bias
-        W = node.create_variable(name="W{0}".format(post_fix), initializer=conv_filter_initializer,
+        W = node.create_variable(name="W{0}ConvFilter".format(post_fix), initializer=conv_filter_initializer,
                                  shape=conv_filter_shape, needs_gradient=True, dtype=tf.float32,
                                  arg_type=ArgumentTypes.learnable_parameter, channel=channel)
-        b = node.create_variable(name="b{0}".format(post_fix), initializer=conv_bias_initializer,
+        b = node.create_variable(name="b{0}ConvBias".format(post_fix), initializer=conv_bias_initializer,
                                  shape=conv_filter_shape[3], needs_gradient=True, dtype=tf.float32,
                                  arg_type=ArgumentTypes.learnable_parameter, channel=channel)
         # Operations
@@ -47,10 +47,10 @@ class TfLayerFactory:
         else:
             raise NotImplementedError()
         # Filters and bias
-        W = node.create_variable(name="A{0}".format(post_fix), initializer=fc_filter_initializer,
+        W = node.create_variable(name="A{0}FCWeight".format(post_fix), initializer=fc_filter_initializer,
                                  shape=fc_shape, needs_gradient=True, dtype=tf.float32,
                                  arg_type=ArgumentTypes.learnable_parameter, channel=channel)
-        b = node.create_variable(name="b{0}".format(post_fix), initializer=fc_bias_initializer,
+        b = node.create_variable(name="b{0}FCBias".format(post_fix), initializer=fc_bias_initializer,
                                  shape=fc_shape[1], needs_gradient=True, dtype=tf.float32,
                                  arg_type=ArgumentTypes.learnable_parameter, channel=channel)
         # Operations

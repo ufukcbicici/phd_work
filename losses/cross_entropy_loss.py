@@ -38,7 +38,8 @@ class CrossEntropyLoss(GenericLoss):
     def build_training_network(self):
         if self.logitTensor is None:
             raise Exception("No logit tensor have been found.")
-        with NetworkChannel(node=self, channel=ChannelTypes.loss) as loss_channel:
+        with NetworkChannel(node=self.parentNode, channel=ChannelTypes.loss,
+                            channel_name=CrossEntropyLoss.Name) as loss_channel:
             softmax_cross_entropy = loss_channel.add_operation(
                 op=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labelTensor, logits=self.logitTensor))
             self.lossOutput = loss_channel.add_operation(op=tf.reduce_mean(input_tensor=softmax_cross_entropy))
@@ -46,7 +47,7 @@ class CrossEntropyLoss(GenericLoss):
     def build_evaluation_network(self):
         if self.logitTensor is None:
             raise Exception("No logit tensor have been found.")
-        with NetworkChannel(node=self, channel=ChannelTypes.evaluation) as eval_channel:
+        with NetworkChannel(node=self.parentNode, channel=ChannelTypes.evaluation) as eval_channel:
             posterior_probs = eval_channel.add_operation(op=tf.nn.softmax(logits=self.logitTensor))
             argmax_label_prediction = eval_channel.add_operation(op=tf.argmax(posterior_probs, 1))
             comparison_with_labels = eval_channel.add_operation(

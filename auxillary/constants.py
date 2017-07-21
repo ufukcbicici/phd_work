@@ -65,3 +65,12 @@ class SpecialNodeTypes(Enum):
 
 class SpecialChannelIndices(Enum):
     data_provider_index = 0
+
+
+class TrainingHyperParameters:
+    wd = 0
+    lr = 1
+
+
+class ShrinkageRegularizers:
+    l2 = 0
