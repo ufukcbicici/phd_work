@@ -28,6 +28,7 @@ class ChannelTypes(Enum):
     gradient = "Gradient"
     evaluation = "Evaluation"
     constant = "Constant"
+    sample_indices = "SampleIndices"
 
 
 class GlobalInputNames(Enum):
