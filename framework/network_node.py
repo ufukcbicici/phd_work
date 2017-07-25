@@ -34,17 +34,34 @@ class NetworkNode:
         return variable_object
 
     def create_transfer_channel(self, producer_node, producer_channel, producer_channel_index):
-        with NetworkChannel(node=self, channel=producer_channel, producer_node=producer_node,
+        invalid_channels = {ChannelTypes.loss, ChannelTypes.pre_loss, ChannelTypes.evaluation, ChannelTypes.gradient}
+        if producer_channel in invalid_channels:
+            raise Exception("{0} type of channels cannot be transferred.".format(producer_channel.value))
+        with NetworkChannel(parent_node=self, parent_node_channel=ChannelTypes.transfer, producer_node=producer_node,
                             producer_channel=producer_channel, producer_channel_index=producer_channel_index) \
                 as transfer_channel:
-            output_tensor = self.parentNetwork.apply_decision(node=self, channel=producer_channel,
-                                                              channel_index=transfer_channel.channelIndex)
+            output_tensor = self.parentNetwork.apply_decision(node=self, channel=transfer_channel)
             transfer_channel.add_operation(op=output_tensor)
+
+    def add_input(self, producer_node, channel, channel_index, input_object):
+        if (producer_node, channel, channel_index) in self.inputs:
+            raise Exception("Input already exists.")
+        self.inputs[(producer_node, channel, channel_index)] = input_object
 
     def get_input(self, producer_node, channel, channel_index):
         if (producer_node, channel, channel_index) not in self.inputs:
             raise Exception("Input node found.")
-        return self.inputs[(producer_node, channel, channel_index)].inputObject
+        return self.inputs[(producer_node, channel, channel_index)]
+
+    def add_output(self, producer_node, channel, channel_index, output_object):
+        if (producer_node, channel, channel_index) in self.outputs:
+            raise Exception("Output already exists.")
+        self.outputs[(producer_node, channel, channel_index)] = output_object
+
+    def get_output(self, producer_node, channel, channel_index):
+        if (producer_node, channel, channel_index) not in self.outputs:
+            raise Exception("Output node found.")
+        return self.outputs[(producer_node, channel, channel_index)]
 
     def attach_loss_eval_channels(self):
         pass
@@ -58,6 +75,9 @@ class NetworkNode:
                     NetworkNode.apply_loss(loss=l2_loss)
         else:
             raise NotImplementedError()
+
+    def attach_decision(self):
+        pass
 
     @staticmethod
     def apply_loss(loss):

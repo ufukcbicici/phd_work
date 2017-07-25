@@ -2,26 +2,28 @@ import tensorflow as tf
 
 # Tensorflow specific code (This should be isolated at some point in future)
 from auxillary.constants import ChannelTypes
-from framework.node_input_outputs import NetworkOutput
+from framework.node_input_outputs import NetworkIOObject
 
 
 class NetworkChannel:
-    def __init__(self, node, channel, producer_node=None, producer_channel=None, producer_channel_index=None,
-                 channel_name=None):
-        self.parentNode = node
-        self.channel = channel
-        if channel not in self.parentNode.networkChannels:
-            self.parentNode.networkChannels[channel] = []
-        self.channelIndex = len(self.parentNode.networkChannels[channel])
+    def __init__(self, parent_node, parent_node_channel, producer_node=None, producer_channel=None,
+                 producer_channel_index=None, channel_name=None):
+        self.parentNode = parent_node
+        self.channel = parent_node_channel
+        if parent_node_channel not in self.parentNode.networkChannels:
+            self.parentNode.networkChannels[parent_node_channel] = []
+        self.channelIndex = len(self.parentNode.networkChannels[parent_node_channel])
         if producer_node is None:
             self.producerNode = self.parentNode
             self.producerChannel = self.channel
             self.producerChannelIndex = self.channelIndex
-        else:
+        elif producer_node is not None and parent_node_channel == ChannelTypes.transfer:
             self.producerNode = producer_node
             self.producerChannel = producer_channel
             self.producerChannelIndex = producer_channel_index
-        self.parentNode.networkChannels[channel].append(self)
+        else:
+            raise Exception("Invalid channel type.")
+        self.parentNode.networkChannels[parent_node_channel].append(self)
         self.producerTriple = (self.producerNode, self.producerChannel, self.producerChannelIndex)
         if channel_name is None:
             self.channelName = "{0}_{1}".format(self.channel.value, self.channelIndex)
@@ -36,14 +38,14 @@ class NetworkChannel:
         if type is not None:
             print("Error:{0}".format(value))
             raise Exception(value)
-        output_tensor = tf.get_collection(key=self.channel.value, scope=self.parentNode.indicatorText)[-1]
-        self.parentNode.outputs[self.producerTriple] = NetworkOutput(node=self.parentNode, channel=self.channel,
-                                                                     channel_index=self.channelIndex,
-                                                                     producer_node=self.producerNode,
-                                                                     producer_channel=self.producerChannel,
-                                                                     producer_channel_index=self.producerChannelIndex,
-                                                                     output_object=output_tensor)
+        if self.producerTriple in self.parentNode.outputs:
+            raise Exception("The triple {0} already exists in the outputs.".format(self.producerTriple))
+        output_tensor = tf.get_collection(key=self.channelName, scope=self.parentNode.indicatorText)[-1]
+        self.parentNode.outputs[self.producerTriple] = NetworkIOObject(producer_node=self.producerNode,
+                                                                       producer_channel=self.producerChannel,
+                                                                       producer_channel_index=self.producerChannelIndex,
+                                                                       tensor=output_tensor)
 
     def add_operation(self, op):
-        tf.add_to_collection(self.channel.value, op)
+        tf.add_to_collection(self.channelName, op)
         return op

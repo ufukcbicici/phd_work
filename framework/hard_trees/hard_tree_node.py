@@ -25,7 +25,7 @@ class HardTreeNode(NetworkNode):
     def attach_shrinkage_losses(self):
         super().attach_shrinkage_losses()
 
-    # Private methods
+    # Private methods - OK
     def attach_leaf_node_loss_eval_channels(self):
         if self.parentNetwork.problemType == ProblemType.classification:
             # Get f, h and ancestor channels, concatenate the outputs
@@ -35,9 +35,9 @@ class HardTreeNode(NetworkNode):
             relevant_channels = {ChannelTypes.f_operator, ChannelTypes.h_operator,
                                  ChannelTypes.ancestor_activation}
             for output in self.outputs.values():
-                if output.currentChannel not in relevant_channels:
+                if output.producerChannel not in relevant_channels:
                     continue
-                output_tensor = output.outputObject
+                output_tensor = output.tensor
                 if len(output_tensor.shape) != 2:
                     raise Exception("Tensors entering the loss must be 2D.")
                 if output_tensor.shape[1].value is None:
@@ -66,9 +66,9 @@ class HardTreeNode(NetworkNode):
             if node == self:
                 continue
             for output in node.outputs.values():
-                if output.currentChannel != ChannelTypes.loss:
+                if output.producerChannel != ChannelTypes.loss:
                     continue
-                loss_list.append(output.outputObject)
+                loss_list.append(output.tensor)
         # Accumulate all learnable parameters from all nodes.
         learnable_parameters = []
         for node in self.parentNetwork.nodes.values():
@@ -79,10 +79,23 @@ class HardTreeNode(NetworkNode):
                     argument.gradientIndex = len(learnable_parameters)
                     learnable_parameters.append(argument.tensor)
         # Add them together and calculate the gradient of the total loss with respect to all learnable parameters.
-        with NetworkChannel(node=self, channel=ChannelTypes.loss) as loss_channel:
+        with NetworkChannel(parent_node=self, parent_node_channel=ChannelTypes.loss) as loss_channel:
             total_loss = loss_channel.add_operation(op=tf.add_n(loss_list))
-        with NetworkChannel(node=self, channel=ChannelTypes.gradient) as gradient_channel:
+        with NetworkChannel(parent_node=self, parent_node_channel=ChannelTypes.gradient) as gradient_channel:
             gradient_channel.add_operation(op=tf.gradients(total_loss, learnable_parameters))
-        # Step 2) Build the final evaluation layer.
+            # Step 2) Build the final evaluation layer.
+            # TODO: Complete this
 
-
+    def attach_decision(self):
+        # Step 1): Gather all inputs which will enter to decision step.
+        tensor_list = []
+        # Get all ancestor activations, as allowed by the related hyperparameter.
+        if self.parentNetwork.ancestorCount != 0:
+            ancestors = self.parentNetwork.dag.ancestors(node=self)
+            for ancestor in ancestors:
+                distance = self.parentNetwork.dag.get_shortest_path_length(source=ancestor, dest=self)
+                if distance <= self.parentNetwork.ancestorCount:
+                    activation_tensor = \
+                        self.parentNetwork.add_nodewise_input(producer_node=ancestor,
+                                                              producer_channel=ChannelTypes.ancestor_activation,
+                                                              producer_channel_index=0, dest_node=self)

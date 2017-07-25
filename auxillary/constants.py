@@ -29,6 +29,7 @@ class ChannelTypes(Enum):
     evaluation = "Evaluation"
     constant = "Constant"
     sample_indices = "SampleIndices"
+    transfer = "Transfer"
 
 
 class GlobalInputNames(Enum):

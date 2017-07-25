@@ -1,15 +1,16 @@
 import tensorflow as tf
-from auxillary.constants import ChannelTypes, GlobalInputNames, TreeType
-from framework.hard_tree_node import HardTreeNode
+import sys
+
+from auxillary.constants import ChannelTypes, TreeType
+from framework.hard_trees.hard_tree_node import HardTreeNode
 from framework.network import Network
 from framework.network_channel import NetworkChannel
-from framework.network_node import NetworkNode
-from framework.node_input_outputs import NetworkInput
+from framework.node_input_outputs import NetworkIOObject
 
 
 class TreeNetwork(Network):
     def __init__(self, run_id, dataset, parameter_file, problem_type,
-                 tree_degree, tree_type, list_of_node_builder_functions):
+                 tree_degree, tree_type, list_of_node_builder_functions, ancestor_count=sys.maxsize):
         super().__init__(run_id, dataset, parameter_file, problem_type)
         self.treeDegree = tree_degree
         self.treeDepth = len(list_of_node_builder_functions)
@@ -17,6 +18,7 @@ class TreeNetwork(Network):
         self.nodesToDepthsDict = {}
         self.nodeBuilderFunctions = list_of_node_builder_functions
         self.treeType = tree_type
+        self.ancestorCount = ancestor_count
         self.indicatorText = "TreeNetwork"
 
     # Tensorflow specific code (This should be isolated at some point in future)
@@ -32,7 +34,7 @@ class TreeNetwork(Network):
         if producer_node is None:
             if producer_channel == ChannelTypes.data_input or producer_channel == ChannelTypes.label_input:
                 tensor = None
-                with NetworkChannel(node=dest_node, channel=producer_channel) as input_channel:
+                with NetworkChannel(parent_node=dest_node, parent_node_channel=producer_channel) as input_channel:
                     if producer_channel == ChannelTypes.data_input:
                         tensor = self.add_networkwise_input(name=ChannelTypes.data_input.value, channel=input_channel,
                                                             tensor_type=tf.float32)
@@ -41,11 +43,11 @@ class TreeNetwork(Network):
                                                             tensor_type=tf.int64)
                     else:
                         raise NotImplementedError()
-                    dest_node.inputs[(producer_node, producer_channel, producer_channel_index)] \
-                        = NetworkInput(source_node=None, source_channel=producer_channel,
-                                       source_channel_index=producer_channel_index, input_object=tensor,
-                                       producer_node=None, producer_channel=producer_channel,
-                                       producer_channel_index=producer_channel_index)
+                    dest_node.add_input(producer_node=producer_node, channel=producer_channel,
+                                        producer_channel_index=producer_channel_index,
+                                        input_object=NetworkIOObject(tensor=tensor, producer_node=None,
+                                                                     producer_channel=producer_channel,
+                                                                     producer_channel_index=producer_channel_index))
                 return tensor
             else:
                 raise Exception("Only data or label inputs can have no source node.")
@@ -72,13 +74,15 @@ class TreeNetwork(Network):
                 elif path_node != producer_node or path_node != dest_node:
                     # This output is not used by path_node at all.
                     if producer_triple not in path_node.inputs and producer_triple not in path_node.outputs:
-                        path_node.inputs[producer_triple] = last_output.produce_input()
-                        path_node.create_transfer_channel(producer_node=path_node, producer_channel=producer_channel,
+                        path_node.add_input(producer_node=)
+                        path_node.inputs[producer_triple] = last_output.clone()
+                        path_node.create_transfer_channel(producer_node=producer_node,
+                                                          producer_channel=producer_channel,
                                                           producer_channel_index=producer_channel_index)
                         last_output = path_node.outputs[producer_triple]
                     # This output is used by the path but for its internal calculations.
                     elif producer_triple in path_node.inputs and producer_triple not in path_node.outputs:
-                        path_node.create_transfer_channel(producer_node=path_node,
+                        path_node.create_transfer_channel(producer_node=producer_node,
                                                           producer_channel=producer_channel,
                                                           producer_channel_index=producer_channel_index)
                         last_output = path_node.outputs[producer_triple]
@@ -96,10 +100,10 @@ class TreeNetwork(Network):
                     if producer_triple in path_node.inputs:
                         raise Exception("The triple {0} must not be in the inputs.".format(producer_triple))
                     else:
-                        path_node.inputs[producer_triple] = last_output.produce_input()
-                        return path_node.inputs[producer_triple].inputObject
+                        path_node.inputs[producer_triple] = last_output.clone()
+                        return path_node.inputs[producer_triple].tensor
 
-    def apply_decision(self, node, channel, channel_index):
+    def apply_decision(self, node, channel):
         raise NotImplementedError()
 
     def build_network(self):
@@ -113,7 +117,7 @@ class TreeNetwork(Network):
                 is_leaf = depth == (self.treeDepth - 1)
                 if self.treeType == TreeType.hard:
                     node = HardTreeNode(index=curr_index, containing_network=self, is_root=is_root,
-                                        is_leaf=is_leaf)
+                                        is_leaf=is_leaf, is_accumulation=False)
                 else:
                     raise NotImplementedError()
                 self.nodes[node.index] = node
@@ -127,7 +131,8 @@ class TreeNetwork(Network):
                     self.dag.add_node(node=node)
                 curr_index += 1
         # Add a final, accumulation node, which combines all the losses from all parent nodes.
-        accumulation_node = HardTreeNode(index=curr_index, containing_network=self, is_root=False, is_leaf=False)
+        accumulation_node = HardTreeNode(index=curr_index, containing_network=self, is_root=False, is_leaf=False,
+                                         is_accumulation=True)
         self.add_node_to_depth(depth=self.treeDepth, node=accumulation_node)
         for node in self.nodes.values():
             if node.isLeaf:

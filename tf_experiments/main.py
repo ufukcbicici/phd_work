@@ -1,14 +1,11 @@
 import tensorflow as tf
-import numpy as np
-from tensorflow.examples.tutorials.mnist import input_data
-import matplotlib.pyplot as plt
 
-from auxillary.constants import ChannelTypes, GlobalInputNames, InitType, ActivationType, PoolingType, TreeType, \
+from auxillary.constants import ChannelTypes, InitType, ActivationType, PoolingType, TreeType, \
     ProblemType
 from auxillary.tf_layer_factory import TfLayerFactory
 from data_handling.mnist_data_set import MnistDataSet
+from framework.hard_trees.tree_network import TreeNetwork
 from framework.network_channel import NetworkChannel
-from framework.tree_network import TreeNetwork
 
 
 def baseline_network(network, node):
@@ -19,7 +16,7 @@ def baseline_network(network, node):
     y = network.add_nodewise_input(producer_node=None, producer_channel=ChannelTypes.label_input, producer_channel_index=0,
                                    dest_node=node)
     # F channel
-    with NetworkChannel(node=node, channel=ChannelTypes.f_operator) as f_channel:
+    with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.f_operator) as f_channel:
         # Reshape x for convolutions
         x_image = tf.reshape(x, [-1, MnistDataSet.MNIST_SIZE, MnistDataSet.MNIST_SIZE, 1])
         # Convolution Filter 1
