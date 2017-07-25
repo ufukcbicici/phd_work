@@ -43,8 +43,7 @@ class TreeNetwork(Network):
                                                             tensor_type=tf.int64)
                     else:
                         raise NotImplementedError()
-                    dest_node.add_input(producer_node=producer_node, channel=producer_channel,
-                                        producer_channel_index=producer_channel_index,
+                    dest_node.add_input(producer_triple=producer_triple,
                                         input_object=NetworkIOObject(tensor=tensor, producer_node=None,
                                                                      producer_channel=producer_channel,
                                                                      producer_channel_index=producer_channel_index))
@@ -68,24 +67,23 @@ class TreeNetwork(Network):
                 if path_node == producer_node:
                     if producer_triple not in path_node.outputs:
                         raise Exception("The output must already exist before.")
-                    last_output = path_node.outputs[producer_triple]
+                    last_output = path_node.get_output()
                 # An ancestor node which on the path [source,dest]. We need to make the desired output of source node
                 # pass through the intermediate nodes on the path, such that decisions are applied to them correctly.
                 elif path_node != producer_node or path_node != dest_node:
                     # This output is not used by path_node at all.
                     if producer_triple not in path_node.inputs and producer_triple not in path_node.outputs:
-                        path_node.add_input(producer_node=)
-                        path_node.inputs[producer_triple] = last_output.clone()
+                        path_node.add_input(producer_triple=producer_triple, input_object=last_output.clone())
                         path_node.create_transfer_channel(producer_node=producer_node,
                                                           producer_channel=producer_channel,
                                                           producer_channel_index=producer_channel_index)
-                        last_output = path_node.outputs[producer_triple]
+                        last_output = path_node.get_output(producer_triple=producer_triple)
                     # This output is used by the path but for its internal calculations.
                     elif producer_triple in path_node.inputs and producer_triple not in path_node.outputs:
                         path_node.create_transfer_channel(producer_node=producer_node,
                                                           producer_channel=producer_channel,
                                                           producer_channel_index=producer_channel_index)
-                        last_output = path_node.outputs[producer_triple]
+                        last_output = path_node.get_output(producer_triple=producer_triple)
                     # There cannot be an operation which is not input but in output. This is invalid.
                     elif producer_triple not in path_node.inputs and producer_triple in path_node.outputs:
                         raise Exception("Operation {0} is not in the input of the node {1} but in its outputs!".format(
@@ -93,14 +91,14 @@ class TreeNetwork(Network):
                     # Both in input and output.
                     # Then this output from the ancestor is already being broadcast from this node.
                     else:
-                        last_output = path_node.outputs[producer_triple]
+                        last_output = path_node.get_output(producer_triple=producer_triple)
                 # The node which will finally use the output.
                 else:
                     # It shouldn't be in the input dict.
                     if producer_triple in path_node.inputs:
                         raise Exception("The triple {0} must not be in the inputs.".format(producer_triple))
                     else:
-                        path_node.inputs[producer_triple] = last_output.clone()
+                        path_node.add_input(producer_triple=producer_triple, input_object=last_output.clone())
                         return path_node.inputs[producer_triple].tensor
 
     def apply_decision(self, node, channel):

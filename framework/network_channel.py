@@ -41,10 +41,11 @@ class NetworkChannel:
         if self.producerTriple in self.parentNode.outputs:
             raise Exception("The triple {0} already exists in the outputs.".format(self.producerTriple))
         output_tensor = tf.get_collection(key=self.channelName, scope=self.parentNode.indicatorText)[-1]
-        self.parentNode.outputs[self.producerTriple] = NetworkIOObject(producer_node=self.producerNode,
-                                                                       producer_channel=self.producerChannel,
-                                                                       producer_channel_index=self.producerChannelIndex,
-                                                                       tensor=output_tensor)
+        output_object = NetworkIOObject(producer_node=self.producerNode,
+                                        producer_channel=self.producerChannel,
+                                        producer_channel_index=self.producerChannelIndex,
+                                        tensor=output_tensor)
+        self.parentNode.add_output(producer_triple=self.producerTriple, output_object=output_object)
 
     def add_operation(self, op):
         tf.add_to_collection(self.channelName, op)

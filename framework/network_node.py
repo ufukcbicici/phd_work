@@ -43,22 +43,31 @@ class NetworkNode:
             output_tensor = self.parentNetwork.apply_decision(node=self, channel=transfer_channel)
             transfer_channel.add_operation(op=output_tensor)
 
-    def add_input(self, producer_node, channel, channel_index, input_object):
-        if (producer_node, channel, channel_index) in self.inputs:
+    def add_io_object(self, producer_node, channel, channel_index, object, container):
+        if (producer_node, channel, channel_index) in container:
             raise Exception("Input already exists.")
-        self.inputs[(producer_node, channel, channel_index)] = input_object
+        container[(producer_node, channel, channel_index)] = object
 
-    def get_input(self, producer_node, channel, channel_index):
+    def add_input(self, producer_triple, input_object):
+        self.add_io_object(producer_node=producer_triple[0], channel=producer_triple[1],
+                           channel_index=producer_triple[2], object=input_object, container=self.inputs)
+
+    def add_output(self, producer_triple, output_object):
+        self.add_io_object(producer_node=producer_triple[0], channel=producer_triple[1],
+                           channel_index=producer_triple[2], object=output_object, container=self.outputs)
+
+    def get_input(self, producer_triple):
+        producer_node = producer_triple[0]
+        channel = producer_triple[1]
+        channel_index = producer_triple[2]
         if (producer_node, channel, channel_index) not in self.inputs:
             raise Exception("Input node found.")
         return self.inputs[(producer_node, channel, channel_index)]
 
-    def add_output(self, producer_node, channel, channel_index, output_object):
-        if (producer_node, channel, channel_index) in self.outputs:
-            raise Exception("Output already exists.")
-        self.outputs[(producer_node, channel, channel_index)] = output_object
-
-    def get_output(self, producer_node, channel, channel_index):
+    def get_output(self, producer_triple):
+        producer_node = producer_triple[0]
+        channel = producer_triple[1]
+        channel_index = producer_triple[2]
         if (producer_node, channel, channel_index) not in self.outputs:
             raise Exception("Output node found.")
         return self.outputs[(producer_node, channel, channel_index)]

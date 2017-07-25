@@ -46,7 +46,7 @@ class HardTreeNode(NetworkNode):
             # Get the label tensor
             root_node = self.parentNetwork.nodes[0]
             if self == root_node:
-                label_tensor = self.get_input(producer_node=None, channel=ChannelTypes.label_input, channel_index=0)
+                label_tensor = self.get_input(producer_triple=(None, ChannelTypes.label_input, 0))
             else:
                 label_tensor = self.parentNetwork.add_nodewise_input(producer_node=root_node,
                                                                      producer_channel=ChannelTypes.label_input,
