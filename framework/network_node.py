@@ -33,16 +33,6 @@ class NetworkNode:
         channel.add_operation(op=variable_object)
         return variable_object
 
-    def create_transfer_channel(self, producer_node, producer_channel, producer_channel_index):
-        invalid_channels = {ChannelTypes.loss, ChannelTypes.pre_loss, ChannelTypes.evaluation, ChannelTypes.gradient}
-        if producer_channel in invalid_channels:
-            raise Exception("{0} type of channels cannot be transferred.".format(producer_channel.value))
-        with NetworkChannel(parent_node=self, parent_node_channel=ChannelTypes.transfer, producer_node=producer_node,
-                            producer_channel=producer_channel, producer_channel_index=producer_channel_index) \
-                as transfer_channel:
-            output_tensor = self.parentNetwork.apply_decision(node=self, channel=transfer_channel)
-            transfer_channel.add_operation(op=output_tensor)
-
     def add_io_object(self, producer_node, channel, channel_index, object, container):
         if (producer_node, channel, channel_index) in container:
             raise Exception("Input already exists.")

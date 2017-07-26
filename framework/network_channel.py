@@ -17,12 +17,10 @@ class NetworkChannel:
             self.producerNode = self.parentNode
             self.producerChannel = self.channel
             self.producerChannelIndex = self.channelIndex
-        elif producer_node is not None and parent_node_channel == ChannelTypes.transfer:
+        elif producer_node is not None:
             self.producerNode = producer_node
             self.producerChannel = producer_channel
             self.producerChannelIndex = producer_channel_index
-        else:
-            raise Exception("Invalid channel type.")
         self.parentNode.networkChannels[parent_node_channel].append(self)
         self.producerTriple = (self.producerNode, self.producerChannel, self.producerChannelIndex)
         if channel_name is None:

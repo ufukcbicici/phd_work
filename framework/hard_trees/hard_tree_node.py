@@ -26,14 +26,15 @@ class HardTreeNode(NetworkNode):
         super().attach_shrinkage_losses()
 
     # Private methods - OK
+    # This method is OK
     def attach_leaf_node_loss_eval_channels(self):
         if self.parentNetwork.problemType == ProblemType.classification:
             # Get f, h and ancestor channels, concatenate the outputs
             # Shapes are constrained to be 2 dimensional. Else, it will raise exception. We have to flatten all tensors
             # before the loss operation.
             tensor_list = []
-            relevant_channels = {ChannelTypes.f_operator, ChannelTypes.h_operator,
-                                 ChannelTypes.ancestor_activation}
+            # First f and h channels.
+            relevant_channels = {ChannelTypes.f_operator, ChannelTypes.h_operator}
             for output in self.outputs.values():
                 if output.producerChannel not in relevant_channels:
                     continue
@@ -43,6 +44,15 @@ class HardTreeNode(NetworkNode):
                 if output_tensor.shape[1].value is None:
                     raise Exception("Output tensor's dim1 cannot be None.")
                 tensor_list.append(output_tensor)
+            # Then ancestor activations
+            for input in self.inputs.values():
+                if input.producerChannel == ChannelTypes.ancestor_activation:
+                    input_tensor = input.tensor
+                    if len(input_tensor.shape) != 2:
+                        raise Exception("Tensors entering the loss must be 2D.")
+                    if input_tensor.shape[1].value is None:
+                        raise Exception("Ancestor tensor's dim1 cannot be None.")
+                    tensor_list.append(input_tensor)
             # Get the label tensor
             root_node = self.parentNetwork.nodes[0]
             if self == root_node:
@@ -58,6 +68,7 @@ class HardTreeNode(NetworkNode):
         else:
             raise NotImplementedError()
 
+    # This method is OK
     def attach_acc_node_loss_eval_channels(self):
         # Step 1) Build the final loss layer.
         # Accumulate all losses from all nodes.
@@ -68,6 +79,8 @@ class HardTreeNode(NetworkNode):
             for output in node.outputs.values():
                 if output.producerChannel != ChannelTypes.loss:
                     continue
+                if output.producerNode != node:
+                    raise Exception("Loss outputs must be produced and outputted in the same node.")
                 loss_list.append(output.tensor)
         # Accumulate all learnable parameters from all nodes.
         learnable_parameters = []
@@ -99,3 +112,8 @@ class HardTreeNode(NetworkNode):
                         self.parentNetwork.add_nodewise_input(producer_node=ancestor,
                                                               producer_channel=ChannelTypes.ancestor_activation,
                                                               producer_channel_index=0, dest_node=self)
+                    tensor_list.append(activation_tensor)
+        # Get all h operators
+
+
+

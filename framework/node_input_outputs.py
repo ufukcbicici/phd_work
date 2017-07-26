@@ -7,10 +7,3 @@ class NetworkIOObject:
         self.producerNode = producer_node
         self.producerChannel = producer_channel
         self.producerChannelIndex = producer_channel_index
-
-    def clone(self):
-        copy_obj = NetworkIOObject(tensor=self.tensor,
-                                   producer_node=self.producerNode,
-                                   producer_channel=self.producerChannel,
-                                   producer_channel_index=self.producerChannelIndex)
-        return copy_obj

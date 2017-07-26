@@ -32,5 +32,5 @@ class Network:
         self.variablesToFeed.add(tensor)
         return tensor
 
-    def apply_decision(self, node, channel):
+    def apply_decision(self, node, tensor):
         pass

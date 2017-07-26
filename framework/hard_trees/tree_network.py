@@ -29,6 +29,9 @@ class TreeNetwork(Network):
     # applies decision to it and propagate to the its child. In that case the node producing the output and the interme-
     # diate node are different and this is the only case that happens.
     def add_nodewise_input(self, producer_node, producer_channel, producer_channel_index, dest_node):
+        invalid_channels = {ChannelTypes.loss, ChannelTypes.pre_loss, ChannelTypes.evaluation, ChannelTypes.gradient}
+        if producer_channel in invalid_channels:
+            raise Exception("{0} type of channels cannot be input to other nodes.".format(producer_channel.value))
         producer_triple = (producer_node, producer_channel, producer_channel_index)
         # Data or label input
         if producer_node is None:
@@ -43,10 +46,11 @@ class TreeNetwork(Network):
                                                             tensor_type=tf.int64)
                     else:
                         raise NotImplementedError()
-                    dest_node.add_input(producer_triple=producer_triple,
-                                        input_object=NetworkIOObject(tensor=tensor, producer_node=None,
-                                                                     producer_channel=producer_channel,
-                                                                     producer_channel_index=producer_channel_index))
+                    network_io_object = NetworkIOObject(tensor=tensor, producer_node=None,
+                                                        producer_channel=producer_channel,
+                                                        producer_channel_index=producer_channel_index)
+                    dest_node.add_input(producer_triple=producer_triple, input_object=network_io_object)
+                    dest_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
                 return tensor
             else:
                 raise Exception("Only data or label inputs can have no source node.")
@@ -67,22 +71,23 @@ class TreeNetwork(Network):
                 if path_node == producer_node:
                     if producer_triple not in path_node.outputs:
                         raise Exception("The output must already exist before.")
-                    last_output = path_node.get_output()
+                    last_output = path_node.get_output(producer_triple=producer_triple)
                 # An ancestor node which on the path [source,dest]. We need to make the desired output of source node
                 # pass through the intermediate nodes on the path, such that decisions are applied to them correctly.
                 elif path_node != producer_node or path_node != dest_node:
                     # This output is not used by path_node at all.
                     if producer_triple not in path_node.inputs and producer_triple not in path_node.outputs:
-                        path_node.add_input(producer_triple=producer_triple, input_object=last_output.clone())
-                        path_node.create_transfer_channel(producer_node=producer_node,
-                                                          producer_channel=producer_channel,
-                                                          producer_channel_index=producer_channel_index)
+                        branched_tensor = self.apply_decision(node=path_node, tensor=last_output.tensor)
+                        network_io_object = NetworkIOObject(tensor=branched_tensor, producer_node=producer_node,
+                                                            producer_channel=producer_channel,
+                                                            producer_channel_index=producer_channel_index)
+                        path_node.add_input(producer_triple=producer_triple, input_object=network_io_object)
+                        path_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
                         last_output = path_node.get_output(producer_triple=producer_triple)
                     # This output is used by the path but for its internal calculations.
                     elif producer_triple in path_node.inputs and producer_triple not in path_node.outputs:
-                        path_node.create_transfer_channel(producer_node=producer_node,
-                                                          producer_channel=producer_channel,
-                                                          producer_channel_index=producer_channel_index)
+                        network_io_object = path_node.get_input(producer_triple=producer_triple)
+                        path_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
                         last_output = path_node.get_output(producer_triple=producer_triple)
                     # There cannot be an operation which is not input but in output. This is invalid.
                     elif producer_triple not in path_node.inputs and producer_triple in path_node.outputs:
@@ -93,15 +98,19 @@ class TreeNetwork(Network):
                     else:
                         last_output = path_node.get_output(producer_triple=producer_triple)
                 # The node which will finally use the output.
-                else:
+                else:  # path_node == dest_node
                     # It shouldn't be in the input dict.
                     if producer_triple in path_node.inputs:
                         raise Exception("The triple {0} must not be in the inputs.".format(producer_triple))
                     else:
-                        path_node.add_input(producer_triple=producer_triple, input_object=last_output.clone())
-                        return path_node.inputs[producer_triple].tensor
+                        branched_tensor = self.apply_decision(node=path_node, tensor=last_output.tensor)
+                        network_io_object = NetworkIOObject(tensor=branched_tensor, producer_node=producer_node,
+                                                            producer_channel=producer_channel,
+                                                            producer_channel_index=producer_channel_index)
+                        path_node.add_input(producer_triple=producer_triple, input_object=network_io_object)
+                        return network_io_object.tensor
 
-    def apply_decision(self, node, channel):
+    def apply_decision(self, node, tensor):
         raise NotImplementedError()
 
     def build_network(self):

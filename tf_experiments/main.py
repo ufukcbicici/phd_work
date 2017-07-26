@@ -62,8 +62,14 @@ def main():
 #     tf.add_to_collection(name="Den", value=y)
 #     tf.add_to_collection(name="Den", value=z)
 
-main()
-
+# main()
+nodes = "(A,B) (A,C) (B,D) (D,C)"
+pairs_list = []
+pairs = nodes.split(" ")
+for pair in pairs:
+    letters = pair[1:4].split(",")
+    pairs_list.append((letters[0],letters[1]))
+print("X")
 # dataset = MnistDataSet(validation_sample_count=5000)
 # dataset.load_dataset()
 # total_samples_seen = 0
