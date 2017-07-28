@@ -21,7 +21,10 @@ class ChannelTypes(Enum):
     label_input = "LabelInput"
     f_operator = "FOperator"
     h_operator = "HOperator"
-    ancestor_activation = "AncestorActivation"
+    branching_activation = "BranchingActivation"
+    branching_probabilities = "BranchingProbabilities"
+    branching_masks_unified = "BranchingMasksUnified"
+    branching_masks_sliced = "BranchingMasksSliced"
     decision = "Decision"
     pre_loss = "PreLoss"
     loss = "Loss"
@@ -35,6 +38,7 @@ class GlobalInputNames(Enum):
     data_input = "DataInput"
     label_input = "LabelInput"
     regularizer_strength = "RegularizerStrength"
+    branching_prob_threshold = "BranchingProbThreshold"
 
 
 class ActivationType(Enum):

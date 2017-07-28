@@ -10,11 +10,9 @@ from framework.network_channel import NetworkChannel
 
 def baseline_network(network, node):
     # Data Input
-    x = network.add_nodewise_input(producer_node=None, producer_channel=ChannelTypes.data_input, producer_channel_index=0,
-                                   dest_node=node)
+    x = network.add_nodewise_input(producer_channel=ChannelTypes.data_input, dest_node=node)
     # Label Input
-    y = network.add_nodewise_input(producer_node=None, producer_channel=ChannelTypes.label_input, producer_channel_index=0,
-                                   dest_node=node)
+    y = network.add_nodewise_input(producer_channel=ChannelTypes.label_input, dest_node=node)
     # F channel
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.f_operator) as f_channel:
         # Reshape x for convolutions

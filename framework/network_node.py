@@ -62,6 +62,7 @@ class NetworkNode:
             raise Exception("Output node found.")
         return self.outputs[(producer_node, channel, channel_index)]
 
+    # Methods to override
     def attach_loss_eval_channels(self):
         pass
 
@@ -76,6 +77,9 @@ class NetworkNode:
             raise NotImplementedError()
 
     def attach_decision(self):
+        pass
+
+    def apply_decision(self, tensor):
         pass
 
     @staticmethod

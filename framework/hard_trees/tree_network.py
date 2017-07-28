@@ -1,7 +1,7 @@
 import tensorflow as tf
 import sys
 
-from auxillary.constants import ChannelTypes, TreeType
+from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames
 from framework.hard_trees.hard_tree_node import HardTreeNode
 from framework.network import Network
 from framework.network_channel import NetworkChannel
@@ -28,28 +28,26 @@ class TreeNetwork(Network):
     # in between the path (ancestor, current_node). Each intermediate node, inductively takes the input from its parent,
     # applies decision to it and propagate to the its child. In that case the node producing the output and the interme-
     # diate node are different and this is the only case that happens.
-    def add_nodewise_input(self, producer_node, producer_channel, producer_channel_index, dest_node):
+    def add_nodewise_input(self, producer_channel, dest_node, producer_node=None, producer_channel_index=0):
         invalid_channels = {ChannelTypes.loss, ChannelTypes.pre_loss, ChannelTypes.evaluation, ChannelTypes.gradient}
         if producer_channel in invalid_channels:
             raise Exception("{0} type of channels cannot be input to other nodes.".format(producer_channel.value))
-        producer_triple = (producer_node, producer_channel, producer_channel_index)
         # Data or label input
         if producer_node is None:
+            producer_triple = (dest_node, producer_channel, 0)
             if producer_channel == ChannelTypes.data_input or producer_channel == ChannelTypes.label_input:
                 tensor = None
                 with NetworkChannel(parent_node=dest_node, parent_node_channel=producer_channel) as input_channel:
                     if producer_channel == ChannelTypes.data_input:
-                        tensor = self.add_networkwise_input(name=ChannelTypes.data_input.value, channel=input_channel,
-                                                            tensor_type=tf.float32)
+                        tensor = self.add_networkwise_input(name=ChannelTypes.data_input.value, tensor_type=tf.float32)
                     elif producer_channel == ChannelTypes.label_input:
-                        tensor = self.add_networkwise_input(name=ChannelTypes.label_input.value, channel=input_channel,
-                                                            tensor_type=tf.int64)
+                        tensor = self.add_networkwise_input(name=ChannelTypes.label_input.value, tensor_type=tf.int64)
                     else:
                         raise NotImplementedError()
                     network_io_object = NetworkIOObject(tensor=tensor, producer_node=None,
                                                         producer_channel=producer_channel,
                                                         producer_channel_index=producer_channel_index)
-                    dest_node.add_input(producer_triple=producer_triple, input_object=network_io_object)
+                    # No inputs
                     dest_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
                 return tensor
             else:
@@ -57,6 +55,7 @@ class TreeNetwork(Network):
         # An input either from a 1)directly from a parent node 2)from an ancestor node.
         # In the second case apply the propagation algorithm.
         else:
+            producer_triple = (producer_node, producer_channel, producer_channel_index)
             path = self.dag.get_shortest_path(source=producer_node, dest=dest_node)
             last_output = None
             # Assume the path starts from the ancestor to the node
@@ -77,7 +76,7 @@ class TreeNetwork(Network):
                 elif path_node != producer_node or path_node != dest_node:
                     # This output is not used by path_node at all.
                     if producer_triple not in path_node.inputs and producer_triple not in path_node.outputs:
-                        branched_tensor = self.apply_decision(node=path_node, tensor=last_output.tensor)
+                        branched_tensor = path_node.apply_decision(tensor=last_output.tensor)
                         network_io_object = NetworkIOObject(tensor=branched_tensor, producer_node=producer_node,
                                                             producer_channel=producer_channel,
                                                             producer_channel_index=producer_channel_index)
@@ -103,15 +102,15 @@ class TreeNetwork(Network):
                     if producer_triple in path_node.inputs:
                         raise Exception("The triple {0} must not be in the inputs.".format(producer_triple))
                     else:
-                        branched_tensor = self.apply_decision(node=path_node, tensor=last_output.tensor)
+                        branched_tensor = path_node.apply_decision(tensor=last_output.tensor)
                         network_io_object = NetworkIOObject(tensor=branched_tensor, producer_node=producer_node,
                                                             producer_channel=producer_channel,
                                                             producer_channel_index=producer_channel_index)
                         path_node.add_input(producer_triple=producer_triple, input_object=network_io_object)
                         return network_io_object.tensor
 
-    def apply_decision(self, node, tensor):
-        raise NotImplementedError()
+    def create_global_inputs(self):
+        self.add_networkwise_input(name=GlobalInputNames.branching_prob_threshold, tensor_type=tf.float32)
 
     def build_network(self):
         curr_index = 0
@@ -146,6 +145,9 @@ class TreeNetwork(Network):
                 self.dag.add_edge(parent=node, child=accumulation_node)
         self.topologicalSortedNodes = self.dag.get_topological_sort()
         # Step 2:
+        # Add network wise constant inputs (probability threshold, etc.)
+        self.create_global_inputs()
+        # Step 3:
         # Build the complete symbolic graph by building and connectiong the symbolic graphs of the nodes
         for node in self.topologicalSortedNodes:
             node_depth = self.nodesToDepthsDict[node]

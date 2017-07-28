@@ -14,9 +14,8 @@ class L2Loss(GenericLoss):
         self.name = "{0}_wd".format(self.argument.name)
 
     def build_training_network(self):
+        wd_tensor = self.parentNode.parentNetwork.add_networkwise_input(name=self.name, tensor_type=tf.float32)
         with NetworkChannel(parent_node=self.parentNode, parent_node_channel=ChannelTypes.loss) as loss_channel:
-            wd_tensor = self.parentNode.parentNetwork.add_networkwise_input(name=self.name, channel=loss_channel,
-                                                                            tensor_type=tf.float32)
             l2_loss = loss_channel.add_operation(op=tf.nn.l2_loss(self.argument.tensor))
             loss_channel.add_operation(op=(wd_tensor * l2_loss))
 
