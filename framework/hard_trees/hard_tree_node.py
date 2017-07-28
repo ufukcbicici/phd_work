@@ -150,7 +150,8 @@ class HardTreeNode(NetworkNode):
     def attach_acc_node_loss_eval_channels(self):
         # Step 1) Build the final loss layer.
         # Accumulate all losses from all nodes.
-        loss_list = self.get_outputs_of_given_type(channel_set={ChannelTypes.loss})
+        loss_list = []
+        #self.get_outputs_of_given_type(channel_set={ChannelTypes.loss})
         # Accumulate all learnable parameters from all nodes.
         learnable_parameters = []
         for node in self.parentNetwork.nodes.values():
@@ -166,4 +167,4 @@ class HardTreeNode(NetworkNode):
         with NetworkChannel(parent_node=self, parent_node_channel=ChannelTypes.gradient) as gradient_channel:
             gradient_channel.add_operation(op=tf.gradients(total_loss, learnable_parameters))
             # Step 2) Build the final evaluation layer.
-            # **********************Private methods - OK**********************
+    # **********************Private methods - OK**********************

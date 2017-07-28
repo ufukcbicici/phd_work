@@ -19,6 +19,7 @@ class ArgumentTypes(Enum):
 class ChannelTypes(Enum):
     data_input = "DataInput"
     label_input = "LabelInput"
+    indices_input = "IndicesInput"
     f_operator = "FOperator"
     h_operator = "HOperator"
     branching_activation = "BranchingActivation"
@@ -37,6 +38,7 @@ class ChannelTypes(Enum):
 class GlobalInputNames(Enum):
     data_input = "DataInput"
     label_input = "LabelInput"
+    indices_input = "IndicesInput"
     regularizer_strength = "RegularizerStrength"
     branching_prob_threshold = "BranchingProbThreshold"
 

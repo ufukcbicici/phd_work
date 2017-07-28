@@ -10,7 +10,8 @@ from framework.node_input_outputs import NetworkIOObject
 
 class TreeNetwork(Network):
     def __init__(self, run_id, dataset, parameter_file, problem_type,
-                 tree_degree, tree_type, list_of_node_builder_functions, ancestor_count=sys.maxsize):
+                 tree_degree, tree_type, list_of_node_builder_functions, ancestor_count=sys.maxsize,
+                 eval_sample_distribution=True):
         super().__init__(run_id, dataset, parameter_file, problem_type)
         self.treeDegree = tree_degree
         self.treeDepth = len(list_of_node_builder_functions)
@@ -20,6 +21,7 @@ class TreeNetwork(Network):
         self.treeType = tree_type
         self.ancestorCount = ancestor_count
         self.indicatorText = "TreeNetwork"
+        self.evalSampleDistribution = eval_sample_distribution
 
     # Tensorflow specific code (This should be isolated at some point in future)
     # A node can take from an input from any ancestor node. If the ancestor is its parent, it is directly connected
@@ -32,23 +34,23 @@ class TreeNetwork(Network):
         invalid_channels = {ChannelTypes.loss, ChannelTypes.pre_loss, ChannelTypes.evaluation, ChannelTypes.gradient}
         if producer_channel in invalid_channels:
             raise Exception("{0} type of channels cannot be input to other nodes.".format(producer_channel.value))
-        # Data or label input
+        # Data or label or index input
         if producer_node is None:
             producer_triple = (dest_node, producer_channel, 0)
             if producer_channel == ChannelTypes.data_input or producer_channel == ChannelTypes.label_input:
-                tensor = None
-                with NetworkChannel(parent_node=dest_node, parent_node_channel=producer_channel) as input_channel:
-                    if producer_channel == ChannelTypes.data_input:
-                        tensor = self.add_networkwise_input(name=ChannelTypes.data_input.value, tensor_type=tf.float32)
-                    elif producer_channel == ChannelTypes.label_input:
-                        tensor = self.add_networkwise_input(name=ChannelTypes.label_input.value, tensor_type=tf.int64)
-                    else:
-                        raise NotImplementedError()
-                    network_io_object = NetworkIOObject(tensor=tensor, producer_node=None,
-                                                        producer_channel=producer_channel,
-                                                        producer_channel_index=producer_channel_index)
-                    # No inputs
-                    dest_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
+                if producer_channel == ChannelTypes.data_input:
+                    tensor = self.add_networkwise_input(name=ChannelTypes.data_input.value, tensor_type=tf.float32)
+                elif producer_channel == ChannelTypes.label_input:
+                    tensor = self.add_networkwise_input(name=ChannelTypes.label_input.value, tensor_type=tf.int64)
+                elif producer_channel == ChannelTypes.indices_input:
+                    tensor = self.add_networkwise_input(name=ChannelTypes.indices_input.value, tensor_type=tf.int64)
+                else:
+                    raise NotImplementedError()
+                network_io_object = NetworkIOObject(tensor=tensor, producer_node=None,
+                                                    producer_channel=producer_channel,
+                                                    producer_channel_index=producer_channel_index)
+                dest_node.add_input(producer_triple=(None, producer_channel, 0), input_object=network_io_object)
+                dest_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
                 return tensor
             else:
                 raise Exception("Only data or label inputs can have no source node.")
@@ -154,7 +156,16 @@ class TreeNetwork(Network):
             # Add customized operations on the top.
             with tf.variable_scope(node.indicatorText):
                 # Build the node-wise ops
+                # Evaluate sample distribution, if we want to.
+                if self.evalSampleDistribution:
+                    if node.isRoot:
+                        self.add_nodewise_input(producer_channel=ChannelTypes.indices_input, dest_node=node)
+                    else:
+                        self.add_nodewise_input(producer_node=self.get_root_node(),
+                                                producer_channel=ChannelTypes.indices_input, dest_node=node)
+                # Build non accumulation node networks.
                 if not node.isAccumulation:
+                    # Build user defined local node network
                     self.nodeBuilderFunctions[node_depth](network=self, node=node)
                     # Build weight shrinkage losses.
                     node.attach_shrinkage_losses()
@@ -162,6 +173,9 @@ class TreeNetwork(Network):
                 # in the graph, apply gradient calculations, etc.
                 if node.isLeaf or node.isAccumulation:
                     node.attach_loss_eval_channels()
+                # If node is not leaf or accumulation (inner node), then apply branching mechanism.
+                else:
+                    node.attach_decision()
 
     # Private methods
     def get_parent_index(self, node_index):
@@ -173,3 +187,6 @@ class TreeNetwork(Network):
             self.depthsToNodesDict[depth] = []
         self.depthsToNodesDict[depth].append(node)
         self.nodesToDepthsDict[node] = depth
+
+    def get_root_node(self):
+        return self.nodes[0]
