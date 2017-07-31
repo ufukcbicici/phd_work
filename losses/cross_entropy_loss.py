@@ -12,7 +12,7 @@ class CrossEntropyLoss(GenericLoss):
     ClassCount = 2
 
     def __init__(self, parent_node, feature_list, label_tensor, class_count):
-        super().__init__(parent_node=parent_node)
+        super().__init__(parent_node=parent_node, name=CrossEntropyLoss.Name)
         self.logitTensor = None
         self.featureList = feature_list
         self.labelTensor = label_tensor
@@ -44,16 +44,23 @@ class CrossEntropyLoss(GenericLoss):
             self.lossOutput = loss_channel.add_operation(op=tf.reduce_mean(input_tensor=softmax_cross_entropy))
 
     def build_evaluation_network(self):
+        self.evalOutput = []
         if self.logitTensor is None:
             raise Exception("No logit tensor have been found.")
-        with NetworkChannel(parent_node=self.parentNode, parent_node_channel=ChannelTypes.evaluation) as eval_channel:
-            posterior_probs = eval_channel.add_operation(op=tf.nn.softmax(logits=self.logitTensor))
-            argmax_label_prediction = eval_channel.add_operation(op=tf.argmax(posterior_probs, 1))
-            comparison_with_labels = eval_channel.add_operation(
+        # Calculate the number of correct sample inferences
+        with NetworkChannel(parent_node=self.parentNode,
+                            parent_node_channel=ChannelTypes.evaluation) as correct_count_channel:
+            posterior_probs = correct_count_channel.add_operation(op=tf.nn.softmax(logits=self.logitTensor))
+            argmax_label_prediction = correct_count_channel.add_operation(op=tf.argmax(posterior_probs, 1))
+            comparison_with_labels = correct_count_channel.add_operation(
                 op=tf.equal(x=argmax_label_prediction, y=self.labelTensor))
-            comparison_cast = eval_channel.add_operation(op=tf.cast(comparison_with_labels, tf.float32))
-            self.evalOutput = eval_channel.add_operation(op=tf.reduce_mean(input_tensor=comparison_cast))
-            # TODO: Return only the number of correct samples and return the number of all samples in this node as well
+            comparison_cast = correct_count_channel.add_operation(op=tf.cast(comparison_with_labels, tf.float32))
+            self.evalOutput.append(correct_count_channel.add_operation(op=tf.reduce_sum(input_tensor=comparison_cast)))
+        # Calcualte the total number of samples
+        with NetworkChannel(parent_node=self.parentNode,
+                            parent_node_channel=ChannelTypes.evaluation) as total_count_channel:
+            self.evalOutput.append(total_count_channel.add_operation(op=tf.size(input_tensor=comparison_cast)))
+
 
     def finalize(self):
         super().finalize()

@@ -29,6 +29,7 @@ class ChannelTypes(Enum):
     decision = "Decision"
     pre_loss = "PreLoss"
     loss = "Loss"
+    total_loss = "TotalLoss"
     gradient = "Gradient"
     evaluation = "Evaluation"
     constant = "Constant"

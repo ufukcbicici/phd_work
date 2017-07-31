@@ -19,6 +19,9 @@ class NetworkNode:
         self.networkChannels = {}
         self.inputs = {}
         self.outputs = {}
+        self.losses = {}
+        # Only used if accumulation node.
+        self.resultsDictionary = {}
 
     # Tensorflow specific code (This should be isolated at some point in future)
     def create_variable(self, name, shape, initializer, needs_gradient, dtype, arg_type, channel):

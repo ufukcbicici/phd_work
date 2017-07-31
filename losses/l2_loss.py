@@ -8,16 +8,16 @@ class L2Loss(GenericLoss):
     Name = "L2Loss"
 
     def __init__(self, parent_node, argument, training_program):
-        super().__init__(parent_node=parent_node)
+        super().__init__(parent_node=parent_node, name="{0}_wd".format(self.argument.name))
         self.argument = argument
         self.trainingProgram = training_program
-        self.name = "{0}_wd".format(self.argument.name)
 
     def build_training_network(self):
         wd_tensor = self.parentNode.parentNetwork.add_networkwise_input(name=self.name, tensor_type=tf.float32)
         with NetworkChannel(parent_node=self.parentNode, parent_node_channel=ChannelTypes.loss) as loss_channel:
             l2_loss = loss_channel.add_operation(op=tf.nn.l2_loss(self.argument.tensor))
-            loss_channel.add_operation(op=(wd_tensor * l2_loss))
+            self.lossOutput = wd_tensor * l2_loss
+            loss_channel.add_operation(op=(self.lossOutput))
 
     def build_evaluation_network(self):
         return

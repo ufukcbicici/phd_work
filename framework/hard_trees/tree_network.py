@@ -5,7 +5,9 @@ from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames
 from framework.hard_trees.hard_tree_node import HardTreeNode
 from framework.network import Network
 from framework.network_channel import NetworkChannel
+from framework.network_node import NetworkNode
 from framework.node_input_outputs import NetworkIOObject
+from losses.sample_index_counter import SampleIndexCounter
 
 
 class TreeNetwork(Network):
@@ -158,11 +160,8 @@ class TreeNetwork(Network):
                 # Build the node-wise ops
                 # Evaluate sample distribution, if we want to.
                 if self.evalSampleDistribution:
-                    if node.isRoot:
-                        self.add_nodewise_input(producer_channel=ChannelTypes.indices_input, dest_node=node)
-                    else:
-                        self.add_nodewise_input(producer_node=self.get_root_node(),
-                                                producer_channel=ChannelTypes.indices_input, dest_node=node)
+                    sample_counter = SampleIndexCounter(parent_node=node)
+                    NetworkNode.apply_loss(loss=sample_counter)
                 # Build non accumulation node networks.
                 if not node.isAccumulation:
                     # Build user defined local node network
