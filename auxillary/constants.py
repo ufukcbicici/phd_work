@@ -37,6 +37,7 @@ class ChannelTypes(Enum):
 
 
 class GlobalInputNames(Enum):
+    global_scope = "GlobalScope"
     data_input = "DataInput"
     label_input = "LabelInput"
     indices_input = "IndicesInput"

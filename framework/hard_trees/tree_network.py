@@ -39,7 +39,8 @@ class TreeNetwork(Network):
         # Data or label or index input
         if producer_node is None:
             producer_triple = (dest_node, producer_channel, 0)
-            if producer_channel == ChannelTypes.data_input or producer_channel == ChannelTypes.label_input:
+            if producer_channel == ChannelTypes.data_input \
+                    or producer_channel == ChannelTypes.label_input or producer_channel == ChannelTypes.indices_input:
                 if producer_channel == ChannelTypes.data_input:
                     tensor = self.add_networkwise_input(name=ChannelTypes.data_input.value, tensor_type=tf.float32)
                 elif producer_channel == ChannelTypes.label_input:
@@ -52,7 +53,7 @@ class TreeNetwork(Network):
                                                     producer_channel=producer_channel,
                                                     producer_channel_index=producer_channel_index)
                 dest_node.add_input(producer_triple=(None, producer_channel, 0), input_object=network_io_object)
-                dest_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
+                dest_node.add_output(producer_triple=producer_triple, output_object=network_io_object)
                 return tensor
             else:
                 raise Exception("Only data or label inputs can have no source node.")
@@ -114,7 +115,7 @@ class TreeNetwork(Network):
                         return network_io_object.tensor
 
     def create_global_inputs(self):
-        self.add_networkwise_input(name=GlobalInputNames.branching_prob_threshold, tensor_type=tf.float32)
+        self.add_networkwise_input(name=GlobalInputNames.branching_prob_threshold.value, tensor_type=tf.float32)
 
     def build_network(self):
         curr_index = 0
@@ -130,10 +131,9 @@ class TreeNetwork(Network):
                                         is_leaf=is_leaf, is_accumulation=False)
                 else:
                     raise NotImplementedError()
-                self.nodes[node.index] = node
+                self.add_node_to_depth(depth=depth, node=node)
                 if is_leaf:
                     self.leafNodes.append(node)
-                self.add_node_to_depth(depth=depth, node=node)
                 if not is_root:
                     parent_index = self.get_parent_index(node_index=curr_index)
                     self.dag.add_edge(parent=self.nodes[parent_index], child=node)
@@ -150,7 +150,8 @@ class TreeNetwork(Network):
         self.topologicalSortedNodes = self.dag.get_topological_sort()
         # Step 2:
         # Add network wise constant inputs (probability threshold, etc.)
-        self.create_global_inputs()
+        with tf.variable_scope(GlobalInputNames.global_scope.value):
+            self.create_global_inputs()
         # Step 3:
         # Build the complete symbolic graph by building and connectiong the symbolic graphs of the nodes
         for node in self.topologicalSortedNodes:
@@ -166,8 +167,6 @@ class TreeNetwork(Network):
                 if not node.isAccumulation:
                     # Build user defined local node network
                     self.nodeBuilderFunctions[node_depth](network=self, node=node)
-                    # Build weight shrinkage losses.
-                    node.attach_shrinkage_losses()
                 # If node is leaf, apply the actual loss function. If accumulation, fetch all losses from all nodes
                 # in the graph, apply gradient calculations, etc.
                 if node.isLeaf or node.isAccumulation:
@@ -175,6 +174,8 @@ class TreeNetwork(Network):
                 # If node is not leaf or accumulation (inner node), then apply branching mechanism.
                 else:
                     node.attach_decision()
+                #  Build weight shrinkage losses.
+                node.attach_shrinkage_losses()
 
     # Private methods
     def get_parent_index(self, node_index):
@@ -186,6 +187,7 @@ class TreeNetwork(Network):
             self.depthsToNodesDict[depth] = []
         self.depthsToNodesDict[depth].append(node)
         self.nodesToDepthsDict[node] = depth
+        self.nodes[node.index] = node
 
     def get_root_node(self):
         return self.nodes[0]

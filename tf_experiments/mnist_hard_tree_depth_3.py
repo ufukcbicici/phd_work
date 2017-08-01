@@ -35,7 +35,8 @@ def root_func(network, node):
             pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
             activation_type=ActivationType.relu, pooling_type=PoolingType.max, post_fix="1")
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.h_operator) as h_channel:
-        h_channel.add_operation(op=x_image)
+        x_flattened = tf.reshape(x, [-1, MnistDataSet.MNIST_SIZE * MnistDataSet.MNIST_SIZE])
+        h_channel.add_operation(op=x_flattened)
 
 
 def l1_func(network, node):
@@ -75,3 +76,5 @@ def main():
                             problem_type=ProblemType.classification,
                             list_of_node_builder_functions=[root_func, l1_func, leaf_func])
     cnn_lenet.build_network()
+
+main()

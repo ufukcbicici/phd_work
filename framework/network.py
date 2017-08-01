@@ -49,17 +49,15 @@ class Network:
             if len(candidates) != 1:
                 raise Exception("There must be exactly one accumulation node in the network.")
             self.accumulationNode = candidates[0]
-        else:
-            return self.accumulationNode
+        return self.accumulationNode
 
     # All networkwise inputs are constant, and they will be placed into the accumulation node.
     def add_networkwise_input(self, name, tensor_type):
-        accumulation_node = self.get_accumulation_node()
         tensor_names = [tensor.name for tensor in tf.get_default_graph().as_graph_def().node]
         for tensor_name in tensor_names:
             if name in tensor_name:
                 raise Exception("Name {0} is already used in tensor name {1}".format(name, tensor_name))
-        with NetworkChannel(parent_node=accumulation_node,
+        with NetworkChannel(parent_node=None,
                             parent_node_channel=ChannelTypes.constant) as constant_channel:
             tensor = constant_channel.add_operation(op=tf.placeholder(dtype=tensor_type, name=name))
             self.variablesToFeed.add(tensor)
