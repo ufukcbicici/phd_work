@@ -24,7 +24,7 @@ class SampleIndexCounter(GenericLoss):
         with NetworkChannel(parent_node=self.parentNode,
                             parent_node_channel=ChannelTypes.evaluation) as eval_channel:
             eval_channel.add_operation(op=sample_index_tensor)
-            self.evalOutput = sample_index_tensor
+            self.evalOutputs = [sample_index_tensor]
 
     def finalize(self):
         self.isFinalized = True

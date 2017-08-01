@@ -26,6 +26,10 @@ class Network:
         self.indicatorText = None
         self.activationInit = activation_init
         self.accumulationNode = None
+        # Tensors to be used in training
+        self.trainingTensorsList = []
+        # Tensors to be used in evaluation
+        self.evaluationTensorsList = []
 
     def build_network(self):
         pass

@@ -41,10 +41,10 @@ class CrossEntropyLoss(GenericLoss):
                             channel_name=CrossEntropyLoss.Name) as loss_channel:
             softmax_cross_entropy = loss_channel.add_operation(
                 op=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labelTensor, logits=self.logitTensor))
-            self.lossOutput = loss_channel.add_operation(op=tf.reduce_mean(input_tensor=softmax_cross_entropy))
+            self.lossOutputs = [loss_channel.add_operation(op=tf.reduce_mean(input_tensor=softmax_cross_entropy))]
 
     def build_evaluation_network(self):
-        self.evalOutput = []
+        self.evalOutputs = []
         if self.logitTensor is None:
             raise Exception("No logit tensor have been found.")
         # Calculate the number of correct sample inferences
@@ -55,11 +55,11 @@ class CrossEntropyLoss(GenericLoss):
             comparison_with_labels = correct_count_channel.add_operation(
                 op=tf.equal(x=argmax_label_prediction, y=self.labelTensor))
             comparison_cast = correct_count_channel.add_operation(op=tf.cast(comparison_with_labels, tf.float32))
-            self.evalOutput.append(correct_count_channel.add_operation(op=tf.reduce_sum(input_tensor=comparison_cast)))
+            self.evalOutputs.append(correct_count_channel.add_operation(op=tf.reduce_sum(input_tensor=comparison_cast)))
         # Calcualte the total number of samples
         with NetworkChannel(parent_node=self.parentNode,
                             parent_node_channel=ChannelTypes.evaluation) as total_count_channel:
-            self.evalOutput.append(total_count_channel.add_operation(op=tf.size(input_tensor=comparison_cast)))
+            self.evalOutputs.append(total_count_channel.add_operation(op=tf.size(input_tensor=comparison_cast)))
 
 
     def finalize(self):
