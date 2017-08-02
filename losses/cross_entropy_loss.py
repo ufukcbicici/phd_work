@@ -59,7 +59,7 @@ class CrossEntropyLoss(GenericLoss):
         # Calcualte the total number of samples
         with NetworkChannel(parent_node=self.parentNode,
                             parent_node_channel=ChannelTypes.evaluation) as total_count_channel:
-            self.evalOutputs.append(total_count_channel.add_operation(op=tf.size(input_tensor=comparison_cast)))
+            self.evalOutputs.append(total_count_channel.add_operation(op=tf.size(input=comparison_cast)))
 
 
     def finalize(self):

@@ -15,7 +15,7 @@ class GenericLoss:
         pass
 
     def finalize(self):
-        if self.name in self.parentNode:
+        if self.name in self.parentNode.losses:
             raise Exception("Loss {0} is already in node {1}".format(self.name, self.parentNode))
-        self.parentNode[self.name] = self
+        self.parentNode.losses[self.name] = self
         self.isFinalized = True

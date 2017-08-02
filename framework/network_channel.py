@@ -2,7 +2,6 @@ import tensorflow as tf
 
 # Tensorflow specific code (This should be isolated at some point in future)
 from auxillary.constants import ChannelTypes, GlobalInputNames
-from auxillary.runtime import Runtime
 from framework.node_input_outputs import NetworkIOObject
 
 
@@ -27,7 +26,6 @@ class NetworkChannel:
         self.producerTriple = (self.producerNode, self.producerChannel, self.producerChannelIndex)
 
     def __enter__(self):
-        Runtime.push_node(node=self.parentNode)
         return self
 
     # Tensorflow specific code (This should be isolated at some point in future)
@@ -37,14 +35,13 @@ class NetworkChannel:
             raise Exception(value)
         if self.producerTriple in self.parentNode.outputs:
             raise Exception("The triple {0} already exists in the outputs.".format(self.producerTriple))
-        context_name = Runtime.get_context_name()
+        context_name = tf.contrib.framework.get_name_scope()
         output_tensor = tf.get_collection(key=self.channelName, scope=context_name)[-1]
         output_object = NetworkIOObject(producer_node=self.producerNode,
                                         producer_channel=self.producerChannel,
                                         producer_channel_index=self.producerChannelIndex,
                                         tensor=output_tensor)
         self.parentNode.add_output(producer_triple=self.producerTriple, output_object=output_object)
-        Runtime.pop_node()
 
     def add_operation(self, op):
         tf.add_to_collection(self.channelName, op)

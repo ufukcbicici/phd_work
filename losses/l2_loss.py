@@ -23,4 +23,4 @@ class L2Loss(GenericLoss):
         return
 
     def finalize(self):
-        self.isFinalized = True
+        super().finalize()

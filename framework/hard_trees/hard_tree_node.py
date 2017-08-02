@@ -103,6 +103,7 @@ class HardTreeNode(NetworkNode):
         # Get all ancestor activations, as allowed by the related hyperparameter.
         if self.parentNetwork.ancestorCount != 0:
             ancestors = self.parentNetwork.dag.ancestors(node=self)
+            distance_tensor_pairs = []
             for ancestor in ancestors:
                 distance = self.parentNetwork.dag.get_shortest_path_length(source=ancestor, dest=self)
                 if distance <= self.parentNetwork.ancestorCount:
@@ -110,7 +111,9 @@ class HardTreeNode(NetworkNode):
                         self.parentNetwork.add_nodewise_input(producer_node=ancestor,
                                                               producer_channel=ChannelTypes.branching_activation,
                                                               producer_channel_index=0, dest_node=self)
-                    tensor_list.append(activation_tensor)
+                    distance_tensor_pairs.append((distance, activation_tensor))
+            sorted_pairs = sorted(distance_tensor_pairs, key=lambda pair: pair[0])
+            tensor_list = [pair[1] for pair in sorted_pairs]
         return tensor_list
 
     # This method is OK

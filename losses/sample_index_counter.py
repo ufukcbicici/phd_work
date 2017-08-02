@@ -27,4 +27,4 @@ class SampleIndexCounter(GenericLoss):
             self.evalOutputs = [sample_index_tensor]
 
     def finalize(self):
-        self.isFinalized = True
+        super().finalize()

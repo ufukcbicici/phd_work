@@ -159,13 +159,13 @@ class TreeNetwork(Network):
             # Add customized operations on the top.
             with tf.variable_scope(node.indicatorText):
                 # Build the node-wise ops
-                # Evaluate sample distribution, if we want to.
                 print("Node:{0}".format(node.indicatorText))
-                if self.evalSampleDistribution:
-                    sample_counter = SampleIndexCounter(parent_node=node)
-                    NetworkNode.apply_loss(loss=sample_counter)
                 # Build non accumulation node networks.
                 if not node.isAccumulation:
+                    # Evaluate sample distribution, if we want to.
+                    if self.evalSampleDistribution:
+                        sample_counter = SampleIndexCounter(parent_node=node)
+                        NetworkNode.apply_loss(loss=sample_counter)
                     # Build user defined local node network
                     self.nodeBuilderFunctions[node_depth](network=self, node=node)
                 # If node is leaf, apply the actual loss function. If accumulation, fetch all losses from all nodes
