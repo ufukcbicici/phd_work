@@ -41,9 +41,9 @@ def root_func(network, node):
 
 def l1_func(network, node):
     parent_node = get_parent(network=network, node=node)
-    conv_input = network.add_nodewise_input(parent_node=parent_node, producer_channel=ChannelTypes.f_operator,
+    conv_input = network.add_nodewise_input(producer_node=parent_node, producer_channel=ChannelTypes.f_operator,
                                             producer_channel_index=0)
-    h_input = network.add_nodewise_input(parent_node=parent_node, producer_channel=ChannelTypes.h_operator,
+    h_input = network.add_nodewise_input(producer_node=parent_node, producer_channel=ChannelTypes.h_operator,
                                          producer_channel_index=0)
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.f_operator) as f_channel:
         TfLayerFactory.create_convolutional_layer(
@@ -58,7 +58,7 @@ def l1_func(network, node):
 
 def leaf_func(network, node):
     parent_node = get_parent(network=network, node=node)
-    conv_input = network.add_nodewise_input(parent_node=parent_node, producer_channel=ChannelTypes.f_operator,
+    conv_input = network.add_nodewise_input(producer_node=parent_node, producer_channel=ChannelTypes.f_operator,
                                             producer_channel_index=0)
     # F channel
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.f_operator) as f_channel:

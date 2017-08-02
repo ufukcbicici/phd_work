@@ -59,12 +59,12 @@ class HardTreeNode(NetworkNode):
         with NetworkChannel(parent_node=self,
                             parent_node_channel=ChannelTypes.branching_masks_unified) as branch_masks_unif_channel:
             branch_probability_threshold = self.parentNetwork.get_networkwise_input(
-                name=GlobalInputNames.branching_prob_threshold)
+                name=GlobalInputNames.branching_prob_threshold.value)
             unified_branch_mask_tensor = branch_masks_unif_channel.add_operation(
                 op=tf.greater_equal(x=branch_probabilities_tensor, y=branch_probability_threshold))
         # Create binary masks for each branch, which will be boolean vectors of the size (N,). k separate such vectors
         # will be generated.
-        for k in self.parentNetwork.treeDegree:
+        for k in range(self.parentNetwork.treeDegree):
             with NetworkChannel(parent_node=self,
                                 parent_node_channel=ChannelTypes.branching_masks_sliced) as branch_masks_sliced_channel:
                 pre_mask_tensor = branch_masks_sliced_channel.add_operation(

@@ -30,6 +30,7 @@ class Network:
         self.trainingTensorsList = []
         # Tensors to be used in evaluation
         self.evaluationTensorsList = []
+        self.globalInputs = {}
 
     def build_network(self):
         pass
@@ -53,26 +54,10 @@ class Network:
 
     # All networkwise inputs are constant, and they will be placed into the accumulation node.
     def add_networkwise_input(self, name, tensor_type):
-        tensor_names = [tensor.name for tensor in tf.get_default_graph().as_graph_def().node]
-        for tensor_name in tensor_names:
-            if name in tensor_name:
-                raise Exception("Name {0} is already used in tensor name {1}".format(name, tensor_name))
-        with NetworkChannel(parent_node=None,
-                            parent_node_channel=ChannelTypes.constant) as constant_channel:
-            tensor = constant_channel.add_operation(op=tf.placeholder(dtype=tensor_type, name=name))
-            self.variablesToFeed.add(tensor)
-        return tensor
+        if name in self.globalInputs:
+            raise Exception("Input {0} already exists".format(name))
+        self.globalInputs[name] = tf.placeholder(dtype=tensor_type, name=name)
+        return self.globalInputs[name]
 
     def get_networkwise_input(self, name):
-        accumulation_node = self.get_accumulation_node()
-        candidates = []
-        for output in accumulation_node.outputs.values():
-            if name in output.tensor.name:
-                candidates.append(output.tensor)
-        if len(candidates) != 1:
-            raise Exception("There must be 1 tensor returned from get_networkwise_input")
-        tensor = candidates[0]
-        return tensor
-
-
-
+        return self.globalInputs[name]

@@ -78,7 +78,7 @@ class TreeNetwork(Network):
                     last_output = path_node.get_output(producer_triple=producer_triple)
                 # An ancestor node which on the path [source,dest]. We need to make the desired output of source node
                 # pass through the intermediate nodes on the path, such that decisions are applied to them correctly.
-                elif path_node != producer_node or path_node != dest_node:
+                elif path_node != producer_node and path_node != dest_node:
                     # This output is not used by path_node at all.
                     if producer_triple not in path_node.inputs and producer_triple not in path_node.outputs:
                         branched_tensor = path_node.apply_decision(tensor=last_output.tensor)
