@@ -42,13 +42,13 @@ def root_func(network, node):
 def l1_func(network, node):
     parent_node = get_parent(network=network, node=node)
     conv_input = network.add_nodewise_input(producer_node=parent_node, producer_channel=ChannelTypes.f_operator,
-                                            producer_channel_index=0)
+                                            producer_channel_index=0, dest_node=node)
     h_input = network.add_nodewise_input(producer_node=parent_node, producer_channel=ChannelTypes.h_operator,
-                                         producer_channel_index=0)
+                                         producer_channel_index=0, dest_node=node)
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.f_operator) as f_channel:
         TfLayerFactory.create_convolutional_layer(
             node=node, channel=f_channel, input_tensor=conv_input,
-            conv_filter_shape=[5, 5, conv_2_feature_map_count, conv_2_feature_map_count],
+            conv_filter_shape=[5, 5, conv_1_feature_map_count, conv_2_feature_map_count],
             conv_stride_shape=[1, 1, 1, 1], pooling_shape=[1, 2, 2, 1], conv_padding="SAME",
             pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
             activation_type=ActivationType.relu, pooling_type=PoolingType.max, post_fix="2")
@@ -59,7 +59,7 @@ def l1_func(network, node):
 def leaf_func(network, node):
     parent_node = get_parent(network=network, node=node)
     conv_input = network.add_nodewise_input(producer_node=parent_node, producer_channel=ChannelTypes.f_operator,
-                                            producer_channel_index=0)
+                                            producer_channel_index=0, dest_node=node)
     # F channel
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.f_operator) as f_channel:
         flattened_conv = f_channel.add_operation(op=tf.reshape(conv_input, [-1, 7 * 7 * conv_2_feature_map_count]))

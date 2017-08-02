@@ -42,4 +42,4 @@ class Dag:
         return nx.shortest_path(self.dag_object, source, dest)
 
     def get_shortest_path_length(self, source, dest):
-        return len(nx.shortest_path(self.dag_object, source, dest))
+        return len(nx.shortest_path(self.dag_object, source, dest)) - 1

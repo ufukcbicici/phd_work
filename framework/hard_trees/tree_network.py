@@ -86,12 +86,12 @@ class TreeNetwork(Network):
                                                             producer_channel=producer_channel,
                                                             producer_channel_index=producer_channel_index)
                         path_node.add_input(producer_triple=producer_triple, input_object=network_io_object)
-                        path_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
+                        path_node.add_output(producer_triple=producer_triple, output_object=network_io_object)
                         last_output = path_node.get_output(producer_triple=producer_triple)
                     # This output is used by the path but for its internal calculations.
                     elif producer_triple in path_node.inputs and producer_triple not in path_node.outputs:
                         network_io_object = path_node.get_input(producer_triple=producer_triple)
-                        path_node.add_output(producer_triple=producer_triple, input_object=network_io_object)
+                        path_node.add_output(producer_triple=producer_triple, output_object=network_io_object)
                         last_output = path_node.get_output(producer_triple=producer_triple)
                     # There cannot be an operation which is not input but in output. This is invalid.
                     elif producer_triple not in path_node.inputs and producer_triple in path_node.outputs:
@@ -160,6 +160,7 @@ class TreeNetwork(Network):
             with tf.variable_scope(node.indicatorText):
                 # Build the node-wise ops
                 # Evaluate sample distribution, if we want to.
+                print("Node:{0}".format(node.indicatorText))
                 if self.evalSampleDistribution:
                     sample_counter = SampleIndexCounter(parent_node=node)
                     NetworkNode.apply_loss(loss=sample_counter)
