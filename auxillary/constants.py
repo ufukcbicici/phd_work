@@ -38,11 +38,9 @@ class ChannelTypes(Enum):
 
 class GlobalInputNames(Enum):
     global_scope = "GlobalScope"
-    data_input = "DataInput"
-    label_input = "LabelInput"
-    indices_input = "IndicesInput"
     regularizer_strength = "RegularizerStrength"
     branching_prob_threshold = "BranchingProbThreshold"
+    batch_size = "BatchSize"
 
 
 class ActivationType(Enum):

@@ -74,6 +74,7 @@ def main():
     dataset.load_dataset()
     cnn_lenet = TreeNetwork(run_id=0, dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
                             problem_type=ProblemType.classification,
+                            batch_size=5000,
                             list_of_node_builder_functions=[root_func, l1_func, leaf_func])
     cnn_lenet.build_network()
 

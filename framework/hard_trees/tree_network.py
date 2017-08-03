@@ -11,10 +11,10 @@ from losses.sample_index_counter import SampleIndexCounter
 
 
 class TreeNetwork(Network):
-    def __init__(self, run_id, dataset, parameter_file, problem_type,
+    def __init__(self, run_id, dataset, parameter_file, problem_type, batch_size,
                  tree_degree, tree_type, list_of_node_builder_functions, ancestor_count=sys.maxsize,
                  eval_sample_distribution=True):
-        super().__init__(run_id, dataset, parameter_file, problem_type)
+        super().__init__(run_id, dataset, parameter_file, problem_type, batch_size)
         self.treeDegree = tree_degree
         self.treeDepth = len(list_of_node_builder_functions)
         self.depthsToNodesDict = {}
@@ -115,6 +115,7 @@ class TreeNetwork(Network):
                         return network_io_object.tensor
 
     def create_global_inputs(self):
+        self.add_networkwise_input(name=GlobalInputNames.batch_size.value, tensor_type=tf.float32)
         self.add_networkwise_input(name=GlobalInputNames.branching_prob_threshold.value, tensor_type=tf.float32)
 
     def build_network(self):

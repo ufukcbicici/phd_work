@@ -153,16 +153,17 @@ class HardTreeNode(NetworkNode):
     def attach_acc_node_loss_eval_channels(self):
         # Step 1) Build the final loss layer.
         # Accumulate all losses from all nodes.
-        loss_tensors = []
+        self.parentNetwork.lossTensors = []
         for node in self.parentNetwork.nodes.values():
             for loss_object in node.losses.values():
                 if loss_object.lossOutputs is None:
                     continue
-                loss_object.lossIndex = len(loss_tensors)
-                loss_tensors.extend(loss_object.lossOutputs)
+                loss_object.lossIndex = len(self.parentNetwork.lossTensors)
+                self.parentNetwork.lossTensors.extend(loss_object.lossOutputs)
         # Step 2) Add all loss tensors
         with NetworkChannel(parent_node=self, parent_node_channel=ChannelTypes.total_loss) as total_loss_channel:
-            total_loss = total_loss_channel.add_operation(op=tf.add_n(loss_tensors))
+            self.parentNetwork.totalLossTensor = total_loss_channel.add_operation(
+                op=tf.add_n(self.parentNetwork.lossTensors))
         # Step 3) Gather all learnable parameters
         learnable_parameters = []
         for node in self.parentNetwork.nodes.values():
@@ -173,8 +174,7 @@ class HardTreeNode(NetworkNode):
                     argument.gradientIndex = len(learnable_parameters)
                     learnable_parameters.append(argument.tensor)
         # Step 4) Calculate the gradients with respect to parameter
-        with NetworkChannel(parent_node=self, parent_node_channel=ChannelTypes.gradient) as gradient_channel:
-            gradients = gradient_channel.add_operation(op=tf.gradients(total_loss, learnable_parameters))
+        self.parentNetwork.gradientTensors = tf.gradients(self.parentNetwork.totalLossTensor, learnable_parameters)
         # Step 5) Gather all tensors to be evaluated
         eval_tensors = []
         for node in self.parentNetwork.nodes.values():
@@ -186,10 +186,10 @@ class HardTreeNode(NetworkNode):
         # Step 6) Save the gathered loss and eval tensors, so they can re-used by the network.
         # Training
         self.parentNetwork.trainingTensorsList = []
-        self.parentNetwork.trainingTensorsList.extend(loss_tensors)
-        self.parentNetwork.trainingTensorsList.append(total_loss)
-        self.parentNetwork.trainingTensorsList.append(gradients)
+        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.lossTensors)
+        self.parentNetwork.trainingTensorsList.append(self.parentNetwork.totalLossTensor)
+        self.parentNetwork.trainingTensorsList.append(self.parentNetwork.gradientTensors)
         # Evaluation
         self.parentNetwork.evaluationTensorsList = []
         self.parentNetwork.evaluationTensorsList.extend(eval_tensors)
-    # **********************Private methods - OK**********************
+        # **********************Private methods - OK**********************

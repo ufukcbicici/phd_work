@@ -7,6 +7,7 @@ from framework.network_channel import NetworkChannel
 
 class Network:
     def __init__(self, run_id, dataset, parameter_file, problem_type,
+                 batch_size,
                  loss_layer_init=InitType.xavier,
                  loss_activation=ActivationType.tanh,
                  activation_init=InitType.xavier,
@@ -26,7 +27,11 @@ class Network:
         self.indicatorText = None
         self.activationInit = activation_init
         self.accumulationNode = None
+        self.batchSize = batch_size
         # Tensors to be used in training
+        self.lossTensors = None
+        self.totalLossTensor = None
+        self.gradientTensors = None
         self.trainingTensorsList = []
         # Tensors to be used in evaluation
         self.evaluationTensorsList = []

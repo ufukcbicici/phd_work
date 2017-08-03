@@ -1,5 +1,5 @@
 import tensorflow as tf
-from auxillary.constants import ChannelTypes
+from auxillary.constants import ChannelTypes, GlobalInputNames
 from auxillary.tf_layer_factory import TfLayerFactory
 from framework.network_channel import NetworkChannel
 from losses.generic_loss import GenericLoss
@@ -41,7 +41,12 @@ class CrossEntropyLoss(GenericLoss):
                             channel_name=CrossEntropyLoss.Name) as loss_channel:
             softmax_cross_entropy = loss_channel.add_operation(
                 op=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labelTensor, logits=self.logitTensor))
-            self.lossOutputs = [loss_channel.add_operation(op=tf.reduce_mean(input_tensor=softmax_cross_entropy))]
+            total_softmax_cross_entropy = loss_channel.add_operation(
+                op=tf.reduce_sum(input_tensor=softmax_cross_entropy))
+            batch_size = self.parentNode.parentNetwork.get_networkwise_input(name=GlobalInputNames.batch_size.value)
+            recip_batch_size = loss_channel.add_operation(op=tf.reciprocal(batch_size))
+            avg_softmax_cross_entropy = loss_channel.add_operation(op=(recip_batch_size * total_softmax_cross_entropy))
+            self.lossOutputs = [avg_softmax_cross_entropy]
 
     def build_evaluation_network(self):
         self.evalOutputs = []
@@ -60,7 +65,6 @@ class CrossEntropyLoss(GenericLoss):
         with NetworkChannel(parent_node=self.parentNode,
                             parent_node_channel=ChannelTypes.evaluation) as total_count_channel:
             self.evalOutputs.append(total_count_channel.add_operation(op=tf.size(input=comparison_cast)))
-
 
     def finalize(self):
         super().finalize()
