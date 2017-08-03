@@ -1,7 +1,10 @@
 import tensorflow as tf
 
-from auxillary.constants import ChannelTypes, PoolingType, ActivationType, InitType, ProblemType, TreeType
+from auxillary.constants import ChannelTypes, PoolingType, ActivationType, InitType, ProblemType, TreeType, \
+    GlobalInputNames
+from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.tf_layer_factory import TfLayerFactory
+from auxillary.train_program import TrainProgram
 from data_handling.mnist_data_set import MnistDataSet
 from framework.hard_trees.tree_network import TreeNetwork
 from framework.network_channel import NetworkChannel
@@ -72,10 +75,13 @@ def leaf_func(network, node):
 def main():
     dataset = MnistDataSet(validation_sample_count=5000)
     dataset.load_dataset()
+    train_program_path = UtilityFuncs.get_absolute_path(script_file=__file__, relative_path="train_program.json")
+    train_program = TrainProgram(program_file=train_program_path)
     cnn_lenet = TreeNetwork(run_id=0, dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
                             problem_type=ProblemType.classification,
-                            batch_size=5000,
+                            train_program=train_program,
                             list_of_node_builder_functions=[root_func, l1_func, leaf_func])
     cnn_lenet.build_network()
+    cnn_lenet.train()
 
 main()

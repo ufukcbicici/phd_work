@@ -3,6 +3,7 @@ import tensorflow as tf
 from auxillary.constants import ChannelTypes, InitType, ActivationType, PoolingType, TreeType, \
     ProblemType
 from auxillary.tf_layer_factory import TfLayerFactory
+from auxillary.train_program import TrainProgram
 from data_handling.mnist_data_set import MnistDataSet
 from framework.hard_trees.tree_network import TreeNetwork
 from framework.network_channel import NetworkChannel
@@ -46,6 +47,7 @@ def baseline_network(network, node):
 def main():
     dataset = MnistDataSet(validation_sample_count=5000)
     dataset.load_dataset()
+    # train_program = TrainProgram(program_file=)
     cnn_lenet = TreeNetwork(run_id=0, dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
                             problem_type=ProblemType.classification,
                             list_of_node_builder_functions=[baseline_network])

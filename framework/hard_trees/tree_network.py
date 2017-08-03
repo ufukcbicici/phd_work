@@ -2,6 +2,8 @@ import tensorflow as tf
 import sys
 
 from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames
+from auxillary.general_utility_funcs import UtilityFuncs
+from auxillary.parameters import DecayingParameter
 from framework.hard_trees.hard_tree_node import HardTreeNode
 from framework.network import Network
 from framework.network_channel import NetworkChannel
@@ -11,10 +13,10 @@ from losses.sample_index_counter import SampleIndexCounter
 
 
 class TreeNetwork(Network):
-    def __init__(self, run_id, dataset, parameter_file, problem_type, batch_size,
+    def __init__(self, run_id, dataset, parameter_file, problem_type, train_program,
                  tree_degree, tree_type, list_of_node_builder_functions, ancestor_count=sys.maxsize,
                  eval_sample_distribution=True):
-        super().__init__(run_id, dataset, parameter_file, problem_type, batch_size)
+        super().__init__(run_id, dataset, parameter_file, problem_type, train_program)
         self.treeDegree = tree_degree
         self.treeDepth = len(list_of_node_builder_functions)
         self.depthsToNodesDict = {}
@@ -118,6 +120,16 @@ class TreeNetwork(Network):
         self.add_networkwise_input(name=GlobalInputNames.batch_size.value, tensor_type=tf.float32)
         self.add_networkwise_input(name=GlobalInputNames.branching_prob_threshold.value, tensor_type=tf.float32)
 
+    def create_global_input_drivers(self):
+        # Branching probability
+        self.globalInputDrivers[GlobalInputNames.branching_prob_threshold.value] = \
+            UtilityFuncs.create_parameter_from_train_program(
+                parameter_name=GlobalInputNames.branching_prob_threshold.value, train_program=self.trainProgram)
+        # Batch Size
+        self.globalInputDrivers[GlobalInputNames.batch_size.value] = \
+            UtilityFuncs.create_parameter_from_train_program(
+                parameter_name=GlobalInputNames.batch_size.value, train_program=self.trainProgram)
+
     def build_network(self):
         curr_index = 0
         # Step 1:
@@ -154,7 +166,7 @@ class TreeNetwork(Network):
         with tf.variable_scope(GlobalInputNames.global_scope.value):
             self.create_global_inputs()
         # Step 3:
-        # Build the complete symbolic graph by building and connectiong the symbolic graphs of the nodes
+        # Build the complete symbolic graph by building and connecting the symbolic graphs of the nodes
         for node in self.topologicalSortedNodes:
             node_depth = self.nodesToDepthsDict[node]
             # Add customized operations on the top.
@@ -176,8 +188,24 @@ class TreeNetwork(Network):
                 # If node is not leaf or accumulation (inner node), then apply branching mechanism.
                 else:
                     node.attach_decision()
-                #  Build weight shrinkage losses.
+                # Build weight shrinkage losses.
                 node.attach_shrinkage_losses()
+        # Step 4:
+        # Set the drivers for the global constants
+        self.create_global_input_drivers()
+
+    def train(self):
+        pass
+        # # Init parameters
+        # init = tf.global_variables_initializer()
+        # sess = tf.Session()
+        # sess.run(init)
+        # # Start the training
+        # for epoch_id in range(self.epochCount):
+        #     while True:
+        #         # Get the next batch
+        #         samples, labels, indices_list = self.dataset.get_next_batch(batch_size=self.batchSize)
+        #         # Prepare the feed dict
 
     # Private methods
     def get_parent_index(self, node_index):

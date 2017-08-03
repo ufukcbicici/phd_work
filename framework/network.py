@@ -7,7 +7,7 @@ from framework.network_channel import NetworkChannel
 
 class Network:
     def __init__(self, run_id, dataset, parameter_file, problem_type,
-                 batch_size,
+                 train_program,
                  loss_layer_init=InitType.xavier,
                  loss_activation=ActivationType.tanh,
                  activation_init=InitType.xavier,
@@ -22,12 +22,11 @@ class Network:
         self.problemType = problem_type
         self.lossLayerInit = loss_layer_init
         self.lossLayerActivation = loss_activation
-        self.variablesToFeed = set()
         self.shrinkageRegularizer = shrinkage_regularizer
         self.indicatorText = None
         self.activationInit = activation_init
         self.accumulationNode = None
-        self.batchSize = batch_size
+        self.trainProgram = train_program
         # Tensors to be used in training
         self.lossTensors = None
         self.totalLossTensor = None
@@ -36,7 +35,9 @@ class Network:
         # Tensors to be used in evaluation
         self.evaluationTensorsList = []
         self.globalInputs = {}
+        self.globalInputDrivers = {}
 
+    # Methods to be overridden
     def build_network(self):
         pass
 
@@ -45,6 +46,14 @@ class Network:
 
     def create_global_inputs(self):
         pass
+
+    def create_global_input_drivers(self):
+        pass
+
+    def train(self):
+        pass
+
+    # Methods to be overridden
 
     def get_accumulation_node(self):
         if self.accumulationNode is None:
