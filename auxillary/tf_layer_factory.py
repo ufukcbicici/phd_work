@@ -21,10 +21,10 @@ class TfLayerFactory:
         conv_filter_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type))
         conv_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type))
         # Filters and bias
-        W = node.create_variable(name="Conv_{0}_Filter".format(post_fix), initializer=conv_filter_initializer,
+        W = node.create_variable(name="Convolution_Filter_{0}".format(post_fix), initializer=conv_filter_initializer,
                                  shape=conv_filter_shape, needs_gradient=True, dtype=tf.float32,
                                  arg_type=ArgumentTypes.learnable_parameter, channel=channel)
-        b = node.create_variable(name="Conv_{0}_Bias".format(post_fix), initializer=conv_bias_initializer,
+        b = node.create_variable(name="Convolution_Bias_{0}".format(post_fix), initializer=conv_bias_initializer,
                                  shape=conv_filter_shape[3], needs_gradient=True, dtype=tf.float32,
                                  arg_type=ArgumentTypes.learnable_parameter, channel=channel)
         # Operations
@@ -49,10 +49,10 @@ class TfLayerFactory:
         fc_filter_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type))
         fc_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type))
         # Filters and bias
-        W = node.create_variable(name="FC_{0}_Weight".format(post_fix), initializer=fc_filter_initializer,
+        W = node.create_variable(name="FullyConnected_Weight_{0}".format(post_fix), initializer=fc_filter_initializer,
                                  shape=fc_shape, needs_gradient=True, dtype=tf.float32,
                                  arg_type=ArgumentTypes.learnable_parameter, channel=channel)
-        b = node.create_variable(name="FC_{0}_Bias".format(post_fix), initializer=fc_bias_initializer,
+        b = node.create_variable(name="FullyConnected_Bias_{0}".format(post_fix), initializer=fc_bias_initializer,
                                  shape=fc_shape[1], needs_gradient=True, dtype=tf.float32,
                                  arg_type=ArgumentTypes.learnable_parameter, channel=channel)
         # Operations

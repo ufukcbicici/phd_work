@@ -13,70 +13,52 @@
     "minLimit":0.0,
     "epsilon_value":0.0
   },
-  "weight_update_intervals": {
-    "_gamma": 100000000,
-    "FullyConnected,_F_": 1,
-    "_loss_": 1,
-    "FullyConnected,_H_": 1,
-    "_beta": 100000000,
-    "Convolution,_F_": 1,
-    "Convolution,_H_": 1,
-    "_decision_": 1
+  "weight_update_interval": {
+    "FullyConnected,BranchingActivation,Weight": 1,
+    "FullyConnected,BranchingActivation,Bias": 1,
+    "FullyConnected,FOperator,Weight": 1,
+    "FullyConnected,FOperator,Bias": 1,
+    "Convolution,FOperator,Filter": 1,
+    "Convolution,FOperator,Bias": 1
   },
   "wd": {
-    "_gamma": 0.0,
-    "_decision_,weight": 0.0022,
-    "Convolution,_H_,weight": 0.0022,
-    "_decision_,bias": 0.0,
-    "_loss_,weight": 0.0022,
-    "Convolution,_F_,bias": 0.0,
-    "FullyConnected,_H_,weight": 0.0022,
-    "_beta": 0.0,
-    "FullyConnected,_F_,bias": 0.0,
-    "Convolution,_F_,weight": 0.0022,
-    "FullyConnected,_H_,bias": 0.0,
-    "FullyConnected,_F_,weight": 0.0022,
-    "_loss_,bias": 0.0,
-    "Convolution,_H_,bias": 0.0
+    "FullyConnected,BranchingActivation,Weight": 0.0022,
+    "FullyConnected,BranchingActivation,Bias": 0.0,
+    "FullyConnected,FOperator,Weight": 0.0022,
+    "FullyConnected,FOperator,Bias": 0.0,
+    "Convolution,FOperator,Filter": 0.0022,
+    "Convolution,FOperator,Bias": 0.0
   },
   "lr_initial": {
-    "_gamma": 0.1,
-    "FullyConnected,_F_": 0.3,
-    "_loss_": 0.3,
-    "FullyConnected,_H_": 0.3,
-    "_beta": 0.1,
-    "Convolution,_F_": 0.3,
-    "Convolution,_H_": 0.3,
-    "_decision_": 0.3
+    "FullyConnected,BranchingActivation,Weight": 0.1,
+    "FullyConnected,BranchingActivation,Bias": 0.1,
+    "FullyConnected,FOperator,Weight": 0.1,
+    "FullyConnected,FOperator,Bias": 0.1,
+    "Convolution,FOperator,Filter": 0.1,
+    "Convolution,FOperator,Bias": 0.1
   },
   "lr_decay_ratio": {
-    "_gamma": 0.5,
-    "FullyConnected,_F_": 0.5,
-    "_loss_": 0.5,
-    "FullyConnected,_H_": 0.5,
-    "_beta": 0.5,
-    "Convolution,_F_": 0.5,
-    "Convolution,_H_": 0.5,
-    "_decision_": 0.5
+    "FullyConnected,BranchingActivation,Weight": 0.5,
+    "FullyConnected,BranchingActivation,Bias": 0.5,
+    "FullyConnected,FOperator,Weight": 0.5,
+    "FullyConnected,FOperator,Bias": 0.5,
+    "Convolution,FOperator,Filter": 0.5,
+    "Convolution,FOperator,Bias": 0.5
   },
   "lr_update_intervals": {
-    "_gamma": 600,
-    "FullyConnected,_F_": 1250,
-    "_loss_": 1250,
-    "FullyConnected,_H_": 1250,
-    "_beta": 600,
-    "Convolution,_F_": 1250,
-    "Convolution,_H_": 1250,
-    "_decision_": 1250
+    "FullyConnected,BranchingActivation,Weight": 500,
+    "FullyConnected,BranchingActivation,Bias": 500,
+    "FullyConnected,FOperator,Weight": 500,
+    "FullyConnected,FOperator,Bias": 500,
+    "Convolution,FOperator,Filter": 500,
+    "Convolution,FOperator,Bias": 500
   },
   "momentum": {
-    "_gamma": 0.9,
-    "FullyConnected,_F_": 0.9,
-    "_loss_": 0.9,
-    "FullyConnected,_H_": 0.9,
-    "_beta": 0.9,
-    "Convolution,_F_": 0.9,
-    "Convolution,_H_": 0.9,
-    "_decision_": 0.9
+    "FullyConnected,BranchingActivation,Weight": 0.9,
+    "FullyConnected,BranchingActivation,Bias": 0.9,
+    "FullyConnected,FOperator,Weight": 0.9,
+    "FullyConnected,FOperator,Bias": 0.9,
+    "Convolution,FOperator,Filter": 0.9,
+    "Convolution,FOperator,Bias": 0.9
   }
 }

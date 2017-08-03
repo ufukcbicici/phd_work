@@ -1,6 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
+from auxillary.constants import GlobalInputNames
+
 
 class NetworkArgument:
     def __init__(self, name, symbolic_network_object, container_node, needs_gradient, arg_type):
@@ -18,3 +20,6 @@ class NetworkArgument:
 
     def set_gradient(self, arr_ref):
         self.gradientArray = arr_ref
+
+    def get_property_name(self, property_):
+        return "{0}_{1}".format(property_, self.name)

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from auxillary.constants import ChannelTypes, TrainingHyperParameters
+from auxillary.constants import ChannelTypes, TrainingHyperParameters, GlobalInputNames
 from framework.network_channel import NetworkChannel
 from losses.generic_loss import GenericLoss
 
@@ -10,7 +10,7 @@ class L2Loss(GenericLoss):
     def __init__(self, parent_node, argument, training_program):
         self.argument = argument
         self.trainingProgram = training_program
-        super().__init__(parent_node=parent_node, name="{0}_wd".format(self.argument.name))
+        super().__init__(parent_node=parent_node, name=self.argument.get_property_name(property_=GlobalInputNames.wd))
 
     def build_training_network(self):
         wd_tensor = self.parentNode.parentNetwork.add_networkwise_input(name=self.name, tensor_type=tf.float32)

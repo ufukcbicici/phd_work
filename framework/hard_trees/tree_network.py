@@ -1,7 +1,7 @@
 import tensorflow as tf
 import sys
 
-from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames
+from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, ArgumentTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter
 from framework.hard_trees.hard_tree_node import HardTreeNode
@@ -129,6 +129,18 @@ class TreeNetwork(Network):
         self.globalInputDrivers[GlobalInputNames.batch_size.value] = \
             UtilityFuncs.create_parameter_from_train_program(
                 parameter_name=GlobalInputNames.batch_size.value, train_program=self.trainProgram)
+        # All hyper parameters regarding to parameter training
+        hyper_parameter_set = {GlobalInputNames.wd.value, GlobalInputNames.lr.value, GlobalInputNames.lr_initial.value,
+                               GlobalInputNames.momentum.value, GlobalInputNames.weight_update_interval.value,
+                               GlobalInputNames.lr_update_interval.value}
+        for node in self.nodes.values():
+            for argument in node.argumentsDict.values():
+                if argument.argumentType == ArgumentTypes.learnable_parameter:
+                    for hyper_parameter in hyper_parameter_set:
+                        argument_hyper_parameter_name = argument.get_property_name(property_=hyper_parameter)
+                        value_dict = self.trainProgram.load_settings_for_property(property_name=hyper_parameter)
+                        hyper_parameter_value = self.trainProgram.decode_json_element_for_parameter(
+                            parameter_name=argument_hyper_parameter_name, json_element=value_dict)
 
     def build_network(self):
         curr_index = 0

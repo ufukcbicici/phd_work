@@ -36,7 +36,7 @@ def root_func(network, node):
             conv_filter_shape=[5, 5, 1, conv_1_feature_map_count],
             conv_stride_shape=[1, 1, 1, 1], pooling_shape=[1, 2, 2, 1], conv_padding="SAME",
             pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
-            activation_type=ActivationType.relu, pooling_type=PoolingType.max, post_fix="1")
+            activation_type=ActivationType.relu, pooling_type=PoolingType.max, post_fix=ChannelTypes.f_operator.value)
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.h_operator) as h_channel:
         x_flattened = tf.reshape(x, [-1, MnistDataSet.MNIST_SIZE * MnistDataSet.MNIST_SIZE])
         h_channel.add_operation(op=x_flattened)
@@ -54,7 +54,7 @@ def l1_func(network, node):
             conv_filter_shape=[5, 5, conv_1_feature_map_count, conv_2_feature_map_count],
             conv_stride_shape=[1, 1, 1, 1], pooling_shape=[1, 2, 2, 1], conv_padding="SAME",
             pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
-            activation_type=ActivationType.relu, pooling_type=PoolingType.max, post_fix="2")
+            activation_type=ActivationType.relu, pooling_type=PoolingType.max, post_fix=ChannelTypes.f_operator.value)
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.h_operator) as h_channel:
         h_channel.add_operation(op=h_input)
 
@@ -69,7 +69,7 @@ def leaf_func(network, node):
         TfLayerFactory.create_fc_layer(node=node, channel=f_channel, input_tensor=flattened_conv,
                                        fc_shape=[7 * 7 * conv_2_feature_map_count, fc_unit_count],
                                        init_type=InitType.xavier, activation_type=ActivationType.relu,
-                                       post_fix="3")
+                                       post_fix=ChannelTypes.f_operator.value)
 
 
 def main():

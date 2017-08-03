@@ -41,6 +41,12 @@ class GlobalInputNames(Enum):
     regularizer_strength = "RegularizerStrength"
     branching_prob_threshold = "BranchingProbThreshold"
     batch_size = "BatchSize"
+    wd = "wd"
+    lr = "lr"
+    lr_initial = "lr_initial"
+    momentum = "momentum"
+    weight_update_interval = "weight_update_interval"
+    lr_update_interval = "lr_update_interval"
 
 
 class ActivationType(Enum):

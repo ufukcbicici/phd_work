@@ -49,7 +49,7 @@ class HardTreeNode(NetworkNode):
                                                                          self.parentNetwork.treeDegree],
                                                                init_type=self.parentNetwork.activationInit,
                                                                activation_type=ActivationType.no_activation,
-                                                               post_fix="Activation")
+                                                               post_fix=ChannelTypes.branching_activation.value)
         # Create branching probabilities
         with NetworkChannel(parent_node=self,
                             parent_node_channel=ChannelTypes.branching_probabilities) as branch_prob_channel:
