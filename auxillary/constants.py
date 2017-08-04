@@ -47,6 +47,7 @@ class GlobalInputNames(Enum):
     momentum = "momentum"
     weight_update_interval = "weight_update_interval"
     lr_update_interval = "lr_update_interval"
+    lr_decay_ratio = "lr_decay_ratio"
 
 
 class ActivationType(Enum):

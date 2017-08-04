@@ -10,7 +10,7 @@ class L2Loss(GenericLoss):
     def __init__(self, parent_node, argument, training_program):
         self.argument = argument
         self.trainingProgram = training_program
-        super().__init__(parent_node=parent_node, name=self.argument.get_property_name(property_=GlobalInputNames.wd))
+        super().__init__(parent_node=parent_node, name=self.argument.get_property_name(property_=GlobalInputNames.wd.value))
 
     def build_training_network(self):
         wd_tensor = self.parentNode.parentNetwork.add_networkwise_input(name=self.name, tensor_type=tf.float32)

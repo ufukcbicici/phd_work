@@ -3,7 +3,7 @@ import sys
 
 from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, ArgumentTypes
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DecayingParameter
+from auxillary.parameters import DecayingParameter, FixedParameter
 from framework.hard_trees.hard_tree_node import HardTreeNode
 from framework.network import Network
 from framework.network_channel import NetworkChannel
@@ -130,17 +130,44 @@ class TreeNetwork(Network):
             UtilityFuncs.create_parameter_from_train_program(
                 parameter_name=GlobalInputNames.batch_size.value, train_program=self.trainProgram)
         # All hyper parameters regarding to parameter training
-        hyper_parameter_set = {GlobalInputNames.wd.value, GlobalInputNames.lr.value, GlobalInputNames.lr_initial.value,
+        hyper_parameter_set = {GlobalInputNames.wd.value, GlobalInputNames.lr_initial.value,
                                GlobalInputNames.momentum.value, GlobalInputNames.weight_update_interval.value,
-                               GlobalInputNames.lr_update_interval.value}
+                               GlobalInputNames.lr_update_interval.value, GlobalInputNames.lr_decay_ratio.value}
         for node in self.nodes.values():
             for argument in node.argumentsDict.values():
                 if argument.argumentType == ArgumentTypes.learnable_parameter:
+                    hyper_parameter_dict = {}
                     for hyper_parameter in hyper_parameter_set:
                         argument_hyper_parameter_name = argument.get_property_name(property_=hyper_parameter)
                         value_dict = self.trainProgram.load_settings_for_property(property_name=hyper_parameter)
                         hyper_parameter_value = self.trainProgram.decode_json_element_for_parameter(
                             parameter_name=argument_hyper_parameter_name, json_element=value_dict)
+                        hyper_parameter_dict[hyper_parameter] = hyper_parameter_value
+                    # Decaying Parameter for the learning rate
+                    lr_hyper_param_name = argument.get_property_name(property_=GlobalInputNames.lr.value)
+                    self.globalInputDrivers[lr_hyper_param_name] = \
+                        DecayingParameter(name=lr_hyper_param_name,
+                                          value=hyper_parameter_dict[GlobalInputNames.lr_initial.value],
+                                          decay=hyper_parameter_dict[GlobalInputNames.lr_decay_ratio.value],
+                                          decay_period=hyper_parameter_dict[GlobalInputNames.lr_update_interval.value])
+                    # Fixed Parameter for the wd
+                    wd_hyper_parameter_name = argument.get_property_name(property_=GlobalInputNames.wd.value)
+                    self.globalInputDrivers[wd_hyper_parameter_name] = \
+                        FixedParameter(name=wd_hyper_parameter_name,
+                                       value=hyper_parameter_dict[GlobalInputNames.wd.value])
+                    # Fixed Parameter for the momentum value
+                    momentum_hyper_parameter_name = \
+                        argument.get_property_name(property_=GlobalInputNames.momentum.value)
+                    self.globalInputDrivers[momentum_hyper_parameter_name] = \
+                        FixedParameter(name=momentum_hyper_parameter_name,
+                                       value=hyper_parameter_dict[GlobalInputNames.momentum.value])
+                    # Weight update parameter
+                    weight_update_interval_parameter_name = \
+                        argument.get_property_name(property_=GlobalInputNames.weight_update_interval.value)
+                    self.globalInputDrivers[weight_update_interval_parameter_name] = \
+                        FixedParameter(name=weight_update_interval_parameter_name,
+                                       value=hyper_parameter_dict[GlobalInputNames.weight_update_interval.value])
+        print("X")
 
     def build_network(self):
         curr_index = 0

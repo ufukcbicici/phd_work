@@ -32,7 +32,7 @@ class CrossEntropyLoss(GenericLoss):
                                                               init_type=self.parentNode.parentNetwork.lossLayerInit,
                                                               activation_type=self.parentNode.parentNetwork.
                                                               lossLayerActivation,
-                                                              post_fix="pre_loss")
+                                                              post_fix=ChannelTypes.pre_loss.value)
 
     def build_training_network(self):
         if self.logitTensor is None:
