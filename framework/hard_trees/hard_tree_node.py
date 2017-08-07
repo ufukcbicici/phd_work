@@ -1,5 +1,5 @@
 import tensorflow as tf
-from auxillary.constants import ProblemType, ChannelTypes, ArgumentTypes, ActivationType, GlobalInputNames
+from auxillary.constants import ProblemType, ChannelTypes, parameterTypes, ActivationType, GlobalInputNames
 from auxillary.tf_layer_factory import TfLayerFactory
 from framework.network_channel import NetworkChannel
 from framework.network_node import NetworkNode
@@ -169,10 +169,10 @@ class HardTreeNode(NetworkNode):
         for node in self.parentNetwork.nodes.values():
             if node == self:
                 continue
-            for argument in node.argumentsDict.values():
-                if argument.argumentType == ArgumentTypes.learnable_parameter:
-                    argument.gradientIndex = len(learnable_parameters)
-                    learnable_parameters.append(argument.tensor)
+            for parameter in node.parametersDict.values():
+                if parameter.parameterType == parameterTypes.learnable_parameter:
+                    parameter.gradientIndex = len(learnable_parameters)
+                    learnable_parameters.append(parameter.tensor)
         # Step 4) Calculate the gradients with respect to parameter
         self.parentNetwork.gradientTensors = tf.gradients(self.parentNetwork.totalLossTensor, learnable_parameters)
         # Step 5) Gather all tensors to be evaluated

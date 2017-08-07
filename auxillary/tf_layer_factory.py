@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from auxillary.constants import GlobalInputNames, InitType, ChannelTypes, ActivationType, PoolingType, ArgumentTypes
+from auxillary.constants import GlobalInputNames, InitType, ChannelTypes, ActivationType, PoolingType, parameterTypes
 
 
 class TfLayerFactory:
@@ -23,10 +23,10 @@ class TfLayerFactory:
         # Filters and bias
         W = node.create_variable(name="Convolution_Filter_{0}".format(post_fix), initializer=conv_filter_initializer,
                                  shape=conv_filter_shape, needs_gradient=True, dtype=tf.float32,
-                                 arg_type=ArgumentTypes.learnable_parameter, channel=channel)
+                                 arg_type=parameterTypes.learnable_parameter, channel=channel)
         b = node.create_variable(name="Convolution_Bias_{0}".format(post_fix), initializer=conv_bias_initializer,
                                  shape=conv_filter_shape[3], needs_gradient=True, dtype=tf.float32,
-                                 arg_type=ArgumentTypes.learnable_parameter, channel=channel)
+                                 arg_type=parameterTypes.learnable_parameter, channel=channel)
         # Operations
         conv_intermediate = channel.add_operation(
             op=tf.nn.conv2d(input_tensor, W, strides=conv_stride_shape, padding=conv_padding))
@@ -51,10 +51,10 @@ class TfLayerFactory:
         # Filters and bias
         W = node.create_variable(name="FullyConnected_Weight_{0}".format(post_fix), initializer=fc_filter_initializer,
                                  shape=fc_shape, needs_gradient=True, dtype=tf.float32,
-                                 arg_type=ArgumentTypes.learnable_parameter, channel=channel)
+                                 arg_type=parameterTypes.learnable_parameter, channel=channel)
         b = node.create_variable(name="FullyConnected_Bias_{0}".format(post_fix), initializer=fc_bias_initializer,
                                  shape=fc_shape[1], needs_gradient=True, dtype=tf.float32,
-                                 arg_type=ArgumentTypes.learnable_parameter, channel=channel)
+                                 arg_type=parameterTypes.learnable_parameter, channel=channel)
         # Operations
         matmul = channel.add_operation(op=tf.matmul(input_tensor, W))
         fc = channel.add_operation(op=matmul + b)

@@ -7,7 +7,7 @@ class DatasetTypes(Enum):
     test = 2
 
 
-class ArgumentTypes(Enum):
+class parameterTypes(Enum):
     input = 0
     learnable_parameter = 1
     auxillary = 2
@@ -34,6 +34,7 @@ class ChannelTypes(Enum):
     evaluation = "Evaluation"
     constant = "Constant"
     sample_indices = "SampleIndices"
+    parameter_update = "ParameterUpdate"
 
 
 class GlobalInputNames(Enum):
@@ -48,6 +49,7 @@ class GlobalInputNames(Enum):
     weight_update_interval = "weight_update_interval"
     lr_update_interval = "lr_update_interval"
     lr_decay_ratio = "lr_decay_ratio"
+    parameter_update = "parameter_update"
 
 
 class ActivationType(Enum):
