@@ -115,33 +115,73 @@ def generate_data(sample_count, decision_count, label_count, data_dim):
 #     return q
 
 def bootstrap_covariance_test():
-    N = 20
+    N = 100000
     K = 5
     D = 784
     L = 100
-    m = 5
+    m = 100
     S, h, X = generate_data(sample_count=N, decision_count=K, label_count=L, data_dim=D)
     h = h[:, 0]
-    f = 10.0 * np.tan(np.sum(X, axis=1))
+    f = np.tan(np.sum(X, axis=1))
     mu_f = np.mean(f)
     mu_h = np.mean(h)
     cov_AB_unbiased_estimate = 0.0
     sample_count = 1000000
     x = range(N)
-    all_As_list = []
-    all_Bs_list = []
-    list_of_lists = [range(N) for k in range(m)]
-    for idx in itertools.product(*list_of_lists):
-        indices = list(idx)
-        A = (f[indices]).mean()
-        B = (h[indices]).mean()
-        all_As_list.append(A)
-        all_Bs_list.append(B)
-    A_arr = np.array(all_As_list)
-    B_arr = np.array(all_Bs_list)
-    cov = np.cov(A_arr, B_arr)
+    print("Mean_A={0}".format(mu_f))
+    print("Mean_B={0}".format(mu_h))
+    # all_As_list = []
+    # all_Bs_list = []
+    # list_of_lists = [range(N) for k in range(m)]
+    # for idx in itertools.product(*list_of_lists):
+    #     indices = list(idx)
+    #     A = (f[indices]).mean()
+    #     B = (h[indices]).mean()
+    #     all_As_list.append(A)
+    #     all_Bs_list.append(B)
+    #     if len(all_As_list) % 10000 == 0:
+    #         print(len(all_As_list))
+    # A_arr = np.array(all_As_list)
+    # B_arr = np.array(all_Bs_list)
+    # cov_original = np.cov(A_arr, B_arr)
 
-    sample = np.random.choice(x, m, replace=True)
+    sample_indices = np.random.choice(x, m, replace=True)
+    # Bootstrapping
+    f_sample = f[sample_indices]
+    h_sample = h[sample_indices]
+    resample_count = 1000
+    resampled_A_list = []
+    resampled_B_list = []
+    for sample_index in range(resample_count):
+        resampled_indices= np.random.choice(m, m, replace=True)
+        f_resampled = f_sample[resampled_indices]
+        h_resampled = h_sample[resampled_indices]
+        resampled_A_list.append(f_resampled.mean())
+        resampled_B_list.append(h_resampled.mean())
+    bootstrap_arr_A = np.array(resampled_A_list)
+    bootstrap_arr_B = np.array(resampled_B_list)
+    print("Bootstrap Mean_A={0}".format(bootstrap_arr_A.mean()))
+    print("Bootstrap Mean_B={0}".format(bootstrap_arr_B.mean()))
+
+    # Subsets
+    n = 10
+    subset_means_A = []
+    subset_means_B = []
+    for i in range(0, int(m/n)):
+        indices = list(range(i*n, (i+1)*n))
+        f_subset = f_sample[indices]
+        h_subset = h_sample[indices]
+        subset_means_A.append(f_subset.mean())
+        subset_means_B.append(h_subset.mean())
+    subset_arr_A = np.array(subset_means_A)
+    subset_arr_B = np.array(subset_means_B)
+    print("Subset Mean_A={0}".format(subset_arr_A.mean()))
+    print("Subset Mean_B={0}".format(subset_arr_B.mean()))
+
+
+
+    cov_bootstrap = np.cov(bootstrap_arr_A, bootstrap_arr_B, bias=True)
+    print("X")
 
 
 
