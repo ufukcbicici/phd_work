@@ -7,7 +7,7 @@ class DatasetTypes(Enum):
     test = 2
 
 
-class ArgumentTypes(Enum):
+class parameterTypes(Enum):
     input = 0
     learnable_parameter = 1
     auxillary = 2
@@ -28,12 +28,15 @@ class ChannelTypes(Enum):
     branching_masks_sliced = "BranchingMasksSliced"
     decision = "Decision"
     pre_loss = "PreLoss"
-    loss = "Loss"
-    total_loss = "TotalLoss"
+    objective_loss = "ObjectiveLoss"
+    regularization_loss = "RegularizationLoss"
+    total_objective_loss = "TotalObjectiveLoss"
+    total_regularization_loss = "TotalRegularizationLoss"
     gradient = "Gradient"
     evaluation = "Evaluation"
     constant = "Constant"
     sample_indices = "SampleIndices"
+    parameter_update = "ParameterUpdate"
 
 
 class GlobalInputNames(Enum):
@@ -48,6 +51,13 @@ class GlobalInputNames(Enum):
     weight_update_interval = "weight_update_interval"
     lr_update_interval = "lr_update_interval"
     lr_decay_ratio = "lr_decay_ratio"
+    parameter_update = "parameter_update"
+
+
+class LossType(Enum):
+    objective = "Objective"
+    regularization = "Regularization"
+    eval_term = "Evaluation"
 
 
 class ActivationType(Enum):

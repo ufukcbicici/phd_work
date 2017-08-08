@@ -1,4 +1,4 @@
-from auxillary.constants import ChannelTypes
+from auxillary.constants import ChannelTypes, LossType
 from framework.network_channel import NetworkChannel
 from losses.generic_loss import GenericLoss
 
@@ -7,7 +7,7 @@ class SampleIndexCounter(GenericLoss):
     Name = "SampleIndexCounter"
 
     def __init__(self, parent_node):
-        super().__init__(parent_node=parent_node, name=SampleIndexCounter.Name)
+        super().__init__(parent_node=parent_node, name=SampleIndexCounter.Name, loss_type=LossType.eval_term)
 
     def build_training_network(self):
         pass

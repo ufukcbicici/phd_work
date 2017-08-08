@@ -28,9 +28,12 @@ class Network:
         self.accumulationNode = None
         self.trainProgram = train_program
         # Tensors to be used in training
-        self.lossTensors = None
-        self.totalLossTensor = None
-        self.gradientTensors = None
+        self.objectiveLossTensors = None
+        self.regularizationTensors = None
+        self.totalObjectiveLossTensor = None
+        self.totalRegularizationLossTensor = None
+        self.objectiveGradientTensors = None
+        self.regularizationGradientTensors = None
         self.trainingTensorsList = []
         # Tensors to be used in evaluation
         self.evaluationTensorsList = []

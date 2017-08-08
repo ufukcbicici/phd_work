@@ -1,5 +1,5 @@
 import tensorflow as tf
-from auxillary.constants import ProblemType, ChannelTypes, ArgumentTypes, ActivationType, GlobalInputNames
+from auxillary.constants import ProblemType, ChannelTypes, parameterTypes, ActivationType, GlobalInputNames, LossType
 from auxillary.tf_layer_factory import TfLayerFactory
 from framework.network_channel import NetworkChannel
 from framework.network_node import NetworkNode
@@ -121,7 +121,7 @@ class HardTreeNode(NetworkNode):
         if self.parentNetwork.problemType == ProblemType.classification:
             # Get f, h and ancestor channels, concatenate the outputs
             # Shapes are constrained to be 2 dimensional. Else, it will raise exception. We have to flatten all tensors
-            # before the loss operation.
+            # before the objective_loss operation.
             tensor_list = []
             # First f and h channels.
             relevant_channels = {ChannelTypes.f_operator, ChannelTypes.h_operator}
@@ -131,7 +131,7 @@ class HardTreeNode(NetworkNode):
             # Check if all tensors of the collect dimension.
             for tensor in tensor_list:
                 if len(tensor.shape) != 2:
-                    raise Exception("Tensors entering the loss must be 2D.")
+                    raise Exception("Tensors entering the objective_loss must be 2D.")
                 if tensor.shape[1].value is None:
                     raise Exception("Output tensor's dim1 cannot be None.")
             # Get the label tensor
@@ -152,44 +152,62 @@ class HardTreeNode(NetworkNode):
     # This method is OK
     def attach_acc_node_loss_eval_channels(self):
         # Step 1) Build the final loss layer.
-        # Accumulate all losses from all nodes.
-        self.parentNetwork.lossTensors = []
+        # Accumulate all objective loss tensors.
+        self.parentNetwork.objectiveLossTensors = []
+        self.parentNetwork.regularizationTensors = []
+        self.parentNetwork.allLossTensors = []
         for node in self.parentNetwork.nodes.values():
             for loss_object in node.losses.values():
                 if loss_object.lossOutputs is None:
                     continue
-                loss_object.lossIndex = len(self.parentNetwork.lossTensors)
-                self.parentNetwork.lossTensors.extend(loss_object.lossOutputs)
-        # Step 2) Add all loss tensors
-        with NetworkChannel(parent_node=self, parent_node_channel=ChannelTypes.total_loss) as total_loss_channel:
-            self.parentNetwork.totalLossTensor = total_loss_channel.add_operation(
-                op=tf.add_n(self.parentNetwork.lossTensors))
-        # Step 3) Gather all learnable parameters
+                if loss_object.lossType == LossType.regularization:
+                    self.parentNetwork.regularizationTensors.extend(loss_object.lossOutputs)
+                elif loss_object.lossType == LossType.objective:
+                    self.parentNetwork.objectiveLossTensors.extend(loss_object.lossOutputs)
+        self.parentNetwork.allLossTensors.extend(self.parentNetwork.regularizationTensors)
+        self.parentNetwork.allLossTensors.extend(self.parentNetwork.objectiveLossTensors)
+        # Step 2) Add all objective_loss tensors
+        with NetworkChannel(parent_node=self,
+                            parent_node_channel=ChannelTypes.total_objective_loss) as total_objective_loss:
+            self.parentNetwork.totalObjectiveLossTensor = total_objective_loss.add_operation(
+                op=tf.add_n(self.parentNetwork.objectiveLossTensors))
+        # Step 3) Add all regularization_loss tensors
+        with NetworkChannel(parent_node=self,
+                            parent_node_channel=ChannelTypes.total_regularization_loss) as total_regularization_loss:
+            self.parentNetwork.totalRegularizationLossTensor = total_regularization_loss.add_operation(
+                op=tf.add_n(self.parentNetwork.regularizationTensors))
+        # Step 4) Gather all learnable parameters
         learnable_parameters = []
         for node in self.parentNetwork.nodes.values():
             if node == self:
                 continue
-            for argument in node.argumentsDict.values():
-                if argument.argumentType == ArgumentTypes.learnable_parameter:
-                    argument.gradientIndex = len(learnable_parameters)
-                    learnable_parameters.append(argument.tensor)
-        # Step 4) Calculate the gradients with respect to parameter
-        self.parentNetwork.gradientTensors = tf.gradients(self.parentNetwork.totalLossTensor, learnable_parameters)
-        # Step 5) Gather all tensors to be evaluated
-        eval_tensors = []
-        for node in self.parentNetwork.nodes.values():
-            for loss_object in node.losses.values():
-                if loss_object.evalOutputs is None:
-                    continue
-                loss_object.evalIndex = len(eval_tensors)
-                eval_tensors.extend(loss_object.evalOutputs)
-        # Step 6) Save the gathered loss and eval tensors, so they can re-used by the network.
-        # Training
-        self.parentNetwork.trainingTensorsList = []
-        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.lossTensors)
-        self.parentNetwork.trainingTensorsList.append(self.parentNetwork.totalLossTensor)
-        self.parentNetwork.trainingTensorsList.append(self.parentNetwork.gradientTensors)
-        # Evaluation
-        self.parentNetwork.evaluationTensorsList = []
-        self.parentNetwork.evaluationTensorsList.extend(eval_tensors)
+            for parameter in node.parametersDict.values():
+                if parameter.parameterType == parameterTypes.learnable_parameter:
+                    parameter.gradientIndex = len(learnable_parameters)
+                    learnable_parameters.append(parameter.tensor)
+        # Step 5) Calculate the objective gradients with respect to parameters
+        self.parentNetwork.objectiveGradientTensors = tf.gradients(self.parentNetwork.totalObjectiveLossTensor,
+                                                                   learnable_parameters)
+        # Step 6) Calculate the regularization gradients with respect to parameters
+        self.parentNetwork.regularizationGradientTensors = tf.gradients(
+            self.parentNetwork.totalRegularizationLossTensor,
+            learnable_parameters)
+
+        # # # Step 5) Gather all tensors to be evaluated
+        # # eval_tensors = []
+        # # for node in self.parentNetwork.nodes.values():
+        # #     for loss_object in node.losses.values():
+        # #         if loss_object.evalOutputs is None:
+        # #             continue
+        # #         loss_object.evalIndex = len(eval_tensors)
+        # #         eval_tensors.extend(loss_object.evalOutputs)
+        # # Step 6) Save the gathered objective_loss and eval tensors, so they can re-used by the network.
+        # # Training
+        # self.parentNetwork.trainingTensorsList = []
+        # self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.lossTensors)
+        # self.parentNetwork.trainingTensorsList.append(self.parentNetwork.totalLossTensor)
+        # self.parentNetwork.trainingTensorsList.append(self.parentNetwork.gradientTensors)
+        # # Evaluation
+        # self.parentNetwork.evaluationTensorsList = []
+        # self.parentNetwork.evaluationTensorsList.extend(eval_tensors)
         # **********************Private methods - OK**********************

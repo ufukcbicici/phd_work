@@ -1,5 +1,5 @@
 class GenericLoss:
-    def __init__(self, parent_node, name):
+    def __init__(self, parent_node, name, loss_type):
         self.parentNode = parent_node
         self.lossOutputs = None
         self.evalOutputs = None
@@ -7,6 +7,7 @@ class GenericLoss:
         self.name = name
         self.lossIndex = None
         self.evalIndex = None
+        self.lossType = loss_type
 
     def build_training_network(self):
         pass

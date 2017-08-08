@@ -1,7 +1,7 @@
 import tensorflow as tf
 import sys
 
-from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, ArgumentTypes
+from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, parameterTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter
 from framework.hard_trees.hard_tree_node import HardTreeNode
@@ -35,7 +35,7 @@ class TreeNetwork(Network):
     # applies decision to it and propagate to the its child. In that case the node producing the output and the interme-
     # diate node are different and this is the only case that happens.
     def add_nodewise_input(self, producer_channel, dest_node, producer_node=None, producer_channel_index=0):
-        invalid_channels = {ChannelTypes.loss, ChannelTypes.pre_loss, ChannelTypes.gradient}
+        invalid_channels = {ChannelTypes.objective_loss, ChannelTypes.pre_loss, ChannelTypes.gradient}
         if producer_channel in invalid_channels:
             raise Exception("{0} type of channels cannot be input to other nodes.".format(producer_channel.value))
         # Data or label or index input
@@ -134,36 +134,36 @@ class TreeNetwork(Network):
                                GlobalInputNames.momentum.value, GlobalInputNames.weight_update_interval.value,
                                GlobalInputNames.lr_update_interval.value, GlobalInputNames.lr_decay_ratio.value}
         for node in self.nodes.values():
-            for argument in node.argumentsDict.values():
-                if argument.argumentType == ArgumentTypes.learnable_parameter:
+            for parameter in node.parametersDict.values():
+                if parameter.parameterType == parameterTypes.learnable_parameter:
                     hyper_parameter_dict = {}
                     for hyper_parameter in hyper_parameter_set:
-                        argument_hyper_parameter_name = argument.get_property_name(property_=hyper_parameter)
+                        parameter_hyper_parameter_name = parameter.get_property_name(property_=hyper_parameter)
                         value_dict = self.trainProgram.load_settings_for_property(property_name=hyper_parameter)
                         hyper_parameter_value = self.trainProgram.decode_json_element_for_parameter(
-                            parameter_name=argument_hyper_parameter_name, json_element=value_dict)
+                            parameter_name=parameter_hyper_parameter_name, json_element=value_dict)
                         hyper_parameter_dict[hyper_parameter] = hyper_parameter_value
                     # Decaying Parameter for the learning rate
-                    lr_hyper_param_name = argument.get_property_name(property_=GlobalInputNames.lr.value)
+                    lr_hyper_param_name = parameter.get_property_name(property_=GlobalInputNames.lr.value)
                     self.globalInputDrivers[lr_hyper_param_name] = \
                         DecayingParameter(name=lr_hyper_param_name,
                                           value=hyper_parameter_dict[GlobalInputNames.lr_initial.value],
                                           decay=hyper_parameter_dict[GlobalInputNames.lr_decay_ratio.value],
                                           decay_period=hyper_parameter_dict[GlobalInputNames.lr_update_interval.value])
                     # Fixed Parameter for the wd
-                    wd_hyper_parameter_name = argument.get_property_name(property_=GlobalInputNames.wd.value)
+                    wd_hyper_parameter_name = parameter.get_property_name(property_=GlobalInputNames.wd.value)
                     self.globalInputDrivers[wd_hyper_parameter_name] = \
                         FixedParameter(name=wd_hyper_parameter_name,
                                        value=hyper_parameter_dict[GlobalInputNames.wd.value])
                     # Fixed Parameter for the momentum value
                     momentum_hyper_parameter_name = \
-                        argument.get_property_name(property_=GlobalInputNames.momentum.value)
+                        parameter.get_property_name(property_=GlobalInputNames.momentum.value)
                     self.globalInputDrivers[momentum_hyper_parameter_name] = \
                         FixedParameter(name=momentum_hyper_parameter_name,
                                        value=hyper_parameter_dict[GlobalInputNames.momentum.value])
                     # Weight update parameter
                     weight_update_interval_parameter_name = \
-                        argument.get_property_name(property_=GlobalInputNames.weight_update_interval.value)
+                        parameter.get_property_name(property_=GlobalInputNames.weight_update_interval.value)
                     self.globalInputDrivers[weight_update_interval_parameter_name] = \
                         FixedParameter(name=weight_update_interval_parameter_name,
                                        value=hyper_parameter_dict[GlobalInputNames.weight_update_interval.value])
@@ -220,7 +220,7 @@ class TreeNetwork(Network):
                         NetworkNode.apply_loss(loss=sample_counter)
                     # Build user defined local node network
                     self.nodeBuilderFunctions[node_depth](network=self, node=node)
-                # If node is leaf, apply the actual loss function. If accumulation, fetch all losses from all nodes
+                # If node is leaf, apply the actual objective_loss function. If accumulation, fetch all losses from all nodes
                 # in the graph, apply gradient calculations, etc.
                 if node.isLeaf or node.isAccumulation:
                     node.attach_loss_eval_channels()
