@@ -192,22 +192,21 @@ class HardTreeNode(NetworkNode):
         self.parentNetwork.regularizationGradientTensors = tf.gradients(
             self.parentNetwork.totalRegularizationLossTensor,
             learnable_parameters)
-
-        # # # Step 5) Gather all tensors to be evaluated
-        # # eval_tensors = []
-        # # for node in self.parentNetwork.nodes.values():
-        # #     for loss_object in node.losses.values():
-        # #         if loss_object.evalOutputs is None:
-        # #             continue
-        # #         loss_object.evalIndex = len(eval_tensors)
-        # #         eval_tensors.extend(loss_object.evalOutputs)
-        # # Step 6) Save the gathered objective_loss and eval tensors, so they can re-used by the network.
-        # # Training
-        # self.parentNetwork.trainingTensorsList = []
-        # self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.lossTensors)
-        # self.parentNetwork.trainingTensorsList.append(self.parentNetwork.totalLossTensor)
-        # self.parentNetwork.trainingTensorsList.append(self.parentNetwork.gradientTensors)
-        # # Evaluation
-        # self.parentNetwork.evaluationTensorsList = []
-        # self.parentNetwork.evaluationTensorsList.extend(eval_tensors)
+        eval_tensors = []
+        for node in self.parentNetwork.nodes.values():
+            for loss_object in node.losses.values():
+                if loss_object.evalOutputs is None:
+                    continue
+                loss_object.evalIndex = len(eval_tensors)
+                eval_tensors.extend(loss_object.evalOutputs)
+        # Step 7) Prepare final tensor lists.
+        # Training
+        self.parentNetwork.trainingTensorsList = []
+        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.objectiveLossTensors)
+        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.regularizationTensors)
+        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.objectiveGradientTensors)
+        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.regularizationGradientTensors)
+        # Evaluation
+        self.parentNetwork.evaluationTensorsList = []
+        self.parentNetwork.evaluationTensorsList.extend(eval_tensors)
         # **********************Private methods - OK**********************

@@ -24,13 +24,13 @@ class NetworkNode:
         self.resultsDictionary = {}
 
     # Tensorflow specific code (This should be isolated at some point in future)
-    def create_variable(self, name, shape, initializer, needs_gradient, dtype, arg_type, channel):
+    def create_variable(self, name, shape, initializer, dtype, arg_type, channel):
         parameter_name = "{0}_{1}".format(self.indicatorText, name)
         if parameter_name in self.parametersDict:
             raise Exception("Another parameter with name {0} exists.".format(parameter_name))
-        parameter = NetworkLearnableParameter(name=parameter_name, symbolic_network_object=variable_object, container_node=self,
-                                             needs_gradient=needs_gradient,
-                                             arg_type=arg_type)
+        variable_object = tf.get_variable(name=parameter_name, shape=shape, initializer=initializer, dtype=dtype)
+        parameter = NetworkLearnableParameter(name=parameter_name, symbolic_network_object=variable_object,
+                                              container_node=self, arg_type=arg_type)
         self.parametersDict[parameter_name] = parameter
         channel.add_operation(op=variable_object)
         return variable_object

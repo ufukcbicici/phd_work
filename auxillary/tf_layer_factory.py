@@ -22,10 +22,10 @@ class TfLayerFactory:
         conv_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type))
         # Filters and bias
         W = node.create_variable(name="Convolution_Filter_{0}".format(post_fix), initializer=conv_filter_initializer,
-                                 shape=conv_filter_shape, needs_gradient=True, dtype=tf.float32,
+                                 shape=conv_filter_shape, dtype=tf.float32,
                                  arg_type=parameterTypes.learnable_parameter, channel=channel)
         b = node.create_variable(name="Convolution_Bias_{0}".format(post_fix), initializer=conv_bias_initializer,
-                                 shape=conv_filter_shape[3], needs_gradient=True, dtype=tf.float32,
+                                 shape=conv_filter_shape[3], dtype=tf.float32,
                                  arg_type=parameterTypes.learnable_parameter, channel=channel)
         # Operations
         conv_intermediate = channel.add_operation(
@@ -50,10 +50,10 @@ class TfLayerFactory:
         fc_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type))
         # Filters and bias
         W = node.create_variable(name="FullyConnected_Weight_{0}".format(post_fix), initializer=fc_filter_initializer,
-                                 shape=fc_shape, needs_gradient=True, dtype=tf.float32,
+                                 shape=fc_shape, dtype=tf.float32,
                                  arg_type=parameterTypes.learnable_parameter, channel=channel)
         b = node.create_variable(name="FullyConnected_Bias_{0}".format(post_fix), initializer=fc_bias_initializer,
-                                 shape=fc_shape[1], needs_gradient=True, dtype=tf.float32,
+                                 shape=fc_shape[1], dtype=tf.float32,
                                  arg_type=parameterTypes.learnable_parameter, channel=channel)
         # Operations
         matmul = channel.add_operation(op=tf.matmul(input_tensor, W))
