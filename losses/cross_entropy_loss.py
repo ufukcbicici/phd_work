@@ -1,5 +1,5 @@
 import tensorflow as tf
-from auxillary.constants import ChannelTypes, GlobalInputNames
+from auxillary.constants import ChannelTypes, GlobalInputNames, LossType
 from auxillary.tf_layer_factory import TfLayerFactory
 from framework.network_channel import NetworkChannel
 from losses.generic_loss import GenericLoss
@@ -12,7 +12,7 @@ class CrossEntropyLoss(GenericLoss):
     ClassCount = 2
 
     def __init__(self, parent_node, feature_list, label_tensor, class_count):
-        super().__init__(parent_node=parent_node, name=CrossEntropyLoss.Name)
+        super().__init__(parent_node=parent_node, name=CrossEntropyLoss.Name, loss_type=LossType.objective)
         self.logitTensor = None
         self.featureList = feature_list
         self.labelTensor = label_tensor
@@ -24,7 +24,7 @@ class CrossEntropyLoss(GenericLoss):
             elif len(self.featureList) == 1:
                 final_feature = self.featureList[0]
             else:
-                raise Exception("No features have been passed to cross entropy loss.")
+                raise Exception("No features have been passed to cross entropy objective_loss.")
             final_dimension = final_feature.shape[1].value
             self.logitTensor = TfLayerFactory.create_fc_layer(node=self.parentNode, channel=pre_loss_channel,
                                                               input_tensor=final_feature,
@@ -37,7 +37,7 @@ class CrossEntropyLoss(GenericLoss):
     def build_training_network(self):
         if self.logitTensor is None:
             raise Exception("No logit tensor have been found.")
-        with NetworkChannel(parent_node=self.parentNode, parent_node_channel=ChannelTypes.loss,
+        with NetworkChannel(parent_node=self.parentNode, parent_node_channel=ChannelTypes.objective_loss,
                             channel_name=CrossEntropyLoss.Name) as loss_channel:
             softmax_cross_entropy = loss_channel.add_operation(
                 op=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labelTensor, logits=self.logitTensor))

@@ -35,7 +35,7 @@ class TreeNetwork(Network):
     # applies decision to it and propagate to the its child. In that case the node producing the output and the interme-
     # diate node are different and this is the only case that happens.
     def add_nodewise_input(self, producer_channel, dest_node, producer_node=None, producer_channel_index=0):
-        invalid_channels = {ChannelTypes.loss, ChannelTypes.pre_loss, ChannelTypes.gradient}
+        invalid_channels = {ChannelTypes.objective_loss, ChannelTypes.pre_loss, ChannelTypes.gradient}
         if producer_channel in invalid_channels:
             raise Exception("{0} type of channels cannot be input to other nodes.".format(producer_channel.value))
         # Data or label or index input
@@ -220,7 +220,7 @@ class TreeNetwork(Network):
                         NetworkNode.apply_loss(loss=sample_counter)
                     # Build user defined local node network
                     self.nodeBuilderFunctions[node_depth](network=self, node=node)
-                # If node is leaf, apply the actual loss function. If accumulation, fetch all losses from all nodes
+                # If node is leaf, apply the actual objective_loss function. If accumulation, fetch all losses from all nodes
                 # in the graph, apply gradient calculations, etc.
                 if node.isLeaf or node.isAccumulation:
                     node.attach_loss_eval_channels()

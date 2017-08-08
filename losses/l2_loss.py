@@ -1,5 +1,5 @@
 import tensorflow as tf
-from auxillary.constants import ChannelTypes, TrainingHyperParameters, GlobalInputNames
+from auxillary.constants import ChannelTypes, TrainingHyperParameters, GlobalInputNames, LossType
 from framework.network_channel import NetworkChannel
 from losses.generic_loss import GenericLoss
 
@@ -7,14 +7,16 @@ from losses.generic_loss import GenericLoss
 class L2Loss(GenericLoss):
     Name = "L2Loss"
 
-    def __init__(self, parent_node, parameter, training_program):
+    def __init__(self, parent_node, parameter):
         self.parameter = parameter
-        self.trainingProgram = training_program
-        super().__init__(parent_node=parent_node, name=self.parameter.get_property_name(property_=GlobalInputNames.wd.value))
+        super().__init__(parent_node=parent_node,
+                         name=self.parameter.get_property_name(property_=GlobalInputNames.wd.value),
+                         loss_type=LossType.regularization)
 
     def build_training_network(self):
         wd_tensor = self.parentNode.parentNetwork.add_networkwise_input(name=self.name, tensor_type=tf.float32)
-        with NetworkChannel(parent_node=self.parentNode, parent_node_channel=ChannelTypes.loss) as loss_channel:
+        with NetworkChannel(parent_node=self.parentNode,
+                            parent_node_channel=ChannelTypes.regularization_loss) as loss_channel:
             l2_loss = loss_channel.add_operation(op=tf.nn.l2_loss(self.parameter.tensor))
             self.lossOutputs = [wd_tensor * l2_loss]
             loss_channel.add_operation(op=(self.lossOutputs[0]))
