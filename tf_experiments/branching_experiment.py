@@ -52,8 +52,10 @@ activations = tf.matmul(flat_x, W) + b
 h = tf.nn.softmax(logits=activations)
 pass_check = tf.greater_equal(x=h, y=threshold)
 branched_conv_list = []
+branched_fc_list = []
 branched_final_feature_list = []
 branched_indices_list = []
+sample_counts_list = []
 slices = []
 summation = None
 for n in range(k):
@@ -67,6 +69,13 @@ for n in range(k):
     branched_final_feature_list.append(branched_final_feature)
     branched_conv_list.append(branched_conv)
     branched_indices_list.append(branched_indices)
+    sample_count = tf.size(branched_indices)
+    sample_counts_list.append(sample_count)
+    weights = tf.get_variable(name="weights{0}".format(n), shape=(D * feature_count, 25), initializer=initializer,
+                              dtype=tf.float32)
+    biases = tf.get_variable(name="biases{0}".format(n), shape=(25,), initializer=initializer, dtype=tf.float32)
+    branched_fc = tf.matmul(branched_conv_flat, weights) + biases
+    branched_fc_list.append(branched_fc)
     slices.append(mask)
     if n == 0:
         summation = tf.reduce_sum(branched_final_feature)
@@ -88,6 +97,9 @@ value_dict = {"C": initial_C, "b_c": initial_b_c, "W": initial_W, "b": initial_b
 tensor_dict = {"C": C, "b_c": b_c, "W": W, "b": b}
 eval_list = [summation, grads]
 eval_list.extend(branched_indices_list)
+eval_list.extend(sample_counts_list)
+eval_list.extend(branched_conv_list)
+eval_list.extend(branched_fc_list)
 results = sess.run(eval_list, {x: samples, indices: index_list})
 original_loss = results[0]
 tf_grads_dict = {"C": results[1][0], "b_c": results[1][1], "W": results[1][2], "b": results[1][3]}

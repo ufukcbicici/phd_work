@@ -160,12 +160,15 @@ class HardTreeNode(NetworkNode):
             for loss_object in node.losses.values():
                 if loss_object.lossOutputs is None:
                     continue
-                if loss_object.lossType == LossType.regularization:
-                    self.parentNetwork.regularizationTensors.extend(loss_object.lossOutputs)
-                elif loss_object.lossType == LossType.objective:
-                    self.parentNetwork.objectiveLossTensors.extend(loss_object.lossOutputs)
-        self.parentNetwork.allLossTensors.extend(self.parentNetwork.regularizationTensors)
-        self.parentNetwork.allLossTensors.extend(self.parentNetwork.objectiveLossTensors)
+                if loss_object.isDifferentiable:
+                    if loss_object.lossType == LossType.regularization:
+                        self.parentNetwork.regularizationTensors.extend(loss_object.lossOutputs)
+                    elif loss_object.lossType == LossType.objective:
+                        self.parentNetwork.objectiveLossTensors.extend(loss_object.lossOutputs)
+                else:
+                    self.parentNetwork.nonDifferentiableLossTensors.extend(loss_object.lossOutputs)
+                loss_object.lossIndex = len(self.parentNetwork.allLossTensors)
+                self.parentNetwork.allLossTensors.extend(loss_object.lossOutputs)
         # Step 2) Add all objective_loss tensors
         with NetworkChannel(parent_node=self,
                             parent_node_channel=ChannelTypes.total_objective_loss) as total_objective_loss:
@@ -202,8 +205,9 @@ class HardTreeNode(NetworkNode):
         # Step 7) Prepare final tensor lists.
         # Training
         self.parentNetwork.trainingTensorsList = []
-        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.objectiveLossTensors)
-        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.regularizationTensors)
+        self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.allLossTensors)
+        self.parentNetwork.trainingTensorsList.extend([self.parentNetwork.totalObjectiveLossTensor,
+                                                       self.parentNetwork.totalRegularizationLossTensor])
         self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.objectiveGradientTensors)
         self.parentNetwork.trainingTensorsList.extend(self.parentNetwork.regularizationGradientTensors)
         # Evaluation

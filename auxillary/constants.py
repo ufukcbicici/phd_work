@@ -30,6 +30,7 @@ class ChannelTypes(Enum):
     pre_loss = "PreLoss"
     objective_loss = "ObjectiveLoss"
     regularization_loss = "RegularizationLoss"
+    non_differentiable_loss = "NonDifferentiableLoss"
     total_objective_loss = "TotalObjectiveLoss"
     total_regularization_loss = "TotalRegularizationLoss"
     gradient = "Gradient"

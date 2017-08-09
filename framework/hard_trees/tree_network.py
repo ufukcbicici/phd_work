@@ -1,7 +1,7 @@
 import tensorflow as tf
 import sys
 
-from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, parameterTypes
+from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, parameterTypes, LossType
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter
 from framework.hard_trees.hard_tree_node import HardTreeNode
@@ -220,7 +220,8 @@ class TreeNetwork(Network):
                         NetworkNode.apply_loss(loss=sample_counter)
                     # Build user defined local node network
                     self.nodeBuilderFunctions[node_depth](network=self, node=node)
-                # If node is leaf, apply the actual objective_loss function. If accumulation, fetch all losses from all nodes
+                # If node is leaf, apply the actual objective_loss function. If accumulation,
+                #  fetch all losses from all nodes
                 # in the graph, apply gradient calculations, etc.
                 if node.isLeaf or node.isAccumulation:
                     node.attach_loss_eval_channels()
@@ -245,6 +246,33 @@ class TreeNetwork(Network):
         #         # Get the next batch
         #         samples, labels, indices_list = self.dataset.get_next_batch(batch_size=self.batchSize)
         #         # Prepare the feed dict
+
+    def get_outputs_for_single_loss(self, loss_object):
+        if loss_object.lossOutputs is None:
+            raise Exception("Loss output list is None.")
+        start_offset = loss_object.lossIndex
+        stop_offset = loss_object.lossIndex + len(loss_object.lossOutputs)
+        return self.trainingResults[start_offset:stop_offset]
+
+    def get_total_loss_output(self, loss_type):
+        if loss_type == LossType.objective:
+            index = len(self.allLossTensors)
+        elif loss_type == LossType.regularization:
+            index = len(self.allLossTensors) + 1
+        else:
+            raise Exception("{0} is an unrecognized loss type.".format(loss_type.value))
+        return self.trainingResults[index]
+
+    def get_gradient_for_parameter(self, parameter_object, loss_type):
+        if loss_type == LossType.objective:
+            index = len(self.allLossTensors) + 2
+        elif loss_type == LossType.regularization:
+            index = len(self.allLossTensors) + 3
+        else:
+            raise Exception("{0} is an unrecognized loss type.".format(loss_type.value))
+        grad_tensors_list = self.trainingResults[index]
+        grad_for_parameter = grad_tensors_list[parameter_object.gradientIndex]
+        return grad_for_parameter
 
     # Private methods
     def get_parent_index(self, node_index):

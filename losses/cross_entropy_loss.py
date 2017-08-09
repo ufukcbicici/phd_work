@@ -12,7 +12,8 @@ class CrossEntropyLoss(GenericLoss):
     ClassCount = 2
 
     def __init__(self, parent_node, feature_list, label_tensor, class_count):
-        super().__init__(parent_node=parent_node, name=CrossEntropyLoss.Name, loss_type=LossType.objective)
+        super().__init__(parent_node=parent_node, name=CrossEntropyLoss.Name, loss_type=LossType.objective,
+                         is_differentiable=True)
         self.logitTensor = None
         self.featureList = feature_list
         self.labelTensor = label_tensor
@@ -44,8 +45,7 @@ class CrossEntropyLoss(GenericLoss):
             total_softmax_cross_entropy = loss_channel.add_operation(
                 op=tf.reduce_sum(input_tensor=softmax_cross_entropy))
             batch_size = self.parentNode.parentNetwork.get_networkwise_input(name=GlobalInputNames.batch_size.value)
-            recip_batch_size = loss_channel.add_operation(op=tf.reciprocal(batch_size))
-            avg_softmax_cross_entropy = loss_channel.add_operation(op=(recip_batch_size * total_softmax_cross_entropy))
+            avg_softmax_cross_entropy = loss_channel.add_operation(op=(total_softmax_cross_entropy / batch_size))
             self.lossOutputs = [avg_softmax_cross_entropy]
 
     def build_evaluation_network(self):
@@ -61,7 +61,7 @@ class CrossEntropyLoss(GenericLoss):
                 op=tf.equal(x=argmax_label_prediction, y=self.labelTensor))
             comparison_cast = correct_count_channel.add_operation(op=tf.cast(comparison_with_labels, tf.float32))
             self.evalOutputs.append(correct_count_channel.add_operation(op=tf.reduce_sum(input_tensor=comparison_cast)))
-        # Calcualte the total number of samples
+        # Calculate the total number of samples
         with NetworkChannel(parent_node=self.parentNode,
                             parent_node_channel=ChannelTypes.evaluation) as total_count_channel:
             self.evalOutputs.append(total_count_channel.add_operation(op=tf.size(input=comparison_cast)))

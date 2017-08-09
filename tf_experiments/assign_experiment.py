@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 
+sm = (x+x for x in range(3))
+
 sample_count = 152
 logitTensor = tf.placeholder(dtype=tf.float32, shape=(sample_count, 10))
 labelTensor = tf.placeholder(dtype=tf.int64, shape=(sample_count,))

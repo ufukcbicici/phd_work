@@ -30,13 +30,18 @@ class Network:
         # Tensors to be used in training
         self.objectiveLossTensors = None
         self.regularizationTensors = None
+        self.nonDifferentiableLossTensors = None
+        self.allLossTensors = None
         self.totalObjectiveLossTensor = None
         self.totalRegularizationLossTensor = None
         self.objectiveGradientTensors = None
         self.regularizationGradientTensors = None
         self.trainingTensorsList = []
+        self.trainingResults = None
         # Tensors to be used in evaluation
         self.evaluationTensorsList = []
+        self.evaluationResults = None
+        # Global input tensors and their drivers (Gaussian Parameter, Decaying Parameter, Fixed Parameter objects etc.)
         self.globalInputs = {}
         self.globalInputDrivers = {}
 
@@ -54,6 +59,15 @@ class Network:
         pass
 
     def train(self):
+        pass
+
+    def get_outputs_for_single_loss(self, loss_object):
+        pass
+
+    def get_total_loss_output(self, loss_type):
+        pass
+
+    def get_gradient_for_parameter(self, parameter_object, loss_type):
         pass
 
     # Methods to be overridden
