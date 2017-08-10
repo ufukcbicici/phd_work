@@ -259,6 +259,12 @@ class TreeNetwork(Network):
         self.trainingTensorsList.extend(self.regularizationGradientTensors)
         epoch_count = self.get_networkwise_input_value(name=GlobalInputNames.epoch_count.value)
         batch_size = self.get_networkwise_input_value(name=GlobalInputNames.batch_size.value)
+        global_training_hyperparameters_set = set(
+            [key for key in
+             self.globalInputs.keys() if key not in {ChannelTypes.data_input.value,
+                                                   ChannelTypes.label_input.value,
+                                                   ChannelTypes.indices_input.value} and not key.endswith(
+                GlobalInputNames.parameter_update.value)])
         # Enter the training loop
         iteration = 0
         for epoch_id in range(epoch_count):
@@ -270,12 +276,10 @@ class TreeNetwork(Network):
                 feed_dict = {self.get_networkwise_input(name=ChannelTypes.data_input.value): samples,
                              self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,
                              self.get_networkwise_input(name=ChannelTypes.indices_input.value): indices_list}
-                # Feed other inputs
-                for k, v in self.globalInputs.items():
+                # Feed other inputs; except parameter update inputs. (The optimizer will use them)
+                for input_name in global_training_hyperparameters_set:
                     # Skip parameter update inputs
-                    if k.endswith(GlobalInputNames.parameter_update.value):
-                        continue
-                    feed_dict[v] = self.get_networkwise_input_value(name=k)
+                    feed_dict[self.globalInputs[input_name]] = self.get_networkwise_input_value(name=input_name)
                 # Run training pass, get individual loss values, total objective and regularization loss values and
                 # gradients
                 self.trainingResults = sess.run(self.trainingTensorsList, feed_dict)
@@ -290,7 +294,6 @@ class TreeNetwork(Network):
                 # Check if an epoch has been completed.
                 if self.dataset.isNewEpoch:
                     break
-
 
     def get_outputs_for_single_loss(self, loss_object):
         if loss_object.lossOutputs is None:
