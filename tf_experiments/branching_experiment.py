@@ -90,6 +90,10 @@ config = tf.ConfigProto(
 )
 sess = tf.Session(config=config)
 sess.run(init)
+initial_values = sess.run([W, b])
+initial_values = sess.run([W, b])
+initial_values = sess.run([W, b])
+initial_values = sess.run([W, b])
 
 # Gradient Test with finite differences
 initial_C, initial_b_c, initial_W, initial_b = sess.run([C, b_c, W, b], {x: samples})

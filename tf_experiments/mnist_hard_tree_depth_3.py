@@ -8,6 +8,7 @@ from auxillary.train_program import TrainProgram
 from data_handling.mnist_data_set import MnistDataSet
 from framework.hard_trees.tree_network import TreeNetwork
 from framework.network_channel import NetworkChannel
+from optimizers.sgd_optimizer import SgdOptimizer
 
 conv_1_feature_map_count = 20
 conv_2_feature_map_count = 25
@@ -81,6 +82,8 @@ def main():
                             problem_type=ProblemType.classification,
                             train_program=train_program,
                             list_of_node_builder_functions=[root_func, l1_func, leaf_func])
+    optimizer = SgdOptimizer(network=cnn_lenet, use_biased_gradient_estimates=True)
+    cnn_lenet.set_optimizer(optimizer=optimizer)
     cnn_lenet.build_network()
     cnn_lenet.train()
 

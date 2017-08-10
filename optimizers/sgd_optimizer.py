@@ -11,7 +11,7 @@ class SgdOptimizer:
 
     def update(self):
         new_values_dict = {}
-        batch_size = float(self.network.globalInputDrivers[GlobalInputNames.batch_size.value].value)
+        batch_size = float(self.network.get_networkwise_input_value(name=GlobalInputNames.batch_size.value))
         for node in self.network.nodes.values():
             sample_index_counter_loss = node.losses[SampleIndexCounter.Name]
             num_of_samples = self.network.get_outputs_for_single_loss(loss_object=sample_index_counter_loss)[0]

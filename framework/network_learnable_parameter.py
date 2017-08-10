@@ -13,12 +13,12 @@ class NetworkLearnableParameter:
         self.containerNode = container_node
         self.valueArray = None
         self.gradientArray = None
-        self.gradientIndex = None
+        self.globalParameterIndex = None
         self.parameterType = arg_type
         self.assignOp = None
         # Create update mechanism for the parameter tensor
         self.inputTensor = \
-            self.containerNode.parentNetwork.add_networkwise_input(name=self.inputName, tensor_type=self.tensor.type)
+            self.containerNode.parentNetwork.add_networkwise_input(name=self.inputName, tensor_type=self.tensor.dtype)
         with NetworkChannel(parent_node=self.containerNode,
                             parent_node_channel=ChannelTypes.parameter_update) as param_update_channel:
             self.assignOp = param_update_channel.add_operation(op=tf.assign(self.tensor, self.inputTensor))

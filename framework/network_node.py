@@ -72,8 +72,7 @@ class NetworkNode:
         if self.parentNetwork.shrinkageRegularizer == ShrinkageRegularizers.l2:
             for parameter in self.parametersDict.values():
                 if parameter.parameterType == parameterTypes.learnable_parameter:
-                    l2_loss = L2Loss(parent_node=self, parameter=parameter,
-                                     training_program=self.parentNetwork.parameterFile)
+                    l2_loss = L2Loss(parent_node=self, parameter=parameter)
                     NetworkNode.apply_loss(loss=l2_loss)
         else:
             raise NotImplementedError()

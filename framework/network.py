@@ -27,7 +27,9 @@ class Network:
         self.activationInit = activation_init
         self.accumulationNode = None
         self.trainProgram = train_program
+        self.optimizer = None
         # Tensors to be used in training
+        self.allLearnableParameterTensorsList = None
         self.objectiveLossTensors = None
         self.regularizationTensors = None
         self.nonDifferentiableLossTensors = None
@@ -92,3 +94,9 @@ class Network:
 
     def get_networkwise_input(self, name):
         return self.globalInputs[name]
+
+    def get_networkwise_input_value(self, name):
+        return self.globalInputDrivers[name].value
+
+    def set_optimizer(self, optimizer):
+        self.optimizer = optimizer

@@ -1,4 +1,9 @@
 {
+  "EpochCount":
+  {
+    "type":"FixedParameter",
+    "value":100
+  },
   "BatchSize":
   {
     "type":"FixedParameter",
