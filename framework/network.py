@@ -33,12 +33,12 @@ class Network:
         self.objectiveLossTensors = None
         self.regularizationTensors = None
         self.nonDifferentiableLossTensors = None
-        self.allLossTensors = None
+        self.allLossTensorsDict = None
         self.totalObjectiveLossTensor = None
         self.totalRegularizationLossTensor = None
         self.objectiveGradientTensors = None
         self.regularizationGradientTensors = None
-        self.trainingTensorsList = []
+        self.trainingTensorsDict = {}
         self.trainingResults = None
         # Tensors to be used in evaluation
         self.evaluationTensorsList = []

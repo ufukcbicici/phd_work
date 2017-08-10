@@ -34,6 +34,8 @@ class ChannelTypes(Enum):
     total_objective_loss = "TotalObjectiveLoss"
     total_regularization_loss = "TotalRegularizationLoss"
     gradient = "Gradient"
+    objective_gradients = "ObjectiveGradients"
+    regularization_gradients = "RegularizationGradients"
     evaluation = "Evaluation"
     constant = "Constant"
     sample_indices = "SampleIndices"

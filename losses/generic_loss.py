@@ -5,8 +5,6 @@ class GenericLoss:
         self.evalOutputs = None
         self.isFinalized = False
         self.name = name
-        self.lossIndex = None
-        self.evalIndex = None
         self.lossType = loss_type
         self.isDifferentiable = is_differentiable
 

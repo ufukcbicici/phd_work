@@ -252,18 +252,13 @@ class TreeNetwork(Network):
                 parameter.valueArray = np.array(initial_values[parameter.globalParameterIndex])
                 assign_op_list.append(parameter.assignOp)
         # Create the fetch list, get the epoch count and the batch size
-        self.trainingTensorsList = []
-        self.trainingTensorsList.extend(self.allLossTensors)
-        self.trainingTensorsList.extend([self.totalObjectiveLossTensor, self.totalRegularizationLossTensor])
-        self.trainingTensorsList.extend(self.objectiveGradientTensors)
-        self.trainingTensorsList.extend(self.regularizationGradientTensors)
         epoch_count = self.get_networkwise_input_value(name=GlobalInputNames.epoch_count.value)
         batch_size = self.get_networkwise_input_value(name=GlobalInputNames.batch_size.value)
         global_training_hyperparameters_set = set(
             [key for key in
              self.globalInputs.keys() if key not in {ChannelTypes.data_input.value,
-                                                   ChannelTypes.label_input.value,
-                                                   ChannelTypes.indices_input.value} and not key.endswith(
+                                                     ChannelTypes.label_input.value,
+                                                     ChannelTypes.indices_input.value} and not key.endswith(
                 GlobalInputNames.parameter_update.value)])
         # Enter the training loop
         iteration = 0
@@ -282,7 +277,7 @@ class TreeNetwork(Network):
                     feed_dict[self.globalInputs[input_name]] = self.get_networkwise_input_value(name=input_name)
                 # Run training pass, get individual loss values, total objective and regularization loss values and
                 # gradients
-                self.trainingResults = sess.run(self.trainingTensorsList, feed_dict)
+                self.trainingResults = sess.run(self.trainingTensorsDict, feed_dict)
                 # Run the optimizer
                 new_values_dict = self.optimizer.update()
                 # Run the update phase; update trainable parameters with their new values
@@ -298,27 +293,24 @@ class TreeNetwork(Network):
     def get_outputs_for_single_loss(self, loss_object):
         if loss_object.lossOutputs is None:
             raise Exception("Loss output list is None.")
-        start_offset = loss_object.lossIndex
-        stop_offset = loss_object.lossIndex + len(loss_object.lossOutputs)
-        return self.trainingResults[start_offset:stop_offset]
+        return self.trainingResults[loss_object.name]
 
     def get_total_loss_output(self, loss_type):
         if loss_type == LossType.objective:
-            index = len(self.allLossTensors)
+            loss = self.trainingResults[ChannelTypes.total_objective_loss.value]
         elif loss_type == LossType.regularization:
-            index = len(self.allLossTensors) + 1
+            loss = self.trainingResults[ChannelTypes.total_regularization_loss.value]
         else:
             raise Exception("{0} is an unrecognized loss type.".format(loss_type.value))
-        return self.trainingResults[index]
+        return loss
 
     def get_gradient_for_parameter(self, parameter_object, loss_type):
         if loss_type == LossType.objective:
-            index = len(self.allLossTensors) + 2
+            grad_tensors_list = self.trainingResults[ChannelTypes.objective_gradients.value]
         elif loss_type == LossType.regularization:
-            index = len(self.allLossTensors) + 3
+            grad_tensors_list = self.trainingResults[ChannelTypes.regularization_gradients.value]
         else:
             raise Exception("{0} is an unrecognized loss type.".format(loss_type.value))
-        grad_tensors_list = self.trainingResults[index]
         grad_for_parameter = grad_tensors_list[parameter_object.globalParameterIndex]
         return grad_for_parameter
 

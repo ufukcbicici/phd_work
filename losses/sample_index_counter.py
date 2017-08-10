@@ -8,7 +8,8 @@ class SampleIndexCounter(GenericLoss):
     Name = "SampleIndexCounter"
 
     def __init__(self, parent_node):
-        super().__init__(parent_node=parent_node, name=SampleIndexCounter.Name, loss_type=LossType.eval_term,
+        super().__init__(parent_node=parent_node, name="{0}_Node{1}".format(SampleIndexCounter.Name, parent_node.index),
+                         loss_type=LossType.eval_term,
                          is_differentiable=False)
         self.sampleIndexTensor = None
         if self.parentNode.isRoot:
