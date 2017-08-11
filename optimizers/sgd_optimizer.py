@@ -11,6 +11,7 @@ class SgdOptimizer:
 
     def update(self):
         new_values_dict = {}
+        assignment_ops_list = []
         batch_size = float(self.network.get_networkwise_input_value(name=GlobalInputNames.batch_size.value))
         for node in self.network.nodes.values():
             if len(node.parametersDict) == 0:
@@ -46,4 +47,5 @@ class SgdOptimizer:
                 momentum_state[:] -= total_gradient
                 parameter.valueArray[:] += momentum_state
                 new_values_dict[parameter.inputTensor] = parameter.valueArray
-        return new_values_dict
+                assignment_ops_list.append(parameter.assignOp)
+        return new_values_dict, assignment_ops_list

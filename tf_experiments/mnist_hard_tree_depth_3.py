@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 from auxillary.constants import ChannelTypes, PoolingType, ActivationType, InitType, ProblemType, TreeType, \
     GlobalInputNames
@@ -9,6 +10,10 @@ from data_handling.mnist_data_set import MnistDataSet
 from framework.hard_trees.tree_network import TreeNetwork
 from framework.network_channel import NetworkChannel
 from optimizers.sgd_optimizer import SgdOptimizer
+
+np_seed = 88
+np.random.seed(np_seed)
+
 
 conv_1_feature_map_count = 20
 conv_2_feature_map_count = 25
@@ -75,7 +80,6 @@ def leaf_func(network, node):
 
 def main():
     dataset = MnistDataSet(validation_sample_count=5000)
-    dataset.load_dataset()
     train_program_path = UtilityFuncs.get_absolute_path(script_file=__file__, relative_path="train_program.json")
     train_program = TrainProgram(program_file=train_program_path)
     cnn_lenet = TreeNetwork(run_id=0, dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,

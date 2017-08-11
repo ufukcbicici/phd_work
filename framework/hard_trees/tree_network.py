@@ -302,8 +302,9 @@ class TreeNetwork(Network):
                     sample_dist_str += "Node{0}:{1} ".format(node.index, num_of_samples)
                 print(sample_dist_str)
                 # Run the optimizer
-                new_values_dict = self.optimizer.update()
+                new_values_dict, self.assignmentOpsList = self.optimizer.update()
                 # Run the update phase; update trainable parameters with their new values
+                # Throw aways ops for the nodes, which did not receive any sample.
                 self.session.run(self.assignmentOpsList, new_values_dict)
                 # Update the global parameters
                 iteration += 1

@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+import numpy as np
 from auxillary.constants import ChannelTypes, InitType, ActivationType, PoolingType, TreeType, \
     ProblemType
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -9,6 +9,9 @@ from data_handling.mnist_data_set import MnistDataSet
 from framework.hard_trees.tree_network import TreeNetwork
 from framework.network_channel import NetworkChannel
 from optimizers.sgd_optimizer import SgdOptimizer
+
+np_seed = 88
+np.random.seed(np_seed)
 
 
 def baseline_network(network, node):
