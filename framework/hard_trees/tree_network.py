@@ -317,6 +317,8 @@ class TreeNetwork(Network):
         if self.problemType == ProblemType.classification:
             total_correct_count = 0.0
             total_sample_count = 0.0
+            corrects_per_leaf = {}
+            total_per_leaf = {}
             while True:
                 # Get the next batch
                 samples, labels, indices_list = self.dataset.get_next_batch(batch_size=eval_batch_size)
@@ -333,11 +335,10 @@ class TreeNetwork(Network):
                     results = self.evaluationResults[cross_entropy_loss_name]
                     leaf_correct_count = results[0]
                     leaf_sample_count = results[1]
+                    corrects_per_leaf[node.index] = leaf_correct_count
+                    total_per_leaf[node.index] = leaf_sample_count
                     total_correct_count += leaf_correct_count
                     total_sample_count += leaf_sample_count
-                    print("Node{0} correct:{1} total:{2} accuracy:{3}".format(node.index, leaf_sample_count,
-                                                                              leaf_sample_count,
-                                                                              leaf_correct_count / leaf_sample_count))
                 if self.dataset.isNewEpoch:
                     break
             if total_sample_count != self.dataset.get_current_sample_count():
@@ -353,6 +354,11 @@ class TreeNetwork(Network):
                 raise NotImplementedError()
             accuracy = total_correct_count / total_sample_count
             print("{0} set accuracy:{1}".format(dataset_type_str, accuracy))
+            for node in self.leafNodes:
+                print("Node{0} correct:{1} total:{2} accuracy:{3}".format(node.index, corrects_per_leaf[node.index],
+                                                                          total_per_leaf[node.index],
+                                                                          corrects_per_leaf[node.index] /
+                                                                          total_per_leaf[node.index]))
         else:
             raise NotImplementedError()
 

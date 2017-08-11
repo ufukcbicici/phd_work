@@ -37,9 +37,11 @@ class MnistDataSet(DataSet):
         self.trainingSamples, self.trainingLabels = self.load(path_img=self.trainImagesPath,
                                                               path_lbl=self.trainLabelsPath)
         self.testSamples, self.testLabels = self.load(path_img=self.testImagesPath, path_lbl=self.testLabelsPath)
-        random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount)
+        random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount, replace=False)
         self.validationSamples = self.trainingSamples[random_indices]
         self.validationLabels = self.trainingLabels[random_indices]
+        self.trainingSamples = np.delete(self.trainingSamples, random_indices, 0)
+        self.trainingLabels = np.delete(self.trainingLabels, random_indices, 0)
 
     def get_next_batch(self, batch_size):
         num_of_samples = self.get_current_sample_count()
