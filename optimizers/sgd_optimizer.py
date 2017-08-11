@@ -13,7 +13,7 @@ class SgdOptimizer:
         new_values_dict = {}
         batch_size = float(self.network.get_networkwise_input_value(name=GlobalInputNames.batch_size.value))
         for node in self.network.nodes.values():
-            sample_index_counter_loss = node.losses[SampleIndexCounter.Name]
+            sample_index_counter_loss = node.losses["{0}_Node{1}".format(SampleIndexCounter.Name, node.index)]
             num_of_samples = self.network.get_outputs_for_single_loss(loss_object=sample_index_counter_loss)[0]
             if num_of_samples == 0:
                 continue
@@ -32,6 +32,11 @@ class SgdOptimizer:
                 if parameter not in self.momentumStates:
                     self.momentumStates[parameter] = np.zeros(shape=parameter.valueArray.shape)
                 momentum_state = self.momentumStates[parameter]
+                # Check the consistency of the shapes.
+                shape_set = {momentum_state.shape, objective_gradient.shape, regularizer_gradient.shape,
+                             parameter.valueArray.shape}
+                if len(shape_set) != 1:
+                    raise Exception("Inconsistent shapes.")
                 total_gradient = lr * regularizer_gradient
                 if self.useBiasedGradientEstimates:
                     total_gradient += lr * (batch_size / float(num_of_samples)) * objective_gradient
