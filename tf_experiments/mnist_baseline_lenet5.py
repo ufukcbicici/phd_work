@@ -27,7 +27,7 @@ def baseline_network(network, node):
             conv_filter_shape=[5, 5, 1, conv_1_feature_map_count],
             conv_stride_shape=[1, 1, 1, 1], pooling_shape=[1, 2, 2, 1], conv_padding="SAME",
             pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
-            activation_type=ActivationType.relu, pooling_type=PoolingType.max,
+            activation_type=ActivationType.tanh, pooling_type=PoolingType.max,
             post_fix="{0}_1".format(ChannelTypes.f_operator.value))
         # Convolution Filter 2
         conv_2_feature_map_count = 50
@@ -36,7 +36,7 @@ def baseline_network(network, node):
             conv_filter_shape=[5, 5, conv_1_feature_map_count, conv_2_feature_map_count],
             conv_stride_shape=[1, 1, 1, 1], pooling_shape=[1, 2, 2, 1], conv_padding="SAME",
             pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
-            activation_type=ActivationType.relu, pooling_type=PoolingType.max,
+            activation_type=ActivationType.tanh, pooling_type=PoolingType.max,
             post_fix="{0}_2".format(ChannelTypes.f_operator.value))
         # Fully Connected Layer 1
         fc_unit_count = 500
@@ -44,7 +44,7 @@ def baseline_network(network, node):
             op=tf.reshape(conv_layer_2, [-1, 7 * 7 * conv_2_feature_map_count]))
         TfLayerFactory.create_fc_layer(node=node, channel=f_channel, input_tensor=flattened_conv,
                                        fc_shape=[7 * 7 * conv_2_feature_map_count, fc_unit_count],
-                                       init_type=InitType.xavier, activation_type=ActivationType.relu,
+                                       init_type=InitType.xavier, activation_type=ActivationType.tanh,
                                        post_fix="{0}_3".format(ChannelTypes.f_operator.value))
 
 

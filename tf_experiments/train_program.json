@@ -34,13 +34,13 @@
     "Convolution,FOperator,Bias": 1
   },
   "wd": {
-    "FullyConnected,BranchingActivation,Weight": 0.0022,
+    "FullyConnected,BranchingActivation,Weight": 0.0,
     "FullyConnected,BranchingActivation,Bias": 0.0,
-    "FullyConnected,FOperator,Weight": 0.0022,
+    "FullyConnected,FOperator,Weight": 0.0,
     "FullyConnected,FOperator,Bias": 0.0,
-    "FullyConnected,PreLoss,Weight": 0.0022,
+    "FullyConnected,PreLoss,Weight": 0.0,
     "FullyConnected,PreLoss,Bias": 0.0,
-    "Convolution,FOperator,Filter": 0.0022,
+    "Convolution,FOperator,Filter": 0.0,
     "Convolution,FOperator,Bias": 0.0
   },
   "lr_initial": {
@@ -64,14 +64,14 @@
     "Convolution,FOperator,Bias": 0.5
   },
   "lr_update_interval": {
-    "FullyConnected,BranchingActivation,Weight": 500,
-    "FullyConnected,BranchingActivation,Bias": 500,
-    "FullyConnected,FOperator,Weight": 500,
-    "FullyConnected,FOperator,Bias": 500,
-    "FullyConnected,PreLoss,Weight": 500,
-    "FullyConnected,PreLoss,Bias": 500,
-    "Convolution,FOperator,Filter": 500,
-    "Convolution,FOperator,Bias": 500
+    "FullyConnected,BranchingActivation,Weight": 1000,
+    "FullyConnected,BranchingActivation,Bias": 1000,
+    "FullyConnected,FOperator,Weight": 1000,
+    "FullyConnected,FOperator,Bias": 1000,
+    "FullyConnected,PreLoss,Weight": 1000,
+    "FullyConnected,PreLoss,Bias": 1000,
+    "Convolution,FOperator,Filter": 1000,
+    "Convolution,FOperator,Bias": 1000
   },
   "momentum": {
     "FullyConnected,BranchingActivation,Weight": 0.9,

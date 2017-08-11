@@ -275,6 +275,7 @@ class TreeNetwork(Network):
         for epoch_id in range(epoch_count):
             # An epoch is a complete pass on the whole dataset.
             self.dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            print("*************Epoch {0}*************".format(epoch_id))
             while True:
                 # Get the next batch
                 samples, labels, indices_list = self.dataset.get_next_batch(batch_size=batch_size)
@@ -290,7 +291,7 @@ class TreeNetwork(Network):
                 # gradients
                 self.trainingResults = self.session.run(self.trainingTensorsDict, feed_dict)
                 # Print sample distribution
-                sample_dist_str = ""
+                sample_dist_str = "Iteration {0} ".format(iteration)
                 for node in self.leafNodes:
                     sample_index_counter_loss = node.losses[SampleIndexCounter.get_loss_name(node=node)]
                     num_of_samples = self.get_outputs_for_single_loss(loss_object=sample_index_counter_loss)[0]
@@ -307,6 +308,7 @@ class TreeNetwork(Network):
                 # Check if an epoch has been completed.
                 if self.dataset.isNewEpoch:
                     break
+            print("*************Epoch {0}*************".format(epoch_id))
             # Evaluate on the training set and validation set
             self.evaluate(dataset_type=DatasetTypes.training)
             self.evaluate(dataset_type=DatasetTypes.validation)
@@ -319,6 +321,9 @@ class TreeNetwork(Network):
             total_sample_count = 0.0
             corrects_per_leaf = {}
             total_per_leaf = {}
+            for node in self.leafNodes:
+                corrects_per_leaf[node.index] = 0.0
+                total_per_leaf[node.index] = 0.0
             while True:
                 # Get the next batch
                 samples, labels, indices_list = self.dataset.get_next_batch(batch_size=eval_batch_size)
@@ -335,8 +340,8 @@ class TreeNetwork(Network):
                     results = self.evaluationResults[cross_entropy_loss_name]
                     leaf_correct_count = results[0]
                     leaf_sample_count = results[1]
-                    corrects_per_leaf[node.index] = leaf_correct_count
-                    total_per_leaf[node.index] = leaf_sample_count
+                    corrects_per_leaf[node.index] += leaf_correct_count
+                    total_per_leaf[node.index] += leaf_sample_count
                     total_correct_count += leaf_correct_count
                     total_sample_count += leaf_sample_count
                 if self.dataset.isNewEpoch:

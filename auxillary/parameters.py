@@ -71,6 +71,7 @@ class DecayingParameter(Parameter):
         if iteration % self.decayPeriod == 0 and self.value > self.minLimit:
             self.value *= self.decay
             dbg_str = "Hyperparameter:{0} New value:{1}".format(self.name, self.value)
+            print(dbg_str)
             # BnnLogger.print_log(log_file_name=self.logFileName, log_string=dbg_str)
         if self.epsilon_value is not None:
             if self.value < self.epsilon_value:
