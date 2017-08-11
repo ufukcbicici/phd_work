@@ -2,7 +2,8 @@ import tensorflow as tf
 import numpy as np
 import sys
 
-from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, parameterTypes, LossType
+from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, parameterTypes, LossType, DatasetTypes, \
+    ProblemType
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter
 from framework.hard_trees.hard_tree_node import HardTreeNode
@@ -10,6 +11,7 @@ from framework.network import Network
 from framework.network_channel import NetworkChannel
 from framework.network_node import NetworkNode
 from framework.node_input_outputs import NetworkIOObject
+from losses.cross_entropy_loss import CrossEntropyLoss
 from losses.sample_index_counter import SampleIndexCounter
 
 
@@ -130,6 +132,10 @@ class TreeNetwork(Network):
         self.globalInputDrivers[GlobalInputNames.batch_size.value] = \
             UtilityFuncs.create_parameter_from_train_program(
                 parameter_name=GlobalInputNames.batch_size.value, train_program=self.trainProgram)
+        # Evaluation Batch Size
+        self.globalInputDrivers[GlobalInputNames.evaluation_batch_size.value] = \
+            UtilityFuncs.create_parameter_from_train_program(
+                parameter_name=GlobalInputNames.evaluation_batch_size.value, train_program=self.trainProgram)
         # Epoch Count
         self.globalInputDrivers[GlobalInputNames.epoch_count.value] = \
             UtilityFuncs.create_parameter_from_train_program(
@@ -239,18 +245,20 @@ class TreeNetwork(Network):
         # Set the drivers for the global constants
         self.create_global_input_drivers()
 
-    def train(self):
+    def init_session(self):
         # Init parameters
         init = tf.global_variables_initializer()
-        sess = tf.Session()
-        sess.run(init)
+        self.session = tf.Session()
+        self.session.run(init)
         # Obtain initial values for each parameter and create the assign operator list for parameter update
-        initial_values = sess.run(self.allLearnableParameterTensorsList)
-        assign_op_list = []
+        initial_values = self.session.run(self.allLearnableParameterTensorsList)
+        self.assignmentOpsList = []
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
                 parameter.valueArray = np.array(initial_values[parameter.globalParameterIndex])
-                assign_op_list.append(parameter.assignOp)
+                self.assignmentOpsList.append(parameter.assignOp)
+
+    def train(self):
         # Create the fetch list, get the epoch count and the batch size
         epoch_count = self.get_networkwise_input_value(name=GlobalInputNames.epoch_count.value)
         batch_size = self.get_networkwise_input_value(name=GlobalInputNames.batch_size.value)
@@ -261,9 +269,12 @@ class TreeNetwork(Network):
                                                      ChannelTypes.indices_input.value} and not key.endswith(
                 GlobalInputNames.parameter_update.value)])
         # Enter the training loop
+        self.evaluate(dataset_type=DatasetTypes.training)
+        self.evaluate(dataset_type=DatasetTypes.validation)
         iteration = 0
         for epoch_id in range(epoch_count):
             # An epoch is a complete pass on the whole dataset.
+            self.dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
             while True:
                 # Get the next batch
                 samples, labels, indices_list = self.dataset.get_next_batch(batch_size=batch_size)
@@ -277,23 +288,51 @@ class TreeNetwork(Network):
                     feed_dict[self.globalInputs[input_name]] = self.get_networkwise_input_value(name=input_name)
                 # Run training pass, get individual loss values, total objective and regularization loss values and
                 # gradients
-                self.trainingResults = sess.run(self.trainingTensorsDict, feed_dict)
+                self.trainingResults = self.session.run(self.trainingTensorsDict, feed_dict)
                 # Run the optimizer
                 new_values_dict = self.optimizer.update()
                 # Run the update phase; update trainable parameters with their new values
-                sess.run(assign_op_list, new_values_dict)
+                self.session.run(self.assignmentOpsList, new_values_dict)
                 # Update the global parameters
+                iteration += 1
                 for global_param in self.globalInputDrivers.values():
                     global_param.update(iteration=iteration)
-                iteration += 1
                 # Check if an epoch has been completed.
                 if self.dataset.isNewEpoch:
                     break
+            # Evaluate on the training set and validation set
+            self.evaluate(dataset_type=DatasetTypes.training)
+            self.evaluate(dataset_type=DatasetTypes.validation)
+
+    def evaluate(self, dataset_type):
+        self.dataset.set_current_data_set_type(dataset_type=dataset_type)
+        eval_batch_size = self.get_networkwise_input_value(name=GlobalInputNames.evaluation_batch_size.value)
+        if self.problemType == ProblemType.classification:
+            total_correct_count = 0.0
+            total_sample_count = 0.0
+            while True:
+                # Get the next batch
+                samples, labels, indices_list = self.dataset.get_next_batch(batch_size=eval_batch_size)
+                # Prepare the feed dict: Samples, labels and indices first, set the probability thresholds to 0.
+                feed_dict = {self.get_networkwise_input(name=ChannelTypes.data_input.value): samples,
+                             self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,
+                             self.get_networkwise_input(name=ChannelTypes.indices_input.value): indices_list,
+                             self.globalInputs[GlobalInputNames.branching_prob_threshold.value]: 0.0}
+                # Run evaluation pass, get individual loss values, total objective and regularization loss values and
+                # gradients
+                self.evaluationResults = self.session.run(self.evaluationTensorsDict, feed_dict)
+                for node in self.leafNodes:
+                    cross_entropy_loss_name = CrossEntropyLoss.get_loss_name(node=node)
+
+                if self.dataset.isNewEpoch:
+                    break
+        else:
+            raise NotImplementedError()
 
     def get_outputs_for_single_loss(self, loss_object):
         if loss_object.lossOutputs is None:
             raise Exception("Loss output list is None.")
-        return self.trainingResults[loss_object.name]
+        return self.trainingResults[loss_object.get_name()]
 
     def get_total_loss_output(self, loss_type):
         if loss_type == LossType.objective:

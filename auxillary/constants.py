@@ -47,6 +47,7 @@ class GlobalInputNames(Enum):
     regularizer_strength = "RegularizerStrength"
     branching_prob_threshold = "BranchingProbThreshold"
     batch_size = "BatchSize"
+    evaluation_batch_size = "EvaluationBatchSize"
     epoch_count = "EpochCount"
     wd = "wd"
     lr = "lr"

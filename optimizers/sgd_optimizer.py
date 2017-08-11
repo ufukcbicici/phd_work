@@ -13,7 +13,9 @@ class SgdOptimizer:
         new_values_dict = {}
         batch_size = float(self.network.get_networkwise_input_value(name=GlobalInputNames.batch_size.value))
         for node in self.network.nodes.values():
-            sample_index_counter_loss = node.losses["{0}_Node{1}".format(SampleIndexCounter.Name, node.index)]
+            if len(node.parametersDict) == 0:
+                continue
+            sample_index_counter_loss = node.losses[SampleIndexCounter.get_loss_name(node=node)]
             num_of_samples = self.network.get_outputs_for_single_loss(loss_object=sample_index_counter_loss)[0]
             if num_of_samples == 0:
                 continue

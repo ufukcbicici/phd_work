@@ -33,19 +33,21 @@ class Network:
         self.objectiveLossTensors = None
         self.regularizationTensors = None
         self.nonDifferentiableLossTensors = None
-        self.allLossTensorsDict = None
         self.totalObjectiveLossTensor = None
         self.totalRegularizationLossTensor = None
         self.objectiveGradientTensors = None
         self.regularizationGradientTensors = None
+        self.assignmentOpsList = None
         self.trainingTensorsDict = {}
         self.trainingResults = None
         # Tensors to be used in evaluation
-        self.evaluationTensorsList = []
+        self.evaluationTensorsDict = {}
         self.evaluationResults = None
         # Global input tensors and their drivers (Gaussian Parameter, Decaying Parameter, Fixed Parameter objects etc.)
         self.globalInputs = {}
         self.globalInputDrivers = {}
+        # Tensorflow session
+        self.session = None
 
     # Methods to be overridden
     def build_network(self):
@@ -60,7 +62,13 @@ class Network:
     def create_global_input_drivers(self):
         pass
 
+    def init_session(self):
+        pass
+
     def train(self):
+        pass
+
+    def evaluate(self, dataset_type):
         pass
 
     def get_outputs_for_single_loss(self, loss_object):

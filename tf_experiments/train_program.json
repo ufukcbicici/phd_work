@@ -9,6 +9,11 @@
     "type":"FixedParameter",
     "value":1000
   },
+  "EvaluationBatchSize":
+  {
+    "type":"FixedParameter",
+    "value":5000
+  },
   "BranchingProbThreshold":
   {
     "type":"DecayingParameter",

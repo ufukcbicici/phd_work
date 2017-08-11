@@ -60,6 +60,7 @@ def main():
     optimizer = SgdOptimizer(network=cnn_lenet, use_biased_gradient_estimates=True)
     cnn_lenet.set_optimizer(optimizer=optimizer)
     cnn_lenet.build_network()
+    cnn_lenet.init_session()
     cnn_lenet.train()
 
 main()

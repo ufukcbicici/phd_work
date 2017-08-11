@@ -12,8 +12,7 @@ class CrossEntropyLoss(GenericLoss):
     ClassCount = 2
 
     def __init__(self, parent_node, feature_list, label_tensor, class_count):
-        super().__init__(parent_node=parent_node, name=CrossEntropyLoss.Name, loss_type=LossType.objective,
-                         is_differentiable=True)
+        super().__init__(parent_node=parent_node, loss_type=LossType.objective, is_differentiable=True)
         self.logitTensor = None
         self.featureList = feature_list
         self.labelTensor = label_tensor
@@ -34,6 +33,13 @@ class CrossEntropyLoss(GenericLoss):
                                                               activation_type=self.parentNode.parentNetwork.
                                                               lossLayerActivation,
                                                               post_fix=ChannelTypes.pre_loss.value)
+
+    def get_name(self):
+        return "{0}_Node{1}".format(CrossEntropyLoss.Name, self.parentNode.index)
+
+    @staticmethod
+    def get_loss_name(node):
+        return "{0}_Node{1}".format(CrossEntropyLoss.Name, node.index)
 
     def build_training_network(self):
         if self.logitTensor is None:

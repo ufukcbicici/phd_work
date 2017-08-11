@@ -1,10 +1,9 @@
 class GenericLoss:
-    def __init__(self, parent_node, name, loss_type, is_differentiable):
+    def __init__(self, parent_node, loss_type, is_differentiable):
         self.parentNode = parent_node
         self.lossOutputs = None
         self.evalOutputs = None
         self.isFinalized = False
-        self.name = name
         self.lossType = loss_type
         self.isDifferentiable = is_differentiable
 
@@ -15,7 +14,11 @@ class GenericLoss:
         pass
 
     def finalize(self):
-        if self.name in self.parentNode.losses:
-            raise Exception("Loss {0} is already in node {1}".format(self.name, self.parentNode))
-        self.parentNode.losses[self.name] = self
+        name = self.get_name()
+        if name in self.parentNode.losses:
+            raise Exception("Loss {0} is already in node {1}".format(name, self.parentNode))
+        self.parentNode.losses[name] = self
         self.isFinalized = True
+
+    def get_name(self):
+        pass

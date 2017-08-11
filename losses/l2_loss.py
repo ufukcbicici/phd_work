@@ -10,11 +10,10 @@ class L2Loss(GenericLoss):
     def __init__(self, parent_node, parameter):
         self.parameter = parameter
         super().__init__(parent_node=parent_node,
-                         name=self.parameter.get_property_name(property_=GlobalInputNames.wd.value),
                          loss_type=LossType.regularization, is_differentiable=True)
 
     def build_training_network(self):
-        wd_tensor = self.parentNode.parentNetwork.add_networkwise_input(name=self.name, tensor_type=tf.float32)
+        wd_tensor = self.parentNode.parentNetwork.add_networkwise_input(name=self.get_name(), tensor_type=tf.float32)
         with NetworkChannel(parent_node=self.parentNode,
                             parent_node_channel=ChannelTypes.regularization_loss) as loss_channel:
             l2_loss = loss_channel.add_operation(op=tf.nn.l2_loss(self.parameter.tensor))
@@ -26,3 +25,6 @@ class L2Loss(GenericLoss):
 
     def finalize(self):
         super().finalize()
+
+    def get_name(self):
+        return self.parameter.get_property_name(property_=GlobalInputNames.wd.value)

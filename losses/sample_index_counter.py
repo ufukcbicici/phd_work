@@ -8,9 +8,7 @@ class SampleIndexCounter(GenericLoss):
     Name = "SampleIndexCounter"
 
     def __init__(self, parent_node):
-        super().__init__(parent_node=parent_node, name="{0}_Node{1}".format(SampleIndexCounter.Name, parent_node.index),
-                         loss_type=LossType.eval_term,
-                         is_differentiable=False)
+        super().__init__(parent_node=parent_node, loss_type=LossType.eval_term, is_differentiable=False)
         self.sampleIndexTensor = None
         if self.parentNode.isRoot:
             # First add as a normal input to the root node, then add into the evaluation channel.
@@ -38,3 +36,10 @@ class SampleIndexCounter(GenericLoss):
 
     def finalize(self):
         super().finalize()
+
+    def get_name(self):
+        return "{0}_Node{1}".format(SampleIndexCounter.Name, self.parentNode.index)
+
+    @staticmethod
+    def get_loss_name(node):
+        return "{0}_Node{1}".format(SampleIndexCounter.Name, node.index)

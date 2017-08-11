@@ -167,7 +167,7 @@ class HardTreeNode(NetworkNode):
                         self.parentNetwork.objectiveLossTensors.extend(loss_object.lossOutputs)
                 else:
                     self.parentNetwork.nonDifferentiableLossTensors.extend(loss_object.lossOutputs)
-                self.parentNetwork.trainingTensorsDict[loss_object.name] = loss_object.lossOutputs
+                self.parentNetwork.trainingTensorsDict[loss_object.get_name()] = loss_object.lossOutputs
         # Step 2) Add all objective_loss tensors
         if len(self.parentNetwork.objectiveLossTensors) > 1:
             with NetworkChannel(parent_node=self,
@@ -208,15 +208,11 @@ class HardTreeNode(NetworkNode):
             self.parentNetwork.allLearnableParameterTensorsList)
         self.parentNetwork.trainingTensorsDict[ChannelTypes.regularization_gradients.value] = \
             self.parentNetwork.regularizationGradientTensors
-        # eval_tensors = []
-        # for node in self.parentNetwork.nodes.values():
-        #     for loss_object in node.losses.values():
-        #         if loss_object.evalOutputs is None:
-        #             continue
-        #         loss_object.evalIndex = len(eval_tensors)
-        #         eval_tensors.extend(loss_object.evalOutputs)
-        # # Step 7) Prepare final tensor lists.
-        # # Evaluation
-        # self.parentNetwork.evaluationTensorsList = []
-        # self.parentNetwork.evaluationTensorsList.extend(eval_tensors)
+        # Step 7) Prepare the evaluation tensors
+        self.parentNetwork.evaluationTensorsDict = {}
+        for node in self.parentNetwork.nodes.values():
+            for loss_object in node.losses.values():
+                if loss_object.evalOutputs is None:
+                            continue
+                self.parentNetwork.evaluationTensorsDict[loss_object.get_name()] = loss_object.evalOutputs
         # **********************Private methods - OK**********************
