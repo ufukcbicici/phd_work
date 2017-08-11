@@ -323,9 +323,16 @@ class TreeNetwork(Network):
                 self.evaluationResults = self.session.run(self.evaluationTensorsDict, feed_dict)
                 for node in self.leafNodes:
                     cross_entropy_loss_name = CrossEntropyLoss.get_loss_name(node=node)
-
+                    results = self.evaluationResults[cross_entropy_loss_name]
+                    leaf_correct_count = results[0]
+                    leaf_sample_count = results[1]
+                    total_correct_count += leaf_correct_count
+                    total_sample_count += leaf_sample_count
                 if self.dataset.isNewEpoch:
                     break
+            if total_sample_count != self.dataset.get_current_sample_count():
+                raise Exception("Expected sample count is {0} but {1} samples have been processed.".format(
+                    self.dataset.get_current_sample_count(), total_sample_count))
         else:
             raise NotImplementedError()
 
