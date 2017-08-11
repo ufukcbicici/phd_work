@@ -289,6 +289,13 @@ class TreeNetwork(Network):
                 # Run training pass, get individual loss values, total objective and regularization loss values and
                 # gradients
                 self.trainingResults = self.session.run(self.trainingTensorsDict, feed_dict)
+                # Print sample distribution
+                sample_dist_str = ""
+                for node in self.leafNodes:
+                    sample_index_counter_loss = node.losses[SampleIndexCounter.get_loss_name(node=node)]
+                    num_of_samples = self.get_outputs_for_single_loss(loss_object=sample_index_counter_loss)[0]
+                    sample_dist_str += "Node{0}:{1} ".format(node.index, num_of_samples)
+                print(sample_dist_str)
                 # Run the optimizer
                 new_values_dict = self.optimizer.update()
                 # Run the update phase; update trainable parameters with their new values
@@ -328,11 +335,24 @@ class TreeNetwork(Network):
                     leaf_sample_count = results[1]
                     total_correct_count += leaf_correct_count
                     total_sample_count += leaf_sample_count
+                    print("Node{0} correct:{1} total:{2} accuracy:{3}".format(node.index, leaf_sample_count,
+                                                                              leaf_sample_count,
+                                                                              leaf_correct_count / leaf_sample_count))
                 if self.dataset.isNewEpoch:
                     break
             if total_sample_count != self.dataset.get_current_sample_count():
                 raise Exception("Expected sample count is {0} but {1} samples have been processed.".format(
                     self.dataset.get_current_sample_count(), total_sample_count))
+            if dataset_type == DatasetTypes.training:
+                dataset_type_str = "training"
+            elif dataset_type == DatasetTypes.validation:
+                dataset_type_str = "validation"
+            elif dataset_type == DatasetTypes.test:
+                dataset_type_str = "test"
+            else:
+                raise NotImplementedError()
+            accuracy = total_correct_count / total_sample_count
+            print("{0} set accuracy:{1}".format(dataset_type_str, accuracy))
         else:
             raise NotImplementedError()
 
