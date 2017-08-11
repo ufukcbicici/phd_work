@@ -286,7 +286,11 @@ class TreeNetwork(Network):
                 # Feed other inputs; except parameter update inputs. (The optimizer will use them)
                 for input_name in global_training_hyperparameters_set:
                     # Skip parameter update inputs
-                    feed_dict[self.globalInputs[input_name]] = self.get_networkwise_input_value(name=input_name)
+                    if input_name == GlobalInputNames.branching_prob_threshold.value:
+                        threshold = (1.0 / self.treeDegree) - self.get_networkwise_input_value(name=input_name)
+                        feed_dict[self.globalInputs[input_name]] = threshold
+                    else:
+                        feed_dict[self.globalInputs[input_name]] = self.get_networkwise_input_value(name=input_name)
                 # Run training pass, get individual loss values, total objective and regularization loss values and
                 # gradients
                 self.trainingResults = self.session.run(self.trainingTensorsDict, feed_dict)
@@ -331,7 +335,8 @@ class TreeNetwork(Network):
                 feed_dict = {self.get_networkwise_input(name=ChannelTypes.data_input.value): samples,
                              self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,
                              self.get_networkwise_input(name=ChannelTypes.indices_input.value): indices_list,
-                             self.globalInputs[GlobalInputNames.branching_prob_threshold.value]: 0.0}
+                             self.globalInputs[GlobalInputNames.branching_prob_threshold.value]: (
+                             1.0 / self.treeDegree)}
                 # Run evaluation pass, get individual loss values, total objective and regularization loss values and
                 # gradients
                 self.evaluationResults = self.session.run(self.evaluationTensorsDict, feed_dict)
@@ -360,10 +365,12 @@ class TreeNetwork(Network):
             accuracy = total_correct_count / total_sample_count
             print("{0} set accuracy:{1}".format(dataset_type_str, accuracy))
             for node in self.leafNodes:
+                if total_per_leaf[node.index] == 0:
+                    leaf_accuracy = "Empty"
+                else:
+                    leaf_accuracy = corrects_per_leaf[node.index] / total_per_leaf[node.index]
                 print("Node{0} correct:{1} total:{2} accuracy:{3}".format(node.index, corrects_per_leaf[node.index],
-                                                                          total_per_leaf[node.index],
-                                                                          corrects_per_leaf[node.index] /
-                                                                          total_per_leaf[node.index]))
+                                                                          total_per_leaf[node.index],leaf_accuracy))
         else:
             raise NotImplementedError()
 
