@@ -9,10 +9,10 @@ from framework.network_channel import NetworkChannel
 
 class Network:
     def __init__(self, dataset, parameter_file, problem_type,
-                 train_program, explanation,
-                 loss_layer_init=InitType.custom,
-                 loss_activation=ActivationType.tanh,
-                 activation_init=InitType.custom,
+                 train_program,
+                 explanation,
+                 activation_generator_func,
+                 loss_layer_generator_func,
                  shrinkage_regularizer=ShrinkageRegularizers.l2):
         self.nodes = {}
         self.leafNodes = []
@@ -24,11 +24,10 @@ class Network:
         self.dag = Dag()
         self.topologicalSortedNodes = []
         self.problemType = problem_type
-        self.lossLayerInit = loss_layer_init
-        self.lossLayerActivation = loss_activation
+        self.activationGeneratorFunc = activation_generator_func
+        self.lossLayerGeneratorFunc = loss_layer_generator_func
         self.shrinkageRegularizer = shrinkage_regularizer
         self.indicatorText = None
-        self.activationInit = activation_init
         self.accumulationNode = None
         self.trainProgram = train_program
         self.optimizer = None

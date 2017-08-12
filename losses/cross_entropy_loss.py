@@ -26,13 +26,11 @@ class CrossEntropyLoss(GenericLoss):
             else:
                 raise Exception("No features have been passed to cross entropy objective_loss.")
             final_dimension = final_feature.shape[1].value
-            self.logitTensor = TfLayerFactory.create_fc_layer(node=self.parentNode, channel=pre_loss_channel,
-                                                              input_tensor=final_feature,
-                                                              fc_shape=[final_dimension, self.classCount],
-                                                              init_type=self.parentNode.parentNetwork.lossLayerInit,
-                                                              activation_type=self.parentNode.parentNetwork.
-                                                              lossLayerActivation,
-                                                              post_fix=ChannelTypes.pre_loss.value)
+            self.logitTensor = self.parentNode.parentNetwork.lossLayerGeneratorFunc(node=self.parentNode,
+                                                                                    channel=pre_loss_channel,
+                                                                                    feature_dimension=final_dimension,
+                                                                                    target_count=self.classCount,
+                                                                                    input_tensor=final_feature)
 
     def get_name(self):
         return "{0}_Node{1}".format(CrossEntropyLoss.Name, self.parentNode.index)

@@ -20,9 +20,10 @@ from losses.sample_index_counter import SampleIndexCounter
 
 class TreeNetwork(Network):
     def __init__(self, dataset, parameter_file, problem_type, train_program, explanation,
-                 tree_degree, tree_type, list_of_node_builder_functions, ancestor_count=sys.maxsize,
-                 eval_sample_distribution=True):
-        super().__init__(dataset, parameter_file, problem_type, train_program, explanation)
+                 tree_degree, tree_type, list_of_node_builder_functions, activation_generator_func,
+                 loss_layer_generator_func, ancestor_count=sys.maxsize, eval_sample_distribution=True):
+        super().__init__(dataset, parameter_file, problem_type, train_program, explanation,
+                         activation_generator_func, loss_layer_generator_func)
         self.treeDegree = tree_degree
         self.treeDepth = len(list_of_node_builder_functions)
         self.depthsToNodesDict = {}
@@ -254,15 +255,17 @@ class TreeNetwork(Network):
         # Init parameters
         self.assignmentOpsList = []
         initial_values_dict = {}
-        self.totalLoss = self.totalRegularizationLossTensor + self.totalObjectiveLossTensor
-        self.trainStep = tf.train.MomentumOptimizer(learning_rate=0.01, momentum=0.9).minimize(self.totalLoss)
+        # self.totalLoss = self.totalRegularizationLossTensor + self.totalObjectiveLossTensor
+        # opt = tf.train.MomentumOptimizer(learning_rate=0.01, momentum=0.9)
+        # grads_and_vars = opt.compute_gradients(self.totalLoss, self.allLearnableParameterTensorsList)
+        # apply_grad = opt.apply_gradients(grads_and_vars)
         init = tf.global_variables_initializer()
         self.session = tf.Session()
         self.session.run(init)
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
                 self.assignmentOpsList.append(parameter.assignOp)
-        initial_values = self.session.run(self.allLearnableParameterTensorsList)
+        # initial_values = self.session.run(self.allLearnableParameterTensorsList)
         # Obtain initial values for each parameter and create the assign operator list for parameter update
         # np.random.seed(int(time.time()))
         # np_seed = 88
@@ -282,9 +285,9 @@ class TreeNetwork(Network):
 
         # When loading parameters from file
         # Depth 3 Tree
-        # self.load_parameters(file_name="parameters_runId17")
+        self.load_parameters(file_name="parameters_runId77")
         # Baseline
-        self.load_parameters(file_name="parameters_runId41")
+        # self.load_parameters(file_name="parameters_runId56")
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
                 initial_values_dict[parameter.inputTensor] = parameter.valueArray

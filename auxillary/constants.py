@@ -79,6 +79,7 @@ class InitType(Enum):
     xavier = 0
     custom = 1
     truncated_normal = 2
+    constant = 3
 
 
 class TreeType(Enum):

@@ -5,35 +5,26 @@ from auxillary.constants import GlobalInputNames, InitType, ChannelTypes, Activa
 
 class TfLayerFactory:
     @staticmethod
-    def get_initializer(init_type, shape):
-        if init_type == InitType.xavier:
-            initializer = tf.contrib.layers.xavier_initializer()
-        elif init_type == InitType.custom:
-            initializer = tf.zeros(shape)
-        elif init_type == InitType.truncated_normal:
-            initializer = tf.truncated_normal(shape, stddev=0.1)
-        else:
-            raise NotImplementedError()
-        return initializer
-
-    @staticmethod
-    def create_convolutional_layer(node, channel, input_tensor, conv_filter_shape, conv_stride_shape, pooling_shape,
+    def create_convolutional_layer(node, channel, input_tensor, conv_filter_shape,
+                                   conv_stride_shape, pooling_shape,
                                    conv_padding,
                                    pooling_stride_shape, pooling_padding,
-                                   init_type, activation_type, pooling_type, post_fix):
+                                   filter_init,
+                                   bias_init,
+                                   activation_type,
+                                   pooling_type,
+                                   post_fix):
         # Initializers
-        conv_filter_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type,
-                                                                                          shape=conv_filter_shape))
-        conv_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type,
-                                                                                        shape=conv_filter_shape[3]))
+        # conv_filter_initializer = channel.add_operation(
+        #     op=TfLayerFactory.get_initializer(init_type=filter_init_type, **filter_init_kwargs))
+        # conv_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=bias_init_type,
+        #                                                                                 shape=conv_filter_shape[3]))
         # Filters and bias
-        W = node.create_variable(name="Convolution_Filter_{0}".format(post_fix), init_type=init_type,
-                                 shape=conv_filter_shape,
-                                 initializer=conv_filter_initializer,
+        W = node.create_variable(name="Convolution_Filter_{0}".format(post_fix),
+                                 initializer=filter_init,
                                  dtype=tf.float32, arg_type=parameterTypes.learnable_parameter, channel=channel)
         b = node.create_variable(name="Convolution_Bias_{0}".format(post_fix),
-                                 init_type=init_type,
-                                 shape=conv_filter_shape[3], initializer=conv_bias_initializer,
+                                 initializer=bias_init,
                                  dtype=tf.float32, arg_type=parameterTypes.learnable_parameter, channel=channel)
         # Operations
         conv_intermediate = channel.add_operation(
@@ -52,22 +43,18 @@ class TfLayerFactory:
         return pool
 
     @staticmethod
-    def create_fc_layer(node, channel, input_tensor, fc_shape, init_type, activation_type, post_fix):
+    def create_fc_layer(node, channel, input_tensor, fc_shape, weight_init, bias_init, activation_type, post_fix):
         # Initializers
-        fc_filter_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type,
-                                                                                        shape=fc_shape))
-        fc_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type,
-                                                                                      shape=fc_shape[1]))
+        # fc_filter_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type,
+        #                                                                                 shape=fc_shape))
+        # fc_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type,
+        #                                                                               shape=fc_shape[1]))
         # Filters and bias
         W = node.create_variable(name="FullyConnected_Weight_{0}".format(post_fix),
-                                 init_type=init_type,
-                                 shape=fc_shape,
-                                 initializer=fc_filter_initializer,
+                                 initializer=weight_init,
                                  dtype=tf.float32, arg_type=parameterTypes.learnable_parameter, channel=channel)
         b = node.create_variable(name="FullyConnected_Bias_{0}".format(post_fix),
-                                 init_type=init_type,
-                                 shape=fc_shape[1],
-                                 initializer=fc_bias_initializer,
+                                 initializer=bias_init,
                                  dtype=tf.float32, arg_type=parameterTypes.learnable_parameter, channel=channel)
         # Operations
         matmul = channel.add_operation(op=tf.matmul(input_tensor, W))

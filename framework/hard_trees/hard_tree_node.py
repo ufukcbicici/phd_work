@@ -43,13 +43,10 @@ class HardTreeNode(NetworkNode):
             feature_dimension = concatenated_features.shape[1].value
             # Apply W'[h_operators,parent_activations] + b, where W' is the transpose of the hyperplanes and
             # b are the biases.
-            activation_tensor = TfLayerFactory.create_fc_layer(node=self, channel=branching_channel,
-                                                               input_tensor=concatenated_features,
-                                                               fc_shape=[feature_dimension,
-                                                                         self.parentNetwork.treeDegree],
-                                                               init_type=self.parentNetwork.activationInit,
-                                                               activation_type=ActivationType.no_activation,
-                                                               post_fix=ChannelTypes.branching_activation.value)
+            activation_tensor = self.parentNetwork.activationGeneratorFunc(node=self, channel=branching_channel,
+                                                                           network=self.parentNetwork,
+                                                                           feature_dimension=feature_dimension,
+                                                                           input_tensor=concatenated_features)
         # Create branching probabilities
         with NetworkChannel(parent_node=self,
                             parent_node_channel=ChannelTypes.branching_probabilities) as branch_prob_channel:
