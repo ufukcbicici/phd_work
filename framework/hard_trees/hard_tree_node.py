@@ -158,16 +158,17 @@ class HardTreeNode(NetworkNode):
         self.parentNetwork.allLossTensorsDict = {}
         for node in self.parentNetwork.nodes.values():
             for loss_object in node.losses.values():
-                if loss_object.lossOutputs is None:
-                    continue
-                if loss_object.isDifferentiable:
-                    if loss_object.lossType == LossType.regularization:
-                        self.parentNetwork.regularizationTensors.extend(loss_object.lossOutputs)
-                    elif loss_object.lossType == LossType.objective:
-                        self.parentNetwork.objectiveLossTensors.extend(loss_object.lossOutputs)
-                else:
-                    self.parentNetwork.nonDifferentiableLossTensors.extend(loss_object.lossOutputs)
-                self.parentNetwork.trainingTensorsDict[loss_object.get_name()] = loss_object.lossOutputs
+                if loss_object.lossOutputs is not None:
+                    if loss_object.isDifferentiable:
+                        if loss_object.lossType == LossType.regularization:
+                            self.parentNetwork.regularizationTensors.extend(loss_object.lossOutputs)
+                        elif loss_object.lossType == LossType.objective:
+                            self.parentNetwork.objectiveLossTensors.extend(loss_object.lossOutputs)
+                    else:
+                        self.parentNetwork.nonDifferentiableLossTensors.extend(loss_object.lossOutputs)
+                    self.parentNetwork.trainingTensorsDict[loss_object.get_name()] = loss_object.lossOutputs
+                if loss_object.auxOutputs is not None:
+                    self.parentNetwork.trainingTensorsDict[loss_object.get_name()+"_aux"] = loss_object.auxOutputs
         # Step 2) Add all objective_loss tensors
         if len(self.parentNetwork.objectiveLossTensors) > 1:
             with NetworkChannel(parent_node=self,

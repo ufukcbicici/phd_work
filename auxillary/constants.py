@@ -78,6 +78,7 @@ class PoolingType(Enum):
 class InitType(Enum):
     xavier = 0
     custom = 1
+    truncated_normal = 2
 
 
 class TreeType(Enum):

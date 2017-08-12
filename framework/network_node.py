@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from auxillary.constants import ProblemType, ChannelTypes, ShrinkageRegularizers, parameterTypes
+from auxillary.constants import ProblemType, ChannelTypes, ShrinkageRegularizers, parameterTypes, InitType
 from auxillary.tf_layer_factory import TfLayerFactory
 from framework.network_learnable_parameter import NetworkLearnableParameter
 from framework.network_channel import NetworkChannel
@@ -24,11 +24,14 @@ class NetworkNode:
         self.resultsDictionary = {}
 
     # Tensorflow specific code (This should be isolated at some point in future)
-    def create_variable(self, name, initializer, dtype, arg_type, channel):
+    def create_variable(self, name, init_type, shape, initializer, dtype, arg_type, channel):
         parameter_name = "{0}_{1}".format(self.indicatorText, name)
         if parameter_name in self.parametersDict:
             raise Exception("Another parameter with name {0} exists.".format(parameter_name))
-        variable_object = tf.get_variable(name=parameter_name, initializer=initializer, dtype=dtype)
+        if init_type == InitType.custom:
+            variable_object = tf.get_variable(name=parameter_name, initializer=initializer, dtype=dtype)
+        else:
+            variable_object = tf.get_variable(name=parameter_name, shape=shape, initializer=initializer, dtype=dtype)
         parameter = NetworkLearnableParameter(name=parameter_name, symbolic_network_object=variable_object,
                                               container_node=self, arg_type=arg_type)
         self.parametersDict[parameter_name] = parameter

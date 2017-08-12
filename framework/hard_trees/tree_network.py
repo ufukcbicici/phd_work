@@ -254,20 +254,20 @@ class TreeNetwork(Network):
         # Init parameters
         self.assignmentOpsList = []
         initial_values_dict = {}
+        self.totalLoss = self.totalRegularizationLossTensor + self.totalObjectiveLossTensor
+        self.trainStep = tf.train.MomentumOptimizer(learning_rate=0.01, momentum=0.9).minimize(self.totalLoss)
         init = tf.global_variables_initializer()
         self.session = tf.Session()
         self.session.run(init)
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
                 self.assignmentOpsList.append(parameter.assignOp)
-
-        # initial_values = self.session.run(self.allLearnableParameterTensorsList)
-        # # Obtain initial values for each parameter and create the assign operator list for parameter update
-        # # np.random.seed(int(time.time()))
+        initial_values = self.session.run(self.allLearnableParameterTensorsList)
+        # Obtain initial values for each parameter and create the assign operator list for parameter update
+        # np.random.seed(int(time.time()))
         # np_seed = 88
         # np.random.seed(np_seed)
-        # xavier_init = Xavier(factor_type="in", magnitude=2.34)
-
+        # xavier_init = Xavier(factor_type="in", magnitude=3.0)
         # for node in self.nodes.values():
         #     for parameter in node.parametersDict.values():
         #         initial_values_dict[parameter.inputTensor] = \
@@ -281,11 +281,65 @@ class TreeNetwork(Network):
         # self.save_parameters()
 
         # When loading parameters from file
-        self.load_parameters(file_name="parameters_runId17")
+        # Depth 3 Tree
+        # self.load_parameters(file_name="parameters_runId17")
+        # Baseline
+        self.load_parameters(file_name="parameters_runId41")
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
                 initial_values_dict[parameter.inputTensor] = parameter.valueArray
         self.session.run(self.assignmentOpsList, initial_values_dict)
+
+    def train_with_tf(self):
+        iteration = 0
+        epoch_count = self.get_networkwise_input_value(name=GlobalInputNames.epoch_count.value)
+        batch_size = self.get_networkwise_input_value(name=GlobalInputNames.batch_size.value)
+        global_training_hyperparameters_set = set(
+            [key for key in
+             self.globalInputs.keys() if key not in {ChannelTypes.data_input.value,
+                                                     ChannelTypes.label_input.value,
+                                                     ChannelTypes.indices_input.value} and not key.endswith(
+                GlobalInputNames.parameter_update.value)])
+        self.evaluate(dataset_type=DatasetTypes.training, iteration=iteration)
+        self.evaluate(dataset_type=DatasetTypes.validation, iteration=iteration)
+        for epoch_id in range(epoch_count):
+            # An epoch is a complete pass on the whole dataset.
+            self.dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            print("*************Epoch {0}*************".format(epoch_id))
+            while True:
+                # Get the next batch
+                samples, labels, indices_list = self.dataset.get_next_batch(batch_size=batch_size)
+                # Prepare the feed dict: Samples, labels and indices first.
+                feed_dict = {self.get_networkwise_input(name=ChannelTypes.data_input.value): samples,
+                             self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,
+                             self.get_networkwise_input(name=ChannelTypes.indices_input.value): indices_list}
+                # Feed other inputs; except parameter update inputs. (The optimizer will use them)
+                for input_name in global_training_hyperparameters_set:
+                    # Skip parameter update inputs
+                    if input_name == GlobalInputNames.branching_prob_threshold.value:
+                        threshold = (1.0 / self.treeDegree) - self.get_networkwise_input_value(name=input_name)
+                        feed_dict[self.globalInputs[input_name]] = threshold
+                    else:
+                        feed_dict[self.globalInputs[input_name]] = self.get_networkwise_input_value(name=input_name)
+                results = self.session.run(self.trainStep, feed_dict)
+                # Update the global parameters
+                iteration += 1
+                for global_param in self.globalInputDrivers.values():
+                    global_param.update(iteration=iteration)
+                # Check if an epoch has been completed.
+                if self.dataset.isNewEpoch:
+                    break
+            print("*************Epoch {0}*************".format(epoch_id))
+            # Evaluate on the training set and validation set
+            training_accuracy = self.evaluate(dataset_type=DatasetTypes.training, iteration=iteration)
+            validation_accuracy = self.evaluate(dataset_type=DatasetTypes.validation, iteration=iteration)
+            log_table_row = (self.runId, iteration, epoch_id, training_accuracy, validation_accuracy, 0.0, 0.0,
+                             self.__class__.__name__)
+            DbLogger.log_into_log_table([log_table_row])
+            final_accuracy = self.evaluate(dataset_type=DatasetTypes.test, iteration=iteration)
+            DbLogger.write_into_table(rows=[(self.runId, self.explanation, final_accuracy)],
+                                      table=DbLogger.runResultsTable,
+                                      col_count=3)
 
     def train(self):
         # Create the fetch list, get the epoch count and the batch size

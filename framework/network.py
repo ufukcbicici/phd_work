@@ -44,6 +44,8 @@ class Network:
         self.assignmentOpsList = None
         self.trainingTensorsDict = {}
         self.trainingResults = None
+        self.totalLoss = None
+        self.trainStep = None
         # Tensors to be used in evaluation
         self.evaluationTensorsDict = {}
         self.evaluationResults = None

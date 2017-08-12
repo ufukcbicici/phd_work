@@ -95,7 +95,7 @@ def main():
         cnn_lenet = TreeNetwork(dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
                                 problem_type=ProblemType.classification,
                                 train_program=train_program,
-                                explanation="1000 Epochs, {0} lr decay period, {1] initial lr".format(lr_period, lr),
+                                explanation="1000 Epochs, {0} lr decay period, {1} initial lr".format(lr_period, lr),
                                 list_of_node_builder_functions=[root_func, l1_func, leaf_func])
         optimizer = SgdOptimizer(network=cnn_lenet, use_biased_gradient_estimates=True)
         cnn_lenet.set_optimizer(optimizer=optimizer)

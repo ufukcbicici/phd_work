@@ -10,6 +10,8 @@ class TfLayerFactory:
             initializer = tf.contrib.layers.xavier_initializer()
         elif init_type == InitType.custom:
             initializer = tf.zeros(shape)
+        elif init_type == InitType.truncated_normal:
+            initializer = tf.truncated_normal(shape, stddev=0.1)
         else:
             raise NotImplementedError()
         return initializer
@@ -25,9 +27,13 @@ class TfLayerFactory:
         conv_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type,
                                                                                         shape=conv_filter_shape[3]))
         # Filters and bias
-        W = node.create_variable(name="Convolution_Filter_{0}".format(post_fix), initializer=conv_filter_initializer,
+        W = node.create_variable(name="Convolution_Filter_{0}".format(post_fix), init_type=init_type,
+                                 shape=conv_filter_shape,
+                                 initializer=conv_filter_initializer,
                                  dtype=tf.float32, arg_type=parameterTypes.learnable_parameter, channel=channel)
-        b = node.create_variable(name="Convolution_Bias_{0}".format(post_fix), initializer=conv_bias_initializer,
+        b = node.create_variable(name="Convolution_Bias_{0}".format(post_fix),
+                                 init_type=init_type,
+                                 shape=conv_filter_shape[3], initializer=conv_bias_initializer,
                                  dtype=tf.float32, arg_type=parameterTypes.learnable_parameter, channel=channel)
         # Operations
         conv_intermediate = channel.add_operation(
@@ -53,9 +59,15 @@ class TfLayerFactory:
         fc_bias_initializer = channel.add_operation(op=TfLayerFactory.get_initializer(init_type=init_type,
                                                                                       shape=fc_shape[1]))
         # Filters and bias
-        W = node.create_variable(name="FullyConnected_Weight_{0}".format(post_fix), initializer=fc_filter_initializer,
+        W = node.create_variable(name="FullyConnected_Weight_{0}".format(post_fix),
+                                 init_type=init_type,
+                                 shape=fc_shape,
+                                 initializer=fc_filter_initializer,
                                  dtype=tf.float32, arg_type=parameterTypes.learnable_parameter, channel=channel)
-        b = node.create_variable(name="FullyConnected_Bias_{0}".format(post_fix), initializer=fc_bias_initializer,
+        b = node.create_variable(name="FullyConnected_Bias_{0}".format(post_fix),
+                                 init_type=init_type,
+                                 shape=fc_shape[1],
+                                 initializer=fc_bias_initializer,
                                  dtype=tf.float32, arg_type=parameterTypes.learnable_parameter, channel=channel)
         # Operations
         matmul = channel.add_operation(op=tf.matmul(input_tensor, W))

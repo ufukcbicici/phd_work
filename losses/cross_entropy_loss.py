@@ -53,6 +53,7 @@ class CrossEntropyLoss(GenericLoss):
             batch_size = self.parentNode.parentNetwork.get_networkwise_input(name=GlobalInputNames.batch_size.value)
             avg_softmax_cross_entropy = loss_channel.add_operation(op=(total_softmax_cross_entropy / batch_size))
             self.lossOutputs = [avg_softmax_cross_entropy]
+            self.auxOutputs = [total_softmax_cross_entropy]
 
     def build_evaluation_network(self):
         self.evalOutputs = []
