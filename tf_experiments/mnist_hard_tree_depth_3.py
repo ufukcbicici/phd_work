@@ -41,7 +41,7 @@ def root_func(network, node):
             node=node, channel=f_channel, input_tensor=x_image,
             conv_filter_shape=[5, 5, 1, conv_1_feature_map_count],
             conv_stride_shape=[1, 1, 1, 1], pooling_shape=[1, 2, 2, 1], conv_padding="SAME",
-            pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
+            pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.custom,
             activation_type=ActivationType.relu, pooling_type=PoolingType.max, post_fix=ChannelTypes.f_operator.value)
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.h_operator) as h_channel:
         x_flattened = tf.reshape(x, [-1, MnistDataSet.MNIST_SIZE * MnistDataSet.MNIST_SIZE])
@@ -59,7 +59,7 @@ def l1_func(network, node):
             node=node, channel=f_channel, input_tensor=conv_input,
             conv_filter_shape=[5, 5, conv_1_feature_map_count, conv_2_feature_map_count],
             conv_stride_shape=[1, 1, 1, 1], pooling_shape=[1, 2, 2, 1], conv_padding="SAME",
-            pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.xavier,
+            pooling_stride_shape=[1, 2, 2, 1], pooling_padding="SAME", init_type=InitType.custom,
             activation_type=ActivationType.relu, pooling_type=PoolingType.max, post_fix=ChannelTypes.f_operator.value)
     with NetworkChannel(parent_node=node, parent_node_channel=ChannelTypes.h_operator) as h_channel:
         h_channel.add_operation(op=h_input)
@@ -74,7 +74,7 @@ def leaf_func(network, node):
         flattened_conv = f_channel.add_operation(op=tf.reshape(conv_input, [-1, 7 * 7 * conv_2_feature_map_count]))
         TfLayerFactory.create_fc_layer(node=node, channel=f_channel, input_tensor=flattened_conv,
                                        fc_shape=[7 * 7 * conv_2_feature_map_count, fc_unit_count],
-                                       init_type=InitType.xavier, activation_type=ActivationType.relu,
+                                       init_type=InitType.custom, activation_type=ActivationType.relu,
                                        post_fix=ChannelTypes.f_operator.value)
 
 

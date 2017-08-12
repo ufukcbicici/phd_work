@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import time
 import sys
 
 from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, parameterTypes, LossType, DatasetTypes, \
@@ -11,6 +12,7 @@ from framework.network import Network
 from framework.network_channel import NetworkChannel
 from framework.network_node import NetworkNode
 from framework.node_input_outputs import NetworkIOObject
+from initializers.xavier import Xavier
 from losses.cross_entropy_loss import CrossEntropyLoss
 from losses.sample_index_counter import SampleIndexCounter
 
@@ -110,7 +112,8 @@ class TreeNetwork(Network):
                 else:  # path_node == dest_node
                     # It shouldn't be in the input dict.
                     if producer_triple in path_node.inputs:
-                        raise Exception("The triple {0} must not be in the inputs.".format(producer_triple))
+                        network_io_object = path_node.get_input(producer_triple=producer_triple)
+                        return network_io_object.tensor
                     else:
                         branched_tensor = path_node.apply_decision(tensor=last_output.tensor)
                         network_io_object = NetworkIOObject(tensor=branched_tensor, producer_node=producer_node,
@@ -225,12 +228,12 @@ class TreeNetwork(Network):
                 print("Node:{0}".format(node.indicatorText))
                 # Build non accumulation node networks.
                 if not node.isAccumulation:
+                    # Build user defined local node network
+                    self.nodeBuilderFunctions[node_depth](network=self, node=node)
                     # Evaluate sample distribution, if we want to.
                     if self.evalSampleDistribution:
                         sample_counter = SampleIndexCounter(parent_node=node)
                         NetworkNode.apply_loss(loss=sample_counter)
-                    # Build user defined local node network
-                    self.nodeBuilderFunctions[node_depth](network=self, node=node)
                 # If node is leaf, apply the actual objective_loss function. If accumulation,
                 #  fetch all losses from all nodes
                 # in the graph, apply gradient calculations, etc.
@@ -250,13 +253,22 @@ class TreeNetwork(Network):
         init = tf.global_variables_initializer()
         self.session = tf.Session()
         self.session.run(init)
-        # Obtain initial values for each parameter and create the assign operator list for parameter update
         initial_values = self.session.run(self.allLearnableParameterTensorsList)
+        # Obtain initial values for each parameter and create the assign operator list for parameter update
+        np.random.seed(int(time.time()))
+        xavier_init = Xavier(factor_type="in", magnitude=2.34)
         self.assignmentOpsList = []
+        initial_values_dict = {}
+        for node in self.nodes.values():
+            for parameter in node.parametersDict.values():
+                initial_values_dict[parameter.inputTensor] = \
+                    xavier_init.init_weight(arr=initial_values[parameter.globalParameterIndex])
+                self.assignmentOpsList.append(parameter.assignOp)
+        self.session.run(self.assignmentOpsList, initial_values_dict)
+        initial_values = self.session.run(self.allLearnableParameterTensorsList)
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
                 parameter.valueArray = np.array(initial_values[parameter.globalParameterIndex])
-                self.assignmentOpsList.append(parameter.assignOp)
 
     def train(self):
         # Create the fetch list, get the epoch count and the batch size

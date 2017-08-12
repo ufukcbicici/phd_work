@@ -8,9 +8,9 @@ from framework.network_channel import NetworkChannel
 class Network:
     def __init__(self, run_id, dataset, parameter_file, problem_type,
                  train_program,
-                 loss_layer_init=InitType.xavier,
+                 loss_layer_init=InitType.custom,
                  loss_activation=ActivationType.tanh,
-                 activation_init=InitType.xavier,
+                 activation_init=InitType.custom,
                  shrinkage_regularizer=ShrinkageRegularizers.l2):
         self.nodes = {}
         self.leafNodes = []

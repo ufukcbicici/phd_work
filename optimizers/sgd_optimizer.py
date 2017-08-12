@@ -43,6 +43,8 @@ class SgdOptimizer:
                 total_gradient = lr * regularizer_gradient
                 if self.useBiasedGradientEstimates:
                     total_gradient += lr * (batch_size / float(num_of_samples)) * objective_gradient
+                else:
+                    total_gradient += lr * objective_gradient
                 momentum_state[:] *= momentum_decay
                 momentum_state[:] -= total_gradient
                 parameter.valueArray[:] += momentum_state

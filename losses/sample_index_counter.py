@@ -26,7 +26,14 @@ class SampleIndexCounter(GenericLoss):
         with NetworkChannel(parent_node=self.parentNode,
                             parent_node_channel=ChannelTypes.non_differentiable_loss) as non_dif_loss_channel:
             sample_count_tensor = non_dif_loss_channel.add_operation(op=tf.size(input=self.sampleIndexTensor))
-            self.lossOutputs = [sample_count_tensor]
+            if self.parentNode != self.parentNode.parentNetwork.get_root_node():
+                label_tensor = self.parentNode.parentNetwork.add_nodewise_input(
+                    producer_node=self.parentNode.parentNetwork.get_root_node(),
+                    producer_channel=ChannelTypes.label_input,
+                    producer_channel_index=0, dest_node=self.parentNode)
+                self.lossOutputs = [sample_count_tensor, self.sampleIndexTensor, label_tensor]
+            else:
+                self.lossOutputs = [sample_count_tensor, self.sampleIndexTensor]
 
     def build_evaluation_network(self):
         with NetworkChannel(parent_node=self.parentNode,
