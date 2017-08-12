@@ -82,9 +82,10 @@ def main():
     dataset = MnistDataSet(validation_sample_count=5000)
     train_program_path = UtilityFuncs.get_absolute_path(script_file=__file__, relative_path="train_program.json")
     train_program = TrainProgram(program_file=train_program_path)
-    cnn_lenet = TreeNetwork(run_id=0, dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
+    cnn_lenet = TreeNetwork(dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
                             problem_type=ProblemType.classification,
                             train_program=train_program,
+                            explanation="1000 Epochs, 10000 lr decay period, 0.001 initial lr",
                             list_of_node_builder_functions=[root_func, l1_func, leaf_func])
     optimizer = SgdOptimizer(network=cnn_lenet, use_biased_gradient_estimates=True)
     cnn_lenet.set_optimizer(optimizer=optimizer)

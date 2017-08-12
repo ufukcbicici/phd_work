@@ -39,7 +39,12 @@ class SampleIndexCounter(GenericLoss):
         with NetworkChannel(parent_node=self.parentNode,
                             parent_node_channel=ChannelTypes.evaluation) as eval_channel:
             eval_channel.add_operation(op=self.sampleIndexTensor)
-            self.evalOutputs = [self.sampleIndexTensor]
+            if not self.parentNode.isLeaf:
+                branch_probs = self.parentNode.get_output(
+                    producer_triple=(self.parentNode, ChannelTypes.branching_probabilities, 0)).tensor
+                self.evalOutputs = [self.sampleIndexTensor, branch_probs]
+            else:
+                self.evalOutputs = [self.sampleIndexTensor]
 
     def finalize(self):
         super().finalize()

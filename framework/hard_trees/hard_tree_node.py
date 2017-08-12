@@ -195,6 +195,9 @@ class HardTreeNode(NetworkNode):
                 continue
             for parameter in node.parametersDict.values():
                 if parameter.parameterType == parameterTypes.learnable_parameter:
+                    # if ChannelTypes.branching_activation.value in parameter.name and \
+                    #                 self.parentNetwork.ancestorCount == 0:
+                    #     continue
                     parameter.globalParameterIndex = len(self.parentNetwork.allLearnableParameterTensorsList)
                     self.parentNetwork.allLearnableParameterTensorsList.append(parameter.tensor)
         # Step 5) Calculate the objective gradients with respect to parameters

@@ -1,20 +1,24 @@
 import tensorflow as tf
+import numpy as np
 from auxillary.dag_utilities import Dag
 from auxillary.constants import ChannelTypes, GlobalInputNames, InitType, ActivationType, PoolingType, TreeType, \
     ProblemType, ShrinkageRegularizers
+from auxillary.db_logger import DbLogger
 from framework.network_channel import NetworkChannel
 
 
 class Network:
-    def __init__(self, run_id, dataset, parameter_file, problem_type,
-                 train_program,
+    def __init__(self, dataset, parameter_file, problem_type,
+                 train_program, explanation,
                  loss_layer_init=InitType.custom,
                  loss_activation=ActivationType.tanh,
                  activation_init=InitType.custom,
                  shrinkage_regularizer=ShrinkageRegularizers.l2):
         self.nodes = {}
         self.leafNodes = []
-        self.runId = run_id
+        self.runId = DbLogger.get_run_id()
+        self.explanation = explanation
+        DbLogger.log_bnn_explanation(runId=self.runId, explanation_string=explanation)
         self.dataset = dataset
         self.parameterFile = parameter_file
         self.dag = Dag()
@@ -68,7 +72,7 @@ class Network:
     def train(self):
         pass
 
-    def evaluate(self, dataset_type):
+    def evaluate(self, dataset_type, iteration):
         pass
 
     def get_outputs_for_single_loss(self, loss_object):
@@ -108,3 +112,20 @@ class Network:
 
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
+
+    def load_parameters(self, file_name):
+        filename = file_name + ".npz"
+        try:
+            npzfile = np.load(filename)
+            for node in self.nodes.values():
+                for param_obj in node.parametersDict.values():
+                    param_obj.valueArray = np.array(npzfile[param_obj.name])
+        except:
+            raise Exception('Tree file {0} not found'.format(filename))
+
+    def save_parameters(self):
+        kwargs = {}
+        for node in self.nodes.values():
+            for param_obj in node.parametersDict.values():
+                kwargs[param_obj.name] = param_obj.valueArray
+        np.savez("parameters_runId{0}".format(self.runId), **kwargs)

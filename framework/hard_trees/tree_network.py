@@ -5,6 +5,7 @@ import sys
 
 from auxillary.constants import ChannelTypes, TreeType, GlobalInputNames, parameterTypes, LossType, DatasetTypes, \
     ProblemType
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter
 from framework.hard_trees.hard_tree_node import HardTreeNode
@@ -18,10 +19,10 @@ from losses.sample_index_counter import SampleIndexCounter
 
 
 class TreeNetwork(Network):
-    def __init__(self, run_id, dataset, parameter_file, problem_type, train_program,
+    def __init__(self, dataset, parameter_file, problem_type, train_program, explanation,
                  tree_degree, tree_type, list_of_node_builder_functions, ancestor_count=sys.maxsize,
                  eval_sample_distribution=True):
-        super().__init__(run_id, dataset, parameter_file, problem_type, train_program)
+        super().__init__(dataset, parameter_file, problem_type, train_program, explanation)
         self.treeDegree = tree_degree
         self.treeDepth = len(list_of_node_builder_functions)
         self.depthsToNodesDict = {}
@@ -230,10 +231,6 @@ class TreeNetwork(Network):
                 if not node.isAccumulation:
                     # Build user defined local node network
                     self.nodeBuilderFunctions[node_depth](network=self, node=node)
-                    # Evaluate sample distribution, if we want to.
-                    if self.evalSampleDistribution:
-                        sample_counter = SampleIndexCounter(parent_node=node)
-                        NetworkNode.apply_loss(loss=sample_counter)
                 # If node is leaf, apply the actual objective_loss function. If accumulation,
                 #  fetch all losses from all nodes
                 # in the graph, apply gradient calculations, etc.
@@ -242,6 +239,11 @@ class TreeNetwork(Network):
                 # If node is not leaf or accumulation (inner node), then apply branching mechanism.
                 else:
                     node.attach_decision()
+                if not node.isAccumulation:
+                    # Evaluate sample distribution, if we want to.
+                    if self.evalSampleDistribution:
+                        sample_counter = SampleIndexCounter(parent_node=node)
+                        NetworkNode.apply_loss(loss=sample_counter)
                 # Build weight shrinkage losses.
                 node.attach_shrinkage_losses()
         # Step 4:
@@ -250,28 +252,44 @@ class TreeNetwork(Network):
 
     def init_session(self):
         # Init parameters
+        self.assignmentOpsList = []
+        initial_values_dict = {}
         init = tf.global_variables_initializer()
         self.session = tf.Session()
         self.session.run(init)
-        initial_values = self.session.run(self.allLearnableParameterTensorsList)
-        # Obtain initial values for each parameter and create the assign operator list for parameter update
-        np.random.seed(int(time.time()))
-        xavier_init = Xavier(factor_type="in", magnitude=2.34)
-        self.assignmentOpsList = []
-        initial_values_dict = {}
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
-                initial_values_dict[parameter.inputTensor] = \
-                    xavier_init.init_weight(arr=initial_values[parameter.globalParameterIndex])
                 self.assignmentOpsList.append(parameter.assignOp)
-        self.session.run(self.assignmentOpsList, initial_values_dict)
-        initial_values = self.session.run(self.allLearnableParameterTensorsList)
+
+        # initial_values = self.session.run(self.allLearnableParameterTensorsList)
+        # # Obtain initial values for each parameter and create the assign operator list for parameter update
+        # # np.random.seed(int(time.time()))
+        # np_seed = 88
+        # np.random.seed(np_seed)
+        # xavier_init = Xavier(factor_type="in", magnitude=2.34)
+
+        # for node in self.nodes.values():
+        #     for parameter in node.parametersDict.values():
+        #         initial_values_dict[parameter.inputTensor] = \
+        #             xavier_init.init_weight(arr=initial_values[parameter.globalParameterIndex])
+        #         self.assignmentOpsList.append(parameter.assignOp)
+        # self.session.run(self.assignmentOpsList, initial_values_dict)
+        # initial_values = self.session.run(self.allLearnableParameterTensorsList)
+        # for node in self.nodes.values():
+        #     for parameter in node.parametersDict.values():
+        #         parameter.valueArray = np.array(initial_values[parameter.globalParameterIndex])
+        # self.save_parameters()
+
+        # When loading parameters from file
+        self.load_parameters(file_name="parameters_runId17")
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
-                parameter.valueArray = np.array(initial_values[parameter.globalParameterIndex])
+                initial_values_dict[parameter.inputTensor] = parameter.valueArray
+        self.session.run(self.assignmentOpsList, initial_values_dict)
 
     def train(self):
         # Create the fetch list, get the epoch count and the batch size
+        iteration = 0
         epoch_count = self.get_networkwise_input_value(name=GlobalInputNames.epoch_count.value)
         batch_size = self.get_networkwise_input_value(name=GlobalInputNames.batch_size.value)
         global_training_hyperparameters_set = set(
@@ -281,14 +299,14 @@ class TreeNetwork(Network):
                                                      ChannelTypes.indices_input.value} and not key.endswith(
                 GlobalInputNames.parameter_update.value)])
         # Enter the training loop
-        self.evaluate(dataset_type=DatasetTypes.training)
-        self.evaluate(dataset_type=DatasetTypes.validation)
-        iteration = 0
+        self.evaluate(dataset_type=DatasetTypes.training, iteration=iteration)
+        self.evaluate(dataset_type=DatasetTypes.validation, iteration=iteration)
         for epoch_id in range(epoch_count):
             # An epoch is a complete pass on the whole dataset.
             self.dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
             print("*************Epoch {0}*************".format(epoch_id))
             while True:
+                kv_store_rows = []
                 # Get the next batch
                 samples, labels, indices_list = self.dataset.get_next_batch(batch_size=batch_size)
                 # Prepare the feed dict: Samples, labels and indices first.
@@ -327,10 +345,16 @@ class TreeNetwork(Network):
                     break
             print("*************Epoch {0}*************".format(epoch_id))
             # Evaluate on the training set and validation set
-            self.evaluate(dataset_type=DatasetTypes.training)
-            self.evaluate(dataset_type=DatasetTypes.validation)
+            training_accuracy = self.evaluate(dataset_type=DatasetTypes.training, iteration=iteration)
+            validation_accuracy = self.evaluate(dataset_type=DatasetTypes.validation, iteration=iteration)
+            log_table_row = (self.runId, iteration, epoch_id, training_accuracy, validation_accuracy, 0.0, 0.0,
+                             self.__class__.__name__)
+            DbLogger.log_into_log_table([log_table_row])
+        final_accuracy = self.evaluate(dataset_type=DatasetTypes.test, iteration=iteration)
+        DbLogger.write_into_table(rows=[(self.runId, self.explanation, final_accuracy)], table=DbLogger.runResultsTable,
+                                  col_count=3)
 
-    def evaluate(self, dataset_type):
+    def evaluate(self, dataset_type, iteration):
         self.dataset.set_current_data_set_type(dataset_type=dataset_type)
         eval_batch_size = self.get_networkwise_input_value(name=GlobalInputNames.evaluation_batch_size.value)
         if self.problemType == ProblemType.classification:
@@ -341,6 +365,7 @@ class TreeNetwork(Network):
             for node in self.leafNodes:
                 corrects_per_leaf[node.index] = 0.0
                 total_per_leaf[node.index] = 0.0
+            kv_store_rows = []
             while True:
                 # Get the next batch
                 samples, labels, indices_list = self.dataset.get_next_batch(batch_size=eval_batch_size)
@@ -349,7 +374,7 @@ class TreeNetwork(Network):
                              self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,
                              self.get_networkwise_input(name=ChannelTypes.indices_input.value): indices_list,
                              self.globalInputs[GlobalInputNames.branching_prob_threshold.value]: (
-                             1.0 / self.treeDegree)}
+                                 1.0 / self.treeDegree)}
                 # Run evaluation pass, get individual loss values, total objective and regularization loss values and
                 # gradients
                 self.evaluationResults = self.session.run(self.evaluationTensorsDict, feed_dict)
@@ -375,15 +400,26 @@ class TreeNetwork(Network):
                 dataset_type_str = "test"
             else:
                 raise NotImplementedError()
-            accuracy = total_correct_count / total_sample_count
-            print("{0} set accuracy:{1}".format(dataset_type_str, accuracy))
+            final_accuracy = total_correct_count / total_sample_count
+            print("{0} set accuracy:{1}".format(dataset_type_str, final_accuracy))
             for node in self.leafNodes:
                 if total_per_leaf[node.index] == 0:
-                    leaf_accuracy = "Empty"
+                    leaf_accuracy = -1.0
                 else:
                     leaf_accuracy = corrects_per_leaf[node.index] / total_per_leaf[node.index]
                 print("Node{0} correct:{1} total:{2} accuracy:{3}".format(node.index, corrects_per_leaf[node.index],
-                                                                          total_per_leaf[node.index],leaf_accuracy))
+                                                                          total_per_leaf[node.index], leaf_accuracy))
+                kv_store_rows.append(
+                    (self.runId, iteration, "{0} set, Node{1} Correct Count".
+                     format(dataset_type_str, node.index), corrects_per_leaf[node.index]))
+                kv_store_rows.append(
+                    (self.runId, iteration, "{0} set, Node{1} Total Count".
+                     format(dataset_type_str, node.index), total_per_leaf[node.index]))
+                kv_store_rows.append(
+                    (self.runId, iteration, "{0} set, Node{1} Accuracy".
+                     format(dataset_type_str, node.index), leaf_accuracy))
+            DbLogger.write_into_table(rows=kv_store_rows, table=DbLogger.runKvStore, col_count=4)
+            return final_accuracy
         else:
             raise NotImplementedError()
 
