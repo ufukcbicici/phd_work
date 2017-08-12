@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import itertools
 
 from auxillary.constants import ChannelTypes, PoolingType, ActivationType, InitType, ProblemType, TreeType, \
     GlobalInputNames
@@ -80,16 +81,25 @@ def leaf_func(network, node):
 
 def main():
     dataset = MnistDataSet(validation_sample_count=5000)
-    train_program_path = UtilityFuncs.get_absolute_path(script_file=__file__, relative_path="train_program.json")
-    train_program = TrainProgram(program_file=train_program_path)
-    cnn_lenet = TreeNetwork(dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
-                            problem_type=ProblemType.classification,
-                            train_program=train_program,
-                            explanation="1000 Epochs, 10000 lr decay period, 0.001 initial lr",
-                            list_of_node_builder_functions=[root_func, l1_func, leaf_func])
-    optimizer = SgdOptimizer(network=cnn_lenet, use_biased_gradient_estimates=True)
-    cnn_lenet.set_optimizer(optimizer=optimizer)
-    cnn_lenet.build_network()
-    cnn_lenet.init_session()
-    cnn_lenet.train()
+    lr_list = [0.005, 0.0075, 0.01, 0.0125, 0.015]
+    lr_periods = [100000, 100000/2, 100000/3, 100000/4, 100000/5]
+    list_of_lists = [lr_list , lr_periods]
+    for idx in itertools.product(*list_of_lists):
+        lr = idx[0]
+        lr_period = idx[1]
+        train_program_path = UtilityFuncs.get_absolute_path(script_file=__file__, relative_path="train_program.json")
+        train_program = TrainProgram(program_file=train_program_path)
+        train_program.set_train_program_element(element_name="lr_initial", keywords=",", skipwords="", value=lr)
+        train_program.set_train_program_element(element_name="lr_update_interval",
+                                                keywords=",", skipwords="", value=lr_period)
+        cnn_lenet = TreeNetwork(dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
+                                problem_type=ProblemType.classification,
+                                train_program=train_program,
+                                explanation="1000 Epochs, {0} lr decay period, {1] initial lr".format(lr_period, lr),
+                                list_of_node_builder_functions=[root_func, l1_func, leaf_func])
+        optimizer = SgdOptimizer(network=cnn_lenet, use_biased_gradient_estimates=True)
+        cnn_lenet.set_optimizer(optimizer=optimizer)
+        cnn_lenet.build_network()
+        cnn_lenet.init_session()
+        cnn_lenet.train()
 main()
