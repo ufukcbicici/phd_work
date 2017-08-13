@@ -80,11 +80,12 @@ def leaf_func(network, node):
 
 
 def main():
-    dataset = MnistDataSet(validation_sample_count=5000)
-    lr_list = [0.005, 0.0075, 0.01, 0.0125, 0.015]
-    lr_periods = [100000, 100000/2, 100000/3, 100000/4, 100000/5]
+    dataset = MnistDataSet(validation_sample_count=10000)
+    lr_list = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15]
+    lr_periods = [500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
     list_of_lists = [lr_list , lr_periods]
     for idx in itertools.product(*list_of_lists):
+        tf.reset_default_graph()
         lr = idx[0]
         lr_period = idx[1]
         train_program_path = UtilityFuncs.get_absolute_path(script_file=__file__, relative_path="train_program.json")
@@ -95,7 +96,8 @@ def main():
         cnn_lenet = TreeNetwork(dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
                                 problem_type=ProblemType.classification,
                                 train_program=train_program,
-                                explanation="1000 Epochs, {0} lr decay period, {1] initial lr".format(lr_period, lr),
+                                explanation="100 Epochs, {0} lr decay period, {1} initial lr params runId17"
+                                .format(lr_period, lr),
                                 list_of_node_builder_functions=[root_func, l1_func, leaf_func])
         optimizer = SgdOptimizer(network=cnn_lenet, use_biased_gradient_estimates=True)
         cnn_lenet.set_optimizer(optimizer=optimizer)

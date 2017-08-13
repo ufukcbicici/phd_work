@@ -390,7 +390,7 @@ class TreeNetwork(Network):
                 if self.dataset.isNewEpoch:
                     break
             if total_sample_count != self.dataset.get_current_sample_count():
-                raise Exception("Expected sample count is {0} but {1} samples have been processed.".format(
+                print("Expected sample count is {0} but {1} samples have been processed.".format(
                     self.dataset.get_current_sample_count(), total_sample_count))
             if dataset_type == DatasetTypes.training:
                 dataset_type_str = "training"
