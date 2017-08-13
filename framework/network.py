@@ -124,9 +124,9 @@ class Network:
         except:
             raise Exception('Tree file {0} not found'.format(filename))
 
-    def save_parameters(self):
+    def save_parameters(self, prefix):
         kwargs = {}
         for node in self.nodes.values():
             for param_obj in node.parametersDict.values():
                 kwargs[param_obj.name] = param_obj.valueArray
-        np.savez("parameters_runId{0}".format(self.runId), **kwargs)
+        np.savez("{0}_runId{1}".format(prefix, self.runId), **kwargs)

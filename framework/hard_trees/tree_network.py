@@ -410,6 +410,7 @@ class TreeNetwork(Network):
         final_accuracy = self.evaluate(dataset_type=DatasetTypes.test, iteration=iteration)
         DbLogger.write_into_table(rows=[(self.runId, self.explanation, final_accuracy)], table=DbLogger.runResultsTable,
                                   col_count=3)
+        self.save_parameters(prefix="trained_params")
 
     def evaluate(self, dataset_type, iteration):
         self.dataset.set_current_data_set_type(dataset_type=dataset_type)

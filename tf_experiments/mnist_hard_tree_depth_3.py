@@ -173,7 +173,7 @@ def main():
     #     cnn_lenet.build_network()
     #     cnn_lenet.init_session()
     #     cnn_lenet.train()
-    lr_list = [0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
+    lr_list = [0.009]
     list_of_lists = [lr_list]
     for idx in itertools.product(*list_of_lists):
         tf.reset_default_graph()
