@@ -173,15 +173,15 @@ def main():
     #     cnn_lenet.build_network()
     #     cnn_lenet.init_session()
     #     cnn_lenet.train()
-    lr_list = [0.009]
+    lr_list = [0.0001]
     list_of_lists = [lr_list]
     for idx in itertools.product(*list_of_lists):
         tf.reset_default_graph()
         lr = idx[0]
         train_program_path = UtilityFuncs.get_absolute_path(script_file=__file__, relative_path="train_program.json")
         train_program = TrainProgram(program_file=train_program_path)
-        train_program.set_train_program_element(element_name="lr_initial", keywords=",",
-                                                skipwords={"BranchingActivation"},
+        train_program.set_train_program_element(element_name="lr_initial", keywords={},
+                                                skipwords={},
                                                 value=lr)
         # train_program.set_train_program_element(element_name="lr_update_interval",
         #                                         keywords=",", skipwords="", value=lr_period)

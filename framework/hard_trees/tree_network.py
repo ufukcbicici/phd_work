@@ -265,7 +265,6 @@ class TreeNetwork(Network):
         for node in self.nodes.values():
             for parameter in node.parametersDict.values():
                 self.assignmentOpsList.append(parameter.assignOp)
-        # initial_values = self.session.run(self.allLearnableParameterTensorsList)
         # Obtain initial values for each parameter and create the assign operator list for parameter update
         # np.random.seed(int(time.time()))
         # np_seed = 88
@@ -277,21 +276,21 @@ class TreeNetwork(Network):
         #             xavier_init.init_weight(arr=initial_values[parameter.globalParameterIndex])
         #         self.assignmentOpsList.append(parameter.assignOp)
         # self.session.run(self.assignmentOpsList, initial_values_dict)
-        # initial_values = self.session.run(self.allLearnableParameterTensorsList)
-        # for node in self.nodes.values():
-        #     for parameter in node.parametersDict.values():
-        #         parameter.valueArray = np.array(initial_values[parameter.globalParameterIndex])
-        # self.save_parameters()
+        initial_values = self.session.run(self.allLearnableParameterTensorsList)
+        for node in self.nodes.values():
+            for parameter in node.parametersDict.values():
+                parameter.valueArray = np.array(initial_values[parameter.globalParameterIndex])
+        self.save_parameters("initial_params")
 
         # When loading parameters from file
         # Depth 3 Tree
-        self.load_parameters(file_name="parameters_runId77")
+        # self.load_parameters(file_name="parameters_runId77")
         # Baseline
         # self.load_parameters(file_name="parameters_runId56")
-        for node in self.nodes.values():
-            for parameter in node.parametersDict.values():
-                initial_values_dict[parameter.inputTensor] = parameter.valueArray
-        self.session.run(self.assignmentOpsList, initial_values_dict)
+        # for node in self.nodes.values():
+        #     for parameter in node.parametersDict.values():
+        #         initial_values_dict[parameter.inputTensor] = parameter.valueArray
+        # self.session.run(self.assignmentOpsList, initial_values_dict)
 
     def train_with_tf(self):
         iteration = 0
@@ -448,7 +447,7 @@ class TreeNetwork(Network):
                 if self.dataset.isNewEpoch:
                     break
             if total_sample_count != self.dataset.get_current_sample_count():
-                raise Exception("Expected sample count is {0} but {1} samples have been processed.".format(
+                print("Expected sample count is {0} but {1} samples have been processed.".format(
                     self.dataset.get_current_sample_count(), total_sample_count))
             if dataset_type == DatasetTypes.training:
                 dataset_type_str = "training"
