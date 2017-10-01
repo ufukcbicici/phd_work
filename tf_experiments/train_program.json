@@ -1,82 +1,82 @@
 {
-  "EpochCount": {
-    "value": 1000,
-    "type": "FixedParameter"
-  },
-  "momentum": {
-    "FullyConnected,BranchingActivation,Bias": 0.9,
-    "FullyConnected,PreLoss,Bias": 0.9,
-    "FullyConnected,BranchingActivation,Weight": 0.9,
-    "Convolution,FOperator,Filter": 0.9,
-    "FullyConnected,FOperator,Bias": 0.9,
-    "FullyConnected,FOperator,Weight": 0.9,
-    "FullyConnected,PreLoss,Weight": 0.9,
-    "Convolution,FOperator,Bias": 0.9
-  },
-  "lr_decay_ratio": {
-    "FullyConnected,BranchingActivation,Bias": 0.5,
-    "FullyConnected,PreLoss,Bias": 0.5,
-    "FullyConnected,BranchingActivation,Weight": 0.5,
-    "Convolution,FOperator,Filter": 0.5,
-    "FullyConnected,FOperator,Bias": 0.5,
-    "FullyConnected,FOperator,Weight": 0.5,
-    "FullyConnected,PreLoss,Weight": 0.5,
-    "Convolution,FOperator,Bias": 0.5
-  },
-  "wd": {
-    "FullyConnected,BranchingActivation,Bias": 0.0,
-    "FullyConnected,PreLoss,Bias": 0.0,
-    "FullyConnected,BranchingActivation,Weight": 0.0,
-    "Convolution,FOperator,Filter": 0.0,
-    "FullyConnected,FOperator,Bias": 0.0,
-    "FullyConnected,FOperator,Weight": 0.0,
-    "FullyConnected,PreLoss,Weight": 0.0,
-    "Convolution,FOperator,Bias": 0.0
+  "BranchingProbThreshold": {
+    "decayPeriod": 500,
+    "minLimit": 0.0,
+    "type": "DecayingParameter",
+    "epsilon_value": 0.0,
+    "decay": 0.5,
+    "value": 0.5
   },
   "weight_update_interval": {
-    "FullyConnected,BranchingActivation,Bias": 1,
     "FullyConnected,PreLoss,Bias": 1,
+    "FullyConnected,BranchingActivation,Bias": 1,
+    "FullyConnected,FOperator,Bias": 1,
+    "FullyConnected,PreLoss,Weight": 1,
     "FullyConnected,BranchingActivation,Weight": 1,
     "Convolution,FOperator,Filter": 1,
-    "FullyConnected,FOperator,Bias": 1,
     "FullyConnected,FOperator,Weight": 1,
-    "FullyConnected,PreLoss,Weight": 1,
     "Convolution,FOperator,Bias": 1
   },
   "lr_update_interval": {
-    "FullyConnected,BranchingActivation,Bias": 1000,
-    "FullyConnected,PreLoss,Bias": 1000,
-    "FullyConnected,BranchingActivation,Weight": 1000,
-    "Convolution,FOperator,Filter": 1000,
-    "FullyConnected,FOperator,Bias": 1000,
-    "FullyConnected,FOperator,Weight": 1000,
-    "FullyConnected,PreLoss,Weight": 1000,
-    "Convolution,FOperator,Bias": 1000
-  },
-  "EvaluationBatchSize": {
-    "value": 5000,
-    "type": "FixedParameter"
-  },
-  "BranchingProbThreshold": {
-    "value": 0.0,
-    "decayPeriod": 1,
-    "minLimit": 0.0,
-    "epsilon_value": 0.0,
-    "type": "DecayingParameter",
-    "decay": 0.999
-  },
-  "BatchSize": {
-    "value": 100,
-    "type": "FixedParameter"
+    "FullyConnected,PreLoss,Bias": 500,
+    "FullyConnected,BranchingActivation,Bias": 500,
+    "FullyConnected,FOperator,Bias": 500,
+    "FullyConnected,PreLoss,Weight": 500,
+    "FullyConnected,BranchingActivation,Weight": 500,
+    "Convolution,FOperator,Filter": 500,
+    "FullyConnected,FOperator,Weight": 500,
+    "Convolution,FOperator,Bias": 500
   },
   "lr_initial": {
-    "FullyConnected,BranchingActivation,Bias": 0.1,
-    "FullyConnected,PreLoss,Bias": 0.1,
-    "FullyConnected,BranchingActivation,Weight": 0.1,
-    "Convolution,FOperator,Filter": 0.1,
-    "FullyConnected,FOperator,Bias": 0.1,
-    "FullyConnected,FOperator,Weight": 0.1,
-    "FullyConnected,PreLoss,Weight": 0.1,
-    "Convolution,FOperator,Bias": 0.1
+    "FullyConnected,PreLoss,Bias": 0.05,
+    "FullyConnected,BranchingActivation,Bias": 0.05,
+    "FullyConnected,FOperator,Bias": 0.05,
+    "FullyConnected,PreLoss,Weight": 0.05,
+    "FullyConnected,BranchingActivation,Weight": 0.05,
+    "Convolution,FOperator,Filter": 0.05,
+    "FullyConnected,FOperator,Weight": 0.05,
+    "Convolution,FOperator,Bias": 0.05
+  },
+  "BatchSize": {
+    "type": "FixedParameter",
+    "value": 1000
+  },
+  "lr_decay_ratio": {
+    "FullyConnected,PreLoss,Bias": 0.5,
+    "FullyConnected,BranchingActivation,Bias": 0.5,
+    "FullyConnected,FOperator,Bias": 0.5,
+    "FullyConnected,PreLoss,Weight": 0.5,
+    "FullyConnected,BranchingActivation,Weight": 0.5,
+    "Convolution,FOperator,Filter": 0.5,
+    "FullyConnected,FOperator,Weight": 0.5,
+    "Convolution,FOperator,Bias": 0.5
+  },
+  "EpochCount": {
+    "type": "FixedParameter",
+    "value": 100
+  },
+  "EvaluationBatchSize": {
+    "type": "FixedParameter",
+    "value": 5000
+  },
+  "wd": {
+    "FullyConnected,PreLoss,Bias": 0.0,
+    "FullyConnected,BranchingActivation,Bias": 0.0,
+    "FullyConnected,FOperator,Bias": 0.0,
+    "FullyConnected,PreLoss,Weight": 0.0,
+    "FullyConnected,BranchingActivation,Weight": 0.0,
+    "Convolution,FOperator,Filter": 0.0,
+    "FullyConnected,FOperator,Weight": 0.0,
+    "Convolution,FOperator,Bias": 0.0
+  },
+  "momentum": {
+    "FullyConnected,PreLoss,Bias": 0.9,
+    "FullyConnected,BranchingActivation,Bias": 0.9,
+    "FullyConnected,FOperator,Bias": 0.9,
+    "FullyConnected,PreLoss,Weight": 0.9,
+    "FullyConnected,BranchingActivation,Weight": 0.9,
+    "Convolution,FOperator,Filter": 0.9,
+    "FullyConnected,FOperator,Weight": 0.9,
+    "Convolution,FOperator,Bias": 0.9
   }
 }

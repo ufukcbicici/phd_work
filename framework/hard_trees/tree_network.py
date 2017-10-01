@@ -250,6 +250,42 @@ class TreeNetwork(Network):
         # Set the drivers for the global constants
         self.create_global_input_drivers()
 
+    def check_grads(self):
+        config = tf.ConfigProto(
+            device_count={'GPU': 0}
+        )
+        with tf.Session(config=config) as sess:
+            init = tf.global_variables_initializer()
+            sess.run(init)
+            epoch_count = self.get_networkwise_input_value(name=GlobalInputNames.epoch_count.value)
+            batch_size = self.get_networkwise_input_value(name=GlobalInputNames.batch_size.value)
+            global_training_hyperparameters_set = set(
+                [key for key in
+                 self.globalInputs.keys() if key not in {ChannelTypes.data_input.value,
+                                                         ChannelTypes.label_input.value,
+                                                         ChannelTypes.indices_input.value} and not key.endswith(
+                    GlobalInputNames.parameter_update.value)])
+            samples, labels, indices_list = self.dataset.get_next_batch(batch_size=batch_size)
+            # Prepare the feed dict: Samples, labels and indices first.
+            feed_dict = {self.get_networkwise_input(name=ChannelTypes.data_input.value): samples,
+                         self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,
+                         self.get_networkwise_input(name=ChannelTypes.indices_input.value): indices_list}
+            # Feed other inputs; except parameter update inputs. (The optimizer will use them)
+            for input_name in global_training_hyperparameters_set:
+                # Skip parameter update inputs
+                if input_name == GlobalInputNames.branching_prob_threshold.value:
+                    threshold = (1.0 / self.treeDegree) - self.get_networkwise_input_value(name=input_name)
+                    feed_dict[self.globalInputs[input_name]] = threshold
+                else:
+                    feed_dict[self.globalInputs[input_name]] = self.get_networkwise_input_value(name=input_name)
+            param_shapes = [param.get_shape().as_list() for param in self.allLearnableParameterTensorsList]
+            x = [tensor for tensor in self.allLearnableParameterTensorsList if "Node_0_Convolution_Bias" in tensor.name][0]
+            x_shape = x.shape.as_list()
+            print("AAA")
+            grad_check = tf.test.compute_gradient(x, x_shape,
+                                                  self.totalObjectiveLossTensor, [], extra_feed_dict=feed_dict)
+            print("XXX")
+
     def init_session(self):
         # Init parameters
         self.assignmentOpsList = []
@@ -324,6 +360,12 @@ class TreeNetwork(Network):
                 # Run training pass, get individual loss values, total objective and regularization loss values and
                 # gradients
                 self.trainingResults = self.session.run(self.trainingTensorsDict, feed_dict)
+                param_shapes = [param.get_shape().as_list() for param in self.allLearnableParameterTensorsList]
+                grad_check = tf.test.compute_gradient(self.allLearnableParameterTensorsList, param_shapes,
+                                                      self.totalObjectiveLossTensor, [])
+                # self.parentNetwork.objectiveGradientTensors = tf.gradients(self.parentNetwork.totalObjectiveLossTensor,
+                #                                                            self.parentNetwork.allLearnableParameterTensorsList)
+                # test_grad = tf.test.compute_gradient(self.pa)
                 # Print sample distribution
                 sample_dist_str = "Iteration {0} ".format(iteration)
                 for node in self.leafNodes:

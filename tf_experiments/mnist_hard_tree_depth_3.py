@@ -83,25 +83,36 @@ def main():
     dataset = MnistDataSet(validation_sample_count=10000)
     lr_list = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15]
     lr_periods = [500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
-    list_of_lists = [lr_list , lr_periods]
+    threshold_decay_periods = [500, 1000]
+    threshold_decays = [0.5, 0.75]
+    list_of_lists = [lr_list , lr_periods, threshold_decay_periods, threshold_decays]
     for idx in itertools.product(*list_of_lists):
         tf.reset_default_graph()
         lr = idx[0]
         lr_period = idx[1]
+        threshold_decay_period = idx[2]
+        threshold_decay = idx[3]
         train_program_path = UtilityFuncs.get_absolute_path(script_file=__file__, relative_path="train_program.json")
         train_program = TrainProgram(program_file=train_program_path)
         train_program.set_train_program_element(element_name="lr_initial", keywords=",", skipwords="", value=lr)
         train_program.set_train_program_element(element_name="lr_update_interval",
                                                 keywords=",", skipwords="", value=lr_period)
+        train_program.set_train_program_element(element_name="BranchingProbThreshold", keywords={"decay"}, skipwords={},
+                                                value=threshold_decay)
+        train_program.set_train_program_element(element_name="BranchingProbThreshold", keywords={"decayPeriod"},
+                                                skipwords={}, value=threshold_decay_period)
         cnn_lenet = TreeNetwork(dataset=dataset, parameter_file=None, tree_degree=2, tree_type=TreeType.hard,
                                 problem_type=ProblemType.classification,
                                 train_program=train_program,
-                                explanation="100 Epochs, {0} lr decay period, {1} initial lr params runId17"
-                                .format(lr_period, lr),
+                                explanation=
+                                "100 Epochs, {0} lr decay period, {1} initial lr params runId17 "
+                                "threshold decay period: {2} threshold decay: {3}"
+                                .format(lr_period, lr, threshold_decay_period, threshold_decay),
                                 list_of_node_builder_functions=[root_func, l1_func, leaf_func])
         optimizer = SgdOptimizer(network=cnn_lenet, use_biased_gradient_estimates=True)
         cnn_lenet.set_optimizer(optimizer=optimizer)
         cnn_lenet.build_network()
+        cnn_lenet.check_grads()
         cnn_lenet.init_session()
         cnn_lenet.train()
 main()
