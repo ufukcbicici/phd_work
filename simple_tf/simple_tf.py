@@ -16,6 +16,7 @@ import numpy
 from six.moves import urllib
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
+import numpy as np
 
 # MNIST
 from data_handling.mnist_data_set import MnistDataSet
@@ -171,27 +172,33 @@ def main():
     network.build_network()
 
     # Do the training
+    config = tf.ConfigProto(
+        device_count={'GPU': 0}
+    )
+    sess = tf.Session(config=config)
     dataset = MnistDataSet(validation_sample_count=10000)
-    with tf.device("/cpu:0"):
-        config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
-        with tf.Session(config=config) as sess:
-            # Train
-            for epoch_id in range(EPOCH_COUNT):
-                # An epoch is a complete pass on the whole dataset.
-                dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
-                print("*************Epoch {0}*************".format(epoch_id))
-                while True:
-                    samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
-                    feed_dict = {TRAIN_DATA_TENSOR: samples,
-                                 TRAIN_LABEL_TENSOR: labels}
-                    eval_list = []
-                    eval_list.extend(network.nodes[0].fOpsList)
-                    eval_list.extend(network.nodes[0].hOpsList)
-                    eval_list.append(network.nodes[0].activationsTensor)
-                    eval_list.extend(network.nodes[0].decisionsDict.values())
-                    evaluationResults = sess.run(eval_list, feed_dict)
-                    if dataset.isNewEpoch:
-                        break
+    #with tf.device("/cpu:0"):
+        # config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
+        # with tf.Session(config=config) as sess:
+    # Init variables
+    init = tf.global_variables_initializer()
+    sess.run(init)
+    # Train
+    for epoch_id in range(EPOCH_COUNT):
+        # An epoch is a complete pass on the whole dataset.
+        dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+        print("*************Epoch {0}*************".format(epoch_id))
+        while True:
+            samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
+            samples = np.expand_dims(samples, axis=3)
+            feed_dict = {TRAIN_DATA_TENSOR: samples,
+                         TRAIN_LABEL_TENSOR: labels}
+            eval_list = [network.nodes[0].fOpsList[-1], network.nodes[0].hOpsList[-1],
+                         network.nodes[0].activationsTensor]
+            eval_list.extend(network.nodes[0].decisionsDict.values())
+            evaluation_results = sess.run(eval_list, feed_dict)
+            if dataset.isNewEpoch:
+                break
 
 
 main()
