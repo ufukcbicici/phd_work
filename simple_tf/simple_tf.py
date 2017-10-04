@@ -172,10 +172,11 @@ def main():
     network.build_network()
 
     # Do the training
-    config = tf.ConfigProto(
-        device_count={'GPU': 0}
-    )
-    sess = tf.Session(config=config)
+    # config = tf.ConfigProto(
+    #     device_count={'GPU': 0}
+    # )
+    # sess = tf.Session(config=config)
+    sess = tf.Session()
     dataset = MnistDataSet(validation_sample_count=10000)
     #with tf.device("/cpu:0"):
         # config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
