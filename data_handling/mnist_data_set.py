@@ -77,6 +77,7 @@ class MnistDataSet(DataSet):
         self.currentSamples = self.currentSamples[indices]
         self.currentIndices = np.arange(self.currentSamples.shape[0])
         np.random.shuffle(self.currentIndices)
+        self.isNewEpoch = False
 
     def set_current_data_set_type(self, dataset_type):
         self.currentDataSetType = dataset_type

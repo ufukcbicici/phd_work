@@ -31,6 +31,9 @@ NO_FILTERS_2 = 50
 NO_HIDDEN = 500
 NUM_LABELS = 10
 WEIGHT_DECAY_COEFFICIENT = 0.0005
+INITIAL_LR = 0.005
+DECAY_STEP = 1000
+DECAY_RATE = 0.5
 DATA_TYPE = tf.float32
 SEED = None
 TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
@@ -51,6 +54,7 @@ class Node:
         self.lossList = []
         self.activationsTensor = None
         self.decisionsDict = {}
+        self.evalDict = {}
 
 
 class TreeNetwork:
@@ -96,6 +100,8 @@ class TreeNetwork:
                                                 variables=network_to_copy_from.nodes[node.index].variablesList)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
+            # if node.isLeaf:
+            #     continue
             # F
             f_output = node.fOpsList[-1]
             self.evalDict["Node{0}_F".format(node.index)] = f_output
@@ -109,6 +115,58 @@ class TreeNetwork:
             # Decision masks
             for k, v in node.decisionsDict.items():
                 self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
+            # Evaluation outputs
+            for k, v in node.evalDict.items():
+                self.evalDict["Node{0}_{1}".format(node.index, k)] = v
+        # Prepare losses
+        all_network_losses = []
+        for node in self.topologicalSortedNodes:
+            all_network_losses.extend(node.lossList)
+        # Weight decays
+        vars = tf.trainable_variables()
+        weights_and_filters = [v for v in vars if "bias" not in v.name]
+        regularizer_loss = WEIGHT_DECAY_COEFFICIENT * tf.add_n([tf.nn.l2_loss(v) for v in weights_and_filters])
+        actual_loss = tf.add_n(all_network_losses)
+        self.finalLoss = actual_loss + regularizer_loss
+        self.evalDict["RegularizerLoss"] = regularizer_loss
+        self.evalDict["ActualLoss"] = actual_loss
+        self.evalDict["NetworkLoss"] = self.finalLoss
+
+    def calculate_accuracy(self, sess, dataset, dataset_type):
+        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        leaf_predicted_labels_dict = {}
+        leaf_true_labels_dict = {}
+        while True:
+            results = eval_network(sess=sess, network=self, dataset=dataset)
+            for node in self.topologicalSortedNodes:
+                if not node.isLeaf:
+                    continue
+                posterior_probs = results["Node{0}_{1}".format(node.index, "posterior_probs")]
+                true_labels = results["Node{0}_{1}".format(node.index, "labels")]
+                predicted_labels = np.argmax(posterior_probs, axis=1)
+                if node.index not in leaf_predicted_labels_dict:
+                    leaf_predicted_labels_dict[node.index] = predicted_labels
+                else:
+                    leaf_predicted_labels_dict[node.index] = np.concatenate((leaf_predicted_labels_dict[node.index],
+                                                                             predicted_labels))
+                if node.index not in leaf_true_labels_dict:
+                    leaf_true_labels_dict[node.index] = true_labels
+                else:
+                    leaf_true_labels_dict[node.index] = np.concatenate((leaf_true_labels_dict[node.index], true_labels))
+            if dataset.isNewEpoch:
+                break
+        print("********Dataset:{0}********".format(dataset_type))
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            predicted = leaf_predicted_labels_dict[node.index]
+            true_labels = leaf_true_labels_dict[node.index]
+            if predicted.shape != true_labels.shape:
+                raise Exception("Predicted and true labels counts do not hold.")
+            correct_count = np.sum(predicted == true_labels)
+            total_count = true_labels.shape[0]
+            print("Leaf {0}: Sample Count:{1} Accuracy:{2}".format(node.index, total_count,
+                                                                   float(correct_count) / float(total_count)))
 
 
 def get_variable_name(name, node):
@@ -183,6 +241,9 @@ def baseline(node, network, variables=None):
     node.fOpsList.extend([conv1, relu1, pool1, conv2, relu2, pool2, flattened, hidden_1, logits,
                           cross_entropy_loss_tensor, loss])
     node.lossList.append(loss)
+    # Evaluation
+    node.evalDict["posterior_probs"] = tf.nn.softmax(logits)
+    node.evalDict["labels"] = network.labelTensor
 
 
 def root_func(node, network):
@@ -254,18 +315,35 @@ def l1_func(node, network):
 #     flattened = tf.contrib.layers.flatten(parent_pool)
 #     hidden_1_r = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1_r)
 
+def eval_network(sess, network, dataset):
+    # if is_train:
+    samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
+    samples = np.expand_dims(samples, axis=3)
+    feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
+    results = sess.run(network.evalDict, feed_dict)
+    # else:
+    #     samples, labels, indices_list = dataset.get_next_batch(batch_size=EVAL_BATCH_SIZE)
+    #     samples = np.expand_dims(samples, axis=3)
+    #     feed_dict = {TEST_DATA_TENSOR: samples, TEST_LABEL_TENSOR: labels}
+    #     results = sess.run(network.evalDict, feed_dict)
+    return results
+
+
+
+
 
 def main():
     # Build the network
-    training_network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=True,
+    network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=True,
                                    data=TRAIN_DATA_TENSOR, label=TRAIN_LABEL_TENSOR)
-    training_network.build_network(network_to_copy_from=None)
-    test_network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=False,
-                               data=TEST_DATA_TENSOR, label=TEST_LABEL_TENSOR)
-    test_network.build_network(network_to_copy_from=training_network)
+    network.build_network(network_to_copy_from=None)
+    # test_network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=False,
+    #                            data=TEST_DATA_TENSOR, label=TEST_LABEL_TENSOR)
+    # test_network.build_network(network_to_copy_from=training_network)
     # Do the training
-    config = tf.ConfigProto(device_count={'GPU': 0})
-    sess = tf.Session(config=config)
+    # config = tf.ConfigProto(device_count={'GPU': 0})
+    # sess = tf.Session(config=config)
+    sess = tf.Session()
     dataset = MnistDataSet(validation_sample_count=10000)
     # Acquire the losses for training
     loss_list = []
@@ -275,16 +353,31 @@ def main():
     init = tf.global_variables_initializer()
     sess.run(init)
     # Train
+    # First loss
+    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
+    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
+    # Setting the optimizer
+    global_counter = tf.Variable(0, dtype=DATA_TYPE , trainable=False)
+    learning_rate = tf.train.exponential_decay(
+        INITIAL_LR,  # Base learning rate.
+        global_counter,  # Current index into the dataset.
+        DECAY_STEP,  # Decay step.
+        DECAY_RATE,  # Decay rate.
+        staircase=True)
+    optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(network.finalLoss, global_step=global_counter)
     for epoch_id in range(EPOCH_COUNT):
         # An epoch is a complete pass on the whole dataset.
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
         print("*************Epoch {0}*************".format(epoch_id))
         while True:
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
             samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
             samples = np.expand_dims(samples, axis=3)
             feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
-            evaluation_results = sess.run(training_network.evalDict, feed_dict)
+            results = sess.run([learning_rate, optimizer], feed_dict=feed_dict)
             if dataset.isNewEpoch:
+                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
+                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
                 break
 
 
