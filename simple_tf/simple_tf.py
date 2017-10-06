@@ -53,8 +53,9 @@ class Node:
         self.fOpsList = []
         self.hOpsList = []
         self.lossList = []
-        self.activationsTensor = None
-        self.decisionsDict = {}
+        # Indexed by the nodes producing them
+        self.activationsDict = {}
+        self.maskTensorsDict = {}
         self.evalDict = {}
 
 
@@ -114,7 +115,7 @@ class TreeNetwork:
             if node.activationsTensor is not None:
                 self.evalDict["Node{0}_activations".format(node.index)] = node.activationsTensor
             # Decision masks
-            for k, v in node.decisionsDict.items():
+            for k, v in node.maskTensorsDict.items():
                 self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
             # Evaluation outputs
             for k, v in node.evalDict.items():
@@ -176,12 +177,12 @@ def get_variable_name(name, node):
 
 def apply_decision(node, network):
     # child_nodes = sorted(network.dagObject.children(node=node), key=lambda child: child.index)
-    arg_max_indices = tf.argmax(input=node.activationsTensor, axis=1)
-    node.decisionsDict = {}
+    arg_max_indices = tf.argmax(input=node.activationsDict[node.index], axis=1)
+    node.maskTensorsDict = {}
     for index in range(network.treeDegree):
         child_index = node.index * network.treeDegree + 1 + index
         mask_vector = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64), name="Mask_{0}".format(child_index))
-        node.decisionsDict[node.index * network.treeDegree + 1 + index] = mask_vector
+        node.maskTensorsDict[node.index * network.treeDegree + 1 + index] = mask_vector
 
 
 def baseline(node, network, variables=None):
@@ -260,7 +261,7 @@ def root_func(node, network, variables=None):
         name=get_variable_name(name="hyperplane_weights", node=node))
     hyperplane_biases = tf.Variable(tf.constant(0.1, shape=[network.treeDegree], dtype=DATA_TYPE),
                                     name=get_variable_name(name="hyperplane_biases", node=node))
-    node.variablesList.extend([conv_weights, conv_biases])
+    node.variablesList.extend([conv_weights, conv_biases, hyperplane_weights, hyperplane_biases])
     # Operations
     # F
     conv = tf.nn.conv2d(network.dataTensor, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
@@ -271,7 +272,7 @@ def root_func(node, network, variables=None):
     flat_data = tf.contrib.layers.flatten(network.dataTensor)
     node.hOpsList.extend([flat_data])
     # Decisions
-    node.activationsTensor = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
+    node.activationsDict[node.index] = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
     apply_decision(node=node, network=network)
 
 
@@ -283,15 +284,30 @@ def l1_func(node, network):
     conv_biases = tf.Variable(tf.constant(0.1, shape=[NO_FILTERS_2], dtype=DATA_TYPE),
                               name=get_variable_name(name="conv_bias",
                                                      node=node))
-    node.variablesList.extend([conv_weights, conv_biases])
+    hyperplane_weights = tf.Variable(
+        tf.truncated_normal([IMAGE_SIZE * IMAGE_SIZE, network.treeDegree], stddev=0.1, seed=SEED, dtype=DATA_TYPE),
+        name=get_variable_name(name="hyperplane_weights", node=node))
+    hyperplane_biases = tf.Variable(tf.constant(0.1, shape=[network.treeDegree], dtype=DATA_TYPE),
+                                    name=get_variable_name(name="hyperplane_biases", node=node))
+    node.variablesList.extend([conv_weights, conv_biases, hyperplane_weights, hyperplane_biases])
     # Operations
     parent_node = network.dagObject.parents(node=node)[0]
-    parent_pool = parent_node.fOpsList[-1]
-    conv = tf.nn.conv2d(parent_pool, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
+    # Mask inputs
+    mask_tensor = parent_node.maskTensorsDict[node.index]
+    parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
+    parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
+    for k, v in parent_node.activationsDict.items():
+        node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
+    # F
+    conv = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
     relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
     pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     node.fOpsList.extend([conv, relu, pool])
-
+    # H
+    node.hOpsList.extend([flat_data])
+    # # Decisions
+    # node.activationsTensor = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
+    # apply_decision(node=node, network=network)
 
 #
 #
