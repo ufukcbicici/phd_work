@@ -30,12 +30,13 @@ NO_FILTERS_1 = 20
 NO_FILTERS_2 = 50
 NO_HIDDEN = 500
 NUM_LABELS = 10
-WEIGHT_DECAY_COEFFICIENT = 0.0005
-INITIAL_LR = 0.005
+WEIGHT_DECAY_COEFFICIENT = 0.0003
+INITIAL_LR = 0.05
 DECAY_STEP = 1000
 DECAY_RATE = 0.5
 DATA_TYPE = tf.float32
 SEED = None
+USE_CPU = False
 TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
 TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(BATCH_SIZE,))
 TEST_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
@@ -246,7 +247,7 @@ def baseline(node, network, variables=None):
     node.evalDict["labels"] = network.labelTensor
 
 
-def root_func(node, network):
+def root_func(node, network, variables=None):
     # Parameters
     conv_weights = tf.Variable(tf.truncated_normal([5, 5, NUM_CHANNELS, NO_FILTERS_1], stddev=0.1, seed=SEED,
                                                    dtype=DATA_TYPE), name=get_variable_name(name="conv_weight",
@@ -262,12 +263,12 @@ def root_func(node, network):
     node.variablesList.extend([conv_weights, conv_biases])
     # Operations
     # F
-    conv = tf.nn.conv2d(DATA_TENSOR, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
+    conv = tf.nn.conv2d(network.dataTensor, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
     relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
     pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     node.fOpsList.extend([conv, relu, pool])
     # H
-    flat_data = tf.contrib.layers.flatten(DATA_TENSOR)
+    flat_data = tf.contrib.layers.flatten(network.dataTensor)
     node.hOpsList.extend([flat_data])
     # Decisions
     node.activationsTensor = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
@@ -329,9 +330,6 @@ def eval_network(sess, network, dataset):
     return results
 
 
-
-
-
 def main():
     # Build the network
     network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=True,
@@ -341,21 +339,17 @@ def main():
     #                            data=TEST_DATA_TENSOR, label=TEST_LABEL_TENSOR)
     # test_network.build_network(network_to_copy_from=training_network)
     # Do the training
-    # config = tf.ConfigProto(device_count={'GPU': 0})
-    # sess = tf.Session(config=config)
-    sess = tf.Session()
+    if USE_CPU:
+        config = tf.ConfigProto(device_count={'GPU': 0})
+        sess = tf.Session(config=config)
+    else:
+        sess = tf.Session()
     dataset = MnistDataSet(validation_sample_count=10000)
     # Acquire the losses for training
     loss_list = []
     vars = tf.trainable_variables()
     var_names = [v.name for v in vars]
-    # Init variables
-    init = tf.global_variables_initializer()
-    sess.run(init)
     # Train
-    # First loss
-    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
-    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
     # Setting the optimizer
     global_counter = tf.Variable(0, dtype=DATA_TYPE , trainable=False)
     learning_rate = tf.train.exponential_decay(
@@ -365,20 +359,32 @@ def main():
         DECAY_RATE,  # Decay rate.
         staircase=True)
     optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(network.finalLoss, global_step=global_counter)
+    # Init variables
+    init = tf.global_variables_initializer()
+    sess.run(init)
+    # First loss
+    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
+    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
+    lr = 9000.0
     for epoch_id in range(EPOCH_COUNT):
         # An epoch is a complete pass on the whole dataset.
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
         print("*************Epoch {0}*************".format(epoch_id))
         while True:
-            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
             samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
             samples = np.expand_dims(samples, axis=3)
             feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
-            results = sess.run([learning_rate, optimizer], feed_dict=feed_dict)
+            results = sess.run([learning_rate, global_counter, optimizer], feed_dict=feed_dict)
+            # print("Iteration:{0}".format(results[1]))
+            if abs(results[0] - lr) > 1e-10:
+                print("Learning rate changed to {0}".format(results[0]))
+                lr = results[0]
+            # print("lr={0}".format(results[0]))
+            # print("global counter={0}".format(results[1]))
             if dataset.isNewEpoch:
                 network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
                 network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
                 break
-
+    print("X")
 
 main()
