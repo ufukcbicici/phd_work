@@ -37,7 +37,7 @@ DECAY_RATE = 0.5
 TREE_DEGREE = 3
 DATA_TYPE = tf.float32
 SEED = None
-USE_CPU = False
+USE_CPU = True
 USE_CPU_MASKING = False
 USE_RANDOM_PARAMETERS = True
 TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
@@ -466,14 +466,15 @@ def main():
     var_names = [v.name for v in vars]
     # Train
     # Setting the optimizer
-    global_counter = tf.Variable(0, dtype=DATA_TYPE, trainable=False)
-    learning_rate = tf.train.exponential_decay(
-        INITIAL_LR,  # Base learning rate.
-        global_counter,  # Current index into the dataset.
-        DECAY_STEP,  # Decay step.
-        DECAY_RATE,  # Decay rate.
-        staircase=True)
-    optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(network.finalLoss, global_step=global_counter)
+    # global_counter = tf.Variable(0, dtype=DATA_TYPE, trainable=False)
+    # learning_rate = tf.train.exponential_decay(
+    #     INITIAL_LR,  # Base learning rate.
+    #     global_counter,  # Current index into the dataset.
+    #     DECAY_STEP,  # Decay step.
+    #     DECAY_RATE,  # Decay rate.
+    #     staircase=True)
+    # optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(network.finalLoss, global_step=global_counter)
+    gradients = tf.gradients(ys=network.finalLoss, xs=vars)
     # Init variables
     init = tf.global_variables_initializer()
     sess.run(init)
@@ -530,7 +531,7 @@ def main():
             samples = np.expand_dims(samples, axis=3)
             start_time = time.time()
             feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
-            results = sess.run([learning_rate, global_counter, optimizer, sample_count_tensors], feed_dict=feed_dict)
+            results = sess.run([gradients, sample_count_tensors], feed_dict=feed_dict)
             elapsed_time = time.time() - start_time
             total_time += elapsed_time
             # print("Iteration:{0}".format(results[1]))
