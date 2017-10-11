@@ -34,10 +34,10 @@ WEIGHT_DECAY_COEFFICIENT = 0.0
 INITIAL_LR = 0.01
 DECAY_STEP = 10000
 DECAY_RATE = 0.5
-TREE_DEGREE = 3
+TREE_DEGREE = 2
 DATA_TYPE = tf.float32
 SEED = None
-USE_CPU = True
+USE_CPU = False
 USE_CPU_MASKING = False
 USE_RANDOM_PARAMETERS = True
 TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
@@ -79,6 +79,7 @@ class TreeNetwork:
         self.labelTensor = label
         self.evalDict = {}
         self.finalLoss = None
+        self.momentumStatesDict = {}
 
     def get_parent_index(self, node_index):
         parent_index = int((node_index - 1) / self.treeDegree)
@@ -188,6 +189,15 @@ class TreeNetwork:
                 print("Leaf {0} is empty.".format(node.index))
         print("*************Overall {0} samples. Overall Accuracy:{1}*************"
               .format(overall_count, overall_correct / overall_count))
+
+    def update_params_with_momentum(self, sess, dataset):
+        samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
+        samples = np.expand_dims(samples, axis=3)
+        start_time = time.time()
+        feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
+        results = sess.run([gradients, sample_count_tensors], feed_dict=feed_dict)
+        elapsed_time = time.time() - start_time
+        total_time += elapsed_time
 
 
 def get_variable_name(name, node):
@@ -463,7 +473,8 @@ def main():
     # Acquire the losses for training
     loss_list = []
     vars = tf.trainable_variables()
-    var_names = [v.name for v in vars]
+    # var_dict = {v.name:  v for v in vars}
+    # var_names = [v.name for v in vars]
     # Train
     # Setting the optimizer
     # global_counter = tf.Variable(0, dtype=DATA_TYPE, trainable=False)
