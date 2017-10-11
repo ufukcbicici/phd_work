@@ -27,14 +27,15 @@ EVAL_BATCH_SIZE = 50000
 IMAGE_SIZE = 28
 NUM_CHANNELS = 1
 NO_FILTERS_1 = 20
-NO_FILTERS_2 = 16
-NO_HIDDEN = 55
+NO_FILTERS_2 = 25
+NO_HIDDEN = 125
 NUM_LABELS = 10
 WEIGHT_DECAY_COEFFICIENT = 0.0
 INITIAL_LR = 0.01
 DECAY_STEP = 10000
 DECAY_RATE = 0.5
 TREE_DEGREE = 2
+MOMENTUM_DECAY = 0.9
 DATA_TYPE = tf.float32
 SEED = None
 USE_CPU = False
@@ -79,7 +80,13 @@ class TreeNetwork:
         self.labelTensor = label
         self.evalDict = {}
         self.finalLoss = None
+        self.gradients = None
+        self.sample_count_tensors = None
         self.momentumStatesDict = {}
+        self.newValuesDict = {}
+        self.assignOpsList = []
+        self.learningRate = None
+        self.globalCounter = None
 
     def get_parent_index(self, node_index):
         parent_index = int((node_index - 1) / self.treeDegree)
@@ -144,6 +151,24 @@ class TreeNetwork:
         self.evalDict["RegularizerLoss"] = regularizer_loss
         self.evalDict["ActualLoss"] = actual_loss
         self.evalDict["NetworkLoss"] = self.finalLoss
+        self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.gradients = tf.gradients(ys=self.finalLoss, xs=vars)
+        # Assign ops for variables
+        for var in vars:
+            op_name = get_assign_op_name(variable=var)
+            new_value = tf.placeholder(name=op_name, dtype=DATA_TYPE)
+            assign_op = tf.assign(ref=var, value=new_value)
+            self.newValuesDict[op_name] = new_value
+            self.assignOpsList.append(assign_op)
+            self.momentumStatesDict[var.name] = np.zeros(shape=var.shape)
+        # Learning rate, counter
+        self.globalCounter = tf.Variable(0, dtype=DATA_TYPE, trainable=False)
+        self.learningRate = tf.train.exponential_decay(
+            INITIAL_LR,  # Base learning rate.
+            self.globalCounter,  # Current index into the dataset.
+            DECAY_STEP,  # Decay step.
+            DECAY_RATE,  # Decay rate.
+            staircase=True)
 
     def calculate_accuracy(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
@@ -190,18 +215,32 @@ class TreeNetwork:
         print("*************Overall {0} samples. Overall Accuracy:{1}*************"
               .format(overall_count, overall_correct / overall_count))
 
-    def update_params_with_momentum(self, sess, dataset):
+    def update_params_with_momentum(self, sess, dataset, iteration):
         samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
-        start_time = time.time()
-        feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
-        results = sess.run([gradients, sample_count_tensors], feed_dict=feed_dict)
-        elapsed_time = time.time() - start_time
-        total_time += elapsed_time
+        vars = tf.trainable_variables()
+        feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels, self.globalCounter: iteration}
+        results = sess.run([self.gradients, self.sample_count_tensors, vars, self.learningRate], feed_dict=feed_dict)
+        grads = results[0]
+        sample_counts = results[1]
+        vars_current_values = results[2]
+        lr = results[3]
+        update_dict = {}
+        for v, g, curr_value in zip(vars, grads, vars_current_values):
+            self.momentumStatesDict[v.name][:] *= MOMENTUM_DECAY
+            self.momentumStatesDict[v.name][:] += -lr * g
+            new_value = curr_value + self.momentumStatesDict[v.name]
+            update_dict[self.newValuesDict[get_assign_op_name(variable=v)]] = new_value
+        sess.run(self.assignOpsList, feed_dict=update_dict)
+        return sample_counts, lr
 
 
 def get_variable_name(name, node):
     return "Node{0}_{1}".format(node.index, name)
+
+
+def get_assign_op_name(variable):
+    return "Assign_{0}".format(variable.name[0:len(variable.name)-2])
 
 
 def apply_decision(node, network):
@@ -333,7 +372,8 @@ def l1_func(node, network, variables=None):
                                                      node=node))
     if USE_RANDOM_PARAMETERS:
         hyperplane_weights = tf.Variable(
-            tf.truncated_normal([IMAGE_SIZE * IMAGE_SIZE + network.treeDegree, network.treeDegree], stddev=0.1, seed=SEED, dtype=DATA_TYPE),
+            tf.truncated_normal([IMAGE_SIZE * IMAGE_SIZE + network.treeDegree, network.treeDegree], stddev=0.1,
+                                seed=SEED, dtype=DATA_TYPE),
             name=get_variable_name(name="hyperplane_weights", node=node))
     else:
         hyperplane_weights = tf.Variable(
@@ -388,10 +428,11 @@ def leaf_func(node, network, variables=None):
                                                        dtype=DATA_TYPE),
                                    name=get_variable_name(name="fc_weights_2", node=node))
     else:
-        fc_weights_1 = tf.Variable(tf.constant(0.1, shape=[IMAGE_SIZE // 4 * IMAGE_SIZE // 4 * NO_FILTERS_2, NO_HIDDEN], dtype=DATA_TYPE),
-                                   name=get_variable_name(name="fc_weights_1", node=node))
+        fc_weights_1 = tf.Variable(
+            tf.constant(0.1, shape=[IMAGE_SIZE // 4 * IMAGE_SIZE // 4 * NO_FILTERS_2, NO_HIDDEN], dtype=DATA_TYPE),
+            name=get_variable_name(name="fc_weights_1", node=node))
         fc_weights_2 = tf.Variable(tf.constant(0.1, shape=[NO_HIDDEN + 2 * network.treeDegree, NUM_LABELS],
-                                                       dtype=DATA_TYPE),
+                                               dtype=DATA_TYPE),
                                    name=get_variable_name(name="fc_weights_2", node=node))
     fc_biases_1 = tf.Variable(tf.constant(0.1, shape=[NO_HIDDEN], dtype=DATA_TYPE),
                               name=get_variable_name(name="fc_biases_1", node=node))
@@ -457,7 +498,8 @@ def main():
     # network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=True,
     #                                data=TRAIN_DATA_TENSOR, label=TRAIN_LABEL_TENSOR)
     # network.build_network(network_to_copy_from=None)
-    network = TreeNetwork(tree_degree=TREE_DEGREE, node_build_funcs=[root_func, l1_func, leaf_func], create_new_variables=True,
+    network = TreeNetwork(tree_degree=TREE_DEGREE, node_build_funcs=[root_func, l1_func, leaf_func],
+                          create_new_variables=True,
                           data=TRAIN_DATA_TENSOR, label=TRAIN_LABEL_TENSOR)
     network.build_network(network_to_copy_from=None)
     # test_network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=False,
@@ -471,27 +513,19 @@ def main():
         sess = tf.Session()
     dataset = MnistDataSet(validation_sample_count=10000)
     # Acquire the losses for training
-    loss_list = []
-    vars = tf.trainable_variables()
+    # loss_list = []
+    # vars = tf.trainable_variables()
     # var_dict = {v.name:  v for v in vars}
     # var_names = [v.name for v in vars]
     # Train
     # Setting the optimizer
-    # global_counter = tf.Variable(0, dtype=DATA_TYPE, trainable=False)
-    # learning_rate = tf.train.exponential_decay(
-    #     INITIAL_LR,  # Base learning rate.
-    #     global_counter,  # Current index into the dataset.
-    #     DECAY_STEP,  # Decay step.
-    #     DECAY_RATE,  # Decay rate.
-    #     staircase=True)
     # optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(network.finalLoss, global_step=global_counter)
-    gradients = tf.gradients(ys=network.finalLoss, xs=vars)
     # Init variables
     init = tf.global_variables_initializer()
     sess.run(init)
     # Experiment
-    samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
-    samples = np.expand_dims(samples, axis=3)
+    # samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
+    # samples = np.expand_dims(samples, axis=3)
     # eval
     # params = {v.name: v for node in network.topologicalSortedNodes for v in node.variablesList}
     # param_values = sess.run(params, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
@@ -531,31 +565,35 @@ def main():
     network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
     network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
     lr = 9000.0
-    sample_count_tensors = {k: network.evalDict[k] for k in network.evalDict.keys() if "sample_count" in k}
+    iteration_counter = 0
     for epoch_id in range(EPOCH_COUNT):
         # An epoch is a complete pass on the whole dataset.
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
         print("*************Epoch {0}*************".format(epoch_id))
         total_time = 0.0
         while True:
-            samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
-            samples = np.expand_dims(samples, axis=3)
+            # samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
+            # samples = np.expand_dims(samples, axis=3)
+            # start_time = time.time()
+            # feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
+            # results = sess.run([gradients, sample_count_tensors], feed_dict=feed_dict)
             start_time = time.time()
-            feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
-            results = sess.run([gradients, sample_count_tensors], feed_dict=feed_dict)
+            sample_counts, lr = network.update_params_with_momentum(sess=sess, dataset=dataset,
+                                                                    iteration=iteration_counter)
             elapsed_time = time.time() - start_time
             total_time += elapsed_time
-            # print("Iteration:{0}".format(results[1]))
-            print("Iteration:{0} Elapsed Time:{1}".format(results[1], elapsed_time))
+            print("Iteration:{0}".format(iteration_counter))
+            print("Lr:{0}".format(lr))
             # Print sample counts
-            for k, v in results[3].items():
+            for k, v in sample_counts.items():
                 print("{0}={1}".format(k, v))
             # print("Iteration:{0}".format(results[1]))
-            if abs(results[0] - lr) > 1e-10:
-                print("Learning rate changed to {0}".format(results[0]))
-                lr = results[0]
+            # if abs(results[0] - lr) > 1e-10:
+            #     print("Learning rate changed to {0}".format(results[0]))
+            #     lr = results[0]
             # print("lr={0}".format(results[0]))
             # print("global counter={0}".format(results[1]))
+            iteration_counter += 1
             if dataset.isNewEpoch:
                 print("Epoch Time={0}".format(total_time))
                 network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
@@ -606,7 +644,6 @@ def experiment():
                             secondMasks],
                            feed_dict=feed_dict)
         print("X")
-
 
 
 main()
