@@ -133,6 +133,7 @@ class TreeNetwork:
             if dataset.isNewEpoch:
                 break
         print("****************Dataset:{0}****************".format(dataset_type))
+        # Measure Accuracy
         overall_count = 0.0
         overall_correct = 0.0
         for node in self.topologicalSortedNodes:
@@ -153,6 +154,20 @@ class TreeNetwork:
                 print("Leaf {0} is empty.".format(node.index))
         print("*************Overall {0} samples. Overall Accuracy:{1}*************"
               .format(overall_count, overall_correct / overall_count))
+        total_accuracy = overall_correct / overall_count
+        # Measure overall label distribution in leaves
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            true_labels = leaf_true_labels_dict[node.index]
+            frequencies = {}
+            distribution_str = ""
+            total_sample_count = true_labels.shape[0]
+            for label in range(dataset.get_label_count()):
+                frequencies[label] = np.sum(true_labels == label)
+                distribution_str += "{0}:{1:.3f} ".format(label, frequencies[label] / float(total_sample_count))
+            print("Node{0} Label Distribution: {1}".format(node.index, distribution_str))
+        # Measure overall information gain
         return overall_correct / overall_count
 
     def update_params_with_momentum(self, sess, dataset, iteration):
