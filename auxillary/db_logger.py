@@ -10,8 +10,8 @@ class DbLogger:
     runMetaData = "run_meta_data"
     leafInfoTable = "leaf_info_table"
     runResultsTable = "run_results"
-    log_db_path = os.path.join(os.getcwd(), "..\\tf_experiments\\logger.db")
-
+    log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
+    # os.path.join(os.getcwd(), "\\logger.db")
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}
     lock = threading.Lock()

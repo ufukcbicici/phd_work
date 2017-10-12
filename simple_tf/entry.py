@@ -19,6 +19,7 @@ import tensorflow as tf
 import numpy as np
 
 # MNIST
+from auxillary.db_logger import DbLogger
 from data_handling.mnist_data_set import MnistDataSet
 from simple_tf.global_params import GlobalConstants
 from simple_tf.tree import TreeNetwork
@@ -32,16 +33,10 @@ np.random.seed(np_seed)
 
 def main():
     # Build the network
-    # network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=True,
-    #                                data=TRAIN_DATA_TENSOR, label=TRAIN_LABEL_TENSOR)
-    # network.build_network(network_to_copy_from=None)
     network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE, node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           create_new_variables=True,
                           data=GlobalConstants.TRAIN_DATA_TENSOR, label=GlobalConstants.TRAIN_LABEL_TENSOR)
     network.build_network(network_to_copy_from=None)
-    # test_network = TreeNetwork(tree_degree=2, node_build_funcs=[baseline], create_new_variables=False,
-    #                            data=TEST_DATA_TENSOR, label=TEST_LABEL_TENSOR)
-    # test_network.build_network(network_to_copy_from=training_network)
     # Do the training
     if GlobalConstants.USE_CPU:
         config = tf.ConfigProto(device_count={'GPU': 0})
@@ -49,55 +44,13 @@ def main():
     else:
         sess = tf.Session()
     dataset = MnistDataSet(validation_sample_count=10000)
-    # Acquire the losses for training
-    # loss_list = []
-    # vars = tf.trainable_variables()
-    # var_dict = {v.name:  v for v in vars}
-    # var_names = [v.name for v in vars]
-    # Train
-    # Setting the optimizer
-    # optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(network.finalLoss, global_step=global_counter)
-    # Init variables
+    experiment_id = DbLogger.get_run_id()
+    explanation = "reduce_mean loss. No threshold."
+    DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
+                              col_count=2)
+    # Init
     init = tf.global_variables_initializer()
     sess.run(init)
-    # Experiment
-    # samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
-    # samples = np.expand_dims(samples, axis=3)
-    # eval
-    # params = {v.name: v for node in network.topologicalSortedNodes for v in node.variablesList}
-    # param_values = sess.run(params, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
-    # node3_eval = {k: v for k, v in network.evalDict.items() if "Node3" in k}
-    # node4_eval = {k: v for k, v in network.evalDict.items() if "Node4" in k}
-    # node5_eval = {k: v for k, v in network.evalDict.items() if "Node5" in k}
-    # node6_eval = {k: v for k, v in network.evalDict.items() if "Node6" in k}
-
-    # for run_id in range(100):
-    #     # results = sess.run(network.evalDict, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
-    #     results3 = sess.run(node3_eval, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
-    #     print("Completed: Node3")
-    # for run_id in range(100):
-    #     results4 = sess.run(node4_eval, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
-    #     print("Completed: Node4")
-    # for run_id in range(100):
-    #     results5 = sess.run(node5_eval, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
-    #     print("Completed: Node5")
-    # for run_id in range(100):
-    #     results6 = sess.run(node6_eval, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
-    #     print("Completed: Node6")
-    #
-    # for run_id in range(100):
-    #     results6 = sess.run(node6_eval, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
-    #     print("Completed: Node6")
-    # for run_id in range(100):
-    #     start_time = time.time()
-    #     results = sess.run(network.evalDict, feed_dict={TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels})
-    #     elapsed_time = time.time() - start_time
-    #     print("elapsed time={0}".format(elapsed_time))
-    #     for k, v in results.items():
-    #         if "sample_count" in k:
-    #             print("{0}={1}".format(k, v))
-    #     print("X")
-
     # First loss
     network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
     network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
@@ -133,9 +86,16 @@ def main():
             iteration_counter += 1
             if dataset.isNewEpoch:
                 print("Epoch Time={0}".format(total_time))
-                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
-                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
+                training_accuracy = \
+                    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
+                validation_accuracy = \
+                    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
+                DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
+                                                 validation_accuracy,
+                                                 0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
                 break
+    test_accuracy = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
+    DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable, col_count=3)
     print("X")
 
 

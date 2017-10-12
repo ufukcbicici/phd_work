@@ -153,6 +153,7 @@ class TreeNetwork:
                 print("Leaf {0} is empty.".format(node.index))
         print("*************Overall {0} samples. Overall Accuracy:{1}*************"
               .format(overall_count, overall_correct / overall_count))
+        return overall_correct / overall_count
 
     def update_params_with_momentum(self, sess, dataset, iteration):
         samples, labels, indices_list = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
