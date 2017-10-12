@@ -44,7 +44,7 @@ def root_func(node, network, variables=None):
     node.hOpsList.extend([flat_data])
     # Decisions
     node.activationsDict[node.index] = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
-    apply_decision(node=node, network=network)
+    network.apply_decision(node=node)
 
 
 def l1_func(node, network, variables=None):
@@ -108,7 +108,7 @@ def l1_func(node, network, variables=None):
     concat_list.extend(node.activationsDict.values())
     h_concat = tf.concat(values=concat_list, axis=1)
     node.activationsDict[node.index] = tf.matmul(h_concat, hyperplane_weights) + hyperplane_biases
-    apply_decision(node=node, network=network)
+    network.apply_decision(node=node)
 
 
 def leaf_func(node, network, variables=None):
