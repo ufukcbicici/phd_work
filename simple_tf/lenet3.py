@@ -1,5 +1,6 @@
 import tensorflow as tf
 from simple_tf.global_params import GlobalConstants
+from simple_tf.global_params import GradientType
 
 
 def root_func(node, network, variables=None):
@@ -32,7 +33,7 @@ def root_func(node, network, variables=None):
     # node.evalDict[network.get_variable_name(name="Print", node=node)] = print_op
     hyperplane_biases = tf.Variable(tf.constant(0.1, shape=[network.treeDegree], dtype=GlobalConstants.DATA_TYPE),
                                     name=network.get_variable_name(name="hyperplane_biases", node=node))
-    node.variablesList.extend([conv_weights, conv_biases, hyperplane_weights, hyperplane_biases])
+    node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
     # Operations
     # F
     conv = tf.nn.conv2d(network.dataTensor, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
@@ -45,6 +46,7 @@ def root_func(node, network, variables=None):
     # Decisions
     node.activationsDict[node.index] = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
     network.apply_decision(node=node)
+    node.evalDict[network.get_variable_name(name="sample_count", node=node)] = tf.size(network.labelTensor)
 
 
 def l1_func(node, network, variables=None):
@@ -76,7 +78,7 @@ def l1_func(node, network, variables=None):
             name=network.get_variable_name(name="hyperplane_weights", node=node))
     hyperplane_biases = tf.Variable(tf.constant(0.1, shape=[network.treeDegree], dtype=GlobalConstants.DATA_TYPE),
                                     name=network.get_variable_name(name="hyperplane_biases", node=node))
-    node.variablesList.extend([conv_weights, conv_biases, hyperplane_weights, hyperplane_biases])
+    node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
     # Operations
     # Mask inputs
     parent_node = network.dagObject.parents(node=node)[0]
@@ -109,6 +111,7 @@ def l1_func(node, network, variables=None):
     h_concat = tf.concat(values=concat_list, axis=1)
     node.activationsDict[node.index] = tf.matmul(h_concat, hyperplane_weights) + hyperplane_biases
     network.apply_decision(node=node)
+    node.evalDict[network.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
 
 
 def leaf_func(node, network, variables=None):
@@ -118,7 +121,7 @@ def leaf_func(node, network, variables=None):
             [GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.NO_FILTERS_2,
              GlobalConstants.NO_HIDDEN],
             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-                                   name=network.get_variable_name(name="fc_weights_1", node=node))
+            name=network.get_variable_name(name="fc_weights_1", node=node))
         fc_weights_2 = tf.Variable(
             tf.truncated_normal([GlobalConstants.NO_HIDDEN + 2 * network.treeDegree, GlobalConstants.NUM_LABELS],
                                 stddev=0.1,
@@ -139,7 +142,7 @@ def leaf_func(node, network, variables=None):
                               name=network.get_variable_name(name="fc_biases_1", node=node))
     fc_biases_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
                               name=network.get_variable_name(name="fc_biases_2", node=node))
-    node.variablesList.extend([fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2])
+    node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2}
     # Operations
     # Mask inputs
     parent_node = network.dagObject.parents(node=node)[0]
@@ -169,8 +172,16 @@ def leaf_func(node, network, variables=None):
     logits = tf.matmul(hidden_layer_concat, fc_weights_2) + fc_biases_2
     cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                logits=logits)
-    pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
-    loss = tf.where(tf.is_nan(pre_loss), 0., pre_loss)
+    parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}
+    mixture_of_expert_updates = {GradientType.mixture_of_experts_biased, GradientType.mixture_of_experts_unbiased}
+    if GlobalConstants.GRADIENT_TYPE in parallel_dnn_updates:
+        pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
+        loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
+    elif GlobalConstants.GRADIENT_TYPE in mixture_of_expert_updates:
+        pre_loss = tf.reduce_sum(cross_entropy_loss_tensor)
+        loss = (1.0 / float(GlobalConstants.BATCH_SIZE)) * pre_loss
+    else:
+        raise NotImplementedError()
     node.fOpsList.extend([flattened, hidden_layer, hidden_layer_concat, logits, cross_entropy_loss_tensor, pre_loss,
                           loss])
     node.lossList.append(loss)

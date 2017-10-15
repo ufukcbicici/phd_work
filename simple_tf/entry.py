@@ -44,59 +44,50 @@ def main():
     else:
         sess = tf.Session()
     dataset = MnistDataSet(validation_sample_count=10000)
-    experiment_id = DbLogger.get_run_id()
-    explanation = "reduce_mean loss. No threshold."
-    DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
-                              col_count=2)
     # Init
     init = tf.global_variables_initializer()
-    sess.run(init)
-    # First loss
-    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
-    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
-    lr = 9000.0
-    iteration_counter = 0
-    for epoch_id in range(GlobalConstants.EPOCH_COUNT):
-        # An epoch is a complete pass on the whole dataset.
-        dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
-        print("*************Epoch {0}*************".format(epoch_id))
-        total_time = 0.0
-        while True:
-            # samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
-            # samples = np.expand_dims(samples, axis=3)
-            # start_time = time.time()
-            # feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
-            # results = sess.run([gradients, sample_count_tensors], feed_dict=feed_dict)
-            start_time = time.time()
-            sample_counts, lr = network.update_params_with_momentum(sess=sess, dataset=dataset,
-                                                                    iteration=iteration_counter)
-            elapsed_time = time.time() - start_time
-            total_time += elapsed_time
-            print("Iteration:{0}".format(iteration_counter))
-            print("Lr:{0}".format(lr))
-            # Print sample counts
-            for k, v in sample_counts.items():
-                print("{0}={1}".format(k, v))
-            # print("Iteration:{0}".format(results[1]))
-            # if abs(results[0] - lr) > 1e-10:
-            #     print("Learning rate changed to {0}".format(results[0]))
-            #     lr = results[0]
-            # print("lr={0}".format(results[0]))
-            # print("global counter={0}".format(results[1]))
-            iteration_counter += 1
-            if dataset.isNewEpoch:
-                print("Epoch Time={0}".format(total_time))
-                training_accuracy = \
-                    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
-                validation_accuracy = \
-                    network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
-                DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                 validation_accuracy,
-                                                 0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
-                break
-    test_accuracy = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
-    DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable, col_count=3)
-    print("X")
+    for run_id in range(10):
+        print("********************NEW RUN:{0}********************".format(run_id))
+        experiment_id = DbLogger.get_run_id()
+        explanation = "Gradient Type:{0} No threshold.".format(GlobalConstants.GRADIENT_TYPE)
+        DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
+                                  col_count=2)
+        sess.run(init)
+        # First loss
+        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
+        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
+        iteration_counter = 0
+        for epoch_id in range(GlobalConstants.EPOCH_COUNT):
+            # An epoch is a complete pass on the whole dataset.
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            print("*************Epoch {0}*************".format(epoch_id))
+            total_time = 0.0
+            while True:
+                start_time = time.time()
+                sample_counts, lr = network.update_params_with_momentum(sess=sess, dataset=dataset,
+                                                                        iteration=iteration_counter)
+                elapsed_time = time.time() - start_time
+                total_time += elapsed_time
+                print("Iteration:{0}".format(iteration_counter))
+                print("Lr:{0}".format(lr))
+                # Print sample counts
+                for k, v in sample_counts.items():
+                    print("{0}={1}".format(k, v))
+                iteration_counter += 1
+                if dataset.isNewEpoch:
+                    print("Epoch Time={0}".format(total_time))
+                    training_accuracy = \
+                        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
+                    validation_accuracy = \
+                        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
+                    DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
+                                                     validation_accuracy,
+                                                     0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
+                    break
+        test_accuracy = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
+        DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable,
+                                  col_count=3)
+        print("X")
 
 
 # def experiment():

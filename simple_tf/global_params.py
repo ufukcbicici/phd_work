@@ -1,8 +1,17 @@
+from enum import Enum
+
 import tensorflow as tf
 
 
+class GradientType(Enum):
+    mixture_of_experts_unbiased = 0
+    mixture_of_experts_biased = 1
+    parallel_dnns_unbiased = 2
+    parallel_dnns_biased = 3
+
+
 class GlobalConstants:
-    EPOCH_COUNT = 1000
+    EPOCH_COUNT = 100
     BATCH_SIZE = 1000
     EVAL_BATCH_SIZE = 50000
     IMAGE_SIZE = 28
@@ -22,6 +31,7 @@ class GlobalConstants:
     USE_CPU = False
     USE_CPU_MASKING = False
     USE_RANDOM_PARAMETERS = True
+    GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
     TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(BATCH_SIZE,))
     TEST_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))

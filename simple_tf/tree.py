@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from auxillary.dag_utilities import Dag
-from simple_tf.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants, GradientType
 from simple_tf.node import Node
 
 
@@ -18,13 +18,16 @@ class TreeNetwork:
         self.labelTensor = label
         self.evalDict = {}
         self.finalLoss = None
-        self.gradients = None
+        self.classificationGradients = None
+        self.regularizationGradients = None
+        self.decisionLossGradients = None
         self.sample_count_tensors = None
         self.momentumStatesDict = {}
         self.newValuesDict = {}
         self.assignOpsList = []
         self.learningRate = None
         self.globalCounter = None
+        self.varToNodesDict = {}
 
     def get_parent_index(self, node_index):
         parent_index = int((node_index - 1) / self.treeDegree)
@@ -82,16 +85,23 @@ class TreeNetwork:
             all_network_losses.extend(node.lossList)
         # Weight decays
         vars = tf.trainable_variables()
-        weights_and_filters = [v for v in vars if "bias" not in v.name]
-        regularizer_loss = GlobalConstants.WEIGHT_DECAY_COEFFICIENT * tf.add_n(
-            [tf.nn.l2_loss(v) for v in weights_and_filters])
+        # l2_loss_list = [0.0 * tf.nn.l2_loss(v) if "bias" in v.name else GlobalConstants.WEIGHT_DECAY_COEFFICIENT * tf.nn.l2_loss(v) for v in vars]
+        l2_loss_list = []
+        for v in vars:
+            if "bias" in v.name:
+                l2_loss_list.append(0.0 * tf.nn.l2_loss(v))
+            else:
+                l2_loss_list.append(GlobalConstants.WEIGHT_DECAY_COEFFICIENT * tf.nn.l2_loss(v))
+        # weights_and_filters = [v for v in vars if "bias" not in v.name]
+        regularizer_loss = tf.add_n(l2_loss_list)
         actual_loss = tf.add_n(all_network_losses)
         self.finalLoss = actual_loss + regularizer_loss
         self.evalDict["RegularizerLoss"] = regularizer_loss
         self.evalDict["ActualLoss"] = actual_loss
         self.evalDict["NetworkLoss"] = self.finalLoss
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
-        self.gradients = tf.gradients(ys=self.finalLoss, xs=vars)
+        self.classificationGradients = tf.gradients(ys=actual_loss, xs=vars)
+        self.regularizationGradients = tf.gradients(ys=regularizer_loss, xs=vars)
         # Assign ops for variables
         for var in vars:
             op_name = self.get_assign_op_name(variable=var)
@@ -100,6 +110,13 @@ class TreeNetwork:
             self.newValuesDict[op_name] = new_value
             self.assignOpsList.append(assign_op)
             self.momentumStatesDict[var.name] = np.zeros(shape=var.shape)
+            for node in self.topologicalSortedNodes:
+                if var in node.variablesSet:
+                    if var.name in self.varToNodesDict:
+                        raise Exception("{0} is in the parameters already.".format(var.name))
+                    self.varToNodesDict[var.name] = var
+            if var.name not in self.varToNodesDict:
+                raise Exception("{0} is not in the parameters!".format(var.name))
         # Learning rate, counter
         self.globalCounter = tf.Variable(0, dtype=GlobalConstants.DATA_TYPE, trainable=False)
         self.learningRate = tf.train.exponential_decay(
@@ -176,18 +193,34 @@ class TreeNetwork:
         vars = tf.trainable_variables()
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
                      self.globalCounter: iteration}
-        results = sess.run([self.gradients, self.sample_count_tensors, vars, self.learningRate], feed_dict=feed_dict)
-        grads = results[0]
-        sample_counts = results[1]
-        vars_current_values = results[2]
-        lr = results[3]
-        update_dict = {}
-        for v, g, curr_value in zip(vars, grads, vars_current_values):
-            self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
-            self.momentumStatesDict[v.name][:] += -lr * g
-            new_value = curr_value + self.momentumStatesDict[v.name]
-            update_dict[self.newValuesDict[self.get_assign_op_name(variable=v)]] = new_value
-        sess.run(self.assignOpsList, feed_dict=update_dict)
+        results = sess.run([self.classificationGradients, self.regularizationGradients,
+                            self.sample_count_tensors, vars, self.learningRate], feed_dict=feed_dict)
+        classification_grads = results[0]
+        regularization_grads = results[1]
+        sample_counts = results[2]
+        vars_current_values = results[3]
+        lr = results[4]
+        if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
+            update_dict = {}
+            for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
+                self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
+                self.momentumStatesDict[v.name][:] += -lr * (g + r)
+                new_value = curr_value + self.momentumStatesDict[v.name]
+                update_dict[self.newValuesDict[self.get_assign_op_name(variable=v)]] = new_value
+            sess.run(self.assignOpsList, feed_dict=update_dict)
+        elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
+            update_dict = {}
+            for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
+                self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
+                node = self.varToNodesDict[v.name]
+                sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
+                sample_count = sample_counts[sample_count_entry_name]
+                gradient_modifier = float(GlobalConstants.BATCH_SIZE) / float(sample_count)
+                modified_g = gradient_modifier * g
+                self.momentumStatesDict[v.name][:] += -lr * (modified_g + r)
+                new_value = curr_value + self.momentumStatesDict[v.name]
+                update_dict[self.newValuesDict[self.get_assign_op_name(variable=v)]] = new_value
+            sess.run(self.assignOpsList, feed_dict=update_dict)
         return sample_counts, lr
 
     def get_variable_name(self, name, node):

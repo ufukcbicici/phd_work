@@ -4,7 +4,7 @@ class Node:
         self.depth = depth
         self.isRoot = is_root
         self.isLeaf = is_leaf
-        self.variablesList = []
+        self.variablesSet = set()
         self.fOpsList = []
         self.hOpsList = []
         self.lossList = []
