@@ -114,7 +114,7 @@ class TreeNetwork:
                 if var in node.variablesSet:
                     if var.name in self.varToNodesDict:
                         raise Exception("{0} is in the parameters already.".format(var.name))
-                    self.varToNodesDict[var.name] = var
+                    self.varToNodesDict[var.name] = node
             if var.name not in self.varToNodesDict:
                 raise Exception("{0} is not in the parameters!".format(var.name))
         # Learning rate, counter
@@ -221,6 +221,8 @@ class TreeNetwork:
                 new_value = curr_value + self.momentumStatesDict[v.name]
                 update_dict[self.newValuesDict[self.get_assign_op_name(variable=v)]] = new_value
             sess.run(self.assignOpsList, feed_dict=update_dict)
+        else:
+            raise NotImplementedError()
         return sample_counts, lr
 
     def get_variable_name(self, name, node):
