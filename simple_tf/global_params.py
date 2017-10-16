@@ -31,7 +31,7 @@ class GlobalConstants:
     USE_CPU = False
     USE_CPU_MASKING = False
     USE_RANDOM_PARAMETERS = True
-    GRADIENT_TYPE = GradientType.mixture_of_experts_biased
+    GRADIENT_TYPE = GradientType.mixture_of_experts_unbiased
     TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
     TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(BATCH_SIZE,))
     TEST_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))

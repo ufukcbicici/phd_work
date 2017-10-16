@@ -26,9 +26,9 @@ from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
 
 
-tf.set_random_seed(1234)
-np_seed = 88
-np.random.seed(np_seed)
+# tf.set_random_seed(1234)
+# np_seed = 88
+# np.random.seed(np_seed)
 
 
 def main():
@@ -46,7 +46,7 @@ def main():
     dataset = MnistDataSet(validation_sample_count=10000)
     # Init
     init = tf.global_variables_initializer()
-    for run_id in range(10):
+    for run_id in range(100):
         print("********************NEW RUN:{0}********************".format(run_id))
         experiment_id = DbLogger.get_run_id()
         explanation = "Gradient Type:{0} No threshold.".format(GlobalConstants.GRADIENT_TYPE)
