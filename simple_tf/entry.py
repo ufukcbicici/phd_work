@@ -33,7 +33,8 @@ import simple_tf.lenet3 as lenet3
 
 def main():
     # Build the network
-    network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE, node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+    network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
+                          node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           create_new_variables=True,
                           data=GlobalConstants.TRAIN_DATA_TENSOR, label=GlobalConstants.TRAIN_LABEL_TENSOR)
     network.build_network(network_to_copy_from=None)
@@ -65,7 +66,7 @@ def main():
             while True:
                 start_time = time.time()
                 sample_counts, lr, is_open_indicators = network.update_params_with_momentum(sess=sess, dataset=dataset,
-                                                                        iteration=iteration_counter)
+                                                                                            iteration=iteration_counter)
                 elapsed_time = time.time() - start_time
                 total_time += elapsed_time
                 print("Iteration:{0}".format(iteration_counter))

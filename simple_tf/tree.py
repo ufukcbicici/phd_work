@@ -207,6 +207,11 @@ class TreeNetwork:
             GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
             update_dict = {}
             for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
+                node = self.varToNodesDict[v.name]
+                is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
+                if not is_node_open:
+                    print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
+                    continue
                 self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
                 self.momentumStatesDict[v.name][:] += -lr * (g + r)
                 new_value = curr_value + self.momentumStatesDict[v.name]
@@ -215,8 +220,12 @@ class TreeNetwork:
         elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
             update_dict = {}
             for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
-                self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
                 node = self.varToNodesDict[v.name]
+                is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
+                if not is_node_open:
+                    print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
+                    continue
+                self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
                 sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
                 sample_count = sample_counts[sample_count_entry_name]
                 gradient_modifier = float(GlobalConstants.BATCH_SIZE) / float(sample_count)
@@ -231,6 +240,11 @@ class TreeNetwork:
 
     def get_variable_name(self, name, node):
         return "Node{0}_{1}".format(node.index, name)
+
+    def get_node_from_variable_name(self, name):
+        node_index_str = name[4:name.find("_")]
+        node_index = int(node_index_str)
+        return self.nodes[node_index]
 
     def get_assign_op_name(self, variable):
         return "Assign_{0}".format(variable.name[0:len(variable.name) - 2])
@@ -250,6 +264,13 @@ class TreeNetwork:
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
             node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            # TO PREVENT TENSORFLOW FROM CRASHING WHEN THERE ARE NO SAMPLES:
+            # If the mask from the parent is completely false, convert it to true; artifically. Note this
+            # is only for crash prevention. "node.isOpenIndicatorTensor" will be 0 anyways, so no parameter update will
+            # be made for that node. Moreover, when applying decision, we will look control "node.isOpenIndicatorTensor"
+            # and set the produced mask vectors to competely false, to propagate the emptyness.
+            mask_tensor = tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_tensor,
+                                  lambda: tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             # Mask all inputs: F channel, H channel, activations from ancestors, labels
             if GlobalConstants.USE_CPU_MASKING:
                 with tf.device("/cpu:0"):
@@ -275,10 +296,27 @@ class TreeNetwork:
             mask_vector = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                    name="Mask_{0}".format(child_index))
             mask_vector = tf.reshape(mask_vector, [-1])
-            # Zero-out the mask if this node is not open
+            # Zero-out the mask if this node is not open;
+            # since we only use the mask vector to avoid Tensorflow crash in this case.
             node.maskTensorsDict[node.index * self.treeDegree + 1 + index] = \
                 tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector,
                         lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool), y=mask_vector))
+
+    def apply_loss(self, node, logits):
+        cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
+                                                                                   logits=logits)
+        parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}
+        mixture_of_expert_updates = {GradientType.mixture_of_experts_biased, GradientType.mixture_of_experts_unbiased}
+        if GlobalConstants.GRADIENT_TYPE in parallel_dnn_updates:
+            pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
+            loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
+        elif GlobalConstants.GRADIENT_TYPE in mixture_of_expert_updates:
+            pre_loss = tf.reduce_sum(cross_entropy_loss_tensor)
+            loss = (1.0 / float(GlobalConstants.BATCH_SIZE)) * pre_loss
+        else:
+            raise NotImplementedError()
+        node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
+        node.lossList.append(loss)
 
     def eval_network(self, sess, dataset):
         # if is_train:

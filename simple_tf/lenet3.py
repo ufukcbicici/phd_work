@@ -137,21 +137,8 @@ def leaf_func(node, network, variables=None):
     hidden_layer_concat = tf.concat(values=concat_list, axis=1)
     logits = tf.matmul(hidden_layer_concat, fc_weights_2) + fc_biases_2
     # Apply loss
-    cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
-                                                                               logits=logits)
-    parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}
-    mixture_of_expert_updates = {GradientType.mixture_of_experts_biased, GradientType.mixture_of_experts_unbiased}
-    if GlobalConstants.GRADIENT_TYPE in parallel_dnn_updates:
-        pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
-        loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
-    elif GlobalConstants.GRADIENT_TYPE in mixture_of_expert_updates:
-        pre_loss = tf.reduce_sum(cross_entropy_loss_tensor)
-        loss = (1.0 / float(GlobalConstants.BATCH_SIZE)) * pre_loss
-    else:
-        raise NotImplementedError()
-    node.fOpsList.extend([flattened, hidden_layer, hidden_layer_concat, logits, cross_entropy_loss_tensor, pre_loss,
-                          loss])
-    node.lossList.append(loss)
+    node.fOpsList.extend([flattened, hidden_layer, hidden_layer_concat, logits])
+    network.apply_loss(node=node, logits=logits)
     # Evaluation
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
