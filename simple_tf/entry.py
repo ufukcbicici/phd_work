@@ -64,7 +64,7 @@ def main():
             total_time = 0.0
             while True:
                 start_time = time.time()
-                sample_counts, lr = network.update_params_with_momentum(sess=sess, dataset=dataset,
+                sample_counts, lr, is_open_indicators = network.update_params_with_momentum(sess=sess, dataset=dataset,
                                                                         iteration=iteration_counter)
                 elapsed_time = time.time() - start_time
                 total_time += elapsed_time
@@ -72,6 +72,8 @@ def main():
                 print("Lr:{0}".format(lr))
                 # Print sample counts
                 for k, v in sample_counts.items():
+                    print("{0}={1}".format(k, v))
+                for k, v in is_open_indicators.items():
                     print("{0}={1}".format(k, v))
                 iteration_counter += 1
                 if dataset.isNewEpoch:

@@ -22,6 +22,7 @@ class TreeNetwork:
         self.regularizationGradients = None
         self.decisionLossGradients = None
         self.sample_count_tensors = None
+        self.isOpenTensors = None
         self.momentumStatesDict = {}
         self.newValuesDict = {}
         self.assignOpsList = []
@@ -100,6 +101,7 @@ class TreeNetwork:
         self.evalDict["ActualLoss"] = actual_loss
         self.evalDict["NetworkLoss"] = self.finalLoss
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.classificationGradients = tf.gradients(ys=actual_loss, xs=vars)
         self.regularizationGradients = tf.gradients(ys=regularizer_loss, xs=vars)
         # Assign ops for variables
@@ -194,13 +196,15 @@ class TreeNetwork:
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
                      self.globalCounter: iteration}
         results = sess.run([self.classificationGradients, self.regularizationGradients,
-                            self.sample_count_tensors, vars, self.learningRate], feed_dict=feed_dict)
+                            self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors], feed_dict=feed_dict)
         classification_grads = results[0]
         regularization_grads = results[1]
         sample_counts = results[2]
         vars_current_values = results[3]
         lr = results[4]
-        if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
+        is_open_indicators = results[5]
+        if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
+            GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
             update_dict = {}
             for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
                 self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
@@ -223,13 +227,44 @@ class TreeNetwork:
             sess.run(self.assignOpsList, feed_dict=update_dict)
         else:
             raise NotImplementedError()
-        return sample_counts, lr
+        return sample_counts, lr, is_open_indicators
 
     def get_variable_name(self, name, node):
         return "Node{0}_{1}".format(node.index, name)
 
     def get_assign_op_name(self, variable):
         return "Assign_{0}".format(variable.name[0:len(variable.name) - 2])
+
+    def mask_input_nodes(self, node):
+        if node.isRoot:
+            node.labelTensor = self.labelTensor
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
+            node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
+        else:
+            # Obtain the mask vector, sample counts and determine if this node receives samples.
+            parent_node = self.dagObject.parents(node=node)[0]
+            # print_op = tf.Print(input_=parent_node.fOpsList[-1], data=[parent_node.fOpsList[-1]], message="Print at Node:{0}".format(node.index))
+            # node.evalDict[network.get_variable_name(name="Print", node=node)] = print_op
+            mask_tensor = parent_node.maskTensorsDict[node.index]
+            sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
+            node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            # Mask all inputs: F channel, H channel, activations from ancestors, labels
+            if GlobalConstants.USE_CPU_MASKING:
+                with tf.device("/cpu:0"):
+                    parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
+                    parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
+                    for k, v in parent_node.activationsDict.items():
+                        node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
+                    node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+            else:
+                parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
+                parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
+                for k, v in parent_node.activationsDict.items():
+                    node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
+                node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+            return parent_F, parent_H
 
     def apply_decision(self, node):
         # child_nodes = sorted(network.dagObject.children(node=node), key=lambda child: child.index)
@@ -240,7 +275,10 @@ class TreeNetwork:
             mask_vector = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                    name="Mask_{0}".format(child_index))
             mask_vector = tf.reshape(mask_vector, [-1])
-            node.maskTensorsDict[node.index * self.treeDegree + 1 + index] = mask_vector
+            # Zero-out the mask if this node is not open
+            node.maskTensorsDict[node.index * self.treeDegree + 1 + index] = \
+                tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector,
+                        lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool), y=mask_vector))
 
     def eval_network(self, sess, dataset):
         # if is_train:

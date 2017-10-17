@@ -9,6 +9,7 @@ class Node:
         self.hOpsList = []
         self.lossList = []
         self.labelTensor = None
+        self.isOpenIndicatorTensor = None
         self.maskTensorsDict = {}
         self.evalDict = {}
         # Indexed by the nodes producing them

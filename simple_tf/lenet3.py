@@ -35,6 +35,7 @@ def root_func(node, network, variables=None):
                                     name=network.get_variable_name(name="hyperplane_biases", node=node))
     node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
     # Operations
+    network.mask_input_nodes(node=node)
     # F
     conv = tf.nn.conv2d(network.dataTensor, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
     relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
@@ -46,7 +47,6 @@ def root_func(node, network, variables=None):
     # Decisions
     node.activationsDict[node.index] = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
     network.apply_decision(node=node)
-    node.evalDict[network.get_variable_name(name="sample_count", node=node)] = tf.size(network.labelTensor)
 
 
 def l1_func(node, network, variables=None):
@@ -80,24 +80,7 @@ def l1_func(node, network, variables=None):
                                     name=network.get_variable_name(name="hyperplane_biases", node=node))
     node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
     # Operations
-    # Mask inputs
-    parent_node = network.dagObject.parents(node=node)[0]
-    # print_op = tf.Print(input_=parent_node.fOpsList[-1], data=[parent_node.fOpsList[-1]], message="Print at Node:{0}".format(node.index))
-    # node.evalDict[network.get_variable_name(name="Print", node=node)] = print_op
-    mask_tensor = parent_node.maskTensorsDict[node.index]
-    if GlobalConstants.USE_CPU_MASKING:
-        with tf.device("/cpu:0"):
-            parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-            parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
-            for k, v in parent_node.activationsDict.items():
-                node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-            node.labelTensor = tf.boolean_mask(network.labelTensor, mask_tensor)
-    else:
-        parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-        parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
-        for k, v in parent_node.activationsDict.items():
-            node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-        node.labelTensor = tf.boolean_mask(network.labelTensor, mask_tensor)
+    parent_F, parent_H = network.mask_input_nodes(node=node)
     # F
     conv = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
     relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
@@ -111,7 +94,6 @@ def l1_func(node, network, variables=None):
     h_concat = tf.concat(values=concat_list, axis=1)
     node.activationsDict[node.index] = tf.matmul(h_concat, hyperplane_weights) + hyperplane_biases
     network.apply_decision(node=node)
-    node.evalDict[network.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
 
 
 def leaf_func(node, network, variables=None):
@@ -145,23 +127,7 @@ def leaf_func(node, network, variables=None):
     node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2}
     # Operations
     # Mask inputs
-    parent_node = network.dagObject.parents(node=node)[0]
-    # print_op = tf.Print(input_=parent_node.fOpsList[-1], data=[parent_node.fOpsList[-1]], message="Print at Node:{0}".format(node.index))
-    # node.evalDict[network.get_variable_name(name="Print", node=node)] = print_op
-    mask_tensor = parent_node.maskTensorsDict[node.index]
-    if GlobalConstants.USE_CPU_MASKING:
-        with tf.device("/cpu:0"):
-            parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-            # parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
-            for k, v in parent_node.activationsDict.items():
-                node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-    else:
-        parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-        # parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
-        for k, v in parent_node.activationsDict.items():
-            node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-        node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+    parent_F, parent_H = network.mask_input_nodes(node=node)
     # Loss
     flattened = tf.contrib.layers.flatten(parent_F)
     hidden_layer = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
@@ -170,6 +136,7 @@ def leaf_func(node, network, variables=None):
     concat_list.extend(node.activationsDict.values())
     hidden_layer_concat = tf.concat(values=concat_list, axis=1)
     logits = tf.matmul(hidden_layer_concat, fc_weights_2) + fc_biases_2
+    # Apply loss
     cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                logits=logits)
     parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}
@@ -188,4 +155,3 @@ def leaf_func(node, network, variables=None):
     # Evaluation
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
-    node.evalDict[network.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
