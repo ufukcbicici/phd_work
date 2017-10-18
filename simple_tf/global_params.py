@@ -17,8 +17,8 @@ class GlobalConstants:
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
     NO_FILTERS_1 = 20
-    NO_FILTERS_2 = 16
-    NO_HIDDEN = 55
+    NO_FILTERS_2 = 50
+    NO_HIDDEN = 500
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.01
@@ -30,6 +30,7 @@ class GlobalConstants:
     SEED = None
     USE_CPU = False
     USE_CPU_MASKING = False
+    USE_EMPTY_NODE_CRASH_PREVENTION = True
     USE_RANDOM_PARAMETERS = True
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))

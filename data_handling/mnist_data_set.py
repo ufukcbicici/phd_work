@@ -4,6 +4,7 @@ import platform
 import numpy as np
 from array import array
 from auxillary.constants import DatasetTypes
+from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.data_set import DataSet
 import matplotlib.pyplot as plt
 
@@ -11,7 +12,7 @@ import matplotlib.pyplot as plt
 class MnistDataSet(DataSet):
     MNIST_SIZE = 28
 
-    def __init__(self, validation_sample_count):
+    def __init__(self, validation_sample_count, save_validation_as=None, load_validation_from=None):
         super().__init__()
         # os_name = platform.system()
         self.testImagesPath = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-images-idx3-ubyte")
@@ -28,16 +29,24 @@ class MnistDataSet(DataSet):
         self.currentLabels = None
         self.currentIndices = None
         self.validationSampleCount = validation_sample_count
+        self.validationSaveFile = save_validation_as
+        self.validationLoadFile = load_validation_from
         self.load_dataset()
         self.set_current_data_set_type(dataset_type=DatasetTypes.training)
         self.labelCount = None
+
 
     # PUBLIC METHODS
     def load_dataset(self):
         self.trainingSamples, self.trainingLabels = self.load(path_img=self.trainImagesPath,
                                                               path_lbl=self.trainLabelsPath)
         self.testSamples, self.testLabels = self.load(path_img=self.testImagesPath, path_lbl=self.testLabelsPath)
-        random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount, replace=False)
+        if self.validationLoadFile is None:
+            random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount, replace=False)
+            if self.validationSaveFile is not None:
+                UtilityFuncs.save_npz(file_name=self.validationSaveFile, arr_dict={"random_indices": random_indices})
+        else:
+            random_indices = UtilityFuncs.load_npz(file_name=self.validationLoadFile)["random_indices"]
         # print(random_indices[0:5])
         self.validationSamples = self.trainingSamples[random_indices]
         self.validationLabels = self.trainingLabels[random_indices]

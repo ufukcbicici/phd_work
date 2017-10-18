@@ -287,8 +287,9 @@ class TreeNetwork:
             # is only for crash prevention. "node.isOpenIndicatorTensor" will be 0 anyways, so no parameter update will
             # be made for that node. Moreover, when applying decision, we will look control "node.isOpenIndicatorTensor"
             # and set the produced mask vectors to competely false, to propagate the emptyness.
-            mask_tensor = tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_tensor,
-                                  lambda: tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
+            if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
+                mask_tensor = tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_tensor,
+                                      lambda: tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             # Mask all inputs: F channel, H channel, activations from ancestors, labels
             if GlobalConstants.USE_CPU_MASKING:
                 with tf.device("/cpu:0"):
@@ -314,11 +315,14 @@ class TreeNetwork:
             mask_vector = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                    name="Mask_{0}".format(child_index))
             mask_vector = tf.reshape(mask_vector, [-1])
-            # Zero-out the mask if this node is not open;
-            # since we only use the mask vector to avoid Tensorflow crash in this case.
-            node.maskTensorsDict[node.index * self.treeDegree + 1 + index] = \
-                tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector,
-                        lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool), y=mask_vector))
+            if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
+                # Zero-out the mask if this node is not open;
+                # since we only use the mask vector to avoid Tensorflow crash in this case.
+                node.maskTensorsDict[node.index * self.treeDegree + 1 + index] = \
+                    tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector,
+                            lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool), y=mask_vector))
+            else:
+                node.maskTensorsDict[node.index * self.treeDegree + 1 + index] = mask_vector
 
     def apply_loss(self, node, logits):
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,

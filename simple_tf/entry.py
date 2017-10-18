@@ -44,7 +44,7 @@ def main():
         sess = tf.Session(config=config)
     else:
         sess = tf.Session()
-    dataset = MnistDataSet(validation_sample_count=10000)
+    dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
     # Init
     init = tf.global_variables_initializer()
     for run_id in range(25):
@@ -153,3 +153,38 @@ def main():
 
 main()
 # experiment()
+
+# conv1_weights = tf.Variable(
+#             tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_FILTERS_1], stddev=0.1,
+#                                 seed=GlobalConstants.SEED,
+#                                 dtype=GlobalConstants.DATA_TYPE), name="conv1_weight")
+# conv1_biases = tf.Variable(
+#     tf.constant(0.1, shape=[GlobalConstants.NO_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
+#     name="conv1_bias")
+# conv2_weights = tf.Variable(
+#     tf.truncated_normal([5, 5, GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2], stddev=0.1,
+#                         seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+#     name="conv2_weight")
+# conv2_biases = tf.Variable(
+#     tf.constant(0.1, shape=[GlobalConstants.NO_FILTERS_2], dtype=GlobalConstants.DATA_TYPE),
+#     name="conv2_bias")
+# fc_weights_1 = tf.Variable(tf.truncated_normal(
+#     [GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.NO_FILTERS_2,
+#      GlobalConstants.NO_HIDDEN],
+#     stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+#                            name="fc_weights_1")
+# fc_biases_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_HIDDEN], dtype=GlobalConstants.DATA_TYPE),
+#                           name="fc_biases_1")
+# fc_weights_2 = tf.Variable(
+#     tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
+#                         stddev=0.1,
+#                         seed=GlobalConstants.SEED,
+#                         dtype=GlobalConstants.DATA_TYPE),
+#     name="fc_weights_2")
+# fc_biases_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
+#                           name="fc_biases_2")
+# vars = tf.trainable_variables()
+# total_param_count = 0
+# for v in vars:
+#     total_param_count += np.prod(v.get_shape().as_list())
+# print("X")

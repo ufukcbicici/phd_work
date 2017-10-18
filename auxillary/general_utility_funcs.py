@@ -80,3 +80,16 @@ class UtilityFuncs:
         else:
             raise Exception("Unknown parameter type.")
         return param_object
+
+    @staticmethod
+    def load_npz(file_name):
+        filename = file_name + ".npz"
+        try:
+            npzfile = np.load(filename)
+        except:
+            raise Exception('Tree file {0} not found'.format(filename))
+        return npzfile
+
+    @staticmethod
+    def save_npz(file_name, arr_dict):
+        np.savez(file_name, **arr_dict)
