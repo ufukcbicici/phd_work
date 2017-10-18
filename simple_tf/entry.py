@@ -47,10 +47,15 @@ def main():
     dataset = MnistDataSet(validation_sample_count=10000)
     # Init
     init = tf.global_variables_initializer()
-    for run_id in range(100):
+    for run_id in range(25):
         print("********************NEW RUN:{0}********************".format(run_id))
         experiment_id = DbLogger.get_run_id()
-        explanation = "Gradient Type:{0} No threshold.".format(GlobalConstants.GRADIENT_TYPE)
+        total_param_count = 0
+        for v in tf.trainable_variables():
+            total_param_count += np.prod(v.get_shape().as_list())
+        explanation = "Gradient Type:{0} No threshold. Tree Degree:{1} Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5}".format(GlobalConstants.GRADIENT_TYPE,
+                                                                               GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
+                                                                               GlobalConstants.DECAY_RATE, total_param_count)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
@@ -63,6 +68,7 @@ def main():
             dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
             print("*************Epoch {0}*************".format(epoch_id))
             total_time = 0.0
+            leaf_info_rows = []
             while True:
                 start_time = time.time()
                 sample_counts, lr, is_open_indicators = network.update_params_with_momentum(sess=sess, dataset=dataset,
@@ -72,10 +78,16 @@ def main():
                 print("Iteration:{0}".format(iteration_counter))
                 print("Lr:{0}".format(lr))
                 # Print sample counts
+                sample_count_str = ""
                 for k, v in sample_counts.items():
-                    print("{0}={1}".format(k, v))
+                    sample_count_str += "[{0}={1}]".format(k, v)
+                    node_index = network.get_node_from_variable_name(name=k).index
+                    leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
+                indicator_str = ""
                 for k, v in is_open_indicators.items():
-                    print("{0}={1}".format(k, v))
+                    indicator_str += "[{0}={1}]".format(k, v)
+                print(sample_count_str)
+                print(indicator_str)
                 iteration_counter += 1
                 if dataset.isNewEpoch:
                     print("Epoch Time={0}".format(total_time))
@@ -86,6 +98,8 @@ def main():
                     DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
                                                      validation_accuracy,
                                                      0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
+                    DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
+                    leaf_info_rows = []
                     break
         test_accuracy = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
         DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable,

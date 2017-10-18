@@ -25,7 +25,7 @@ class TreeNetwork:
         self.isOpenTensors = None
         self.momentumStatesDict = {}
         self.newValuesDict = {}
-        self.assignOpsList = []
+        self.assignOpsDict = {}
         self.learningRate = None
         self.globalCounter = None
         self.varToNodesDict = {}
@@ -110,7 +110,7 @@ class TreeNetwork:
             new_value = tf.placeholder(name=op_name, dtype=GlobalConstants.DATA_TYPE)
             assign_op = tf.assign(ref=var, value=new_value)
             self.newValuesDict[op_name] = new_value
-            self.assignOpsList.append(assign_op)
+            self.assignOpsDict[op_name] = assign_op
             self.momentumStatesDict[var.name] = np.zeros(shape=var.shape)
             for node in self.topologicalSortedNodes:
                 if var in node.variablesSet:
@@ -134,12 +134,17 @@ class TreeNetwork:
         leaf_true_labels_dict = {}
         while True:
             results = self.eval_network(sess=sess, dataset=dataset)
+            batch_sample_count = 0.0
             for node in self.topologicalSortedNodes:
                 if not node.isLeaf:
                     continue
+                if results[self.get_variable_name(name="is_open", node=node)] == 0.0:
+                    continue
                 posterior_probs = results[self.get_variable_name(name="posterior_probs", node=node)]
                 true_labels = results[self.get_variable_name(name="labels", node=node)]
+                # batch_sample_count += results[self.get_variable_name(name="sample_count", node=node)]
                 predicted_labels = np.argmax(posterior_probs, axis=1)
+                batch_sample_count += predicted_labels.shape[0]
                 if node.index not in leaf_predicted_labels_dict:
                     leaf_predicted_labels_dict[node.index] = predicted_labels
                 else:
@@ -149,6 +154,8 @@ class TreeNetwork:
                     leaf_true_labels_dict[node.index] = true_labels
                 else:
                     leaf_true_labels_dict[node.index] = np.concatenate((leaf_true_labels_dict[node.index], true_labels))
+            if batch_sample_count != GlobalConstants.BATCH_SIZE:
+                raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
             if dataset.isNewEpoch:
                 break
         print("****************Dataset:{0}****************".format(dataset_type))
@@ -157,6 +164,8 @@ class TreeNetwork:
         overall_correct = 0.0
         for node in self.topologicalSortedNodes:
             if not node.isLeaf:
+                continue
+            if node.index not in leaf_predicted_labels_dict:
                 continue
             predicted = leaf_predicted_labels_dict[node.index]
             true_labels = leaf_true_labels_dict[node.index]
@@ -177,6 +186,8 @@ class TreeNetwork:
         # Measure overall label distribution in leaves
         for node in self.topologicalSortedNodes:
             if not node.isLeaf:
+                continue
+            if node.index not in leaf_true_labels_dict:
                 continue
             true_labels = leaf_true_labels_dict[node.index]
             frequencies = {}
@@ -206,24 +217,28 @@ class TreeNetwork:
         if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
             GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
             update_dict = {}
+            assign_dict = {}
             for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
                 node = self.varToNodesDict[v.name]
                 is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
                 if not is_node_open:
-                    print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
+                    # print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
                     continue
                 self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
                 self.momentumStatesDict[v.name][:] += -lr * (g + r)
                 new_value = curr_value + self.momentumStatesDict[v.name]
-                update_dict[self.newValuesDict[self.get_assign_op_name(variable=v)]] = new_value
-            sess.run(self.assignOpsList, feed_dict=update_dict)
+                op_name = self.get_assign_op_name(variable=v)
+                update_dict[self.newValuesDict[op_name]] = new_value
+                assign_dict[op_name] = self.assignOpsDict[op_name]
+            sess.run(assign_dict, feed_dict=update_dict)
         elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
             update_dict = {}
+            assign_dict = {}
             for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
                 node = self.varToNodesDict[v.name]
                 is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
                 if not is_node_open:
-                    print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
+                    # print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
                     continue
                 self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
                 sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
@@ -232,8 +247,10 @@ class TreeNetwork:
                 modified_g = gradient_modifier * g
                 self.momentumStatesDict[v.name][:] += -lr * (modified_g + r)
                 new_value = curr_value + self.momentumStatesDict[v.name]
-                update_dict[self.newValuesDict[self.get_assign_op_name(variable=v)]] = new_value
-            sess.run(self.assignOpsList, feed_dict=update_dict)
+                op_name = self.get_assign_op_name(variable=v)
+                update_dict[self.newValuesDict[op_name]] = new_value
+                assign_dict[op_name] = self.assignOpsDict[op_name]
+            sess.run(assign_dict, feed_dict=update_dict)
         else:
             raise NotImplementedError()
         return sample_counts, lr, is_open_indicators
@@ -254,6 +271,7 @@ class TreeNetwork:
             node.labelTensor = self.labelTensor
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
         else:
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
