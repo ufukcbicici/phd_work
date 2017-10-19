@@ -17,6 +17,7 @@ from six.moves import urllib
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 import numpy as np
+import itertools
 
 # MNIST
 from auxillary.db_logger import DbLogger
@@ -24,6 +25,8 @@ from data_handling.mnist_data_set import MnistDataSet
 from simple_tf.global_params import GlobalConstants
 from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
+import simple_tf.baseline as baseline
+
 
 
 # tf.set_random_seed(1234)
@@ -34,7 +37,7 @@ import simple_tf.lenet3 as lenet3
 def main():
     # Build the network
     network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
-                          node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+                          node_build_funcs=[baseline.baseline], # [lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           create_new_variables=True,
                           data=GlobalConstants.TRAIN_DATA_TENSOR, label=GlobalConstants.TRAIN_LABEL_TENSOR)
     network.build_network(network_to_copy_from=None)
@@ -47,15 +50,22 @@ def main():
     dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
     # Init
     init = tf.global_variables_initializer()
-    for run_id in range(25):
+    # Grid search
+    wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 10)] # list(itertools.product(*list_of_lists))
+    run_id = 0
+    for wd in wd_list:
         print("********************NEW RUN:{0}********************".format(run_id))
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = wd
         experiment_id = DbLogger.get_run_id()
         total_param_count = 0
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
-        explanation = "Gradient Type:{0} No threshold. Tree Degree:{1} Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5}".format(GlobalConstants.GRADIENT_TYPE,
-                                                                               GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
-                                                                               GlobalConstants.DECAY_RATE, total_param_count)
+        # explanation = "Gradient Type:{0} No threshold. Tree Degree:{1} Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5}".format(GlobalConstants.GRADIENT_TYPE,
+        #                                                                        GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
+        #                                                                        GlobalConstants.DECAY_RATE, total_param_count)
+        explanation = "Baseline. C1:{0} C2:{1}: FC1:{2} Initial Lr:{3} Decay Steps:{4} Decay Rate:{5} Total Param Count:{6} wd:{7}".format(GlobalConstants.NO_FILTERS_1,
+                                                                               GlobalConstants.NO_FILTERS_2, GlobalConstants.NO_HIDDEN, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
+                                                                               GlobalConstants.DECAY_RATE, total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
@@ -105,6 +115,7 @@ def main():
         DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable,
                                   col_count=3)
         print("X")
+        run_id += 1
 
 
 # def experiment():
