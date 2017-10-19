@@ -37,7 +37,7 @@ import simple_tf.baseline as baseline
 def main():
     # Build the network
     network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
-                          node_build_funcs=[baseline.baseline], # [lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+                          node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           create_new_variables=True,
                           data=GlobalConstants.TRAIN_DATA_TENSOR, label=GlobalConstants.TRAIN_LABEL_TENSOR)
     network.build_network(network_to_copy_from=None)
@@ -60,18 +60,18 @@ def main():
         total_param_count = 0
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
-        # explanation = "Gradient Type:{0} No threshold. Tree Degree:{1} Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5}".format(GlobalConstants.GRADIENT_TYPE,
-        #                                                                        GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
-        #                                                                        GlobalConstants.DECAY_RATE, total_param_count)
-        explanation = "Baseline. C1:{0} C2:{1}: FC1:{2} Initial Lr:{3} Decay Steps:{4} Decay Rate:{5} Total Param Count:{6} wd:{7}".format(GlobalConstants.NO_FILTERS_1,
-                                                                               GlobalConstants.NO_FILTERS_2, GlobalConstants.NO_HIDDEN, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
-                                                                               GlobalConstants.DECAY_RATE, total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+        explanation = "Gradient Type:{0} No threshold. Tree Degree:{1} Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5}".format(GlobalConstants.GRADIENT_TYPE,
+                                                                               GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
+                                                                               GlobalConstants.DECAY_RATE, total_param_count)
+        # explanation = "Baseline. C1:{0} C2:{1}: FC1:{2} Initial Lr:{3} Decay Steps:{4} Decay Rate:{5} Total Param Count:{6} wd:{7}".format(GlobalConstants.NO_FILTERS_1,
+        #                                                                        GlobalConstants.NO_FILTERS_2, GlobalConstants.NO_HIDDEN, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
+        #                                                                        GlobalConstants.DECAY_RATE, total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
         # First loss
-        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
-        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
+        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training, run_id=experiment_id)
+        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation, run_id=experiment_id)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -101,19 +101,25 @@ def main():
                 iteration_counter += 1
                 if dataset.isNewEpoch:
                     print("Epoch Time={0}".format(total_time))
-                    training_accuracy = \
-                        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training)
-                    validation_accuracy = \
-                        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation)
+                    training_accuracy, training_confusion = \
+                        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
+                                                   run_id=experiment_id)
+                    validation_accuracy, validation_confusion = \
+                        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
+                                                   run_id=experiment_id)
                     DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
                                                      validation_accuracy,
                                                      0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
                     DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
+                    DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable, col_count=6)
+                    DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable, col_count=6)
                     leaf_info_rows = []
                     break
-        test_accuracy = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
+        test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                                   run_id=experiment_id)
         DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable,
                                   col_count=3)
+        DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=6)
         print("X")
         run_id += 1
 

@@ -128,7 +128,7 @@ class TreeNetwork:
             GlobalConstants.DECAY_RATE,  # Decay rate.
             staircase=True)
 
-    def calculate_accuracy(self, sess, dataset, dataset_type):
+    def calculate_accuracy(self, sess, dataset, dataset_type, run_id):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
@@ -162,6 +162,7 @@ class TreeNetwork:
         # Measure Accuracy
         overall_count = 0.0
         overall_correct = 0.0
+        confusion_matrix_db_rows = []
         for node in self.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
@@ -172,6 +173,17 @@ class TreeNetwork:
             if predicted.shape != true_labels.shape:
                 raise Exception("Predicted and true labels counts do not hold.")
             correct_count = np.sum(predicted == true_labels)
+            # Get the incorrect predictions by preparing a confusion matrix for each leaf
+            sparse_confusion_matrix = {}
+            for i in range(predicted.shape[0]):
+                predicted_label = predicted[i]
+                true_label = true_labels[i]
+                if (predicted_label, true_label) not in sparse_confusion_matrix:
+                    sparse_confusion_matrix[(predicted_label, true_label)] = 0
+                sparse_confusion_matrix[(predicted_label, true_label)] += 1
+            for k, v in sparse_confusion_matrix.items():
+                confusion_matrix_db_rows.append((run_id, dataset_type.value, node.index, k[0], k[1], v))
+            # Overall accuracy
             total_count = true_labels.shape[0]
             overall_correct += correct_count
             overall_count += total_count
@@ -198,7 +210,7 @@ class TreeNetwork:
                 distribution_str += "{0}:{1:.3f} ".format(label, frequencies[label] / float(total_sample_count))
             print("Node{0} Label Distribution: {1}".format(node.index, distribution_str))
         # Measure overall information gain
-        return overall_correct / overall_count
+        return overall_correct / overall_count, confusion_matrix_db_rows
 
     def update_params_with_momentum(self, sess, dataset, iteration):
         samples, labels, indices_list = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)

@@ -35,7 +35,6 @@ class MnistDataSet(DataSet):
         self.set_current_data_set_type(dataset_type=DatasetTypes.training)
         self.labelCount = None
 
-
     # PUBLIC METHODS
     def load_dataset(self):
         self.trainingSamples, self.trainingLabels = self.load(path_img=self.trainImagesPath,
