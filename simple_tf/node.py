@@ -10,7 +10,8 @@ class Node:
         self.lossList = []
         self.labelTensor = None
         self.isOpenIndicatorTensor = None
-        self.maskTensorsDict = {}
+        self.maskTensorsWithThresholdDict = {}
+        self.maskTensorsWithoutThresholdDict = {}
         self.evalDict = {}
         # Indexed by the nodes producing them
         self.activationsDict = {}

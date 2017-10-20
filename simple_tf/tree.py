@@ -28,6 +28,8 @@ class TreeNetwork:
         self.assignOpsDict = {}
         self.learningRate = None
         self.globalCounter = None
+        self.weightDecayCoeff = None
+        self.probabilityThreshold = None
         self.varToNodesDict = {}
 
     def get_parent_index(self, node_index):
@@ -57,6 +59,8 @@ class TreeNetwork:
             else:
                 self.nodeBuildFuncs[node.depth](node=node, network=self,
                                                 variables=network_to_copy_from.nodes[node.index].variablesList)
+        # Probability threshold
+        self.probabilityThreshold = tf.placeholder(name="probability_threshold", dtype=tf.float32)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
@@ -72,7 +76,9 @@ class TreeNetwork:
             for k, v in node.activationsDict.items():
                 self.evalDict["Node{0}_activation_from_{1}".format(node.index, k)] = v
             # Decision masks
-            for k, v in node.maskTensorsDict.items():
+            for k, v in node.maskTensorsWithThresholdDict.items():
+                self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
+            for k, v in node.maskTensorsWithoutThresholdDict.items():
                 self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
             # Evaluation outputs
             for k, v in node.evalDict.items():
@@ -85,6 +91,7 @@ class TreeNetwork:
         for node in self.topologicalSortedNodes:
             all_network_losses.extend(node.lossList)
         # Weight decays
+        self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
         vars = tf.trainable_variables()
         # l2_loss_list = [0.0 * tf.nn.l2_loss(v) if "bias" in v.name else GlobalConstants.WEIGHT_DECAY_COEFFICIENT * tf.nn.l2_loss(v) for v in vars]
         l2_loss_list = []
@@ -92,7 +99,7 @@ class TreeNetwork:
             if "bias" in v.name:
                 l2_loss_list.append(0.0 * tf.nn.l2_loss(v))
             else:
-                l2_loss_list.append(GlobalConstants.WEIGHT_DECAY_COEFFICIENT * tf.nn.l2_loss(v))
+                l2_loss_list.append(self.weightDecayCoeff * tf.nn.l2_loss(v))
         # weights_and_filters = [v for v in vars if "bias" not in v.name]
         regularizer_loss = tf.add_n(l2_loss_list)
         actual_loss = tf.add_n(all_network_losses)
@@ -217,9 +224,10 @@ class TreeNetwork:
         samples = np.expand_dims(samples, axis=3)
         vars = tf.trainable_variables()
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
-                     self.globalCounter: iteration}
+                     self.globalCounter: iteration, self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT}
         results = sess.run([self.classificationGradients, self.regularizationGradients,
-                            self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors], feed_dict=feed_dict)
+                            self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors],
+                           feed_dict=feed_dict)
         classification_grads = results[0]
         regularization_grads = results[1]
         sample_counts = results[2]
@@ -227,7 +235,7 @@ class TreeNetwork:
         lr = results[4]
         is_open_indicators = results[5]
         if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
-            GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
+                    GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
             update_dict = {}
             assign_dict = {}
             for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
@@ -330,11 +338,37 @@ class TreeNetwork:
             if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
                 # Zero-out the mask if this node is not open;
                 # since we only use the mask vector to avoid Tensorflow crash in this case.
-                node.maskTensorsDict[node.index * self.treeDegree + 1 + index] = \
+                node.maskTensorsDict[child_index] = \
                     tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector,
                             lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool), y=mask_vector))
             else:
-                node.maskTensorsDict[node.index * self.treeDegree + 1 + index] = mask_vector
+                node.maskTensorsDict[child_index] = mask_vector
+
+    def apply_decision_with_probability_threshold(self, node):
+        p_n_given_x = tf.nn.softmax(node.activationsDict[node.index])
+        # Threshold 0 decisions
+        arg_max_indices = tf.argmax(p_n_given_x, axis=1)
+        # Decisions with threshold
+        node.maskTensorsWithThresholdDict = {}
+        node.maskTensorsWithoutThresholdDict = {}
+        for index in range(self.treeDegree):
+            child_index = node.index * self.treeDegree + 1 + index
+            branch_prob = p_n_given_x[:, index]
+            mask_vector_with_threshold = tf.greater_equal(x=branch_prob,
+                                                          y=tf.constant(self.probabilityThreshold, tf.float32),
+                                                          name="Mask_with_threshold_{0}".format(child_index))
+            mask_vector_with_threshold = tf.reshape(mask_vector_with_threshold, [-1])
+            mask_vector_without_threshold = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
+                                                     name="Mask_{0}".format(child_index))
+            mask_vector_without_threshold = tf.reshape(mask_vector_without_threshold, [-1])
+            if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
+                # Zero-out the mask if this node is not open;
+                # since we only use the mask vector to avoid Tensorflow crash in this case.
+                node.maskTensorsDict[child_index] = \
+                    tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector,
+                            lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool), y=mask_vector))
+            else:
+                node.maskTensorsDict[child_index] = mask_vector
 
     def apply_loss(self, node, logits):
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
@@ -356,7 +390,8 @@ class TreeNetwork:
         # if is_train:
         samples, labels, indices_list = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
-        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels}
+        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT}
         results = sess.run(self.evalDict, feed_dict)
         # else:
         #     samples, labels, indices_list = dataset.get_next_batch(batch_size=EVAL_BATCH_SIZE)

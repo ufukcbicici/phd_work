@@ -11,7 +11,8 @@ class DbLogger:
     leafInfoTable = "leaf_info_table"
     runResultsTable = "run_results"
     confusionTable = "confusion_data"
-    log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
+    log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
+    # "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
     # "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
     # "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
     # os.path.join(os.getcwd(), "\\logger.db")

@@ -37,7 +37,7 @@ import simple_tf.baseline as baseline
 def main():
     # Build the network
     network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
-                          node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+                          node_build_funcs=[baseline.baseline], # [lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           create_new_variables=True,
                           data=GlobalConstants.TRAIN_DATA_TENSOR, label=GlobalConstants.TRAIN_LABEL_TENSOR)
     network.build_network(network_to_copy_from=None)
@@ -51,7 +51,7 @@ def main():
     # Init
     init = tf.global_variables_initializer()
     # Grid search
-    wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 10)] # list(itertools.product(*list_of_lists))
+    wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     run_id = 0
     for wd in wd_list:
         print("********************NEW RUN:{0}********************".format(run_id))
@@ -60,12 +60,12 @@ def main():
         total_param_count = 0
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
-        explanation = "Gradient Type:{0} No threshold. Tree Degree:{1} Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5}".format(GlobalConstants.GRADIENT_TYPE,
-                                                                               GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
-                                                                               GlobalConstants.DECAY_RATE, total_param_count)
-        # explanation = "Baseline. C1:{0} C2:{1}: FC1:{2} Initial Lr:{3} Decay Steps:{4} Decay Rate:{5} Total Param Count:{6} wd:{7}".format(GlobalConstants.NO_FILTERS_1,
-        #                                                                        GlobalConstants.NO_FILTERS_2, GlobalConstants.NO_HIDDEN, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
-        #                                                                        GlobalConstants.DECAY_RATE, total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+        # explanation = "Gradient Type:{0} No threshold. Tree Degree:{1} Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5}".format(GlobalConstants.GRADIENT_TYPE,
+        #                                                                        GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
+        #                                                                        GlobalConstants.DECAY_RATE, total_param_count)
+        explanation = "Wd, corrected. Baseline. C1:{0} C2:{1}: FC1:{2} Initial Lr:{3} Decay Steps:{4} Decay Rate:{5} Total Param Count:{6} wd:{7}".format(GlobalConstants.NO_FILTERS_1,
+                                                                               GlobalConstants.NO_FILTERS_2, GlobalConstants.NO_HIDDEN, GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP,
+                                                                               GlobalConstants.DECAY_RATE, total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
@@ -111,15 +111,17 @@ def main():
                                                      validation_accuracy,
                                                      0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
                     DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
-                    DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable, col_count=6)
-                    DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable, col_count=6)
+                    if GlobalConstants.SAVE_CONFUSION_MATRICES:
+                        DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable, col_count=6)
+                        DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable, col_count=6)
                     leaf_info_rows = []
                     break
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
                                                    run_id=experiment_id)
         DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable,
                                   col_count=3)
-        DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=6)
+        if GlobalConstants.SAVE_CONFUSION_MATRICES:
+            DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=6)
         print("X")
         run_id += 1
 
@@ -168,7 +170,7 @@ def main():
 #         print("X")
 
 
-main()
+# main()
 # experiment()
 
 # conv1_weights = tf.Variable(
@@ -204,4 +206,23 @@ main()
 # total_param_count = 0
 # for v in vars:
 #     total_param_count += np.prod(v.get_shape().as_list())
+# print("X")
+
+
+# fc_weights_2 = tf.Variable(
+#     tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
+#                         stddev=0.1,
+#                         seed=GlobalConstants.SEED,
+#                         dtype=GlobalConstants.DATA_TYPE),
+#     name="fc_weights_2")
+#
+#
+# config = tf.ConfigProto(device_count={'GPU': 0})
+# sess = tf.Session(config=config)
+# # Init
+# init = tf.global_variables_initializer()
+# sess.run(init)
+#
+# sliced = fc_weights_2[:, 2]
+# res = sess.run([fc_weights_2, sliced])
 # print("X")
