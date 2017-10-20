@@ -32,6 +32,7 @@ class GlobalConstants:
     USE_CPU_MASKING = False
     USE_EMPTY_NODE_CRASH_PREVENTION = False
     USE_RANDOM_PARAMETERS = True
+    USE_PROBABILITY_THRESHOLD = False
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))

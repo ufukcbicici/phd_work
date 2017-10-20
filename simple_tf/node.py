@@ -13,5 +13,6 @@ class Node:
         self.maskTensorsWithThresholdDict = {}
         self.maskTensorsWithoutThresholdDict = {}
         self.evalDict = {}
+        self.parentNonThresholdMaskVector = None
         # Indexed by the nodes producing them
         self.activationsDict = {}
