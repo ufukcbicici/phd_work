@@ -17,8 +17,8 @@ class GlobalConstants:
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
     NO_FILTERS_1 = 20
-    NO_FILTERS_2 = 50 # 10
-    NO_HIDDEN = 500 # 30
+    NO_FILTERS_2 = 10 # 10
+    NO_HIDDEN = 30 # 30
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.015
