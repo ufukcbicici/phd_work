@@ -9,6 +9,7 @@ class Node:
         self.hOpsList = []
         self.lossList = []
         self.labelTensor = None
+        self.indicesTensor = None
         self.isOpenIndicatorTensor = None
         self.maskTensorsWithThresholdDict = {}
         self.maskTensorsWithoutThresholdDict = {}
@@ -16,3 +17,4 @@ class Node:
         self.parentNonThresholdMaskVector = None
         # Indexed by the nodes producing them
         self.activationsDict = {}
+        self.proxyLossInputDicts = {}

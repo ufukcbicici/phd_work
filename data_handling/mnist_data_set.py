@@ -75,7 +75,7 @@ class MnistDataSet(DataSet):
             self.currentIndex = self.currentIndex % num_of_samples
         else:
             self.isNewEpoch = False
-        return samples, labels, indices_list
+        return samples, labels, indices_list.astype(np.int64)
 
     def reset(self):
         self.currentIndex = 0

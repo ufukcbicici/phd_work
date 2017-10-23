@@ -28,9 +28,9 @@ import simple_tf.lenet3 as lenet3
 import simple_tf.baseline as baseline
 
 
-# tf.set_random_seed(1234)
-# np_seed = 88
-# np.random.seed(np_seed)
+tf.set_random_seed(1234)
+np_seed = 88
+np.random.seed(np_seed)
 
 
 def main():
@@ -38,7 +38,8 @@ def main():
     network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
                           node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           create_new_variables=True,
-                          data=GlobalConstants.TRAIN_DATA_TENSOR, label=GlobalConstants.TRAIN_LABEL_TENSOR)
+                          data=GlobalConstants.TRAIN_DATA_TENSOR, label=GlobalConstants.TRAIN_LABEL_TENSOR,
+                          indices=GlobalConstants.INDICES_TENSOR)
     network.build_network(network_to_copy_from=None)
     # Do the training
     if GlobalConstants.USE_CPU:
@@ -60,7 +61,7 @@ def main():
         total_param_count = 0
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
-        explanation = "Gradient Type:{0} No threshold. Tree Degree:{1} " \
+        explanation = "Tree. Gradient Type:{0} No threshold. Tree Degree:{1} " \
                       "Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5} Wd:{6}".format(
                        GlobalConstants.GRADIENT_TYPE, GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR,
                        GlobalConstants.DECAY_STEP, GlobalConstants.DECAY_RATE, total_param_count,
@@ -74,9 +75,9 @@ def main():
                                   col_count=2)
         sess.run(init)
         # First loss
-        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training, run_id=experiment_id)
-        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
-                                   run_id=experiment_id)
+        # network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training, run_id=experiment_id)
+        # network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
+        #                            run_id=experiment_id)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
