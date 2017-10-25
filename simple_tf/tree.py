@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from auxillary.dag_utilities import Dag
+from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, GradientType
 from simple_tf.node import Node
 
@@ -32,10 +33,16 @@ class TreeNetwork:
         self.weightDecayCoeff = None
         self.probabilityThreshold = None
         self.varToNodesDict = {}
+        self.paramsDict = {}
 
     def get_parent_index(self, node_index):
         parent_index = int((node_index - 1) / self.treeDegree)
         return parent_index
+
+    def get_fixed_variable(self, name, node):
+        complete_name = self.get_variable_name(name=name, node=node)
+        cnst = tf.constant(value=self.paramsDict["{0}:0".format(complete_name)], dtype=GlobalConstants.DATA_TYPE)
+        return tf.Variable(cnst, name=complete_name)
 
     def build_network(self, network_to_copy_from):
         curr_index = 0
@@ -56,6 +63,8 @@ class TreeNetwork:
         # Probability threshold
         self.probabilityThreshold = tf.placeholder(name="probability_threshold", dtype=tf.float32)
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
+        if not GlobalConstants.USE_RANDOM_PARAMETERS:
+            self.paramsDict = UtilityFuncs.load_npz(file_name="parameters")
         for node in self.topologicalSortedNodes:
             if self.createNewVariables:
                 self.nodeBuildFuncs[node.depth](node=node, network=self)
@@ -228,28 +237,35 @@ class TreeNetwork:
                      GlobalConstants.INDICES_TENSOR: indices_list,
                      self.globalCounter: iteration, self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.probabilityThreshold: 0.15}
-        label_dicts = {k: v for k, v in self.evalDict.items() if "_label_tensor" in k}
-        zero_threshold_label_dicts = {k: v for k, v in self.evalDict.items() if "zero_threshold" in k}
-        softmax_dicts = {k: v for k, v in self.evalDict.items() if "p(n|x)" in k}
-        mask_dicts = {k: v for k, v in self.evalDict.items() if "Mask_" in k}
-        activations_dict = {k: v for k, v in self.evalDict.items() if "activation" in k}
-        indices_dict = {k: v for k, v in self.evalDict.items() if "indices" in k}
+        # label_dicts = {k: v for k, v in self.evalDict.items() if "_label_tensor" in k}
+        # zero_threshold_label_dicts = {k: v for k, v in self.evalDict.items() if "zero_threshold" in k}
+        # softmax_dicts = {k: v for k, v in self.evalDict.items() if "p(n|x)" in k}
+        # mask_dicts = {k: v for k, v in self.evalDict.items() if "Mask_" in k}
+        # activations_dict = {k: v for k, v in self.evalDict.items() if "activation" in k}
+        # indices_dict = {k: v for k, v in self.evalDict.items() if "indices" in k}
         results = sess.run([self.classificationGradients, self.regularizationGradients,
-                            self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors, label_dicts,
-                            zero_threshold_label_dicts, softmax_dicts, mask_dicts, activations_dict, indices_dict],
+                            self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors],
                            feed_dict=feed_dict)
+        # results = sess.run([self.classificationGradients, self.regularizationGradients,
+        #                     self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors, label_dicts,
+        #                     zero_threshold_label_dicts, softmax_dicts, mask_dicts, activations_dict, indices_dict],
+        #                    feed_dict=feed_dict)
         classification_grads = results[0]
         regularization_grads = results[1]
         sample_counts = results[2]
         vars_current_values = results[3]
         lr = results[4]
         is_open_indicators = results[5]
-        label_res = results[6]
-        zero_threshold_label_res = results[7]
-        softmax_dicts_res = results[8]
-        mask_dicts_res = results[9]
-        activations_dicts_res = results[10]
-        indices_dict_res = results[11]
+        # label_res = results[6]
+        # zero_threshold_label_res = results[7]
+        # softmax_dicts_res = results[8]
+        # mask_dicts_res = results[9]
+        # activations_dicts_res = results[10]
+        # indices_dict_res = results[11]
+        # params_dict = {}
+        # for var, value in zip(vars, vars_current_values):
+        #     params_dict[var.name] = value
+        # UtilityFuncs.save_npz(file_name="parameters", arr_dict=params_dict)
         if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
                     GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
             update_dict = {}
@@ -396,11 +412,11 @@ class TreeNetwork:
             for index in range(self.treeDegree):
                 child_index = node.index * self.treeDegree + 1 + index
                 branch_prob = p_n_given_x[:, index]
-                mask_vector_with_threshold = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
-                                                         name="Mask_with_threshold_{0}".format(child_index))
-                # mask_vector_with_threshold = tf.greater_equal(x=branch_prob,
-                #                                               y=self.probabilityThreshold,
-                #                                               name="Mask_with_threshold_{0}".format(child_index))
+                # mask_vector_with_threshold = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
+                #                                          name="Mask_with_threshold_{0}".format(child_index))
+                mask_vector_with_threshold = tf.greater_equal(x=branch_prob,
+                                                              y=self.probabilityThreshold,
+                                                              name="Mask_with_threshold_{0}".format(child_index))
                 mask_vector_with_threshold = tf.reshape(mask_vector_with_threshold, [-1])
                 node.evalDict[self.get_variable_name(name="Mask_{0}".format(child_index), node=node)] = mask_vector_with_threshold
                 mask_vector_without_threshold = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
