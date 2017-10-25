@@ -27,6 +27,7 @@ class Node:
             self.isOpenIndicatorTensors[pipeline] = None
             self.maskTensors[pipeline] = None
             self.activationsDict[pipeline] = {}
+            self.evalDict[pipeline] = {}
         # self.maskTensorsWithThresholdDict = {}
         # self.maskTensorsWithoutThresholdDict = {}
 

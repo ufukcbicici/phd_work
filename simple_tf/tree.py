@@ -323,25 +323,20 @@ class TreeNetwork:
         if node.isRoot:
             node.labelTensors[pipeline] = self.labelTensor
             # node.indicesTensor = self.indicesTensor
-            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
+            node.evalDict[pipeline][self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             # node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
-            node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
-            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            node.isOpenIndicatorTensors[pipeline] = tf.constant(value=1.0, dtype=tf.float32)
+            node.evalDict[pipeline][self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensors[
+                pipeline]
         else:
-            parent_non_threshold_mask = None
-            no_threshold_parent_H = None
-            no_threshold_labels = None
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
-            if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-                mask_tensor = parent_node.maskTensorsWithThresholdDict[node.index]
-                parent_non_threshold_mask = parent_node.maskTensorsWithoutThresholdDict[node.index]
-            else:
-                mask_tensor = parent_node.maskTensorsWithoutThresholdDict[node.index]
+            mask_tensor = parent_node.maskTensors[pipeline]
             sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
-            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
-            node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
-            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            node.evalDict[pipeline][self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
+            node.isOpenIndicatorTensors[pipeline] = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
+            node.evalDict[pipeline][self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensors[
+                pipeline]
             # TO PREVENT TENSORFLOW FROM CRASHING WHEN THERE ARE NO SAMPLES:
             # If the mask from the parent is completely false, convert it to true; artifically. Note this
             # is only for crash prevention. "node.isOpenIndicatorTensor" will be 0 anyways, so no parameter update will
@@ -351,38 +346,12 @@ class TreeNetwork:
                 mask_tensor = tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_tensor,
                                       lambda: tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             # Mask all inputs: F channel, H channel, activations from ancestors, labels
-            # if GlobalConstants.USE_CPU_MASKING:
-                # with tf.device("/cpu:0"):
-                #     parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-                #     parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
-                #     for k, v in parent_node.activationsDict.items():
-                #         node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-                #     node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-                #     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-                #         node.parentNonThresholdMaskVector = tf.boolean_mask(parent_non_threshold_mask, mask_tensor)
-                #         # Mask inputs for the proxy loss.
-                #         no_threshold_parent_H = tf.boolean_mask(parent_H, node.parentNonThresholdMaskVector)
-                #         no_threshold_labels = tf.boolean_mask(node.labelTensor, node.parentNonThresholdMaskVector)
-                #         node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, node.parentNonThresholdMaskVector)
-                #         node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
-                #     else:
-                #         node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-                #         node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
-            # else:
-            parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-            parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
-            for k, v in parent_node.activationsDict.items():
-                node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-            # node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-            if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-                node.parentNonThresholdMaskVector = tf.boolean_mask(parent_non_threshold_mask, mask_tensor)
-                # Mask inputs for the proxy loss.
-                no_threshold_parent_H = tf.boolean_mask(parent_H, node.parentNonThresholdMaskVector)
-                no_threshold_labels = tf.boolean_mask(node.labelTensor, node.parentNonThresholdMaskVector)
-                # node.indicesTensor = tf.boolean_mask(node.indicesTensor, node.parentNonThresholdMaskVector)
-            # node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
-            return parent_F, parent_H, no_threshold_parent_H, no_threshold_labels
+            parent_F = tf.boolean_mask(parent_node.fOpsList[pipeline][-1], mask_tensor)
+            parent_H = tf.boolean_mask(parent_node.hOpsList[pipeline][-1], mask_tensor)
+            for k, v in parent_node.activationsDict[pipeline].items():
+                node.activationsDict[pipeline][k] = tf.boolean_mask(v, mask_tensor)
+            node.labelTensors[pipeline] = tf.boolean_mask(parent_node.labelTensors[pipeline], mask_tensor)
+            return parent_F, parent_H
 
     def apply_decision(self, node):
         # child_nodes = sorted(network.dagObject.children(node=node), key=lambda child: child.index)
