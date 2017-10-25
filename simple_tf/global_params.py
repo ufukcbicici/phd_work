@@ -10,6 +10,10 @@ class GradientType(Enum):
     parallel_dnns_biased = 3
 
 
+class Pipeline(Enum):
+    thresholded = 0
+    non_thresholded = 1
+
 class GlobalConstants:
     EPOCH_COUNT = 500
     BATCH_SIZE = 1000

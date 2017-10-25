@@ -18,6 +18,7 @@ class TreeNetwork:
         self.dataTensor = data
         self.labelTensor = label
         self.indicesTensor = indices
+        self.variables = {}
         self.evalDict = {}
         self.finalLoss = None
         self.classificationGradients = None
@@ -318,9 +319,9 @@ class TreeNetwork:
     def get_assign_op_name(self, variable):
         return "Assign_{0}".format(variable.name[0:len(variable.name) - 2])
 
-    def mask_input_nodes(self, node):
+    def mask_input_nodes(self, node, pipeline):
         if node.isRoot:
-            node.labelTensor = self.labelTensor
+            node.labelTensors[pipeline] = self.labelTensor
             # node.indicesTensor = self.indicesTensor
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             # node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
