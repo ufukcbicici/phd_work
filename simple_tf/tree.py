@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from auxillary.dag_utilities import Dag
 from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants, GradientType
+from simple_tf.global_params import GlobalConstants, GradientType, Pipeline
 from simple_tf.node import Node
 
 
@@ -308,17 +308,21 @@ class TreeNetwork:
             raise NotImplementedError()
         return sample_counts, lr, is_open_indicators
 
+    # OK
     def get_variable_name(self, name, node):
         return "Node{0}_{1}".format(node.index, name)
 
+    # OK
     def get_node_from_variable_name(self, name):
         node_index_str = name[4:name.find("_")]
         node_index = int(node_index_str)
         return self.nodes[node_index]
 
+    # OK
     def get_assign_op_name(self, variable):
         return "Assign_{0}".format(variable.name[0:len(variable.name) - 2])
 
+    # OK
     def mask_input_nodes(self, node, pipeline):
         if node.isRoot:
             node.labelTensors[pipeline] = self.labelTensor
@@ -353,7 +357,31 @@ class TreeNetwork:
             node.labelTensors[pipeline] = tf.boolean_mask(parent_node.labelTensors[pipeline], mask_tensor)
             return parent_F, parent_H
 
-    def apply_decision(self, node):
+    # OK
+    def apply_decision(self, node, pipeline):
+        if pipeline == Pipeline.non_thresholded:
+            arg_max_indices = tf.argmax(input=node.branchingProbs[pipeline], axis=1)
+            for index in range(self.treeDegree):
+                child_index = node.index * self.treeDegree + 1 + index
+                mask_vector = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
+                                       name="Mask_{0}_no_threshold".format(child_index, pipeline))
+                mask_vector = tf.reshape(mask_vector, [-1])
+                if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
+                    # Zero-out the mask if this node is not open;
+                    # since we only use the mask vector to avoid Tensorflow crash in this case.
+                    node.maskTensors[pipeline][child_index] = \
+                        tf.cond(node.isOpenIndicatorTensors[pipeline] > 0.0, lambda: mask_vector,
+                                lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool), y=mask_vector))
+                else:
+                    node.maskTensors[pipeline][child_index] = mask_vector
+        else:
+            branch_probs = node.branchingProbs[pipeline]
+            for index in range(self.treeDegree):
+                child_index = node.index * self.treeDegree + 1 + index
+                branch_prob = branch_probs[:, index]
+
+
+
         # child_nodes = sorted(network.dagObject.children(node=node), key=lambda child: child.index)
         if not GlobalConstants.USE_PROBABILITY_THRESHOLD:
             arg_max_indices = tf.argmax(input=node.activationsDict[node.index], axis=1)

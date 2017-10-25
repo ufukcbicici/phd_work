@@ -1,5 +1,5 @@
 import tensorflow as tf
-from simple_tf.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants, Pipeline
 from simple_tf.global_params import GradientType
 
 
@@ -34,13 +34,16 @@ def root_func(node, network, variables=None):
     conv = tf.nn.conv2d(network.dataTensor, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
     relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
     pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    node.fOpsList.extend([conv, relu, pool])
+    node.fOpsList[Pipeline.non_thresholded].extend([conv, relu, pool])
     # H
     flat_data = tf.contrib.layers.flatten(network.dataTensor)
-    node.hOpsList.extend([flat_data])
+    node.hOpsList[Pipeline.non_thresholded].extend([flat_data])
     # Decisions
-    node.activationsDict[node.index] = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
-    network.apply_decision(node=node)
+    activations = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
+    node.activationsDict[Pipeline.non_thresholded][node.index] = activations
+    node.branchingProbs[Pipeline.non_thresholded] = tf.nn.softmax(activations)
+    node.evalDict[Pipeline.non_thresholded]["branch_probs"] = node.branchingProbs[Pipeline.non_thresholded]
+    network.apply_decision_without_threshold(node=node)
 
 
 def l1_func(node, network, variables=None):

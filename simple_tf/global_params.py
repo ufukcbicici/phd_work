@@ -14,6 +14,7 @@ class Pipeline(Enum):
     thresholded = 0
     non_thresholded = 1
 
+
 class GlobalConstants:
     EPOCH_COUNT = 500
     BATCH_SIZE = 1000

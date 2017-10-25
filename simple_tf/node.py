@@ -17,6 +17,7 @@ class Node:
         self.maskTensors = {}
         self.evalDict = {}
         self.activationsDict = {}
+        self.branchingProbs = {}
         self.proxyLossInputDicts = {}
         for pipeline in {Pipeline.thresholded, Pipeline.non_thresholded}:
             self.fOpsList[pipeline] = []
@@ -27,6 +28,7 @@ class Node:
             self.isOpenIndicatorTensors[pipeline] = None
             self.maskTensors[pipeline] = None
             self.activationsDict[pipeline] = {}
+            self.branchingProbs[pipeline] = None
             self.evalDict[pipeline] = {}
         # self.maskTensorsWithThresholdDict = {}
         # self.maskTensorsWithoutThresholdDict = {}
