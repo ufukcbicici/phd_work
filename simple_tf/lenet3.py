@@ -68,7 +68,7 @@ def l1_func(node, network, variables=None):
                                     name=network.get_variable_name(name="hyperplane_biases", node=node))
     node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
     # Operations
-    parent_F, parent_H, no_threshold_parent_H, no_threshold_labels = network.mask_input_nodes(node=node)
+    parent_F, parent_H  = network.mask_input_nodes(node=node)
     # F
     conv = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
     relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
@@ -82,8 +82,6 @@ def l1_func(node, network, variables=None):
     h_concat = tf.concat(values=concat_list, axis=1)
     node.activationsDict[node.index] = tf.matmul(h_concat, hyperplane_weights) + hyperplane_biases
     network.apply_decision(node=node)
-    if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-        node.evalDict[network.get_variable_name(name="zero_threshold_labels", node=node)] = no_threshold_labels
 
 
 def leaf_func(node, network, variables=None):
@@ -110,7 +108,7 @@ def leaf_func(node, network, variables=None):
     node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2}
     # Operations
     # Mask inputs
-    parent_F, parent_H, no_threshold_parent_H, no_threshold_labels = network.mask_input_nodes(node=node)
+    parent_F, parent_H = network.mask_input_nodes(node=node)
     # Loss
     flattened = tf.contrib.layers.flatten(parent_F)
     hidden_layer = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
@@ -125,5 +123,3 @@ def leaf_func(node, network, variables=None):
     # Evaluation
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
-    if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-        node.evalDict[network.get_variable_name(name="zero_threshold_labels", node=node)] = no_threshold_labels

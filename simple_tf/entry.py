@@ -176,7 +176,7 @@ def main():
 #         print("X")
 
 
-main()
+# main()
 # experiment()
 
 # conv1_weights = tf.Variable(
@@ -214,7 +214,17 @@ main()
 #     total_param_count += np.prod(v.get_shape().as_list())
 # print("X")
 
-
+# flag = tf.placeholder(dtype=tf.int64, name="flag")
+# x = tf.Variable(tf.constant(0.5, shape=[10], dtype=tf.float32))
+# y = tf.Variable(tf.constant(1.5, shape=[10], dtype=tf.float32))
+# where = tf.where(flag > 0, x, y)
+#
+#
+# sess = tf.Session()
+# init = tf.global_variables_initializer()
+# sess.run(init)
+# res = sess.run([where], feed_dict={flag: -1})
+# print("X")
 # fc_weights_2 = tf.Variable(
 #     tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
 #                         stddev=0.1,

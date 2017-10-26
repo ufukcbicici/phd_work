@@ -32,6 +32,7 @@ class TreeNetwork:
         self.globalCounter = None
         self.weightDecayCoeff = None
         self.probabilityThreshold = None
+        self.useThresholding = None
         self.varToNodesDict = {}
         self.paramsDict = {}
 
@@ -61,6 +62,7 @@ class TreeNetwork:
                 curr_index += 1
         # Build symbolic networks
         # Probability threshold
+        self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
         self.probabilityThreshold = tf.placeholder(name="probability_threshold", dtype=tf.float32)
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -103,7 +105,6 @@ class TreeNetwork:
         # Weight decays
         self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
         vars = tf.trainable_variables()
-        # l2_loss_list = [0.0 * tf.nn.l2_loss(v) if "bias" in v.name else GlobalConstants.WEIGHT_DECAY_COEFFICIENT * tf.nn.l2_loss(v) for v in vars]
         l2_loss_list = []
         for v in vars:
             if "bias" in v.name:
@@ -321,22 +322,13 @@ class TreeNetwork:
     def mask_input_nodes(self, node):
         if node.isRoot:
             node.labelTensor = self.labelTensor
-            # node.indicesTensor = self.indicesTensor
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
-            # node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
         else:
-            parent_non_threshold_mask = None
-            no_threshold_parent_H = None
-            no_threshold_labels = None
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
-            if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-                mask_tensor = parent_node.maskTensorsWithThresholdDict[node.index]
-                parent_non_threshold_mask = parent_node.maskTensorsWithoutThresholdDict[node.index]
-            else:
-                mask_tensor = parent_node.maskTensorsWithoutThresholdDict[node.index]
+            mask_tensor = parent_node.maskTensors[node.index]
             sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
             node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
@@ -347,98 +339,36 @@ class TreeNetwork:
             # be made for that node. Moreover, when applying decision, we will look control "node.isOpenIndicatorTensor"
             # and set the produced mask vectors to competely false, to propagate the emptyness.
             if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
-                mask_tensor = tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_tensor,
-                                      lambda: tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
+                mask_tensor = tf.where(node.isOpenIndicatorTensor > 0.0, x=mask_tensor,
+                                       y=tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             # Mask all inputs: F channel, H channel, activations from ancestors, labels
-            # if GlobalConstants.USE_CPU_MASKING:
-                # with tf.device("/cpu:0"):
-                #     parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-                #     parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
-                #     for k, v in parent_node.activationsDict.items():
-                #         node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-                #     node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-                #     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-                #         node.parentNonThresholdMaskVector = tf.boolean_mask(parent_non_threshold_mask, mask_tensor)
-                #         # Mask inputs for the proxy loss.
-                #         no_threshold_parent_H = tf.boolean_mask(parent_H, node.parentNonThresholdMaskVector)
-                #         no_threshold_labels = tf.boolean_mask(node.labelTensor, node.parentNonThresholdMaskVector)
-                #         node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, node.parentNonThresholdMaskVector)
-                #         node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
-                #     else:
-                #         node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-                #         node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
-            # else:
             parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
             parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
             for k, v in parent_node.activationsDict.items():
                 node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
             node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-            # node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-            if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-                node.parentNonThresholdMaskVector = tf.boolean_mask(parent_non_threshold_mask, mask_tensor)
-                # Mask inputs for the proxy loss.
-                no_threshold_parent_H = tf.boolean_mask(parent_H, node.parentNonThresholdMaskVector)
-                no_threshold_labels = tf.boolean_mask(node.labelTensor, node.parentNonThresholdMaskVector)
-                # node.indicesTensor = tf.boolean_mask(node.indicesTensor, node.parentNonThresholdMaskVector)
-            # node.evalDict[self.get_variable_name(name="indices", node=node)] = node.indicesTensor
-            return parent_F, parent_H, no_threshold_parent_H, no_threshold_labels
+            return parent_F, parent_H
 
     def apply_decision(self, node):
-        # child_nodes = sorted(network.dagObject.children(node=node), key=lambda child: child.index)
-        if not GlobalConstants.USE_PROBABILITY_THRESHOLD:
-            arg_max_indices = tf.argmax(input=node.activationsDict[node.index], axis=1)
-            node.maskTensorsWithoutThresholdDict = {}
-            for index in range(self.treeDegree):
-                child_index = node.index * self.treeDegree + 1 + index
-                mask_vector = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
-                                       name="Mask_{0}".format(child_index))
-                mask_vector = tf.reshape(mask_vector, [-1])
-                if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
-                    # Zero-out the mask if this node is not open;
-                    # since we only use the mask vector to avoid Tensorflow crash in this case.
-                    node.maskTensorsWithoutThresholdDict[child_index] = \
-                        tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector,
-                                lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool), y=mask_vector))
-                else:
-                    node.maskTensorsWithoutThresholdDict[child_index] = mask_vector
-        else:
-            p_n_given_x = tf.nn.softmax(node.activationsDict[node.index])
-            # Threshold 0 decisions
-            arg_max_indices = tf.argmax(p_n_given_x, axis=1)
-            node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
-            # Decisions with threshold
-            node.maskTensorsWithThresholdDict = {}
-            node.maskTensorsWithoutThresholdDict = {}
-            for index in range(self.treeDegree):
-                child_index = node.index * self.treeDegree + 1 + index
-                branch_prob = p_n_given_x[:, index]
-                # mask_vector_with_threshold = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
-                #                                          name="Mask_with_threshold_{0}".format(child_index))
-                mask_vector_with_threshold = tf.greater_equal(x=branch_prob,
-                                                              y=self.probabilityThreshold,
-                                                              name="Mask_with_threshold_{0}".format(child_index))
-                mask_vector_with_threshold = tf.reshape(mask_vector_with_threshold, [-1])
-                node.evalDict[self.get_variable_name(name="Mask_{0}".format(child_index), node=node)] = mask_vector_with_threshold
-                mask_vector_without_threshold = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
-                                                         name="Mask_{0}".format(child_index))
-                mask_vector_without_threshold = tf.reshape(mask_vector_without_threshold, [-1])
-                if not node.isRoot:
-                    mask_vector_without_threshold = tf.logical_and(mask_vector_without_threshold,
-                                                                   node.parentNonThresholdMaskVector)
-                if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
-                    # Zero-out the mask if this node is not open;
-                    # since we only use the mask vector to avoid Tensorflow crash in this case.
-                    node.maskTensorsWithThresholdDict[child_index] = \
-                        tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector_with_threshold,
-                                lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool),
-                                                       y=mask_vector_with_threshold))
-                    node.mask_vector_without_threshold[child_index] = \
-                        tf.cond(node.isOpenIndicatorTensor > 0.0, lambda: mask_vector_without_threshold,
-                                lambda: tf.logical_and(x=tf.constant(value=False, dtype=tf.bool),
-                                                       y=mask_vector_without_threshold))
-                else:
-                    node.maskTensorsWithThresholdDict[child_index] = mask_vector_with_threshold
-                    node.maskTensorsWithoutThresholdDict[child_index] = mask_vector_without_threshold
+        p_n_given_x = tf.nn.softmax(node.activationsDict[node.index])
+        node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
+        arg_max_indices = tf.argmax(p_n_given_x, axis=1)
+        for index in range(self.treeDegree):
+            child_index = node.index * self.treeDegree + 1 + index
+            branch_prob = p_n_given_x[:, index]
+            mask_with_threshold = tf.reshape(tf.greater_equal(x=branch_prob, y=self.probabilityThreshold,
+                                                              name="Mask_with_threshold_{0}".format(child_index)), [-1])
+            mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
+                                                         name="Mask_without_threshold_{0}".format(child_index)), [-1])
+            mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            if GlobalConstants.USE_EMPTY_NODE_CRASH_PREVENTION:
+                # Zero-out the mask if this node is not open;
+                # since we only use the mask vector to avoid Tensorflow crash in this case.
+                node.maskTensors[child_index] = tf.where(node.isOpenIndicatorTensor > 0.0, x=mask_tensor,
+                                                         y=tf.logical_and(
+                                                             x=tf.constant(value=False, dtype=tf.bool), y=mask_tensor))
+            else:
+                node.maskTensors[child_index] = mask_tensor
 
     def apply_loss(self, node, logits):
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,

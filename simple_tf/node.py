@@ -11,8 +11,7 @@ class Node:
         self.labelTensor = None
         self.indicesTensor = None
         self.isOpenIndicatorTensor = None
-        self.maskTensorsWithThresholdDict = {}
-        self.maskTensorsWithoutThresholdDict = {}
+        self.maskTensors = {}
         self.evalDict = {}
         self.parentNonThresholdMaskVector = None
         # Indexed by the nodes producing them
