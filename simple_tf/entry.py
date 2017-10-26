@@ -176,7 +176,7 @@ def main():
 #         print("X")
 
 
-# main()
+main()
 # experiment()
 
 # conv1_weights = tf.Variable(

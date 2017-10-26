@@ -68,7 +68,7 @@ def l1_func(node, network, variables=None):
                                     name=network.get_variable_name(name="hyperplane_biases", node=node))
     node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
     # Operations
-    parent_F, parent_H  = network.mask_input_nodes(node=node)
+    parent_F, parent_H = network.mask_input_nodes(node=node)
     # F
     conv = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
     relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))

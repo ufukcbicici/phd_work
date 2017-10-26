@@ -88,9 +88,7 @@ class TreeNetwork:
             for k, v in node.activationsDict.items():
                 self.evalDict["Node{0}_activation_from_{1}".format(node.index, k)] = v
             # Decision masks
-            for k, v in node.maskTensorsWithThresholdDict.items():
-                self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
-            for k, v in node.maskTensorsWithoutThresholdDict.items():
+            for k, v in node.maskTensors.items():
                 self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
             # Evaluation outputs
             for k, v in node.evalDict.items():
@@ -237,15 +235,15 @@ class TreeNetwork:
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
                      GlobalConstants.INDICES_TENSOR: indices_list,
                      self.globalCounter: iteration, self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-                     self.probabilityThreshold: 0.15}
-        # label_dicts = {k: v for k, v in self.evalDict.items() if "_label_tensor" in k}
+                     self.probabilityThreshold: 0.15, self.useThresholding: 0}
+        label_dicts = {k: v for k, v in self.evalDict.items() if "_label_tensor" in k}
         # zero_threshold_label_dicts = {k: v for k, v in self.evalDict.items() if "zero_threshold" in k}
         # softmax_dicts = {k: v for k, v in self.evalDict.items() if "p(n|x)" in k}
         # mask_dicts = {k: v for k, v in self.evalDict.items() if "Mask_" in k}
         # activations_dict = {k: v for k, v in self.evalDict.items() if "activation" in k}
         # indices_dict = {k: v for k, v in self.evalDict.items() if "indices" in k}
         results = sess.run([self.classificationGradients, self.regularizationGradients,
-                            self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors],
+                            self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors, label_dicts],
                            feed_dict=feed_dict)
         # results = sess.run([self.classificationGradients, self.regularizationGradients,
         #                     self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors, label_dicts,
@@ -391,7 +389,7 @@ class TreeNetwork:
         samples, labels, indices_list = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
-                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT}
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT, self.useThresholding: 0}
         results = sess.run(self.evalDict, feed_dict)
         # else:
         #     samples, labels, indices_list = dataset.get_next_batch(batch_size=EVAL_BATCH_SIZE)
