@@ -31,7 +31,7 @@ class GlobalConstants:
     USE_CPU = False
     USE_CPU_MASKING = False
     USE_EMPTY_NODE_CRASH_PREVENTION = False
-    USE_RANDOM_PARAMETERS = True
+    USE_RANDOM_PARAMETERS = False
     USE_PROBABILITY_THRESHOLD = True
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
