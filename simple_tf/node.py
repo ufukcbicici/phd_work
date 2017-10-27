@@ -8,7 +8,9 @@ class Node:
         self.fOpsList = []
         self.hOpsList = []
         self.lossList = []
+        self.infoGainLoss = None
         self.labelTensor = None
+        self.oneHotLabelTensor = None
         self.indicesTensor = None
         self.isOpenIndicatorTensor = None
         self.maskTensors = {}

@@ -45,6 +45,8 @@ def get_explanation_string():
     explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
     explanation += "Param Count:{0}\n".format(total_param_count)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
+    explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         explanation += "Prob Threshold Initial Value:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.value)
         explanation += "Prob Threshold Decay Step:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decayPeriod)
@@ -61,13 +63,12 @@ def get_explanation_string():
     #                total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     return explanation
 
+
 def main():
     # Build the network
     network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
                           node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
-                          create_new_variables=True,
-                          data=GlobalConstants.TRAIN_DATA_TENSOR, label=GlobalConstants.TRAIN_LABEL_TENSOR,
-                          indices=GlobalConstants.INDICES_TENSOR)
+                          create_new_variables=True)
     network.build_network(network_to_copy_from=None)
     # Do the training
     if GlobalConstants.USE_CPU:

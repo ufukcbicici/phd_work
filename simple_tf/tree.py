@@ -3,11 +3,12 @@ import numpy as np
 from auxillary.dag_utilities import Dag
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, GradientType
+from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
 
 
 class TreeNetwork:
-    def __init__(self, tree_degree, node_build_funcs, create_new_variables, data, label, indices):
+    def __init__(self, tree_degree, node_build_funcs, create_new_variables):
         self.treeDegree = tree_degree
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
@@ -15,9 +16,10 @@ class TreeNetwork:
         self.nodes = {}
         self.topologicalSortedNodes = []
         self.createNewVariables = create_new_variables
-        self.dataTensor = data
-        self.labelTensor = label
-        self.indicesTensor = indices
+        self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
+        self.labelTensor = GlobalConstants.TRAIN_LABEL_TENSOR
+        self.oneHotLabelTensor = GlobalConstants.TRAIN_ONE_HOT_LABELS
+        # self.indicesTensor = indices
         self.evalDict = {}
         self.finalLoss = None
         self.classificationGradients = None
@@ -96,10 +98,14 @@ class TreeNetwork:
             # Label outputs
             if node.labelTensor is not None:
                 self.evalDict["Node{0}_label_tensor".format(node.index)] = node.labelTensor
-        # Prepare losses
-        all_network_losses = []
+            # One Hot Label outputs
+            if node.oneHotLabelTensor is not None:
+                self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
+        # Prepare the cost function
+        # Main losses
+        primary_losses = []
         for node in self.topologicalSortedNodes:
-            all_network_losses.extend(node.lossList)
+            primary_losses.extend(node.lossList)
         # Weight decays
         self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
         vars = tf.trainable_variables()
@@ -110,16 +116,26 @@ class TreeNetwork:
             else:
                 l2_loss_list.append(self.weightDecayCoeff * tf.nn.l2_loss(v))
         # weights_and_filters = [v for v in vars if "bias" not in v.name]
+        # Proxy, decision losses
+        decision_losses = []
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            decision_losses.append(node.infoGainLoss)
         regularizer_loss = tf.add_n(l2_loss_list)
-        actual_loss = tf.add_n(all_network_losses)
-        self.finalLoss = actual_loss + regularizer_loss
+        actual_loss = tf.add_n(primary_losses)
+        decision_loss = GlobalConstants.DECISION_LOSS_COEFFICIENT * tf.add_n(decision_losses)
+        self.finalLoss = actual_loss + regularizer_loss + decision_loss
         self.evalDict["RegularizerLoss"] = regularizer_loss
         self.evalDict["ActualLoss"] = actual_loss
+        self.evalDict["DecisionLoss"] = decision_loss
         self.evalDict["NetworkLoss"] = self.finalLoss
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.classificationGradients = tf.gradients(ys=actual_loss, xs=vars)
         self.regularizationGradients = tf.gradients(ys=regularizer_loss, xs=vars)
+        H_vars = [v for v in vars if "hyperplane" in v.name]
+        self.decisionLossGradients = tf.gradients(ys=decision_loss, xs=H_vars)
         # Assign ops for variables
         for var in vars:
             op_name = self.get_assign_op_name(variable=var)
@@ -148,11 +164,16 @@ class TreeNetwork:
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
+        info_gain_dict = {}
         while True:
             results = self.eval_network(sess=sess, dataset=dataset)
             batch_sample_count = 0.0
             for node in self.topologicalSortedNodes:
                 if not node.isLeaf:
+                    info_gain = results[self.get_variable_name(name="info_gain", node=node)]
+                    if node.index not in info_gain_dict:
+                        info_gain_dict[node.index] = []
+                    info_gain_dict[node.index].append(np.asscalar(info_gain))
                     continue
                 if results[self.get_variable_name(name="is_open", node=node)] == 0.0:
                     continue
@@ -175,6 +196,10 @@ class TreeNetwork:
             if dataset.isNewEpoch:
                 break
         print("****************Dataset:{0}****************".format(dataset_type))
+        # Measure Information Gain
+        for k, v in info_gain_dict.items():
+            avg_info_gain = sum(v) / float(len(v))
+            print("{0}={1}".format(k, avg_info_gain))
         # Measure Accuracy
         overall_count = 0.0
         overall_correct = 0.0
@@ -229,26 +254,54 @@ class TreeNetwork:
         return overall_correct / overall_count, confusion_matrix_db_rows
 
     def update_params_with_momentum(self, sess, dataset, iteration):
-        samples, labels, indices_list, _ = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         vars = tf.trainable_variables()
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         prob_threshold = (1.0 / float(GlobalConstants.TREE_DEGREE)) - GlobalConstants.PROBABILITY_THRESHOLD.value
         print("prob_threshold={0}".format(prob_threshold))
-        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
-                     GlobalConstants.INDICES_TENSOR: indices_list,
-                     self.globalCounter: iteration, self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-                     self.probabilityThreshold: prob_threshold, self.useThresholding: use_threshold}
-        results = sess.run([self.classificationGradients, self.regularizationGradients,
-                            self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors],
-                           feed_dict=feed_dict)
+        # info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
+        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
+                     GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+                     GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
+                     self.globalCounter: iteration,
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                     self.probabilityThreshold: prob_threshold,
+                     self.useThresholding: use_threshold}
+        results_threshold = sess.run(
+            [self.classificationGradients,
+             self.regularizationGradients,
+             self.sample_count_tensors,
+             vars,
+             self.learningRate,
+             self.isOpenTensors], feed_dict=feed_dict)
+        # Only calculate the derivatives for information gain losses
+        if GlobalConstants.USE_INFO_GAIN_DECISION:
+            info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
+            feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
+                         GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+                         GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
+                         self.globalCounter: iteration,
+                         self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                         self.probabilityThreshold: prob_threshold,
+                         self.useThresholding: 0}
+            results_no_threshold = sess.run(
+                [self.decisionLossGradients,
+                 self.sample_count_tensors,
+                 self.isOpenTensors,
+                 info_gain_dicts], feed_dict=feed_dict)
+            decision_grads = results_no_threshold[0]
+            sample_counts_no_threshold = results_no_threshold[1]
+            is_open_indicators_no_threshold = results_no_threshold[2]
+            info_gain_results = results_no_threshold[3]
         GlobalConstants.PROBABILITY_THRESHOLD.update(iteration=iteration)
-        classification_grads = results[0]
-        regularization_grads = results[1]
-        sample_counts = results[2]
-        vars_current_values = results[3]
-        lr = results[4]
-        is_open_indicators = results[5]
+        classification_grads = results_threshold[0]
+        regularization_grads = results_threshold[1]
+        sample_counts_threshold = results_threshold[2]
+        vars_current_values = results_threshold[3]
+        lr = results_threshold[4]
+        is_open_indicators_threshold = results_threshold[5]
+        # info_gain_results = results[6]
         # UtilityFuncs.save_npz(file_name="parameters", arr_dict=params_dict)
         if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
                     GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
@@ -256,7 +309,7 @@ class TreeNetwork:
             assign_dict = {}
             for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
                 node = self.varToNodesDict[v.name]
-                is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
+                is_node_open = is_open_indicators_threshold[self.get_variable_name(name="is_open", node=node)]
                 if not is_node_open:
                     # print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
                     continue
@@ -272,13 +325,13 @@ class TreeNetwork:
             assign_dict = {}
             for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
                 node = self.varToNodesDict[v.name]
-                is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
+                is_node_open = is_open_indicators_threshold[self.get_variable_name(name="is_open", node=node)]
                 if not is_node_open:
                     # print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
                     continue
                 self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
                 sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
-                sample_count = sample_counts[sample_count_entry_name]
+                sample_count = sample_counts_threshold[sample_count_entry_name]
                 gradient_modifier = float(GlobalConstants.BATCH_SIZE) / float(sample_count)
                 modified_g = gradient_modifier * g
                 self.momentumStatesDict[v.name][:] += -lr * (modified_g + r)
@@ -289,7 +342,7 @@ class TreeNetwork:
             sess.run(assign_dict, feed_dict=update_dict)
         else:
             raise NotImplementedError()
-        return sample_counts, lr, is_open_indicators
+        return sample_counts_threshold, lr, is_open_indicators_threshold
 
     def get_variable_name(self, name, node):
         return "Node{0}_{1}".format(node.index, name)
@@ -305,6 +358,7 @@ class TreeNetwork:
     def mask_input_nodes(self, node):
         if node.isRoot:
             node.labelTensor = self.labelTensor
+            node.oneHotLabelTensor = self.oneHotLabelTensor
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
@@ -330,10 +384,14 @@ class TreeNetwork:
             for k, v in parent_node.activationsDict.items():
                 node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
             node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
             return parent_F, parent_H
 
     def apply_decision(self, node):
         p_n_given_x = tf.nn.softmax(node.activationsDict[node.index])
+        p_c_given_x = node.oneHotLabelTensor
+        node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x)
+        node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
         arg_max_indices = tf.argmax(p_n_given_x, axis=1)
         for index in range(self.treeDegree):
@@ -371,11 +429,15 @@ class TreeNetwork:
 
     def eval_network(self, sess, dataset):
         # if is_train:
-        samples, labels, indices_list, _ = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
-        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
-                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT, self.probabilityThreshold: 0.0,
-                     self.useThresholding: 0}
+        feed_dict = {
+            GlobalConstants.TRAIN_DATA_TENSOR: samples,
+            GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+            GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
+            self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+            self.probabilityThreshold: 0.0,
+            self.useThresholding: 0}
         results = sess.run(self.evalDict, feed_dict)
         # else:
         #     samples, labels, indices_list = dataset.get_next_batch(batch_size=EVAL_BATCH_SIZE)
