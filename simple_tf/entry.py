@@ -28,9 +28,9 @@ import simple_tf.lenet3 as lenet3
 import simple_tf.baseline as baseline
 
 
-tf.set_random_seed(1234)
-np_seed = 88
-np.random.seed(np_seed)
+# tf.set_random_seed(1234)
+# np_seed = 88
+# np.random.seed(np_seed)
 
 
 def main():
@@ -74,10 +74,6 @@ def main():
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
-        # First loss
-        # network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training, run_id=experiment_id)
-        # network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
-        #                            run_id=experiment_id)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -132,113 +128,4 @@ def main():
         print("X")
         run_id += 1
 
-# def experiment():
-#     sess = tf.Session()
-#     dataset = MnistDataSet(validation_sample_count=10000)
-#     conv_weights = tf.Variable(tf.truncated_normal([5, 5, NUM_CHANNELS, NO_FILTERS_1], stddev=0.1, seed=SEED,
-#                                                    dtype=DATA_TYPE), name="conv_weight")
-#     conv_biases = tf.Variable(tf.constant(0.1, shape=[NO_FILTERS_1], dtype=DATA_TYPE), name="conv_bias")
-#     hyperplane_weights = tf.Variable(tf.constant(value=0.1, shape=[IMAGE_SIZE * IMAGE_SIZE, TREE_DEGREE]),
-#                                      name="hyperplane_weights")
-#     hyperplane_biases = tf.Variable(tf.constant(0.1, shape=[TREE_DEGREE], dtype=DATA_TYPE), name="hyperplane_biases")
-#     conv = tf.nn.conv2d(TRAIN_DATA_TENSOR, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-#     relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
-#     pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-#     flat_data = tf.contrib.layers.flatten(TRAIN_DATA_TENSOR)
-#     activations = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
-#     arg_max_indices = tf.argmax(input=activations, axis=1)
-#     maskTensorsDict = {}
-#     outputsDict = {}
-#     sumDict = {}
-#     secondMasks = {}
-#     secondMaskOutput = {}
-#     activationsDict = {}
-#     for index in range(TREE_DEGREE):
-#         mask_vector = tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64), name="Mask_{0}".format(index))
-#         maskTensorsDict[index] = mask_vector
-#         outputsDict[index] = tf.boolean_mask(pool, mask_vector)
-#         activationsDict[index] = tf.boolean_mask(activations, mask_vector)
-#         flattened = tf.contrib.layers.flatten(outputsDict[index])
-#         sum_vec = tf.reduce_sum(flattened, axis=1)
-#         sumDict[index] = sum_vec
-#         second_mask = tf.greater_equal(x=sum_vec, y=tf.constant(550.0, tf.float32))
-#         secondMasks[index] = second_mask
-#         secondMaskOutput[index] = tf.boolean_mask(activationsDict[index], second_mask)
-#     init = tf.global_variables_initializer()
-#     sess.run(init)
-#     samples, labels, indices_list = dataset.get_next_batch(batch_size=BATCH_SIZE)
-#     samples = np.expand_dims(samples, axis=3)
-#     for run_id in range(100):
-#         feed_dict = {TRAIN_DATA_TENSOR: samples, TRAIN_LABEL_TENSOR: labels}
-#         results = sess.run([maskTensorsDict, outputsDict, activationsDict, arg_max_indices, sumDict, secondMaskOutput,
-#                             secondMasks],
-#                            feed_dict=feed_dict)
-#         print("X")
-
-
 main()
-# experiment()
-
-# conv1_weights = tf.Variable(
-#             tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_FILTERS_1], stddev=0.1,
-#                                 seed=GlobalConstants.SEED,
-#                                 dtype=GlobalConstants.DATA_TYPE), name="conv1_weight")
-# conv1_biases = tf.Variable(
-#     tf.constant(0.1, shape=[GlobalConstants.NO_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
-#     name="conv1_bias")
-# conv2_weights = tf.Variable(
-#     tf.truncated_normal([5, 5, GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2], stddev=0.1,
-#                         seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-#     name="conv2_weight")
-# conv2_biases = tf.Variable(
-#     tf.constant(0.1, shape=[GlobalConstants.NO_FILTERS_2], dtype=GlobalConstants.DATA_TYPE),
-#     name="conv2_bias")
-# fc_weights_1 = tf.Variable(tf.truncated_normal(
-#     [GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.NO_FILTERS_2,
-#      GlobalConstants.NO_HIDDEN],
-#     stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-#                            name="fc_weights_1")
-# fc_biases_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_HIDDEN], dtype=GlobalConstants.DATA_TYPE),
-#                           name="fc_biases_1")
-# fc_weights_2 = tf.Variable(
-#     tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
-#                         stddev=0.1,
-#                         seed=GlobalConstants.SEED,
-#                         dtype=GlobalConstants.DATA_TYPE),
-#     name="fc_weights_2")
-# fc_biases_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
-#                           name="fc_biases_2")
-# vars = tf.trainable_variables()
-# total_param_count = 0
-# for v in vars:
-#     total_param_count += np.prod(v.get_shape().as_list())
-# print("X")
-
-# flag = tf.placeholder(dtype=tf.int64, name="flag")
-# x = tf.Variable(tf.constant(0.5, shape=[10], dtype=tf.float32))
-# y = tf.Variable(tf.constant(1.5, shape=[10], dtype=tf.float32))
-# where = tf.where(flag > 0, x, y)
-#
-#
-# sess = tf.Session()
-# init = tf.global_variables_initializer()
-# sess.run(init)
-# res = sess.run([where], feed_dict={flag: -1})
-# print("X")
-# fc_weights_2 = tf.Variable(
-#     tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
-#                         stddev=0.1,
-#                         seed=GlobalConstants.SEED,
-#                         dtype=GlobalConstants.DATA_TYPE),
-#     name="fc_weights_2")
-#
-#
-# config = tf.ConfigProto(device_count={'GPU': 0})
-# sess = tf.Session(config=config)
-# # Init
-# init = tf.global_variables_initializer()
-# sess.run(init)
-#
-# sliced = fc_weights_2[:, 2]
-# res = sess.run([fc_weights_2, sliced])
-# print("X")

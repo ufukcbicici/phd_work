@@ -236,34 +236,16 @@ class TreeNetwork:
                      GlobalConstants.INDICES_TENSOR: indices_list,
                      self.globalCounter: iteration, self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.probabilityThreshold: 0.15, self.useThresholding: 0}
-        # label_dicts = {k: v for k, v in self.evalDict.items() if "_label_tensor" in k}
-        # zero_threshold_label_dicts = {k: v for k, v in self.evalDict.items() if "zero_threshold" in k}
-        # softmax_dicts = {k: v for k, v in self.evalDict.items() if "p(n|x)" in k}
-        # mask_dicts = {k: v for k, v in self.evalDict.items() if "Mask_" in k}
-        # activations_dict = {k: v for k, v in self.evalDict.items() if "activation" in k}
-        # indices_dict = {k: v for k, v in self.evalDict.items() if "indices" in k}
         results = sess.run([self.classificationGradients, self.regularizationGradients,
                             self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors],
                            feed_dict=feed_dict)
-        # results = sess.run([self.classificationGradients, self.regularizationGradients,
-        #                     self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors, label_dicts,
-        #                     zero_threshold_label_dicts, softmax_dicts, mask_dicts, activations_dict, indices_dict],
-        #                    feed_dict=feed_dict)
+
         classification_grads = results[0]
         regularization_grads = results[1]
         sample_counts = results[2]
         vars_current_values = results[3]
         lr = results[4]
         is_open_indicators = results[5]
-        # label_res = results[6]
-        # zero_threshold_label_res = results[7]
-        # softmax_dicts_res = results[8]
-        # mask_dicts_res = results[9]
-        # activations_dicts_res = results[10]
-        # indices_dict_res = results[11]
-        # params_dict = {}
-        # for var, value in zip(vars, vars_current_values):
-        #     params_dict[var.name] = value
         # UtilityFuncs.save_npz(file_name="parameters", arr_dict=params_dict)
         if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
                     GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
@@ -389,7 +371,7 @@ class TreeNetwork:
         samples, labels, indices_list, _ = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
-                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT, self.probabilityThreshold: 0.15,
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT, self.probabilityThreshold: 0.0,
                      self.useThresholding: 0}
         results = sess.run(self.evalDict, feed_dict)
         # else:

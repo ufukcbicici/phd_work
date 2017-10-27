@@ -2,6 +2,8 @@ from enum import Enum
 
 import tensorflow as tf
 
+from auxillary.parameters import DecayingParameter
+
 
 class GradientType(Enum):
     mixture_of_experts_unbiased = 0
@@ -26,6 +28,8 @@ class GlobalConstants:
     DECAY_RATE = 0.5
     TREE_DEGREE = 3
     MOMENTUM_DECAY = 0.9
+    PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
+                                              decay_period=1, min_limit=0.0)
     DATA_TYPE = tf.float32
     SEED = None
     USE_CPU = False
