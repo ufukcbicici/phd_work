@@ -21,7 +21,7 @@ class GlobalConstants:
     NO_HIDDEN = 30 # 30
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
-    INITIAL_LR = 0.015
+    INITIAL_LR = 0.0015
     DECAY_STEP = 5000
     DECAY_RATE = 0.5
     TREE_DEGREE = 3
@@ -35,6 +35,7 @@ class GlobalConstants:
     USE_PROBABILITY_THRESHOLD = True
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
+    INFO_GAIN_LOG_EPSILON = 1e-45
     TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
     TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(BATCH_SIZE,))
     TEST_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))

@@ -67,6 +67,8 @@ class MnistDataSet(DataSet):
                             .format(self.currentIndex, curr_end_index))
         samples = self.currentSamples[indices_list]
         labels = self.currentLabels[indices_list]
+        one_hot_labels = np.zeros(shape=(batch_size, self.get_label_count()))
+        one_hot_labels[np.arange(batch_size), labels.astype(np.int)] = 1.0
         self.currentIndex = self.currentIndex + batch_size
         if num_of_samples <= self.currentIndex:
             self.currentEpoch += 1
@@ -75,7 +77,7 @@ class MnistDataSet(DataSet):
             self.currentIndex = self.currentIndex % num_of_samples
         else:
             self.isNewEpoch = False
-        return samples, labels, indices_list.astype(np.int64)
+        return samples, labels, indices_list.astype(np.int64), one_hot_labels
 
     def reset(self):
         self.currentIndex = 0

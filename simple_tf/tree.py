@@ -229,7 +229,7 @@ class TreeNetwork:
         return overall_correct / overall_count, confusion_matrix_db_rows
 
     def update_params_with_momentum(self, sess, dataset, iteration):
-        samples, labels, indices_list = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples, labels, indices_list, _ = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         vars = tf.trainable_variables()
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
@@ -386,7 +386,7 @@ class TreeNetwork:
 
     def eval_network(self, sess, dataset):
         # if is_train:
-        samples, labels, indices_list = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples, labels, indices_list, _ = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT, self.probabilityThreshold: 0.15,
