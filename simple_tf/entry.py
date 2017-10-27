@@ -27,11 +27,39 @@ from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
 import simple_tf.baseline as baseline
 
+tf.set_random_seed(1234)
+np_seed = 88
+np.random.seed(np_seed)
 
-# tf.set_random_seed(1234)
-# np_seed = 88
-# np.random.seed(np_seed)
 
+def get_explanation_string():
+    total_param_count = 0
+    for v in tf.trainable_variables():
+        total_param_count += np.prod(v.get_shape().as_list())
+    explanation = "Tree.\n"
+    explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE)
+    explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
+    explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+    explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
+    explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
+    explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
+    explanation += "Param Count:{0}\n".format(total_param_count)
+    explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    if GlobalConstants.USE_PROBABILITY_THRESHOLD:
+        explanation += "Prob Threshold Initial Value:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.value)
+        explanation += "Prob Threshold Decay Step:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decayPeriod)
+        explanation += "Prob Threshold Decay Ratio:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decay)
+    # explanation = "Tree. Gradient Type:{0} No threshold. Tree Degree:{1} " \
+    #               "Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5} Wd:{6}".format(
+    #                 GlobalConstants.GRADIENT_TYPE, GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR,
+    #                 GlobalConstants.DECAY_STEP, GlobalConstants.DECAY_RATE, total_param_count,
+    #                 GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    # explanation = "Wd, corrected. Baseline. C1:{0} C2:{1}: FC1:{2} " \
+    #               "Initial Lr:{3} Decay Steps:{4} Decay Rate:{5} Total Param Count:{6} wd:{7}".format(
+    #                GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2, GlobalConstants.NO_HIDDEN,
+    #                GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP, GlobalConstants.DECAY_RATE,
+    #                total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    return explanation
 
 def main():
     # Build the network
@@ -58,19 +86,7 @@ def main():
         print("********************NEW RUN:{0}********************".format(run_id))
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = wd
         experiment_id = DbLogger.get_run_id()
-        total_param_count = 0
-        for v in tf.trainable_variables():
-            total_param_count += np.prod(v.get_shape().as_list())
-        explanation = "Tree. Gradient Type:{0} No threshold. Tree Degree:{1} " \
-                      "Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5} Wd:{6}".format(
-                       GlobalConstants.GRADIENT_TYPE, GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR,
-                       GlobalConstants.DECAY_STEP, GlobalConstants.DECAY_RATE, total_param_count,
-                       GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
-        # explanation = "Wd, corrected. Baseline. C1:{0} C2:{1}: FC1:{2} " \
-        #               "Initial Lr:{3} Decay Steps:{4} Decay Rate:{5} Total Param Count:{6} wd:{7}".format(
-        #                GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2, GlobalConstants.NO_HIDDEN,
-        #                GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP, GlobalConstants.DECAY_RATE,
-        #                total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+        explanation = get_explanation_string()
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
@@ -127,5 +143,6 @@ def main():
             DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=6)
         print("X")
         run_id += 1
+
 
 main()

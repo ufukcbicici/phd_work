@@ -232,14 +232,17 @@ class TreeNetwork:
         samples, labels, indices_list, _ = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         vars = tf.trainable_variables()
+        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+        prob_threshold = (1.0 / float(GlobalConstants.TREE_DEGREE)) - GlobalConstants.PROBABILITY_THRESHOLD.value
+        print("prob_threshold={0}".format(prob_threshold))
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples, GlobalConstants.TRAIN_LABEL_TENSOR: labels,
                      GlobalConstants.INDICES_TENSOR: indices_list,
                      self.globalCounter: iteration, self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-                     self.probabilityThreshold: 0.15, self.useThresholding: 0}
+                     self.probabilityThreshold: prob_threshold, self.useThresholding: use_threshold}
         results = sess.run([self.classificationGradients, self.regularizationGradients,
                             self.sample_count_tensors, vars, self.learningRate, self.isOpenTensors],
                            feed_dict=feed_dict)
-
+        GlobalConstants.PROBABILITY_THRESHOLD.update(iteration=iteration)
         classification_grads = results[0]
         regularization_grads = results[1]
         sample_counts = results[2]

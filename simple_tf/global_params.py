@@ -23,7 +23,7 @@ class GlobalConstants:
     NO_HIDDEN = 30 # 30
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
-    INITIAL_LR = 0.0015
+    INITIAL_LR = 0.015
     DECAY_STEP = 5000
     DECAY_RATE = 0.5
     TREE_DEGREE = 3
