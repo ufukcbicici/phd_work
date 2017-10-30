@@ -11,10 +11,10 @@ class InfoGainLoss:
 
     @staticmethod
     def calculate_entropy(prob_distribution):
-        log_prob = tf.log(prob_distribution)
-        is_inf = tf.is_inf(log_prob)
-        zero_tensor = tf.zeros_like(log_prob)
-        log_prob = tf.where(is_inf, x=zero_tensor, y=log_prob)
+        log_prob = tf.log(prob_distribution + GlobalConstants.INFO_GAIN_LOG_EPSILON)
+        # is_inf = tf.is_inf(log_prob)
+        # zero_tensor = tf.zeros_like(log_prob)
+        # log_prob = tf.where(is_inf, x=zero_tensor, y=log_prob)
         prob_log_prob = prob_distribution * log_prob
         entropy = -1.0 * tf.reduce_sum(prob_log_prob)
         return entropy, log_prob

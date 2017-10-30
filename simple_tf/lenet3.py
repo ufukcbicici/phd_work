@@ -56,9 +56,15 @@ def l1_func(node, network, variables=None):
                               name=network.get_variable_name(name="conv_bias",
                                                              node=node))
     if GlobalConstants.USE_RANDOM_PARAMETERS:
+        # hyperplane_weights = tf.Variable(
+        #     tf.truncated_normal(
+        #         [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE + network.treeDegree, network.treeDegree],
+        #         stddev=0.1,
+        #         seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+        #     name=network.get_variable_name(name="hyperplane_weights", node=node))
         hyperplane_weights = tf.Variable(
             tf.truncated_normal(
-                [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE + network.treeDegree, network.treeDegree],
+                [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE, network.treeDegree],
                 stddev=0.1,
                 seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="hyperplane_weights", node=node))
@@ -77,10 +83,10 @@ def l1_func(node, network, variables=None):
     # H
     node.hOpsList.extend([parent_H])
     # Decisions
-    concat_list = [parent_H]
-    concat_list.extend(node.activationsDict.values())
-    h_concat = tf.concat(values=concat_list, axis=1)
-    node.activationsDict[node.index] = tf.matmul(h_concat, hyperplane_weights) + hyperplane_biases
+    # concat_list = [parent_H]
+    # concat_list.extend(node.activationsDict.values())
+    # h_concat = tf.concat(values=concat_list, axis=1)
+    node.activationsDict[node.index] = tf.matmul(parent_H, hyperplane_weights) + hyperplane_biases
     network.apply_decision(node=node)
 
 
@@ -93,11 +99,17 @@ def leaf_func(node, network, variables=None):
             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="fc_weights_1", node=node))
         fc_weights_2 = tf.Variable(
-            tf.truncated_normal([GlobalConstants.NO_HIDDEN + 2 * network.treeDegree, GlobalConstants.NUM_LABELS],
+            tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
                                 stddev=0.1,
                                 seed=GlobalConstants.SEED,
                                 dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="fc_weights_2", node=node))
+        # fc_weights_2 = tf.Variable(
+        #     tf.truncated_normal([GlobalConstants.NO_HIDDEN + 2 * network.treeDegree, GlobalConstants.NUM_LABELS],
+        #                         stddev=0.1,
+        #                         seed=GlobalConstants.SEED,
+        #                         dtype=GlobalConstants.DATA_TYPE),
+        #     name=network.get_variable_name(name="fc_weights_2", node=node))
     else:
         fc_weights_1 = network.get_fixed_variable(name="fc_weights_1", node=node)
         fc_weights_2 = network.get_fixed_variable(name="fc_weights_2", node=node)
@@ -113,12 +125,12 @@ def leaf_func(node, network, variables=None):
     flattened = tf.contrib.layers.flatten(parent_F)
     hidden_layer = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
     # Concatenate activations from ancestors
-    concat_list = [hidden_layer]
-    concat_list.extend(node.activationsDict.values())
-    hidden_layer_concat = tf.concat(values=concat_list, axis=1)
-    logits = tf.matmul(hidden_layer_concat, fc_weights_2) + fc_biases_2
+    # concat_list = [hidden_layer]
+    # concat_list.extend(node.activationsDict.values())
+    # hidden_layer_concat = tf.concat(values=concat_list, axis=1)
+    logits = tf.matmul(hidden_layer, fc_weights_2) + fc_biases_2
     # Apply loss
-    node.fOpsList.extend([flattened, hidden_layer, hidden_layer_concat, logits])
+    node.fOpsList.extend([flattened, hidden_layer, logits])
     network.apply_loss(node=node, logits=logits)
     # Evaluation
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)

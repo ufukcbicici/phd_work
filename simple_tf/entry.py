@@ -65,11 +65,6 @@ def get_explanation_string():
 
 
 def main():
-    # Build the network
-    network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
-                          node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
-                          create_new_variables=True)
-    network.build_network(network_to_copy_from=None)
     # Do the training
     if GlobalConstants.USE_CPU:
         config = tf.ConfigProto(device_count={'GPU': 0})
@@ -77,8 +72,13 @@ def main():
     else:
         sess = tf.Session()
     dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
+    # Build the network
+    network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
+                          node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+                          create_new_variables=True)
+    network.build_network(sess=sess, dataset=dataset)
+    dataset.reset()
     # Init
-    init = tf.global_variables_initializer()
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     wd_list = [0.0]
@@ -90,7 +90,6 @@ def main():
         explanation = get_explanation_string()
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
-        sess.run(init)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.

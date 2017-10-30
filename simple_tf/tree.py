@@ -37,6 +37,10 @@ class TreeNetwork:
         self.useThresholding = None
         self.varToNodesDict = {}
         self.paramsDict = {}
+        self.mainLossParamsDict = {}
+        self.decisionParamsDict = {}
+        self.initOp = tf.global_variables_initializer()
+
 
     def get_parent_index(self, node_index):
         parent_index = int((node_index - 1) / self.treeDegree)
@@ -47,7 +51,14 @@ class TreeNetwork:
         cnst = tf.constant(value=self.paramsDict["{0}:0".format(complete_name)], dtype=GlobalConstants.DATA_TYPE)
         return tf.Variable(cnst, name=complete_name)
 
-    def build_network(self, network_to_copy_from):
+    def get_decision_parameters(self):
+        vars = tf.trainable_variables()
+        H_vars = [v for v in vars if "hyperplane" in v.name]
+        for i in range(len(H_vars)):
+            self.decisionParamsDict[H_vars[i]] = i
+        return H_vars
+
+    def build_network(self, sess, dataset):
         curr_index = 0
         for depth in range(0, self.depth):
             node_count_in_depth = pow(self.treeDegree, depth)
@@ -70,11 +81,7 @@ class TreeNetwork:
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
             self.paramsDict = UtilityFuncs.load_npz(file_name="parameters")
         for node in self.topologicalSortedNodes:
-            if self.createNewVariables:
-                self.nodeBuildFuncs[node.depth](node=node, network=self)
-            else:
-                self.nodeBuildFuncs[node.depth](node=node, network=self,
-                                                variables=network_to_copy_from.nodes[node.index].variablesList)
+            self.nodeBuildFuncs[node.depth](node=node, network=self)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
@@ -134,7 +141,7 @@ class TreeNetwork:
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.classificationGradients = tf.gradients(ys=actual_loss, xs=vars)
         self.regularizationGradients = tf.gradients(ys=regularizer_loss, xs=vars)
-        H_vars = [v for v in vars if "hyperplane" in v.name]
+        H_vars = self.get_decision_parameters()
         self.decisionLossGradients = tf.gradients(ys=decision_loss, xs=H_vars)
         # Assign ops for variables
         for var in vars:
@@ -159,6 +166,35 @@ class TreeNetwork:
             GlobalConstants.DECAY_STEP,  # Decay step.
             GlobalConstants.DECAY_RATE,  # Decay rate.
             staircase=True)
+
+
+    def get_trainable_vars(self, loss, sess, dataset):
+        vars = tf.trainable_variables()
+        accepted_vars = []
+        rejected_vars = []
+        curr_vars = []
+        grad_obj = None
+        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples = np.expand_dims(samples, axis=3)
+        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
+                     GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+                     GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
+                     self.globalCounter: 0,
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                     self.probabilityThreshold: 0.0,
+                     self.useThresholding: 0}
+        for candidate_v in vars:
+            curr_vars.append(candidate_v)
+            grad_obj = tf.gradients(ys=loss, xs=curr_vars)
+            try:
+                grad_results = sess.run([grad_obj], feed_dict=feed_dict)
+            except TypeError as e:
+                print(e)
+            else:
+
+
+
+
 
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
@@ -276,6 +312,16 @@ class TreeNetwork:
              self.learningRate,
              self.isOpenTensors], feed_dict=feed_dict)
         # Only calculate the derivatives for information gain losses
+        classification_grads = results_threshold[0]
+        regularization_grads = results_threshold[1]
+        sample_counts_threshold = results_threshold[2]
+        vars_current_values = results_threshold[3]
+        lr = results_threshold[4]
+        is_open_indicators_threshold = results_threshold[5]
+        decision_grads = None
+        sample_counts_no_threshold = None
+        is_open_indicators_no_threshold = None
+        info_gain_results = None
         if GlobalConstants.USE_INFO_GAIN_DECISION:
             info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
             feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
@@ -290,28 +336,31 @@ class TreeNetwork:
                  self.sample_count_tensors,
                  self.isOpenTensors,
                  info_gain_dicts], feed_dict=feed_dict)
-            decision_grads = results_no_threshold[0]
+            decision_grads_temp = results_no_threshold[0]
             sample_counts_no_threshold = results_no_threshold[1]
             is_open_indicators_no_threshold = results_no_threshold[2]
             info_gain_results = results_no_threshold[3]
+            decision_grads = []
+            for v in vars:
+                if v not in self.decisionParamsDict:
+                    decision_grads.append(np.zeros(shape=v.shape))
+                elif is_open_indicators_no_threshold[self.get_variable_name(name="is_open",
+                                                                                       node=self.varToNodesDict[v.name])] == 0.0:
+                    decision_grads.append(np.zeros(shape=v.shape))
+                else:
+                    decision_grads.append(decision_grads_temp[self.decisionParamsDict[v]])
         GlobalConstants.PROBABILITY_THRESHOLD.update(iteration=iteration)
-        classification_grads = results_threshold[0]
-        regularization_grads = results_threshold[1]
-        sample_counts_threshold = results_threshold[2]
-        vars_current_values = results_threshold[3]
-        lr = results_threshold[4]
-        is_open_indicators_threshold = results_threshold[5]
         # info_gain_results = results[6]
         # UtilityFuncs.save_npz(file_name="parameters", arr_dict=params_dict)
         if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
                     GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
             update_dict = {}
             assign_dict = {}
-            for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
+            for v, g, r, d, curr_value in zip(vars, classification_grads, regularization_grads, decision_grads,
+                                              vars_current_values):
                 node = self.varToNodesDict[v.name]
-                is_node_open = is_open_indicators_threshold[self.get_variable_name(name="is_open", node=node)]
-                if not is_node_open:
-                    # print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
+                is_node_open_threshold = is_open_indicators_threshold[self.get_variable_name(name="is_open", node=node)]
+                if not is_node_open_threshold:
                     continue
                 self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
                 self.momentumStatesDict[v.name][:] += -lr * (g + r)
@@ -323,7 +372,8 @@ class TreeNetwork:
         elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
             update_dict = {}
             assign_dict = {}
-            for v, g, r, curr_value in zip(vars, classification_grads, regularization_grads, vars_current_values):
+            for v, g, r, d, curr_value in zip(vars, classification_grads, regularization_grads, decision_grads,
+                                              vars_current_values):
                 node = self.varToNodesDict[v.name]
                 is_node_open = is_open_indicators_threshold[self.get_variable_name(name="is_open", node=node)]
                 if not is_node_open:
