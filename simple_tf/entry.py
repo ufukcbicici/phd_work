@@ -90,6 +90,7 @@ def main():
         explanation = get_explanation_string()
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
+        sess.run(network.initOp)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.

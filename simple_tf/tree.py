@@ -39,8 +39,7 @@ class TreeNetwork:
         self.paramsDict = {}
         self.mainLossParamsDict = {}
         self.decisionParamsDict = {}
-        self.initOp = tf.global_variables_initializer()
-
+        self.initOp = None
 
     def get_parent_index(self, node_index):
         parent_index = int((node_index - 1) / self.treeDegree)
@@ -108,6 +107,14 @@ class TreeNetwork:
             # One Hot Label outputs
             if node.oneHotLabelTensor is not None:
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
+        # Learning rate, counter
+        self.globalCounter = tf.Variable(0, dtype=GlobalConstants.DATA_TYPE, trainable=False)
+        self.learningRate = tf.train.exponential_decay(
+            GlobalConstants.INITIAL_LR,  # Base learning rate.
+            self.globalCounter,  # Current index into the dataset.
+            GlobalConstants.DECAY_STEP,  # Decay step.
+            GlobalConstants.DECAY_RATE,  # Decay rate.
+            staircase=True)
         # Prepare the cost function
         # Main losses
         primary_losses = []
@@ -130,16 +137,19 @@ class TreeNetwork:
                 continue
             decision_losses.append(node.infoGainLoss)
         regularizer_loss = tf.add_n(l2_loss_list)
-        actual_loss = tf.add_n(primary_losses)
+        primary_loss = tf.add_n(primary_losses)
         decision_loss = GlobalConstants.DECISION_LOSS_COEFFICIENT * tf.add_n(decision_losses)
-        self.finalLoss = actual_loss + regularizer_loss + decision_loss
+        self.finalLoss = primary_loss + regularizer_loss + decision_loss
         self.evalDict["RegularizerLoss"] = regularizer_loss
-        self.evalDict["ActualLoss"] = actual_loss
+        self.evalDict["PrimaryLoss"] = primary_loss
         self.evalDict["DecisionLoss"] = decision_loss
         self.evalDict["NetworkLoss"] = self.finalLoss
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
-        self.classificationGradients = tf.gradients(ys=actual_loss, xs=vars)
+        self.initOp = tf.global_variables_initializer()
+        sess.run(self.initOp)
+        self.get_trainable_vars(loss=primary_loss, sess=sess, dataset=dataset)
+        self.classificationGradients = tf.gradients(ys=primary_loss, xs=vars)
         self.regularizationGradients = tf.gradients(ys=regularizer_loss, xs=vars)
         H_vars = self.get_decision_parameters()
         self.decisionLossGradients = tf.gradients(ys=decision_loss, xs=H_vars)
@@ -158,22 +168,13 @@ class TreeNetwork:
                     self.varToNodesDict[var.name] = node
             if var.name not in self.varToNodesDict:
                 raise Exception("{0} is not in the parameters!".format(var.name))
-        # Learning rate, counter
-        self.globalCounter = tf.Variable(0, dtype=GlobalConstants.DATA_TYPE, trainable=False)
-        self.learningRate = tf.train.exponential_decay(
-            GlobalConstants.INITIAL_LR,  # Base learning rate.
-            self.globalCounter,  # Current index into the dataset.
-            GlobalConstants.DECAY_STEP,  # Decay step.
-            GlobalConstants.DECAY_RATE,  # Decay rate.
-            staircase=True)
-
 
     def get_trainable_vars(self, loss, sess, dataset):
         vars = tf.trainable_variables()
-        accepted_vars = []
-        rejected_vars = []
-        curr_vars = []
+        accepted_vars = set()
+        rejected_vars = set()
         grad_obj = None
+        grads_index_dict = {}
         samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
@@ -184,17 +185,18 @@ class TreeNetwork:
                      self.probabilityThreshold: 0.0,
                      self.useThresholding: 0}
         for candidate_v in vars:
-            curr_vars.append(candidate_v)
-            grad_obj = tf.gradients(ys=loss, xs=curr_vars)
+            accepted_vars.add(candidate_v)
+            print("Trying variable:{0}".format(candidate_v.name))
+            grad_obj = tf.gradients(ys=loss, xs=list(accepted_vars))
             try:
                 grad_results = sess.run([grad_obj], feed_dict=feed_dict)
             except TypeError as e:
                 print(e)
+                accepted_vars.remove(candidate_v)
+                rejected_vars.add(candidate_v)
             else:
-
-
-
-
+                grads_index_dict[candidate_v] = len(accepted_vars) - 1
+        return accepted_vars, grads_index_dict
 
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
