@@ -292,14 +292,11 @@ class TreeNetwork:
         # Measure overall information gain
         return overall_correct / overall_count, confusion_matrix_db_rows
 
-    def update_params_with_momentum(self, sess, dataset, iteration):
-        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
-        samples = np.expand_dims(samples, axis=3)
+    def get_main_and_regularization_grads(self, sess, samples, labels, one_hot_labels, iteration):
         vars = tf.trainable_variables()
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         prob_threshold = (1.0 / float(GlobalConstants.TREE_DEGREE)) - GlobalConstants.PROBABILITY_THRESHOLD.value
         print("prob_threshold={0}".format(prob_threshold))
-        # info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
                      GlobalConstants.TRAIN_LABEL_TENSOR: labels,
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
@@ -317,85 +314,94 @@ class TreeNetwork:
         # Only calculate the derivatives for information gain losses
         classification_grads = results_threshold[0]
         regularization_grads = results_threshold[1]
-        sample_counts_threshold = results_threshold[2]
+        sample_counts = results_threshold[2]
         vars_current_values = results_threshold[3]
         lr = results_threshold[4]
-        is_open_indicators_threshold = results_threshold[5]
-        decision_grads = None
-        sample_counts_no_threshold = None
-        is_open_indicators_no_threshold = None
-        info_gain_results = None
-        if GlobalConstants.USE_INFO_GAIN_DECISION:
-            info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
-            feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
-                         GlobalConstants.TRAIN_LABEL_TENSOR: labels,
-                         GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
-                         self.globalCounter: iteration,
-                         self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-                         self.probabilityThreshold: prob_threshold,
-                         self.useThresholding: 0}
-            results_no_threshold = sess.run(
-                [self.decisionGradients,
-                 self.sample_count_tensors,
-                 self.isOpenTensors,
-                 info_gain_dicts], feed_dict=feed_dict)
-            decision_grads_temp = results_no_threshold[0]
-            sample_counts_no_threshold = results_no_threshold[1]
-            is_open_indicators_no_threshold = results_no_threshold[2]
-            info_gain_results = results_no_threshold[3]
-            decision_grads = []
-            for v in vars:
-                if v not in self.decisionParamsDict:
-                    decision_grads.append(np.zeros(shape=v.shape))
-                elif is_open_indicators_no_threshold[self.get_variable_name(name="is_open",
-                                                                                       node=self.varToNodesDict[v.name])] == 0.0:
-                    decision_grads.append(np.zeros(shape=v.shape))
-                else:
-                    decision_grads.append(decision_grads_temp[self.decisionParamsDict[v]])
-        GlobalConstants.PROBABILITY_THRESHOLD.update(iteration=iteration)
-        # info_gain_results = results[6]
-        # UtilityFuncs.save_npz(file_name="parameters", arr_dict=params_dict)
-        if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
-                    GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
-            update_dict = {}
-            assign_dict = {}
-            for v, g, r, d, curr_value in zip(vars, classification_grads, regularization_grads, decision_grads,
-                                              vars_current_values):
-                node = self.varToNodesDict[v.name]
-                is_node_open_threshold = is_open_indicators_threshold[self.get_variable_name(name="is_open", node=node)]
-                if not is_node_open_threshold:
-                    continue
-                self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
-                self.momentumStatesDict[v.name][:] += -lr * (g + r)
-                new_value = curr_value + self.momentumStatesDict[v.name]
-                op_name = self.get_assign_op_name(variable=v)
-                update_dict[self.newValuesDict[op_name]] = new_value
-                assign_dict[op_name] = self.assignOpsDict[op_name]
-            sess.run(assign_dict, feed_dict=update_dict)
-        elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
-            update_dict = {}
-            assign_dict = {}
-            for v, g, r, d, curr_value in zip(vars, classification_grads, regularization_grads, decision_grads,
-                                              vars_current_values):
-                node = self.varToNodesDict[v.name]
-                is_node_open = is_open_indicators_threshold[self.get_variable_name(name="is_open", node=node)]
-                if not is_node_open:
-                    # print("Skipping Node{0} Parameter:{1}".format(node.index, v.name))
-                    continue
-                self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
+        is_open_indicators = results_threshold[5]
+        # ******************* Calculate grads *******************
+        # Main loss
+        main_grads = {}
+        for k, v in self.mainLossParamsDict.items():
+            node = self.varToNodesDict[k.name]
+            is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
+            if not is_node_open:
+                continue
+            g = classification_grads[v]
+            if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
+                        GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
+                main_grads[k] = g
+            elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
                 sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
-                sample_count = sample_counts_threshold[sample_count_entry_name]
+                sample_count = sample_counts[sample_count_entry_name]
                 gradient_modifier = float(GlobalConstants.BATCH_SIZE) / float(sample_count)
                 modified_g = gradient_modifier * g
-                self.momentumStatesDict[v.name][:] += -lr * (modified_g + r)
-                new_value = curr_value + self.momentumStatesDict[v.name]
-                op_name = self.get_assign_op_name(variable=v)
-                update_dict[self.newValuesDict[op_name]] = new_value
-                assign_dict[op_name] = self.assignOpsDict[op_name]
-            sess.run(assign_dict, feed_dict=update_dict)
-        else:
-            raise NotImplementedError()
-        return sample_counts_threshold, lr, is_open_indicators_threshold
+                main_grads[k] = modified_g
+        # Regularization loss
+        reg_grads = {}
+        for k, v in self.regularizationParamsDict.items():
+            node = self.varToNodesDict[k.name]
+            is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
+            if not is_node_open:
+                continue
+            r = regularization_grads[v]
+            reg_grads[k] = r
+        return main_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators
+
+    def get_decision_grads(self, sess, samples, labels, one_hot_labels, iteration):
+        info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
+        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
+                     GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+                     GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
+                     self.globalCounter: iteration,
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                     self.probabilityThreshold: 0.0,
+                     self.useThresholding: 0}
+        results = sess.run([self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts],
+                           feed_dict=feed_dict)
+        decision_grads = results[0]
+        sample_counts = results[1]
+        is_open_indicators = results[2]
+        info_gain_results = results[3]
+        d_grads = {}
+        for k, v in self.decisionParamsDict.items():
+            node = self.varToNodesDict[k.name]
+            is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
+            if not is_node_open:
+                continue
+            d = decision_grads[v]
+            d_grads[k] = d
+        return d_grads, info_gain_results
+
+    def update_params_with_momentum(self, sess, dataset, iteration):
+        vars = tf.trainable_variables()
+        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples = np.expand_dims(samples, axis=3)
+        main_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
+            self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
+                                                   one_hot_labels=one_hot_labels, iteration=iteration)
+        if GlobalConstants.USE_INFO_GAIN_DECISION:
+            decision_grads, info_gain_results = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
+                                                                        one_hot_labels=one_hot_labels,
+                                                                        iteration=iteration)
+        GlobalConstants.PROBABILITY_THRESHOLD.update(iteration=iteration)
+        update_dict = {}
+        assign_dict = {}
+        for v, curr_value in zip(vars, vars_current_values):
+            total_grad = np.zeros(shape=v.shape)
+            if v in main_grads:
+                total_grad += main_grads[v]
+            if v in reg_grads:
+                total_grad += reg_grads[v]
+            if GlobalConstants.USE_INFO_GAIN_DECISION and v in decision_grads:
+                total_grad += decision_grads[v]
+            self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
+            self.momentumStatesDict[v.name][:] += -lr * total_grad
+            new_value = curr_value + self.momentumStatesDict[v.name]
+            op_name = self.get_assign_op_name(variable=v)
+            update_dict[self.newValuesDict[op_name]] = new_value
+            assign_dict[op_name] = self.assignOpsDict[op_name]
+        sess.run(assign_dict, feed_dict=update_dict),
+        return sample_counts, lr, is_open_indicators
 
     def get_variable_name(self, name, node):
         return "Node{0}_{1}".format(node.index, name)
