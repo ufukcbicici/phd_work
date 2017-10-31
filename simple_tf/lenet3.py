@@ -135,3 +135,25 @@ def leaf_func(node, network, variables=None):
     # Evaluation
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
+
+
+def grad_func(network):
+    # self.initOp = tf.global_variables_initializer()
+    # sess.run(self.initOp)
+    vars = tf.trainable_variables()
+    decision_vars_list = []
+    classification_vars_list = []
+    for v in vars:
+        if "hyperplane" in v.name:
+            decision_vars_list.append(v)
+        else:
+            classification_vars_list.append(v)
+    for i in range(len(decision_vars_list)):
+        network.decisionParamsDict[decision_vars_list[i]] = i
+    for i in range(len(classification_vars_list)):
+        network.mainLossParamsDict[classification_vars_list[i]] = i
+    for i in range(len(vars)):
+        network.regularizationParamsDict[vars[i]] = i
+    network.classificationGradients = tf.gradients(ys=network.mainLoss, xs=classification_vars_list)
+    network.decisionGradients = tf.gradients(ys=network.decisionLoss, xs=decision_vars_list)
+    network.regularizationGradients = tf.gradients(ys=network.regularizationLoss, xs=vars)
