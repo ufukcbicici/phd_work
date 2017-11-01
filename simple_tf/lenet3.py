@@ -162,13 +162,15 @@ def grad_func(network):
                 decision_vars_list.append(v)
             classification_vars_list.append(v)
             regularization_vars_list.append(v)
-    else:
+    elif GlobalConstants.USE_INFO_GAIN_DECISION:
         for v in vars:
             if "hyperplane" in v.name:
                 decision_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
-                regularization_vars_list.append(v)
+            regularization_vars_list.append(v)
+    else:
+        raise NotImplementedError()
     for i in range(len(decision_vars_list)):
         network.decisionParamsDict[decision_vars_list[i]] = i
     for i in range(len(classification_vars_list)):

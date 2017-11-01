@@ -369,6 +369,8 @@ class TreeNetwork:
             if not is_node_open:
                 continue
             d = decision_grads[v]
+            if np.any(np.isnan(d)):
+                raise Exception("NAN Gradient!!!")
             d_grads[k] = d
         return d_grads, info_gain_results
 

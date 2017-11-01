@@ -36,6 +36,7 @@ class InfoGainLoss:
         entropy_p_c, log_prob_p_c = InfoGainLoss.calculate_entropy(prob_distribution=marginal_p_c)
         # Calculate the information gain
         information_gain = entropy_p_n + entropy_p_c - entropy_p_cn
+        information_gain = -1.0 * information_gain
         return information_gain
         # return information_gain, unnormalized_joint_xcn, entropy_p_cn, entropy_p_n, entropy_p_c, \
         #        marginal_p_cn, marginal_p_n, marginal_p_c, log_prob_p_cn, log_prob_p_n, log_prob_p_c
