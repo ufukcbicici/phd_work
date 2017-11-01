@@ -38,7 +38,8 @@ def get_explanation_string():
         total_param_count += np.prod(v.get_shape().as_list())
     explanation = "Tree.\n"
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE)
-    explanation += "No Ancestors, constant hyperplanes"
+    explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
+    explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
     explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
