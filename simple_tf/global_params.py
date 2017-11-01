@@ -38,6 +38,7 @@ class GlobalConstants:
     USE_RANDOM_PARAMETERS = True
     USE_PROBABILITY_THRESHOLD = False
     USE_INFO_GAIN_DECISION = False
+    USE_CONCAT_TRICK = True
     DECISION_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased

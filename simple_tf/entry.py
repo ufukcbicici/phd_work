@@ -27,9 +27,9 @@ from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
 import simple_tf.baseline as baseline
 
-tf.set_random_seed(1234)
-np_seed = 88
-np.random.seed(np_seed)
+# tf.set_random_seed(1234)
+# np_seed = 88
+# np.random.seed(np_seed)
 
 
 def get_explanation_string():
@@ -38,6 +38,7 @@ def get_explanation_string():
         total_param_count += np.prod(v.get_shape().as_list())
     explanation = "Tree.\n"
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE)
+    explanation += "No Ancestors, constant hyperplanes"
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
     explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
@@ -83,7 +84,7 @@ def main():
     init = tf.global_variables_initializer()
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
-    wd_list = [0.0]
+    wd_list = [x for x in itertools.repeat(0.0, 10)]
     run_id = 0
     for wd in wd_list:
         print("********************NEW RUN:{0}********************".format(run_id))
