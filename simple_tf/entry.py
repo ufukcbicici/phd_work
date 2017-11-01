@@ -85,7 +85,7 @@ def main():
     init = tf.global_variables_initializer()
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
-    wd_list = [x for x in itertools.repeat(0.0, 7)]
+    wd_list = [x for x in itertools.repeat(0.0, 4)]
     run_id = 0
     for wd in wd_list:
         print("********************NEW RUN:{0}********************".format(run_id))

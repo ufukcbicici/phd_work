@@ -204,12 +204,18 @@ class TreeNetwork:
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
         info_gain_dict = {}
+        branch_probs = {}
         while True:
             results = self.eval_network(sess=sess, dataset=dataset)
             batch_sample_count = 0.0
             for node in self.topologicalSortedNodes:
                 if not node.isLeaf:
                     info_gain = results[self.get_variable_name(name="info_gain", node=node)]
+                    branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
+                    if node.index not in branch_probs:
+                        branch_probs[node.index] = branch_prob
+                    else:
+                        branch_probs[node.index] = np.concatenate((branch_probs[node.index], branch_prob))
                     if node.index not in info_gain_dict:
                         info_gain_dict[node.index] = []
                     info_gain_dict[node.index].append(np.asscalar(info_gain))
@@ -238,7 +244,11 @@ class TreeNetwork:
         # Measure Information Gain
         for k, v in info_gain_dict.items():
             avg_info_gain = sum(v) / float(len(v))
-            print("{0}={1}".format(k, avg_info_gain))
+            print("IG_{0}={1}".format(k, -avg_info_gain))
+        # Measure Branching Probabilities
+        for k, v in branch_probs.items():
+            p_n = np.mean(v, axis=0)
+            print("p_{0}(n)={1}".format(k, p_n))
         # Measure Accuracy
         overall_count = 0.0
         overall_correct = 0.0
