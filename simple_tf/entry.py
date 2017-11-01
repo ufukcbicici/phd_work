@@ -66,7 +66,7 @@ def get_explanation_string():
     explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
     explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
     explanation += "Param Count:{0}\n".format(total_param_count)
-    explanation += "Model: {0}Conv - {1}Conv - {2}FC".format(GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2,
+    explanation += "Model: {0}Conv - {1}Conv - {2}FC\n".format(GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2,
                                                              GlobalConstants.NO_HIDDEN)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     return explanation
