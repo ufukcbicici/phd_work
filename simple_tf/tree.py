@@ -85,6 +85,10 @@ class TreeNetwork:
             self.paramsDict = UtilityFuncs.load_npz(file_name="parameters")
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
+        if len(self.topologicalSortedNodes) == 1:
+            GlobalConstants.USE_INFO_GAIN_DECISION = False
+            GlobalConstants.USE_CONCAT_TRICK = False
+            GlobalConstants.USE_PROBABILITY_THRESHOLD = False
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
@@ -142,7 +146,10 @@ class TreeNetwork:
             decision_losses.append(node.infoGainLoss)
         self.regularizationLoss = tf.add_n(l2_loss_list)
         self.mainLoss = tf.add_n(primary_losses)
-        self.decisionLoss = GlobalConstants.DECISION_LOSS_COEFFICIENT * tf.add_n(decision_losses)
+        if len(decision_losses) > 0:
+            self.decisionLoss = GlobalConstants.DECISION_LOSS_COEFFICIENT * tf.add_n(decision_losses)
+        else:
+            self.decisionLoss = tf.constant(value=0.0)
         self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
         self.evalDict["RegularizerLoss"] = self.regularizationLoss
         self.evalDict["PrimaryLoss"] = self.mainLoss
@@ -391,6 +398,7 @@ class TreeNetwork:
         main_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
             self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
                                                    one_hot_labels=one_hot_labels, iteration=iteration)
+        decision_grads = {}
         if GlobalConstants.USE_INFO_GAIN_DECISION:
             decision_grads, info_gain_results = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
                                                                         one_hot_labels=one_hot_labels,

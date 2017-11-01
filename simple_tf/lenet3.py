@@ -169,6 +169,10 @@ def grad_func(network):
             else:
                 classification_vars_list.append(v)
             regularization_vars_list.append(v)
+    elif len(network.topologicalSortedNodes) == 1:
+        for v in vars:
+            classification_vars_list.append(v)
+            regularization_vars_list.append(v)
     else:
         raise NotImplementedError()
     for i in range(len(decision_vars_list)):
@@ -180,5 +184,8 @@ def grad_func(network):
     # for i in range(len(vars)):
     #     network.regularizationParamsDict[vars[i]] = i
     network.classificationGradients = tf.gradients(ys=network.mainLoss, xs=classification_vars_list)
-    network.decisionGradients = tf.gradients(ys=network.decisionLoss, xs=decision_vars_list)
+    if len(decision_vars_list) > 0:
+        network.decisionGradients = tf.gradients(ys=network.decisionLoss, xs=decision_vars_list)
+    else:
+        network.decisionGradients = None
     network.regularizationGradients = tf.gradients(ys=network.regularizationLoss, xs=regularization_vars_list)

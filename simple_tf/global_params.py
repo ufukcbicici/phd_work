@@ -13,20 +13,20 @@ class GradientType(Enum):
 
 
 class GlobalConstants:
-    EPOCH_COUNT = 500
-    BATCH_SIZE = 1000
+    EPOCH_COUNT = 300
+    BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 50000
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
     NO_FILTERS_1 = 20
-    NO_FILTERS_2 = 10 # 10
-    NO_HIDDEN = 30 # 30
+    NO_FILTERS_2 = 50 # 10
+    NO_HIDDEN = 32 # 30
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
-    INITIAL_LR = 0.015
-    DECAY_STEP = 5000
+    INITIAL_LR = 0.025
+    DECAY_STEP = 20000
     DECAY_RATE = 0.5
-    TREE_DEGREE = 3
+    TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
     PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
                                               decay_period=1, min_limit=0.0)

@@ -36,33 +36,39 @@ def get_explanation_string():
     total_param_count = 0
     for v in tf.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
-    explanation = "Tree.\n"
-    explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE)
-    explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
-    explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
-    explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
-    explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-    explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
-    explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
-    explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
-    explanation += "Param Count:{0}\n".format(total_param_count)
-    explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
-    explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
-    explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
-    if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-        explanation += "Prob Threshold Initial Value:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.value)
-        explanation += "Prob Threshold Decay Step:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decayPeriod)
-        explanation += "Prob Threshold Decay Ratio:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decay)
+    # explanation = "Tree.\n"
+    # explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
+    # explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE)
+    # explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
+    # explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
+    # explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
+    # explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+    # explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
+    # explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
+    # explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
+    # explanation += "Param Count:{0}\n".format(total_param_count)
+    # explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    # explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
+    # explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
+    # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
+    #     explanation += "Prob Threshold Initial Value:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.value)
+    #     explanation += "Prob Threshold Decay Step:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decayPeriod)
+    #     explanation += "Prob Threshold Decay Ratio:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decay)
     # explanation = "Tree. Gradient Type:{0} No threshold. Tree Degree:{1} " \
     #               "Initial Lr:{2} Decay Steps:{3} Decay Rate:{4} Total Param Count:{5} Wd:{6}".format(
     #                 GlobalConstants.GRADIENT_TYPE, GlobalConstants.TREE_DEGREE, GlobalConstants.INITIAL_LR,
     #                 GlobalConstants.DECAY_STEP, GlobalConstants.DECAY_RATE, total_param_count,
     #                 GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
-    # explanation = "Wd, corrected. Baseline. C1:{0} C2:{1}: FC1:{2} " \
-    #               "Initial Lr:{3} Decay Steps:{4} Decay Rate:{5} Total Param Count:{6} wd:{7}".format(
-    #                GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2, GlobalConstants.NO_HIDDEN,
-    #                GlobalConstants.INITIAL_LR, GlobalConstants.DECAY_STEP, GlobalConstants.DECAY_RATE,
-    #                total_param_count, GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    explanation = "Baseline.\n"
+    explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
+    explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
+    explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
+    explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
+    explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
+    explanation += "Param Count:{0}\n".format(total_param_count)
+    explanation += "Model: {0}Conv - {1}Conv - {2}FC".format(GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2,
+                                                             GlobalConstants.NO_HIDDEN)
+    explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     return explanation
 
 
@@ -75,8 +81,13 @@ def main():
         sess = tf.Session()
     dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
     # Build the network
+    # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
+    #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+    #                       grad_func=lenet3.grad_func,
+    #                       create_new_variables=True)
     network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
-                          node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+                          node_build_funcs=[baseline.baseline],
+                          # node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           grad_func=lenet3.grad_func,
                           create_new_variables=True)
     network.build_network()
@@ -84,8 +95,8 @@ def main():
     # Init
     init = tf.global_variables_initializer()
     # Grid search
-    # wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
-    wd_list = [x for x in itertools.repeat(0.0, 4)]
+    wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
+    # wd_list = [x for x in itertools.repeat(0.0, 4)]
     run_id = 0
     for wd in wd_list:
         print("********************NEW RUN:{0}********************".format(run_id))
