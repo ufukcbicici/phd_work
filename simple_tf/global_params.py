@@ -14,13 +14,13 @@ class GradientType(Enum):
 
 class GlobalConstants:
     EPOCH_COUNT = 300
-    BATCH_SIZE = 125
+    BATCH_SIZE = 250
     EVAL_BATCH_SIZE = 50000
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
     NO_FILTERS_1 = 20
-    NO_FILTERS_2 = 50 # 10
-    NO_HIDDEN = 32 # 30
+    NO_FILTERS_2 = 15 # 10
+    NO_HIDDEN = 15 # 30
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.025
@@ -37,8 +37,8 @@ class GlobalConstants:
     USE_EMPTY_NODE_CRASH_PREVENTION = False
     USE_RANDOM_PARAMETERS = True
     USE_PROBABILITY_THRESHOLD = False
-    USE_INFO_GAIN_DECISION = True
-    USE_CONCAT_TRICK = False
+    USE_INFO_GAIN_DECISION = False
+    USE_CONCAT_TRICK = True
     DECISION_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
