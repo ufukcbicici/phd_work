@@ -189,3 +189,22 @@ def grad_func(network):
     else:
         network.decisionGradients = None
     network.regularizationGradients = tf.gradients(ys=network.regularizationLoss, xs=regularization_vars_list)
+
+
+def tensorboard_func(network):
+    # Info gain, branch probs
+    for node in network.topologicalSortedNodes:
+        if not node.isLeaf:
+            info_gain_name = network.get_variable_name(name="info_gain", node=node)
+            branch_prob_name = network.get_variable_name(name="p(n|x)", node=node)
+            info_gain_output = network.evalDict[network.get_variable_name(name="info_gain", node=node)]
+            branch_prob_output = network.evalDict[network.get_variable_name(name="p(n|x)", node=node)]
+            network.decisionPathSummaries.append(tf.summary.scalar(info_gain_name, info_gain_output))
+            network.decisionPathSummaries.append(tf.summary.scalar(branch_prob_name, branch_prob_output))
+    # Hyperplane norms
+    vars = tf.trainable_variables()
+    for v in vars:
+        if "hyperplane" in v:
+            loss_name = "l2_loss_{0}".format(v.name)
+            l2_loss_output = network.evalDict[loss_name]
+            network.classificationPathSummaries.append(tf.summary.scalar(loss_name, l2_loss_output))

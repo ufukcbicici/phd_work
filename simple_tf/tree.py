@@ -8,7 +8,7 @@ from simple_tf.node import Node
 
 
 class TreeNetwork:
-    def __init__(self, tree_degree, node_build_funcs, grad_func, create_new_variables):
+    def __init__(self, tree_degree, node_build_funcs, grad_func, summary_func, create_new_variables):
         self.treeDegree = tree_degree
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
@@ -16,6 +16,7 @@ class TreeNetwork:
         self.nodes = {}
         self.topologicalSortedNodes = []
         self.gradFunc = grad_func
+        self.summaryFunc = summary_func
         self.createNewVariables = create_new_variables
         self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
         self.labelTensor = GlobalConstants.TRAIN_LABEL_TENSOR
@@ -44,6 +45,9 @@ class TreeNetwork:
         self.regularizationParamsDict = {}
         self.decisionParamsDict = {}
         self.initOp = None
+        self.classificationPathSummaries = []
+        self.decisionPathSummaries = []
+        self.summaryWriter = None
 
     def get_parent_index(self, node_index):
         parent_index = int((node_index - 1) / self.treeDegree)
@@ -133,10 +137,12 @@ class TreeNetwork:
         vars = tf.trainable_variables()
         l2_loss_list = []
         for v in vars:
+            loss_tensor = tf.nn.l2_loss(v)
+            self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
             if "bias" in v.name:
-                l2_loss_list.append(0.0 * tf.nn.l2_loss(v))
+                l2_loss_list.append(0.0 * loss_tensor)
             else:
-                l2_loss_list.append(self.weightDecayCoeff * tf.nn.l2_loss(v))
+                l2_loss_list.append(self.weightDecayCoeff * loss_tensor)
         # weights_and_filters = [v for v in vars if "bias" not in v.name]
         # Proxy, decision losses
         decision_losses = []
@@ -173,6 +179,9 @@ class TreeNetwork:
                     self.varToNodesDict[var.name] = node
             if var.name not in self.varToNodesDict:
                 raise Exception("{0} is not in the parameters!".format(var.name))
+        # Add tensorboard ops
+        self.summaryFunc(network=self)
+        self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
 
     def get_trainable_vars(self, loss, sess, dataset):
         vars = tf.trainable_variables()
@@ -321,20 +330,25 @@ class TreeNetwork:
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.probabilityThreshold: prob_threshold,
                      self.useThresholding: use_threshold}
-        results_threshold = sess.run(
-            [self.classificationGradients,
-             self.regularizationGradients,
-             self.sample_count_tensors,
-             vars,
-             self.learningRate,
-             self.isOpenTensors], feed_dict=feed_dict)
+        run_ops = [self.classificationGradients,
+                   self.regularizationGradients,
+                   self.sample_count_tensors,
+                   vars,
+                   self.learningRate,
+                   self.isOpenTensors]
+        if iteration % GlobalConstants.SUMMARY_PERIOD:
+            run_ops.append(self.classificationPathSummaries)
+        results = sess.run(run_ops, feed_dict=feed_dict)
         # Only calculate the derivatives for information gain losses
-        classification_grads = results_threshold[0]
-        regularization_grads = results_threshold[1]
-        sample_counts = results_threshold[2]
-        vars_current_values = results_threshold[3]
-        lr = results_threshold[4]
-        is_open_indicators = results_threshold[5]
+        classification_grads = results[0]
+        regularization_grads = results[1]
+        sample_counts = results[2]
+        vars_current_values = results[3]
+        lr = results[4]
+        is_open_indicators = results[5]
+        if iteration % GlobalConstants.SUMMARY_PERIOD:
+            summary = results[6]
+            self.summaryWriter.addSummary(summary, iteration)
         # ******************* Calculate grads *******************
         # Main loss
         main_grads = {}
@@ -373,12 +387,17 @@ class TreeNetwork:
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.probabilityThreshold: 0.0,
                      self.useThresholding: 0}
-        results = sess.run([self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts],
-                           feed_dict=feed_dict)
+        run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
+        if iteration % GlobalConstants.SUMMARY_PERIOD:
+            run_ops.append(self.decisionPathSummaries)
+        results = sess.run(run_ops, feed_dict=feed_dict)
         decision_grads = results[0]
         sample_counts = results[1]
         is_open_indicators = results[2]
         info_gain_results = results[3]
+        if iteration % GlobalConstants.SUMMARY_PERIOD:
+            summary = results[4]
+            self.summaryWriter.addSummary(summary, iteration)
         d_grads = {}
         for k, v in self.decisionParamsDict.items():
             node = self.varToNodesDict[k.name]

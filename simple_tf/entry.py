@@ -90,6 +90,7 @@ def main():
                           # node_build_funcs=[baseline.baseline],
                           node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           grad_func=lenet3.grad_func,
+                          summary_func=lenet3.tensorboard_func,
                           create_new_variables=True)
     network.build_network()
     # dataset.reset()

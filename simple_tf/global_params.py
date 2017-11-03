@@ -37,12 +37,16 @@ class GlobalConstants:
     USE_EMPTY_NODE_CRASH_PREVENTION = False
     USE_RANDOM_PARAMETERS = True
     USE_PROBABILITY_THRESHOLD = False
-    USE_INFO_GAIN_DECISION = False
-    USE_CONCAT_TRICK = True
+    USE_INFO_GAIN_DECISION = True
+    USE_CONCAT_TRICK = False
     DECISION_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     INFO_GAIN_LOG_EPSILON = 1e-30
+    SUMMARY_PERIOD = 1
+    # Idea
+    SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"
+
     # TRAIN
     TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
     TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(BATCH_SIZE,))
