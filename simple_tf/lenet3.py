@@ -5,6 +5,7 @@ from simple_tf.global_params import GradientType
 
 def root_func(node, network, variables=None):
     # Parameters
+    node_degree = network.degreeList[node.depth]
     if GlobalConstants.USE_RANDOM_PARAMETERS:
         conv_weights = tf.Variable(
             tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_FILTERS_1], stddev=0.1,
@@ -18,14 +19,14 @@ def root_func(node, network, variables=None):
                                                              node=node))
     if GlobalConstants.USE_RANDOM_PARAMETERS:
         hyperplane_weights = tf.Variable(
-            tf.truncated_normal([GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE, network.treeDegree],
+            tf.truncated_normal([GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE, node_degree],
                                 stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="hyperplane_weights", node=node))
     else:
         hyperplane_weights = network.get_fixed_variable(name="hyperplane_weights", node=node)
     # print_op = tf.Print(input_=network.dataTensor, data=[network.dataTensor], message="Print at Node:{0}".format(node.index))
     # node.evalDict[network.get_variable_name(name="Print", node=node)] = print_op
-    hyperplane_biases = tf.Variable(tf.constant(0.1, shape=[network.treeDegree], dtype=GlobalConstants.DATA_TYPE),
+    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
                                     name=network.get_variable_name(name="hyperplane_biases", node=node))
     node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
     # Operations
@@ -44,6 +45,8 @@ def root_func(node, network, variables=None):
 
 
 def l1_func(node, network, variables=None):
+    node_degree = network.degreeList[node.depth]
+    total_prev_degrees = sum(network.degreeList[0:node.depth])
     # Parameters
     if GlobalConstants.USE_RANDOM_PARAMETERS:
         conv_weights = tf.Variable(
@@ -59,20 +62,20 @@ def l1_func(node, network, variables=None):
         if GlobalConstants.USE_CONCAT_TRICK:
             hyperplane_weights = tf.Variable(
                 tf.truncated_normal(
-                    [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE + network.treeDegree, network.treeDegree],
+                    [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE + total_prev_degrees, node_degree],
                     stddev=0.1,
                     seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
                 name=network.get_variable_name(name="hyperplane_weights", node=node))
         else:
             hyperplane_weights = tf.Variable(
                 tf.truncated_normal(
-                    [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE, network.treeDegree],
+                    [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE, node_degree],
                     stddev=0.1,
                     seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
                 name=network.get_variable_name(name="hyperplane_weights", node=node))
     else:
         hyperplane_weights = network.get_fixed_variable(name="hyperplane_weights", node=node)
-    hyperplane_biases = tf.Variable(tf.constant(0.1, shape=[network.treeDegree], dtype=GlobalConstants.DATA_TYPE),
+    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
                                     name=network.get_variable_name(name="hyperplane_biases", node=node))
     node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
     # Operations
@@ -96,6 +99,7 @@ def l1_func(node, network, variables=None):
 
 
 def leaf_func(node, network, variables=None):
+    total_prev_degrees = sum(network.degreeList[0:node.depth])
     # Parameters
     if GlobalConstants.USE_RANDOM_PARAMETERS:
         fc_weights_1 = tf.Variable(tf.truncated_normal(
@@ -105,7 +109,7 @@ def leaf_func(node, network, variables=None):
             name=network.get_variable_name(name="fc_weights_1", node=node))
         if GlobalConstants.USE_CONCAT_TRICK:
             fc_weights_2 = tf.Variable(
-                tf.truncated_normal([GlobalConstants.NO_HIDDEN + 2 * network.treeDegree, GlobalConstants.NUM_LABELS],
+                tf.truncated_normal([GlobalConstants.NO_HIDDEN + total_prev_degrees, GlobalConstants.NUM_LABELS],
                                     stddev=0.1,
                                     seed=GlobalConstants.SEED,
                                     dtype=GlobalConstants.DATA_TYPE),
@@ -200,11 +204,11 @@ def tensorboard_func(network):
             info_gain_output = network.evalDict[network.get_variable_name(name="info_gain", node=node)]
             branch_prob_output = network.evalDict[network.get_variable_name(name="p(n|x)", node=node)]
             network.decisionPathSummaries.append(tf.summary.scalar(info_gain_name, info_gain_output))
-            network.decisionPathSummaries.append(tf.summary.scalar(branch_prob_name, branch_prob_output))
+            network.decisionPathSummaries.append(tf.summary.histogram(branch_prob_name, branch_prob_output))
     # Hyperplane norms
     vars = tf.trainable_variables()
     for v in vars:
-        if "hyperplane" in v:
+        if "hyperplane" in v.name:
             loss_name = "l2_loss_{0}".format(v.name)
             l2_loss_output = network.evalDict[loss_name]
             network.classificationPathSummaries.append(tf.summary.scalar(loss_name, l2_loss_output))

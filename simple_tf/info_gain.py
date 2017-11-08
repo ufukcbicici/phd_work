@@ -51,7 +51,7 @@ class InfoGainLoss:
 #
 # dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
 # N = GlobalConstants.BATCH_SIZE
-# K = 3
+# K = 2
 # L = dataset.get_label_count()
 #
 # W = tf.Variable(tf.truncated_normal([GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE, K],
@@ -62,10 +62,9 @@ class InfoGainLoss:
 # activations = tf.matmul(flat_data, W) + b
 # p_n_given_x_2d = tf.nn.softmax(activations)
 # p_c_given_x_2d = GlobalConstants.TRAIN_ONE_HOT_LABELS
-# information_gain, unnormalized_joint_xcn, tf_entropy_p_cn, tf_entropy_p_n, tf_entropy_p_c = \
-#     InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x_2d, p_c_given_x_2d=p_c_given_x_2d)
-# negative_ig = -1.0 * information_gain
-# optimizer = tf.train.MomentumOptimizer(GlobalConstants.INITIAL_LR, 0.9).minimize(negative_ig)
+# information_gain = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x_2d, p_c_given_x_2d=p_c_given_x_2d)
+# # unnormalized_joint_xcn, tf_entropy_p_cn, tf_entropy_p_n, tf_entropy_p_c = \
+# optimizer = tf.train.MomentumOptimizer(GlobalConstants.INITIAL_LR, 0.9).minimize(information_gain)
 #
 #
 # init = tf.global_variables_initializer()
@@ -75,7 +74,7 @@ class InfoGainLoss:
 # results = sess.run([unnormalized_joint_xcn, W, b, information_gain, tf_entropy_p_cn, tf_entropy_p_n, tf_entropy_p_c],
 #                    feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
 #                               GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels})
-#
+
 # tf_unnormalized_joint_xcn = results[0]
 # np_W = results[1]
 # np_b = results[2]
@@ -106,18 +105,18 @@ class InfoGainLoss:
 # entropy_p_n = -1.0 * np.sum(p_n * log_p_n)
 # entropy_p_c = -1.0 * np.sum(p_c * log_p_c)
 # np_information_gain = entropy_p_n + entropy_p_c - entropy_p_cn
-#
-#
-# # Increase info gain
+
+
+# Increase info gain
 # dataset.reset()
-# for i in range(10000):
-#     samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+# for i in range(60000):
+#     samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=50000)
 #     samples = np.expand_dims(samples, axis=3)
 #     sess.run([optimizer], feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
 #                                       GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels})
 #     results = sess.run([information_gain], feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
 #                                                       GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels})
 #     ig = results[0]
-#     print("IG={0}".format(ig))
+#     print("IG_{0}={1}".format(i, ig))
 #
 # print("X")

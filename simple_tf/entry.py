@@ -40,7 +40,7 @@ def get_explanation_string():
     # Tree
     explanation = "Tree.\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
-    explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE)
+    explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
     explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
     explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
@@ -52,6 +52,7 @@ def get_explanation_string():
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
+    explanation += "Hyperplane bias at 0.0\n"
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         explanation += "Prob Threshold Initial Value:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.value)
         explanation += "Prob Threshold Decay Step:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decayPeriod)
@@ -86,12 +87,12 @@ def main():
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
     #                       grad_func=lenet3.grad_func,
     #                       create_new_variables=True)
-    network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
+    network = TreeNetwork(# tree_degree=GlobalConstants.TREE_DEGREE,
                           # node_build_funcs=[baseline.baseline],
                           node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           grad_func=lenet3.grad_func,
                           summary_func=lenet3.tensorboard_func,
-                          create_new_variables=True)
+                          degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()
     # Init

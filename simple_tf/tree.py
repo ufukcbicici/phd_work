@@ -5,11 +5,11 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, GradientType
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
+from collections import deque
 
 
 class TreeNetwork:
-    def __init__(self, tree_degree, node_build_funcs, grad_func, summary_func, create_new_variables):
-        self.treeDegree = tree_degree
+    def __init__(self, node_build_funcs, grad_func, summary_func, degree_list):
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
         self.depth = len(self.nodeBuildFuncs)
@@ -17,7 +17,7 @@ class TreeNetwork:
         self.topologicalSortedNodes = []
         self.gradFunc = grad_func
         self.summaryFunc = summary_func
-        self.createNewVariables = create_new_variables
+        self.degreeList = degree_list
         self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
         self.labelTensor = GlobalConstants.TRAIN_LABEL_TENSOR
         self.oneHotLabelTensor = GlobalConstants.TRAIN_ONE_HOT_LABELS
@@ -40,6 +40,7 @@ class TreeNetwork:
         self.weightDecayCoeff = None
         self.probabilityThreshold = None
         self.useThresholding = None
+        self.isTrain = None
         self.varToNodesDict = {}
         self.mainLossParamsDict = {}
         self.regularizationParamsDict = {}
@@ -49,9 +50,9 @@ class TreeNetwork:
         self.decisionPathSummaries = []
         self.summaryWriter = None
 
-    def get_parent_index(self, node_index):
-        parent_index = int((node_index - 1) / self.treeDegree)
-        return parent_index
+    # def get_parent_index(self, node_index):
+    #     parent_index = int((node_index - 1) / self.treeDegree)
+    #     return parent_index
 
     def get_fixed_variable(self, name, node):
         complete_name = self.get_variable_name(name=name, node=node)
@@ -66,23 +67,50 @@ class TreeNetwork:
         return H_vars
 
     def build_network(self):
+        # curr_index = 0
+        # prev_depth_node_count = 1
+        # for depth in range(0, self.depth):
+        #     degree = self.degreeList[depth]
+        #     if depth == 0:
+        #         node_count_in_depth = 1
+        #     else:
+        #         node_count_in_depth =
+        #     for i in range(0, node_count_in_depth):
+        #         is_root = depth == 0
+        #         is_leaf = depth == (self.depth - 1)
+        #         node = Node(index=curr_index, depth=depth, is_root=is_root, is_leaf=is_leaf)
+        #         self.nodes[curr_index] = node
+        #         if not is_root:
+        #             parent_index = self.get_parent_index(node_index=curr_index)
+        #             self.dagObject.add_edge(parent=self.nodes[parent_index], child=node)
+        #         else:
+        #             self.dagObject.add_node(node=node)
+        #         curr_index += 1
+        # Create itself
         curr_index = 0
-        for depth in range(0, self.depth):
-            node_count_in_depth = pow(self.treeDegree, depth)
-            for i in range(0, node_count_in_depth):
-                is_root = depth == 0
-                is_leaf = depth == (self.depth - 1)
-                node = Node(index=curr_index, depth=depth, is_root=is_root, is_leaf=is_leaf)
-                self.nodes[curr_index] = node
-                if not is_root:
-                    parent_index = self.get_parent_index(node_index=curr_index)
-                    self.dagObject.add_edge(parent=self.nodes[parent_index], child=node)
-                else:
-                    self.dagObject.add_node(node=node)
-                curr_index += 1
+        is_leaf = 0 == (self.depth - 1)
+        root_node = Node(index=curr_index, depth=0, is_root=True, is_leaf=is_leaf)
+        self.dagObject.add_node(node=root_node)
+        self.nodes[curr_index] = root_node
+        d = deque()
+        d.append(root_node)
+        # Create children if not leaf
+        while len(d) > 0:
+            # Dequeue
+            curr_node = d.popleft()
+            if not curr_node.isLeaf:
+                for i in range(self.degreeList[curr_node.depth]):
+                    new_depth = curr_node.depth + 1
+                    is_leaf = new_depth == (self.depth - 1)
+                    curr_index += 1
+                    child_node = Node(index=curr_index, depth=new_depth, is_root=False, is_leaf=is_leaf)
+                    self.nodes[curr_index] = child_node
+                    self.dagObject.add_edge(parent=curr_node, child=child_node)
+                    d.append(child_node)
         # Build symbolic networks
         # Probability threshold
         self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
+        self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
         self.probabilityThreshold = tf.placeholder(name="probability_threshold", dtype=tf.float32)
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -336,7 +364,7 @@ class TreeNetwork:
                    vars,
                    self.learningRate,
                    self.isOpenTensors]
-        if iteration % GlobalConstants.SUMMARY_PERIOD:
+        if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.classificationPathSummaries)
         results = sess.run(run_ops, feed_dict=feed_dict)
         # Only calculate the derivatives for information gain losses
@@ -346,9 +374,10 @@ class TreeNetwork:
         vars_current_values = results[3]
         lr = results[4]
         is_open_indicators = results[5]
-        if iteration % GlobalConstants.SUMMARY_PERIOD:
-            summary = results[6]
-            self.summaryWriter.addSummary(summary, iteration)
+        if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
+            summary_list = results[6]
+            for summary in summary_list:
+                self.summaryWriter.add_summary(summary, iteration)
         # ******************* Calculate grads *******************
         # Main loss
         main_grads = {}
@@ -388,16 +417,18 @@ class TreeNetwork:
                      self.probabilityThreshold: 0.0,
                      self.useThresholding: 0}
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
-        if iteration % GlobalConstants.SUMMARY_PERIOD:
+        if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
         results = sess.run(run_ops, feed_dict=feed_dict)
         decision_grads = results[0]
         sample_counts = results[1]
         is_open_indicators = results[2]
         info_gain_results = results[3]
-        if iteration % GlobalConstants.SUMMARY_PERIOD:
-            summary = results[4]
-            self.summaryWriter.addSummary(summary, iteration)
+        # print(info_gain_results)
+        if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
+            summary_list = results[4]
+            for summary in summary_list:
+                self.summaryWriter.add_summary(summary, iteration)
         d_grads = {}
         for k, v in self.decisionParamsDict.items():
             node = self.varToNodesDict[k.name]
@@ -453,6 +484,42 @@ class TreeNetwork:
     def get_assign_op_name(self, variable):
         return "Assign_{0}".format(variable.name[0:len(variable.name) - 2])
 
+    def batch_norm_wrapper(self, node, inputs, decay=0.9):
+        if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
+            gamma = tf.Variable(tf.ones([inputs.get_shape()[-1]]))
+            beta = tf.Variable(tf.zeros([inputs.get_shape()[-1]]))
+        batch_mean, batch_var = tf.nn.moments(inputs, [0])
+        ema = tf.train.ExponentialMovingAverage(decay=decay)
+
+        def mean_var_with_update():
+            ema_apply_op = ema.apply([batch_mean, batch_var])
+            with tf.control_dependencies([ema_apply_op]):
+                return tf.identity(batch_mean), tf.identity(batch_var)
+
+        mean, var = tf.cond(self.isTrain,
+                            mean_var_with_update,
+                            lambda: (ema.average(batch_mean), ema.average(batch_var)))
+        if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
+            normed = tf.nn.batch_normalization(x=inputs, mean=mean, variance=var, offset=beta, scale=gamma,
+                                               variance_epsilon=1e-3)
+        else:
+            normed = tf.nn.batch_normalization(x=inputs, mean=mean, variance=var, offset=None, scale=None,
+                                               variance_epsilon=1e-3)
+        return normed
+
+        # if is_training:
+        #     batch_mean, batch_var = tf.nn.moments(inputs, [0])
+        #     train_mean = tf.assign(pop_mean,
+        #                            pop_mean * decay + batch_mean * (1 - decay))
+        #     train_var = tf.assign(pop_var,
+        #                           pop_var * decay + batch_var * (1 - decay))
+        #     with tf.control_dependencies([train_mean, train_var]):
+        #         return tf.nn.batch_normalization(inputs,
+        #                                          batch_mean, batch_var, beta, scale, epsilon)
+        # else:
+        #     return tf.nn.batch_normalization(inputs,
+        #                                      pop_mean, pop_var, beta, scale, epsilon)
+
     def mask_input_nodes(self, node):
         if node.isRoot:
             node.labelTensor = self.labelTensor
@@ -486,14 +553,17 @@ class TreeNetwork:
             return parent_F, parent_H
 
     def apply_decision(self, node):
+        node_degree = self.degreeList[node.depth]
         p_n_given_x = tf.nn.softmax(node.activationsDict[node.index])
         p_c_given_x = node.oneHotLabelTensor
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x)
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
         arg_max_indices = tf.argmax(p_n_given_x, axis=1)
-        for index in range(self.treeDegree):
-            child_index = node.index * self.treeDegree + 1 + index
+        child_nodes = self.dagObject.children(node=node)
+        for index in range(len(child_nodes)):
+            child_node = child_nodes[index]
+            child_index = child_node.index
             branch_prob = p_n_given_x[:, index]
             mask_with_threshold = tf.reshape(tf.greater_equal(x=branch_prob, y=self.probabilityThreshold,
                                                               name="Mask_with_threshold_{0}".format(child_index)), [-1])
