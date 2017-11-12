@@ -52,6 +52,8 @@ def get_explanation_string():
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
+    explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
+    explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
     explanation += "Hyperplane bias at 0.0\n"
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         explanation += "Prob Threshold Initial Value:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.value)
@@ -99,7 +101,7 @@ def main():
     init = tf.global_variables_initializer()
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
-    wd_list = [x for x in itertools.repeat(0.0, 10)]
+    wd_list = [x for x in itertools.repeat(0.0, 1)]
     run_id = 0
     for wd in wd_list:
         print("********************NEW RUN:{0}********************".format(run_id))

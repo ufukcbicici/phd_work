@@ -13,8 +13,8 @@ class GradientType(Enum):
 
 
 class GlobalConstants:
-    EPOCH_COUNT = 6000
-    BATCH_SIZE = 5000
+    EPOCH_COUNT = 1200
+    BATCH_SIZE = 1000
     EVAL_BATCH_SIZE = 50000
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
@@ -28,6 +28,7 @@ class GlobalConstants:
     DECAY_RATE = 0.5
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
+    BATCH_NORM_DECAY = 0.9
     PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
                                               decay_period=1, min_limit=0.0)
     DATA_TYPE = tf.float32
@@ -37,9 +38,9 @@ class GlobalConstants:
     USE_EMPTY_NODE_CRASH_PREVENTION = False
     USE_RANDOM_PARAMETERS = True
     USE_PROBABILITY_THRESHOLD = False
-    USE_INFO_GAIN_DECISION = True
-    USE_CONCAT_TRICK = False
-    USE_BATCH_NORM_BEFORE_BRANCHING = False
+    USE_INFO_GAIN_DECISION = False
+    USE_CONCAT_TRICK = True
+    USE_BATCH_NORM_BEFORE_BRANCHING = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = False
     DECISION_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = False

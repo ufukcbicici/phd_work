@@ -40,7 +40,9 @@ class TreeNetwork:
         self.weightDecayCoeff = None
         self.probabilityThreshold = None
         self.useThresholding = None
+        self.iterationHolder = None
         self.isTrain = None
+        self.isDecisionPhase = None
         self.varToNodesDict = {}
         self.mainLossParamsDict = {}
         self.regularizationParamsDict = {}
@@ -110,7 +112,9 @@ class TreeNetwork:
         # Build symbolic networks
         # Probability threshold
         self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
+        self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
+        self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.float32)
         self.probabilityThreshold = tf.placeholder(name="probability_threshold", dtype=tf.float32)
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -210,38 +214,6 @@ class TreeNetwork:
         # Add tensorboard ops
         self.summaryFunc(network=self)
         self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
-
-    def get_trainable_vars(self, loss, sess, dataset):
-        vars = tf.trainable_variables()
-        accepted_vars = set()
-        rejected_vars = set()
-        grad_obj = None
-        grads_index_dict = {}
-        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
-        samples = np.expand_dims(samples, axis=3)
-        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
-                     GlobalConstants.TRAIN_LABEL_TENSOR: labels,
-                     GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
-                     self.globalCounter: 0,
-                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-                     self.probabilityThreshold: 0.0,
-                     self.useThresholding: 0}
-        list_accepted_vars = None
-        for candidate_v in vars:
-            accepted_vars.add(candidate_v)
-            print("Trying variable:{0}".format(candidate_v.name))
-            list_accepted_vars = list(accepted_vars)
-            grad_obj = tf.gradients(ys=loss, xs=list_accepted_vars)
-            try:
-                grad_results = sess.run([grad_obj], feed_dict=feed_dict)
-            except TypeError as e:
-                print(e)
-                accepted_vars.remove(candidate_v)
-                rejected_vars.add(candidate_v)
-        list_accepted_vars = list(accepted_vars)
-        for i in range(len(list_accepted_vars)):
-            grads_index_dict[list_accepted_vars[i]] = i
-        return grads_index_dict, grad_obj
 
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
@@ -357,7 +329,10 @@ class TreeNetwork:
                      self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.probabilityThreshold: prob_threshold,
-                     self.useThresholding: use_threshold}
+                     self.useThresholding: use_threshold,
+                     self.isDecisionPhase: 0.0,
+                     self.isTrain: 1,
+                     self.iterationHolder: iteration}
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.sample_count_tensors,
@@ -415,7 +390,10 @@ class TreeNetwork:
                      self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.probabilityThreshold: 0.0,
-                     self.useThresholding: 0}
+                     self.useThresholding: 0,
+                     self.isDecisionPhase: 1.0,
+                     self.isTrain: 1,
+                     self.iterationHolder: iteration}
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
@@ -483,49 +461,6 @@ class TreeNetwork:
 
     def get_assign_op_name(self, variable):
         return "Assign_{0}".format(variable.name[0:len(variable.name) - 2])
-
-    def batch_norm_wrapper(self, node, inputs, decay=0.9):
-        if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
-            gamma = tf.Variable(name=self.get_variable_name(name="gamma", node=node),
-                                initial_value=tf.ones([inputs.get_shape()[-1]]))
-            beta = tf.Variable(name=self.get_variable_name(name="beta", node=node),
-                               initial_value=tf.zeros([inputs.get_shape()[-1]]))
-        pop_mean = tf.Variable(tf.zeros([inputs.get_shape()[-1]]), trainable=False)
-        pop_var = tf.Variable(tf.ones([inputs.get_shape()[-1]]), trainable=False)
-        batch_mean, batch_var = tf.nn.moments(inputs, [0])
-        def mean_var_with_update():
-            train_mean_op = tf.where()
-
-        # ema = tf.train.ExponentialMovingAverage(decay=decay)
-        #
-        # def mean_var_with_update():
-        #     ema_apply_op = ema.apply([batch_mean, batch_var])
-        #     with tf.control_dependencies([ema_apply_op]):
-        #         return tf.identity(batch_mean), tf.identity(batch_var)
-        #
-        # mean, var = tf.cond(self.isTrain,
-        #                     mean_var_with_update,
-        #                     lambda: (ema.average(batch_mean), ema.average(batch_var)))
-        # if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
-        #     normed = tf.nn.batch_normalization(x=inputs, mean=mean, variance=var, offset=beta, scale=gamma,
-        #                                        variance_epsilon=1e-3)
-        # else:
-        #     normed = tf.nn.batch_normalization(x=inputs, mean=mean, variance=var, offset=None, scale=None,
-        #                                        variance_epsilon=1e-3)
-        return normed
-
-        # if is_training:
-        #     batch_mean, batch_var = tf.nn.moments(inputs, [0])
-        #     train_mean = tf.assign(pop_mean,
-        #                            pop_mean * decay + batch_mean * (1 - decay))
-        #     train_var = tf.assign(pop_var,
-        #                           pop_var * decay + batch_var * (1 - decay))
-        #     with tf.control_dependencies([train_mean, train_var]):
-        #         return tf.nn.batch_normalization(inputs,
-        #                                          batch_mean, batch_var, beta, scale, epsilon)
-        # else:
-        #     return tf.nn.batch_normalization(inputs,
-        #                                      pop_mean, pop_var, beta, scale, epsilon)
 
     def mask_input_nodes(self, node):
         if node.isRoot:
@@ -612,7 +547,10 @@ class TreeNetwork:
             GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
             self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
             self.probabilityThreshold: 0.0,
-            self.useThresholding: 0}
+            self.useThresholding: 0,
+            self.isDecisionPhase: 0.0,
+            self.isTrain: 0,
+            self.iterationHolder: 1000000}
         results = sess.run(self.evalDict, feed_dict)
         # else:
         #     samples, labels, indices_list = dataset.get_next_batch(batch_size=EVAL_BATCH_SIZE)

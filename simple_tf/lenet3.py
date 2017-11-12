@@ -1,4 +1,6 @@
 import tensorflow as tf
+
+from simple_tf import batch_norm
 from simple_tf.global_params import GlobalConstants
 from simple_tf.global_params import GradientType
 
@@ -40,7 +42,16 @@ def root_func(node, network, variables=None):
     flat_data = tf.contrib.layers.flatten(network.dataTensor)
     node.hOpsList.extend([flat_data])
     # Decisions
-    node.activationsDict[node.index] = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
+    activations = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
+    if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
+        normed_activations = batch_norm.batch_norm(x=activations, iteration=network.iterationHolder,
+                                                   is_decision_phase=network.isDecisionPhase,
+                                                   is_training_phase=network.isTrain,
+                                                   decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                   node=node, network=network)
+        node.activationsDict[node.index] = normed_activations
+    else:
+        node.activationsDict[node.index] = activations
     network.apply_decision(node=node)
 
 
@@ -92,9 +103,19 @@ def l1_func(node, network, variables=None):
         concat_list = [parent_H]
         concat_list.extend(node.activationsDict.values())
         h_concat = tf.concat(values=concat_list, axis=1)
-        node.activationsDict[node.index] = tf.matmul(h_concat, hyperplane_weights) + hyperplane_biases
+        activations = tf.matmul(h_concat, hyperplane_weights) + hyperplane_biases
     else:
-        node.activationsDict[node.index] = tf.matmul(parent_H, hyperplane_weights) + hyperplane_biases
+        activations = tf.matmul(parent_H, hyperplane_weights) + hyperplane_biases
+    # Batch Norm
+    if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
+        normed_activations = batch_norm.batch_norm(x=activations, iteration=network.iterationHolder,
+                                                   is_decision_phase=network.isDecisionPhase,
+                                                   is_training_phase=network.isTrain,
+                                                   decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                   node=node, network=network)
+        node.activationsDict[node.index] = normed_activations
+    else:
+        node.activationsDict[node.index] = activations
     network.apply_decision(node=node)
 
 
