@@ -5,53 +5,67 @@ import numpy as np
 from simple_tf.global_params import GlobalConstants
 
 
-def batch_norm(x, decay):
-    if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
-        gamma = tf.Variable(name="gamma", initial_value=tf.ones([x.get_shape()[-1]]))
-        beta = tf.Variable(name="beta", initial_value=tf.zeros([x.get_shape()[-1]]))
-    else:
-        gamma = None
-        beta = None
+def batch_norm(x, decay, g, b):
     pop_mean = tf.Variable(name="pop_mean", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
     pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
-    decision_batch_mean = tf.Variable(name="decision_batch_mean",
-                                      initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
-    decision_batch_var = tf.Variable(name="decision_batch_var",
-                                     initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
-    batch_mean, batch_var = tf.nn.moments(x, [0])
-    decision_batch_mean_assign_op = tf.assign(decision_batch_mean,
-                                              is_decision_phase * batch_mean +
-                                              (1.0 - is_decision_phase) * decision_batch_mean)
-    decision_batch_var_assign_op = tf.assign(decision_batch_var, is_decision_phase * batch_var +
-                                             (1.0 - is_decision_phase) * decision_batch_var)
-    with tf.control_dependencies([decision_batch_mean_assign_op, decision_batch_var_assign_op]):
-        new_mean = tf.where(iteration > 0, is_decision_phase * (decay * pop_mean + (1.0 - decay)
-                                                                * decision_batch_mean) +
-                            (1.0 - is_decision_phase) * pop_mean, decision_batch_mean)
-        new_var = tf.where(iteration > 0, is_decision_phase * (decay * pop_var + (1.0 - decay) * decision_batch_var) +
-                           (1.0 - is_decision_phase) * pop_var, decision_batch_var)
+    b_mean = tf.Variable(name="batch_mean", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
+    b_var = tf.Variable(name="batch_var", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
+    mu, sigma = tf.nn.moments(x, [0])
+    decision_b_mean_assign_op = tf.assign(b_mean, is_decision_phase * mu + (1.0 - is_decision_phase) * b_mean)
+    decision_b_var_assign_op = tf.assign(b_var, is_decision_phase * sigma + (1.0 - is_decision_phase) * b_var)
+    with tf.control_dependencies([decision_b_mean_assign_op, decision_b_var_assign_op]):
+        new_mean = tf.where(iteration > 0, is_decision_phase * (decay * pop_mean + (1.0 - decay) * b_mean) + (1.0 - is_decision_phase) * pop_mean, b_mean)
+        new_var = tf.where(iteration > 0, is_decision_phase * (decay * pop_var + (1.0 - decay) * b_var) + (1.0 - is_decision_phase) * pop_var, b_var)
         pop_mean_assign_op = tf.assign(pop_mean, new_mean)
         pop_var_assign_op = tf.assign(pop_var, new_var)
 
         def get_population_moments_with_update():
             with tf.control_dependencies([pop_mean_assign_op, pop_var_assign_op]):
-                return tf.identity(decision_batch_mean), tf.identity(decision_batch_var)
-        final_mean, final_var = tf.cond(is_training_phase > 0,
-                                        get_population_moments_with_update,
-                                        lambda: (tf.identity(pop_mean), tf.identity(pop_var)))
-        normed = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
-                                           variance_epsilon=1e-5)
-        return normed, final_mean, final_var, batch_mean, batch_var
+                return tf.identity(b_mean), tf.identity(b_var)
+
+        final_mean, final_var = tf.cond(is_training_phase > 0, get_population_moments_with_update, lambda: (tf.identity(pop_mean), tf.identity(pop_var)))
+        normed_x = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=b, scale=g, variance_epsilon=1e-5)
+        return normed_x, final_mean, final_var, b_mean, b_var
+
+
+def batch_norm_full(x, decay, g, b):
+    mu, sigma = tf.nn.moments(x, [0])
+    normed_x = tf.nn.batch_normalization(x=x, mean=mu, variance=sigma, offset=b, scale=g, variance_epsilon=1e-5)
+    return normed_x
+
+
+def batch_norm_eval(x, decay, b_mean, b_var, g, b):
+    normed_x = tf.nn.batch_normalization(x=x, mean=b_mean, variance=b_var, offset=b, scale=g, variance_epsilon=1e-5)
+    return normed_x
+
 
 decay = 0.5
 dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
 
 # Network
+flat_data = tf.contrib.layers.flatten(GlobalConstants.TRAIN_DATA_TENSOR)
 iteration = tf.placeholder(name="iteration", dtype=tf.int64)
 is_decision_phase = tf.placeholder(name="is_decision_phase", dtype=tf.float32)
 is_training_phase = tf.placeholder(name="is_training_phase", dtype=tf.int64)
-flat_data = tf.contrib.layers.flatten(GlobalConstants.TRAIN_DATA_TENSOR)
-normed, pop_mean_eval, pop_var_eval, batch_mean, batch_var = batch_norm(x=flat_data, decay=decay)
+if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
+    gamma = tf.Variable(name="gamma", initial_value=tf.ones([flat_data.get_shape()[-1]]))
+    beta = tf.Variable(name="beta", initial_value=tf.zeros([flat_data.get_shape()[-1]]))
+else:
+    gamma = None
+    beta = None
+
+normed, pop_mean_eval, pop_var_eval, batch_mean, batch_var = batch_norm(x=flat_data, decay=decay, g=gamma, b=beta)
+sum_0 = tf.reduce_sum(normed)
+grads_0 = tf.gradients(sum_0, [flat_data, gamma, beta])
+
+normed_full = batch_norm_full(x=flat_data, decay=decay, g=gamma, b=beta)
+sum_1 = tf.reduce_sum(normed_full)
+grads_1 = tf.gradients(sum_1, [flat_data, gamma, beta])
+
+normed_eval = batch_norm_eval(x=flat_data, decay=decay, b_mean=batch_mean, b_var=batch_var, g=gamma, b=beta)
+sum_2 = tf.reduce_sum(normed_eval)
+grads_2 = tf.gradients(sum_2, [flat_data, gamma, beta])
+
 init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
@@ -62,11 +76,13 @@ shadow_var = 0.0
 for epoch in range(5):
     for i in range(10):
         samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        random_indices = np.random.choice(GlobalConstants.BATCH_SIZE, size=int(GlobalConstants.BATCH_SIZE / 2), replace=False)
         samples = np.expand_dims(samples, axis=3)
+        samples_subset = samples[random_indices]
         print("Epoch {0}".format(epoch))
         # ************************************ Decision ************************************
-        results = sess.run([pop_mean_eval, pop_var_eval, batch_mean, batch_var, normed],
-                           feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
+        results = sess.run([pop_mean_eval, pop_var_eval, batch_mean, batch_var, normed, grads_0, grads_1],
+                           feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples_subset,
                                       iteration: i, is_decision_phase: 1.0, is_training_phase: 1})
         if i == 0:
             shadow_mean = results[2]
@@ -76,20 +92,26 @@ for epoch in range(5):
             shadow_var = decay * shadow_var + (1.0 - decay) * results[3]
         print("")
         print("Decision")
-        print("Manual Ema (Mean) {0} = {1}".format(i, np.sum(shadow_mean)))
-        print("Auto Ema (Mean) {0} = {1}".format(i, np.sum(results[0])))
-        print("Manual Ema (Var) {0} = {1}".format(i, np.sum(shadow_var)))
-        print("Auto Ema (Var) {0} = {1}".format(i, np.sum(results[1])))
+        print("shadow_mean = {0}".format(i, np.sum(shadow_mean)))
+        print("pop_mean_eval = {0}".format(i, np.sum(results[0])))
+        print("shadow_var = {0}".format(i, np.sum(shadow_var)))
+        print("pop_var_eval = {0}".format(i, np.sum(results[1])))
+        print("batch_mean = {0}".format(i, np.sum(results[2])))
+        print("batch_var = {0}".format(i, np.sum(results[3])))
         # ************************************ Decision ************************************
 
         # ************************************ Classification ************************************
-        results = sess.run([pop_mean_eval, pop_var_eval, batch_mean, batch_var, normed],
+        results = sess.run([pop_mean_eval, pop_var_eval, batch_mean, batch_var, normed, grads_0, grads_2],
                            feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
                                       iteration: i, is_decision_phase: 0.0, is_training_phase: 1})
         print("")
         print("Classification")
-        print("Auto Ema (Mean) {0} = {1}".format(i, np.sum(results[0])))
-        print("Auto Ema (Var) {0} = {1}".format(i, np.sum(results[1])))
+        print("shadow_mean = {0}".format(i, np.sum(shadow_mean)))
+        print("pop_mean_eval = {0}".format(i, np.sum(results[0])))
+        print("shadow_var = {0}".format(i, np.sum(shadow_var)))
+        print("pop_var_eval = {0}".format(i, np.sum(results[1])))
+        print("batch_mean = {0}".format(i, np.sum(results[2])))
+        print("batch_var = {0}".format(i, np.sum(results[3])))
         # ************************************ Classification ************************************
         #
     # ************************************ Test ************************************
@@ -100,8 +122,8 @@ for epoch in range(5):
                                   iteration: 1000000, is_decision_phase: 0.0, is_training_phase: 0})
     print("")
     print("Test")
-    print("Auto Ema (Mean) {0} = {1}".format(i, np.sum(results[0])))
-    print("Auto Ema (Var) {0} = {1}".format(i, np.sum(results[1])))
+    print("pop_mean_eval} = {1}".format(i, np.sum(results[0])))
+    print("pop_var_eval = {1}".format(i, np.sum(results[1])))
     print("batch_mean {0} = {1}".format(i, np.sum(results[2])))
     print("batch_var {0} = {1}".format(i, np.sum(results[3])))
     # ************************************ Test ************************************
