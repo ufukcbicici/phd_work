@@ -12,6 +12,11 @@ class UtilityFuncs:
         pass
 
     @staticmethod
+    def compare_floats(f1, f2, eps=1e-10):
+        abs_dif = abs(f1 - f2)
+        return abs_dif <= eps
+
+    @staticmethod
     def set_tuple_element(target_tuple, target_index, value):
         tuple_as_list = list(target_tuple)
         tuple_as_list[target_index] = value

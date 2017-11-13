@@ -1,3 +1,4 @@
+from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.mnist_data_set import MnistDataSet
 import tensorflow as tf
 import numpy as np
@@ -25,7 +26,7 @@ def batch_norm(x, decay, g, b):
 
         final_mean, final_var = tf.cond(is_training_phase > 0, get_population_moments_with_update, lambda: (tf.identity(pop_mean), tf.identity(pop_var)))
         normed_x = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=b, scale=g, variance_epsilon=1e-5)
-        return normed_x, final_mean, final_var, b_mean, b_var
+        return normed_x, final_mean, final_var, b_mean, b_var, pop_mean, pop_var, mu, sigma
 
 
 def batch_norm_full(x, decay, g, b):
@@ -54,7 +55,8 @@ else:
     gamma = None
     beta = None
 
-normed, pop_mean_eval, pop_var_eval, batch_mean, batch_var = batch_norm(x=flat_data, decay=decay, g=gamma, b=beta)
+normed, final_mean_eval, final_var_eval, b_mean_eval, b_var_eval, pop_mean_eval, pop_var_eval, mu_eval, sigma_eval = \
+    batch_norm(x=flat_data, decay=decay, g=gamma, b=beta)
 sum_0 = tf.reduce_sum(normed)
 grads_0 = tf.gradients(sum_0, [flat_data, gamma, beta])
 
@@ -62,7 +64,7 @@ normed_full = batch_norm_full(x=flat_data, decay=decay, g=gamma, b=beta)
 sum_1 = tf.reduce_sum(normed_full)
 grads_1 = tf.gradients(sum_1, [flat_data, gamma, beta])
 
-normed_eval = batch_norm_eval(x=flat_data, decay=decay, b_mean=batch_mean, b_var=batch_var, g=gamma, b=beta)
+normed_eval = batch_norm_eval(x=flat_data, decay=decay, b_mean=b_mean_eval, b_var=b_var_eval, g=gamma, b=beta)
 sum_2 = tf.reduce_sum(normed_eval)
 grads_2 = tf.gradients(sum_2, [flat_data, gamma, beta])
 
@@ -74,58 +76,98 @@ shadow_mean = 0.0
 shadow_var = 0.0
 # Training
 for epoch in range(5):
+    print("***********************Epoch {0}***********************".format(epoch))
     for i in range(10):
+        print("Iteration {0}".format(i))
         samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
-        random_indices = np.random.choice(GlobalConstants.BATCH_SIZE, size=int(GlobalConstants.BATCH_SIZE / 2), replace=False)
         samples = np.expand_dims(samples, axis=3)
-        samples_subset = samples[random_indices]
-        print("Epoch {0}".format(epoch))
         # ************************************ Decision ************************************
-        results = sess.run([pop_mean_eval, pop_var_eval, batch_mean, batch_var, normed, grads_0, grads_1],
-                           feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples_subset,
+        eval_list = [final_mean_eval, final_var_eval, b_mean_eval, b_var_eval, pop_mean_eval, pop_var_eval, mu_eval, sigma_eval]
+        eval_dict = {v: v for v in eval_list}
+        eval_dict["grads_0"] = grads_0
+        eval_dict["grads_1"] = grads_1
+        results = sess.run(eval_dict,
+                           feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
                                       iteration: i, is_decision_phase: 1.0, is_training_phase: 1})
         if i == 0:
-            shadow_mean = results[2]
-            shadow_var = results[3]
+            shadow_mean = results[b_mean_eval]
+            shadow_var = results[b_var_eval]
         else:
-            shadow_mean = decay * shadow_mean + (1.0 - decay) * results[2]
-            shadow_var = decay * shadow_var + (1.0 - decay) * results[3]
+            shadow_mean = decay * shadow_mean + (1.0 - decay) * results[b_mean_eval]
+            shadow_var = decay * shadow_var + (1.0 - decay) * results[b_var_eval]
         print("")
         print("Decision")
-        print("shadow_mean = {0}".format(i, np.sum(shadow_mean)))
-        print("pop_mean_eval = {0}".format(i, np.sum(results[0])))
-        print("shadow_var = {0}".format(i, np.sum(shadow_var)))
-        print("pop_var_eval = {0}".format(i, np.sum(results[1])))
-        print("batch_mean = {0}".format(i, np.sum(results[2])))
-        print("batch_var = {0}".format(i, np.sum(results[3])))
+        print("Manual Batch Mean = {0}".format(np.sum(np.mean(samples, axis=0))))
+        print("shadow_mean = {0}".format(np.sum(shadow_mean)))
+        print("pop_mean_eval = {0}".format(np.sum(results[pop_mean_eval])))
+        print("shadow_var = {0}".format(np.sum(shadow_var)))
+        print("pop_var_eval = {0}".format(np.sum(results[pop_var_eval])))
+        print("b_mean_eval = {0}".format(np.sum(results[b_mean_eval])))
+        print("b_var_eval = {0}".format(np.sum(results[b_var_eval])))
+        print("mu_eval = {0}".format(np.sum(results[mu_eval])))
+        print("sigma_eval = {0}".format(np.sum(results[sigma_eval])))
+        print("final_mean_eval = {0}".format(np.sum(results[final_mean_eval])))
+        print("final_var_eval = {0}".format(np.sum(results[final_var_eval])))
+        dec_mu = np.sum(results[final_mean_eval])
+        dec_sigma = np.sum(results[final_var_eval])
+        assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_mean), f2=np.sum(results[pop_mean_eval])))
+        assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_var), f2=np.sum(results[pop_var_eval])))
+        assert (UtilityFuncs.compare_floats(f1=np.sum(results[final_mean_eval]), f2=np.sum(results[mu_eval])))
+        assert (UtilityFuncs.compare_floats(f1=np.sum(results[final_var_eval]), f2=np.sum(results[sigma_eval])))
         # ************************************ Decision ************************************
 
         # ************************************ Classification ************************************
-        results = sess.run([pop_mean_eval, pop_var_eval, batch_mean, batch_var, normed, grads_0, grads_2],
+        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples = np.expand_dims(samples, axis=3)
+        eval_list = [final_mean_eval, final_var_eval, b_mean_eval, b_var_eval, pop_mean_eval, pop_var_eval, mu_eval, sigma_eval]
+        eval_dict = {v: v for v in eval_list}
+        eval_dict["grads_0"] = grads_0
+        eval_dict["grads_2"] = grads_2
+        results = sess.run(eval_dict,
                            feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
                                       iteration: i, is_decision_phase: 0.0, is_training_phase: 1})
         print("")
         print("Classification")
-        print("shadow_mean = {0}".format(i, np.sum(shadow_mean)))
-        print("pop_mean_eval = {0}".format(i, np.sum(results[0])))
-        print("shadow_var = {0}".format(i, np.sum(shadow_var)))
-        print("pop_var_eval = {0}".format(i, np.sum(results[1])))
-        print("batch_mean = {0}".format(i, np.sum(results[2])))
-        print("batch_var = {0}".format(i, np.sum(results[3])))
+        print("shadow_mean = {0}".format(np.sum(shadow_mean)))
+        print("pop_mean_eval = {0}".format(np.sum(results[pop_mean_eval])))
+        print("shadow_var = {0}".format(np.sum(shadow_var)))
+        print("pop_var_eval = {0}".format(np.sum(results[pop_var_eval])))
+        print("b_mean_eval = {0}".format(np.sum(results[b_mean_eval])))
+        print("b_var_eval = {0}".format(np.sum(results[b_var_eval])))
+        print("mu_eval = {0}".format(np.sum(results[mu_eval])))
+        print("sigma_eval = {0}".format(np.sum(results[sigma_eval])))
+        print("final_mean_eval = {0}".format(np.sum(results[final_mean_eval])))
+        print("final_var_eval = {0}".format(np.sum(results[final_var_eval])))
+        assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_mean), f2=np.sum(results[pop_mean_eval])))
+        assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_var), f2=np.sum(results[pop_var_eval])))
+        assert (UtilityFuncs.compare_floats(f1=np.sum(results[final_mean_eval]), f2=dec_mu))
+        assert (UtilityFuncs.compare_floats(f1=np.sum(results[final_var_eval]), f2=dec_sigma))
         # ************************************ Classification ************************************
         #
     # ************************************ Test ************************************
     samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
     samples = np.expand_dims(samples, axis=3)
-    results = sess.run([pop_mean_eval, pop_var_eval, batch_mean, batch_var, normed],
+    eval_list = [final_mean_eval, final_var_eval, b_mean_eval, b_var_eval, pop_mean_eval, pop_var_eval, mu_eval, sigma_eval]
+    eval_dict = {v: v for v in eval_list}
+    results = sess.run(eval_dict,
                        feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
                                   iteration: 1000000, is_decision_phase: 0.0, is_training_phase: 0})
     print("")
     print("Test")
-    print("pop_mean_eval} = {1}".format(i, np.sum(results[0])))
-    print("pop_var_eval = {1}".format(i, np.sum(results[1])))
-    print("batch_mean {0} = {1}".format(i, np.sum(results[2])))
-    print("batch_var {0} = {1}".format(i, np.sum(results[3])))
+    print("shadow_mean = {0}".format(np.sum(shadow_mean)))
+    print("pop_mean_eval = {0}".format(np.sum(results[pop_mean_eval])))
+    print("shadow_var = {0}".format(np.sum(shadow_var)))
+    print("pop_var_eval = {0}".format(np.sum(results[pop_var_eval])))
+    print("b_mean_eval = {0}".format(np.sum(results[b_mean_eval])))
+    print("b_var_eval = {0}".format(np.sum(results[b_var_eval])))
+    print("mu_eval = {0}".format(np.sum(results[mu_eval])))
+    print("sigma_eval = {0}".format(np.sum(results[sigma_eval])))
+    print("final_mean_eval = {0}".format(np.sum(results[final_mean_eval])))
+    print("final_var_eval = {0}".format(np.sum(results[final_var_eval])))
+    assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_mean), f2=np.sum(results[pop_mean_eval])))
+    assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_var), f2=np.sum(results[pop_var_eval])))
+    assert (UtilityFuncs.compare_floats(f1=np.sum(results[final_mean_eval]), f2=np.sum(results[pop_mean_eval])))
+    assert (UtilityFuncs.compare_floats(f1=np.sum(results[final_var_eval]), f2=np.sum(results[pop_var_eval])))
     # ************************************ Test ************************************
 print("X")
 
