@@ -44,11 +44,12 @@ def root_func(node, network, variables=None):
     # Decisions
     activations = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
     if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-        normed_activations = batch_norm.batch_norm(x=activations, iteration=network.iterationHolder,
-                                                   is_decision_phase=network.isDecisionPhase,
-                                                   is_training_phase=network.isTrain,
-                                                   decay=GlobalConstants.BATCH_NORM_DECAY,
-                                                   node=node, network=network)
+        normed_activations, assign_ops = batch_norm.batch_norm(x=activations, iteration=network.iterationHolder,
+                                                               is_decision_phase=network.isDecisionPhase,
+                                                               is_training_phase=network.isTrain,
+                                                               decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                               node=node, network=network)
+        network.branchingBatchNormAssignOps.extend(assign_ops)
         node.activationsDict[node.index] = normed_activations
     else:
         node.activationsDict[node.index] = activations
@@ -108,11 +109,12 @@ def l1_func(node, network, variables=None):
         activations = tf.matmul(parent_H, hyperplane_weights) + hyperplane_biases
     # Batch Norm
     if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-        normed_activations = batch_norm.batch_norm(x=activations, iteration=network.iterationHolder,
-                                                   is_decision_phase=network.isDecisionPhase,
-                                                   is_training_phase=network.isTrain,
-                                                   decay=GlobalConstants.BATCH_NORM_DECAY,
-                                                   node=node, network=network)
+        normed_activations, assign_ops = batch_norm.batch_norm(x=activations, iteration=network.iterationHolder,
+                                                               is_decision_phase=network.isDecisionPhase,
+                                                               is_training_phase=network.isTrain,
+                                                               decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                               node=node, network=network)
+        network.branchingBatchNormAssignOps.extend(assign_ops)
         node.activationsDict[node.index] = normed_activations
     else:
         node.activationsDict[node.index] = activations
@@ -186,18 +188,21 @@ def grad_func(network):
             if "hyperplane" in v.name:
                 decision_vars_list.append(v)
             classification_vars_list.append(v)
-            regularization_vars_list.append(v)
+            if not ("gamma" in v.name or "beta" in v.name):
+                regularization_vars_list.append(v)
     elif GlobalConstants.USE_INFO_GAIN_DECISION:
         for v in vars:
-            if "hyperplane" in v.name:
+            if "hyperplane" in v.name or "gamma" in v.name or "beta" in v.name:
                 decision_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
-            regularization_vars_list.append(v)
+            if not ("gamma" in v.name or "beta" in v.name):
+                regularization_vars_list.append(v)
     elif len(network.topologicalSortedNodes) == 1:
         for v in vars:
             classification_vars_list.append(v)
-            regularization_vars_list.append(v)
+            if not ("gamma" in v.name or "beta" in v.name):
+                regularization_vars_list.append(v)
     else:
         raise NotImplementedError()
     for i in range(len(decision_vars_list)):

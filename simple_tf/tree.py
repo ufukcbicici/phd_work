@@ -51,6 +51,7 @@ class TreeNetwork:
         self.classificationPathSummaries = []
         self.decisionPathSummaries = []
         self.summaryWriter = None
+        self.branchingBatchNormAssignOps = []
 
     # def get_parent_index(self, node_index):
     #     parent_index = int((node_index - 1) / self.treeDegree)
@@ -114,7 +115,7 @@ class TreeNetwork:
         self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
         self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
-        self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.float32)
+        self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
         self.probabilityThreshold = tf.placeholder(name="probability_threshold", dtype=tf.float32)
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -323,6 +324,10 @@ class TreeNetwork:
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         prob_threshold = (1.0 / float(GlobalConstants.TREE_DEGREE)) - GlobalConstants.PROBABILITY_THRESHOLD.value
         print("prob_threshold={0}".format(prob_threshold))
+        if GlobalConstants.USE_INFO_GAIN_DECISION:
+            is_decision_phase = 0
+        else:
+            is_decision_phase = 1
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
                      GlobalConstants.TRAIN_LABEL_TENSOR: labels,
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
@@ -330,7 +335,7 @@ class TreeNetwork:
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.probabilityThreshold: prob_threshold,
                      self.useThresholding: use_threshold,
-                     self.isDecisionPhase: 0.0,
+                     self.isDecisionPhase: is_decision_phase,
                      self.isTrain: 1,
                      self.iterationHolder: iteration}
         run_ops = [self.classificationGradients,
@@ -391,12 +396,14 @@ class TreeNetwork:
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.probabilityThreshold: 0.0,
                      self.useThresholding: 0,
-                     self.isDecisionPhase: 1.0,
+                     self.isDecisionPhase: 1,
                      self.isTrain: 1,
                      self.iterationHolder: iteration}
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
+        if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
+            run_ops.extend(self.branchingBatchNormAssignOps)
         results = sess.run(run_ops, feed_dict=feed_dict)
         decision_grads = results[0]
         sample_counts = results[1]
@@ -423,14 +430,16 @@ class TreeNetwork:
         vars = tf.trainable_variables()
         samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
-        main_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
-            self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
-                                                   one_hot_labels=one_hot_labels, iteration=iteration)
+        # Decision network
         decision_grads = {}
         if GlobalConstants.USE_INFO_GAIN_DECISION:
             decision_grads, info_gain_results = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
                                                                         one_hot_labels=one_hot_labels,
                                                                         iteration=iteration)
+        # Classification network
+        main_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
+            self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
+                                                   one_hot_labels=one_hot_labels, iteration=iteration)
         GlobalConstants.PROBABILITY_THRESHOLD.update(iteration=iteration)
         update_dict = {}
         assign_dict = {}
@@ -548,7 +557,7 @@ class TreeNetwork:
             self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
             self.probabilityThreshold: 0.0,
             self.useThresholding: 0,
-            self.isDecisionPhase: 0.0,
+            self.isDecisionPhase: 0,
             self.isTrain: 0,
             self.iterationHolder: 1000000}
         results = sess.run(self.evalDict, feed_dict)
