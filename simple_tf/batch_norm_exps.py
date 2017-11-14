@@ -9,23 +9,27 @@ from simple_tf.global_params import GlobalConstants
 def batch_norm_2(x, decay, g, b):
     pop_mean = tf.Variable(name="pop_mean", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
     pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
-    last_mean = tf.Variable(name="batch_mean", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
+    last_mean = tf.Variable(name="batch_mean", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]),
+                            trainable=False)
     last_var = tf.Variable(name="batch_var", initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
     mu, sigma = tf.nn.moments(x, [0])
-    last_mean_assign_op = tf.assign(last_mean, mu)
-    last_var_assign_op = tf.assign(last_var, sigma)
     curr_mean = tf.where(is_decision_phase > 0, mu, last_mean)
     curr_var = tf.where(is_decision_phase > 0, sigma, last_var)
-    new_pop_mean = tf.where(iteration > 0, (decay * pop_mean + (1.0 - decay) * curr_mean), curr_mean)
-    new_pop_var= tf.where(iteration > 0, (decay * pop_var + (1.0 - decay) * curr_var), curr_var)
-    pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean)
-    pop_var_assign_op = tf.assign(pop_var, new_pop_var)
     final_mean = tf.where(is_training_phase > 0, curr_mean, pop_mean)
     final_var = tf.where(is_training_phase > 0, curr_var, pop_var)
     normed_x = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=b, scale=g,
                                          variance_epsilon=1e-5)
+    with tf.control_dependencies([normed_x]):
+        last_mean_assign_op = tf.assign(last_mean, mu)
+        last_var_assign_op = tf.assign(last_var, sigma)
+        new_pop_mean = tf.where(iteration > 0, (decay * pop_mean + (1.0 - decay) * mu), mu)
+        new_pop_var = tf.where(iteration > 0, (decay * pop_var + (1.0 - decay) * sigma), sigma)
+        pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean)
+        pop_var_assign_op = tf.assign(pop_var, new_pop_var)
+
     return normed_x, final_mean, final_var, curr_mean, curr_var, pop_mean, pop_var, mu, sigma, \
            [last_mean_assign_op, last_var_assign_op, pop_mean_assign_op, pop_var_assign_op]
+
 
 def batch_norm_full(x, decay, g, b):
     # b_mean_2 = tf.Variable(name="batch_mean", initial_value=tf.constant(5.0, shape=[x.get_shape()[-1]]), trainable=False)
@@ -93,10 +97,10 @@ for epoch in range(5):
         eval_dict["sum_1"] = sum_1
         eval_dict["normed"] = normed
         eval_dict["normed_full"] = normed_full
+        eval_dict["assign_ops"] = assign_ops
         results = sess.run(eval_dict,
                            feed_dict={GlobalConstants.TRAIN_DATA_TENSOR: samples,
                                       iteration: i, is_decision_phase: 1, is_training_phase: 1})
-        sess.run(assign_ops)
         if i == 0:
             shadow_mean = results[b_mean_eval]
             shadow_var = results[b_var_eval]
@@ -118,6 +122,10 @@ for epoch in range(5):
         print("final_var_eval = {0}".format(np.sum(results[final_var_eval])))
         dec_mu = np.sum(results[final_mean_eval])
         dec_sigma = np.sum(results[final_var_eval])
+        grads_0_np = results["grads_0"]
+        grads_1_np = results["grads_1"]
+        for g0, g1 in zip(grads_0_np, grads_1_np):
+            assert (np.allclose(g0, g1))
         assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_mean), f2=np.sum(results[pop_mean_eval])))
         assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_var), f2=np.sum(results[pop_var_eval])))
         assert (UtilityFuncs.compare_floats(f1=np.sum(results[final_mean_eval]), f2=np.sum(results[mu_eval])))
@@ -147,6 +155,10 @@ for epoch in range(5):
         print("sigma_eval = {0}".format(np.sum(results[sigma_eval])))
         print("final_mean_eval = {0}".format(np.sum(results[final_mean_eval])))
         print("final_var_eval = {0}".format(np.sum(results[final_var_eval])))
+        grads_0_np = results["grads_0"]
+        grads_2_np = results["grads_2"]
+        for g0, g2 in zip(grads_0_np, grads_2_np):
+            assert (np.allclose(g0, g2))
         assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_mean), f2=np.sum(results[pop_mean_eval])))
         assert (UtilityFuncs.compare_floats(f1=np.sum(shadow_var), f2=np.sum(results[pop_var_eval])))
         assert (UtilityFuncs.compare_floats(f1=np.sum(results[final_mean_eval]), f2=dec_mu))
