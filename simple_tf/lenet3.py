@@ -42,16 +42,17 @@ def root_func(node, network, variables=None):
     flat_data = tf.contrib.layers.flatten(network.dataTensor)
     node.hOpsList.extend([flat_data])
     # Decisions
-    activations = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
     if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-        normed_activations, assign_ops = batch_norm.batch_norm(x=activations, iteration=network.iterationHolder,
-                                                               is_decision_phase=network.isDecisionPhase,
-                                                               is_training_phase=network.isTrain,
-                                                               decay=GlobalConstants.BATCH_NORM_DECAY,
-                                                               node=node, network=network)
+        normed_data, assign_ops = batch_norm.batch_norm(x=flat_data, iteration=network.iterationHolder,
+                                                        is_decision_phase=network.isDecisionPhase,
+                                                        is_training_phase=network.isTrain,
+                                                        decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                        node=node, network=network)
         network.branchingBatchNormAssignOps.extend(assign_ops)
+        normed_activations = tf.matmul(normed_data, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = normed_activations
     else:
+        activations = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
     network.apply_decision(node=node)
 
@@ -103,20 +104,21 @@ def l1_func(node, network, variables=None):
     if GlobalConstants.USE_CONCAT_TRICK:
         concat_list = [parent_H]
         concat_list.extend(node.activationsDict.values())
-        h_concat = tf.concat(values=concat_list, axis=1)
-        activations = tf.matmul(h_concat, hyperplane_weights) + hyperplane_biases
+        h_vector = tf.concat(values=concat_list, axis=1)
     else:
-        activations = tf.matmul(parent_H, hyperplane_weights) + hyperplane_biases
+        h_vector = parent_H
     # Batch Norm
     if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-        normed_activations, assign_ops = batch_norm.batch_norm(x=activations, iteration=network.iterationHolder,
-                                                               is_decision_phase=network.isDecisionPhase,
-                                                               is_training_phase=network.isTrain,
-                                                               decay=GlobalConstants.BATCH_NORM_DECAY,
-                                                               node=node, network=network)
+        normed_h_vector, assign_ops = batch_norm.batch_norm(x=h_vector, iteration=network.iterationHolder,
+                                                            is_decision_phase=network.isDecisionPhase,
+                                                            is_training_phase=network.isTrain,
+                                                            decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                            node=node, network=network)
         network.branchingBatchNormAssignOps.extend(assign_ops)
+        normed_activations = tf.matmul(normed_h_vector, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = normed_activations
     else:
+        activations = tf.matmul(h_vector, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
     network.apply_decision(node=node)
 

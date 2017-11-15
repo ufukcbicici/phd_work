@@ -346,6 +346,8 @@ class TreeNetwork:
                    self.isOpenTensors]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.classificationPathSummaries)
+        if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING and is_decision_phase:
+            run_ops.extend(self.branchingBatchNormAssignOps)
         results = sess.run(run_ops, feed_dict=feed_dict)
         # Only calculate the derivatives for information gain losses
         classification_grads = results[0]

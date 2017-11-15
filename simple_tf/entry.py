@@ -101,7 +101,7 @@ def main():
     init = tf.global_variables_initializer()
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 21) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
-    wd_list = [x for x in itertools.repeat(0.0, 1)]
+    wd_list = [x for x in itertools.repeat(0.0, 5)]
     run_id = 0
     for wd in wd_list:
         print("********************NEW RUN:{0}********************".format(run_id))
@@ -138,6 +138,11 @@ def main():
                 print(sample_count_str)
                 print(indicator_str)
                 iteration_counter += 1
+                if iteration_counter % 50 == 0:
+                    kv_rows = []
+                    for k, v in sample_counts.items():
+                        kv_rows.append((experiment_id, iteration_counter, k, np.asscalar(v)))
+                    DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
                 if dataset.isNewEpoch:
                     print("Epoch Time={0}".format(total_time))
                     training_accuracy, training_confusion = \
