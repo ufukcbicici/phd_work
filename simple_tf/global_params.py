@@ -18,9 +18,14 @@ class GlobalConstants:
     EVAL_BATCH_SIZE = 50000
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
+    # FOR [3, 2]
+    # NO_FILTERS_1 = 20
+    # NO_FILTERS_2 = 13  # 10
+    # NO_HIDDEN = 10  # 30
+    # FOR [2, 2]
     NO_FILTERS_1 = 20
-    NO_FILTERS_2 = 13  # 10
-    NO_HIDDEN = 10  # 30
+    NO_FILTERS_2 = 15  # 10
+    NO_HIDDEN = 15  # 30
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.025
@@ -40,14 +45,14 @@ class GlobalConstants:
     USE_PROBABILITY_THRESHOLD = False
     USE_INFO_GAIN_DECISION = True
     USE_CONCAT_TRICK = False
-    USE_BATCH_NORM_BEFORE_BRANCHING = True
-    USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
+    USE_BATCH_NORM_BEFORE_BRANCHING = False
+    USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = False
     DECISION_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     INFO_GAIN_LOG_EPSILON = 1e-30
     SUMMARY_PERIOD = 100000000000
-    TREE_DEGREE_LIST = [3, 2]
+    TREE_DEGREE_LIST = [2, 2]
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"
     # Home
