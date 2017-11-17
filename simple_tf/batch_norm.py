@@ -18,6 +18,8 @@ def batch_norm(x, network, node, decay, iteration, is_decision_phase, is_trainin
     if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
         gamma = tf.Variable(name=gamma_name, initial_value=tf.ones([x.get_shape()[-1]]))
         beta = tf.Variable(name=beta_name, initial_value=tf.zeros([x.get_shape()[-1]]))
+        node.variablesSet.add(gamma)
+        node.variablesSet.add(beta)
     else:
         gamma = None
         beta = None

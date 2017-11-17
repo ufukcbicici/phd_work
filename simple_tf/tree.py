@@ -213,8 +213,8 @@ class TreeNetwork:
             if var.name not in self.varToNodesDict:
                 raise Exception("{0} is not in the parameters!".format(var.name))
         # Add tensorboard ops
-        self.summaryFunc(network=self)
-        self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
+        # self.summaryFunc(network=self)
+        # self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
 
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
@@ -356,10 +356,10 @@ class TreeNetwork:
         vars_current_values = results[3]
         lr = results[4]
         is_open_indicators = results[5]
-        if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
-            summary_list = results[6]
-            for summary in summary_list:
-                self.summaryWriter.add_summary(summary, iteration)
+        # if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
+        #     summary_list = results[6]
+        #     for summary in summary_list:
+        #         self.summaryWriter.add_summary(summary, iteration)
         # ******************* Calculate grads *******************
         # Main loss
         main_grads = {}
@@ -412,10 +412,10 @@ class TreeNetwork:
         is_open_indicators = results[2]
         info_gain_results = results[3]
         # print(info_gain_results)
-        if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
-            summary_list = results[4]
-            for summary in summary_list:
-                self.summaryWriter.add_summary(summary, iteration)
+        # if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
+        #     summary_list = results[4]
+        #     for summary in summary_list:
+        #         self.summaryWriter.add_summary(summary, iteration)
         d_grads = {}
         for k, v in self.decisionParamsDict.items():
             node = self.varToNodesDict[k.name]
