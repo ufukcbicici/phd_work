@@ -198,8 +198,8 @@ def grad_func(network):
                 decision_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
-            if not ("gamma" in v.name or "beta" in v.name):
                 regularization_vars_list.append(v)
+            # if not ("gamma" in v.name or "beta" in v.name):
     elif len(network.topologicalSortedNodes) == 1:
         for v in vars:
             classification_vars_list.append(v)
