@@ -9,13 +9,14 @@ from collections import deque
 
 
 class TreeNetwork:
-    def __init__(self, node_build_funcs, grad_func, summary_func, degree_list):
+    def __init__(self, node_build_funcs, grad_func, threshold_func, summary_func, degree_list):
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
         self.depth = len(self.nodeBuildFuncs)
         self.nodes = {}
         self.topologicalSortedNodes = []
         self.gradFunc = grad_func
+        self.thresholdFunc = threshold_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
         self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
@@ -38,7 +39,6 @@ class TreeNetwork:
         self.learningRate = None
         self.globalCounter = None
         self.weightDecayCoeff = None
-        self.probabilityThreshold = None
         self.useThresholding = None
         self.iterationHolder = None
         self.isTrain = None
@@ -107,16 +107,19 @@ class TreeNetwork:
                     is_leaf = new_depth == (self.depth - 1)
                     curr_index += 1
                     child_node = Node(index=curr_index, depth=new_depth, is_root=False, is_leaf=is_leaf)
+                    if not child_node.isLeaf:
+                        threshold_name = self.get_variable_name(name="threshold", node=child_node)
+                        child_node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
                     self.nodes[curr_index] = child_node
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
-        # Build symbolic networks
-        # Probability threshold
+        # Probability thresholding
         self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
+        # Flags
         self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
         self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
-        self.probabilityThreshold = tf.placeholder(name="probability_threshold", dtype=tf.float32)
+        # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
             self.paramsDict = UtilityFuncs.load_npz(file_name="parameters")
@@ -126,6 +129,8 @@ class TreeNetwork:
             GlobalConstants.USE_INFO_GAIN_DECISION = False
             GlobalConstants.USE_CONCAT_TRICK = False
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
+        # Set up mechanism for probability thresholding
+        self.thresholdFunc(network=self)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
@@ -212,9 +217,9 @@ class TreeNetwork:
                     self.varToNodesDict[var.name] = node
             if var.name not in self.varToNodesDict:
                 raise Exception("{0} is not in the parameters!".format(var.name))
-        # Add tensorboard ops
-        # self.summaryFunc(network=self)
-        # self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
+                # Add tensorboard ops
+                # self.summaryFunc(network=self)
+                # self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
 
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
@@ -319,11 +324,23 @@ class TreeNetwork:
         # Measure overall information gain
         return overall_correct / overall_count, confusion_matrix_db_rows
 
+    def get_probability_thresholds_dict(self, feed_dict, iteration, update_thresholds):
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            if update_thresholds:
+                node_degree = self.degreeList[node.depth]
+                uniform_prob = 1.0 / float(node_degree)
+                threshold = uniform_prob - node.probThresholdCalculator.value
+                feed_dict[node.probabilityThreshold] = threshold
+                # Update the threshold calculator
+                node.probThresholdCalculator.update(iteration=iteration + 1)
+            else:
+                feed_dict[node.probabilityThreshold] = 0.0
+
     def get_main_and_regularization_grads(self, sess, samples, labels, one_hot_labels, iteration):
         vars = tf.trainable_variables()
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-        prob_threshold = (1.0 / float(GlobalConstants.TREE_DEGREE)) - GlobalConstants.PROBABILITY_THRESHOLD.value
-        print("prob_threshold={0}".format(prob_threshold))
         if GlobalConstants.USE_INFO_GAIN_DECISION:
             is_decision_phase = 0
         else:
@@ -333,11 +350,12 @@ class TreeNetwork:
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
                      self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-                     self.probabilityThreshold: prob_threshold,
                      self.useThresholding: use_threshold,
                      self.isDecisionPhase: is_decision_phase,
                      self.isTrain: 1,
                      self.iterationHolder: iteration}
+        # Add probability thresholds into the feed dict
+        self.get_probability_thresholds_dict(feed_dict=feed_dict, iteration=iteration, update_thresholds=True)
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.sample_count_tensors,
@@ -396,11 +414,13 @@ class TreeNetwork:
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
                      self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-                     self.probabilityThreshold: 0.0,
                      self.useThresholding: 0,
                      self.isDecisionPhase: 1,
                      self.isTrain: 1,
                      self.iterationHolder: iteration}
+        # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
+        # the network to operate.
+        self.get_probability_thresholds_dict(feed_dict=feed_dict, iteration=iteration, update_thresholds=False)
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
@@ -442,7 +462,6 @@ class TreeNetwork:
         main_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
             self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
                                                    one_hot_labels=one_hot_labels, iteration=iteration)
-        GlobalConstants.PROBABILITY_THRESHOLD.update(iteration=iteration)
         update_dict = {}
         assign_dict = {}
         for v, curr_value in zip(vars, vars_current_values):
@@ -506,7 +525,7 @@ class TreeNetwork:
             return parent_F, parent_H
 
     def apply_decision(self, node):
-        node_degree = self.degreeList[node.depth]
+        # node_degree = self.degreeList[node.depth]
         p_n_given_x = tf.nn.softmax(node.activationsDict[node.index])
         p_c_given_x = node.oneHotLabelTensor
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x)
@@ -518,7 +537,7 @@ class TreeNetwork:
             child_node = child_nodes[index]
             child_index = child_node.index
             branch_prob = p_n_given_x[:, index]
-            mask_with_threshold = tf.reshape(tf.greater_equal(x=branch_prob, y=self.probabilityThreshold,
+            mask_with_threshold = tf.reshape(tf.greater_equal(x=branch_prob, y=node.probabilityThreshold,
                                                               name="Mask_with_threshold_{0}".format(child_index)), [-1])
             mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                                          name="Mask_without_threshold_{0}".format(child_index)), [-1])
@@ -557,11 +576,13 @@ class TreeNetwork:
             GlobalConstants.TRAIN_LABEL_TENSOR: labels,
             GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
             self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-            self.probabilityThreshold: 0.0,
             self.useThresholding: 0,
             self.isDecisionPhase: 0,
             self.isTrain: 0,
             self.iterationHolder: 1000000}
+        # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
+        # the network to operate.
+        self.get_probability_thresholds_dict(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
         # else:
         #     samples, labels, indices_list = dataset.get_next_batch(batch_size=EVAL_BATCH_SIZE)

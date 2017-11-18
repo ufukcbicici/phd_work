@@ -34,8 +34,9 @@ class GlobalConstants:
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
     BATCH_NORM_DECAY = 0.9
-    PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
-                                              decay_period=1, min_limit=0.0)
+    # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
+    #                                           decay_period=1, min_limit=0.0)
+
     DATA_TYPE = tf.float32
     SEED = None
     USE_CPU = False

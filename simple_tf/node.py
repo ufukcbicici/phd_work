@@ -16,6 +16,8 @@ class Node:
         self.maskTensors = {}
         self.evalDict = {}
         self.parentNonThresholdMaskVector = None
+        self.probabilityThreshold = None
+        self.probThresholdCalculator = None
         # Indexed by the nodes producing them
         self.activationsDict = {}
         self.proxyLossInputDicts = {}

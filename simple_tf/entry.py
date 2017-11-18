@@ -32,7 +32,7 @@ import simple_tf.baseline as baseline
 # np.random.seed(np_seed)
 
 
-def get_explanation_string():
+def get_explanation_string(network):
     total_param_count = 0
     for v in tf.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
@@ -56,11 +56,14 @@ def get_explanation_string():
     explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
     explanation += "Hyperplane bias at 0.0\n"
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-        explanation += "Prob Threshold Initial Value:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.value)
-        explanation += "Prob Threshold Decay Step:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decayPeriod)
-        explanation += "Prob Threshold Decay Ratio:{0}\n".format(GlobalConstants.PROBABILITY_THRESHOLD.decay)
-
-
+        for node in network.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            explanation += "********Node{0} Probability Threshold Settings********".format(node.index)
+            explanation += "Prob Threshold Initial Value:{0}\n".format(node.probThresholdCalculator.value)
+            explanation += "Prob Threshold Decay Step:{0}\n".format(node.probThresholdCalculator.decayPeriod)
+            explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
+            explanation += "********Node{0} Probability Threshold Settings********".format(node.index)
 
     # Baseline
     # explanation = "Baseline.\n"
@@ -93,6 +96,7 @@ def main():
                           # node_build_funcs=[baseline.baseline],
                           node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
                           grad_func=lenet3.grad_func,
+                          threshold_func=lenet3.threshold_calculator_func,
                           summary_func=lenet3.tensorboard_func,
                           degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
@@ -107,7 +111,7 @@ def main():
         print("********************NEW RUN:{0}********************".format(run_id))
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = wd
         experiment_id = DbLogger.get_run_id()
-        explanation = get_explanation_string()
+        explanation = get_explanation_string(network=network)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)

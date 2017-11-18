@@ -78,6 +78,32 @@ class DecayingParameter(Parameter):
                 self.value = 0.0
 
 
+class GrowingParameter(Parameter):
+    # @staticmethod
+    # def from_training_program(name, training_program):
+    #     value_dict = training_program.load_settings_for_property(property_name=name)
+    #     decaying_parameter = \
+    #         DecayingParameter(name=name,
+    #                           value=value_dict["value"], decay=value_dict["decay"],
+    #                           decay_period=value_dict["growthPeriod"], min_limit=value_dict["minLimit"],
+    #                           epsilon_value=value_dict["epsilon_value"])
+    #     return decaying_parameter
+
+    def __init__(self, name, value, growth, growth_period, max_limit):
+        Parameter.__init__(self, name=name, value=value)
+        self.growth = growth
+        self.growthPeriod = growth_period
+        self.maxLimit = max_limit
+
+    def update(self, iteration):
+        if not self.isActive:
+            return
+        if iteration % self.growthPeriod == 0 and self.value < self.maxLimit:
+            self.value *= self.growth
+            dbg_str = "Hyperparameter:{0} New value:{1}".format(self.name, self.value)
+            print(dbg_str)
+
+
 class DiscreteParameter(Parameter):
     def __init__(self, name, value, schedule):
         Parameter.__init__(self, name=name, value=value)

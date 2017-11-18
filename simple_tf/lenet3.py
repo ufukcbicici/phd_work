@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from auxillary.parameters import DecayingParameter
 from simple_tf import batch_norm
 from simple_tf.global_params import GlobalConstants
 from simple_tf.global_params import GradientType
@@ -240,3 +241,14 @@ def tensorboard_func(network):
             loss_name = "l2_loss_{0}".format(v.name)
             l2_loss_output = network.evalDict[loss_name]
             network.classificationPathSummaries.append(tf.summary.scalar(loss_name, l2_loss_output))
+
+
+def threshold_calculator_func(network):
+    for node in network.topologicalSortedNodes:
+        if node.isLeaf:
+            continue
+        node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
+        initial_value = 1.0 / float(node_degree)
+        name = network.get_variable_name(name="prob_threshold_calculator", node=node)
+        node.probThresholdCalculator = DecayingParameter(name=name, value=initial_value, decay=0.999, decay_period=1,
+                                                         min_limit=0.0)
