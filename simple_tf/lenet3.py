@@ -30,11 +30,11 @@ def root_func(node, network, variables=None):
         conv_h_weights = tf.Variable(
             tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_H_FILTERS_1], stddev=0.1,
                                 seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_h_weight",
+                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_decision_weight",
                                                                                                  node=node))
         conv_h_bias = tf.Variable(
             tf.constant(0.1, shape=[GlobalConstants.NO_H_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="conv_h_bias",
+            name=network.get_variable_name(name="conv_decision_bias",
                                            node=node))
         node.variablesSet.add(conv_h_weights)
         node.variablesSet.add(conv_h_bias)
@@ -97,11 +97,11 @@ def l1_func(node, network, variables=None):
         conv_h_weights = tf.Variable(
             tf.truncated_normal([3, 3, GlobalConstants.NO_H_FILTERS_1, GlobalConstants.NO_H_FILTERS_2], stddev=0.1,
                                 seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_h_weight",
+                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_decision_weight",
                                                                                                  node=node))
         conv_h_bias = tf.Variable(
             tf.constant(0.1, shape=[GlobalConstants.NO_H_FILTERS_2], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="conv_h_bias",
+            name=network.get_variable_name(name="conv_decision_bias",
                                            node=node))
         node.variablesSet.add(conv_h_weights)
         node.variablesSet.add(conv_h_bias)
@@ -181,18 +181,11 @@ def grad_func(network):
     decision_vars_list = []
     classification_vars_list = []
     regularization_vars_list = []
-    if GlobalConstants.USE_CONCAT_TRICK:
+    if GlobalConstants.USE_INFO_GAIN_DECISION:
         for v in vars:
-            if "hyperplane" in v.name:
+            if "hyperplane" in v.name or "gamma" in v.name or "beta" in v.name or "_decision_" in v.name:
                 decision_vars_list.append(v)
-            classification_vars_list.append(v)
-            if not ("gamma" in v.name or "beta" in v.name):
-                regularization_vars_list.append(v)
-    elif GlobalConstants.USE_INFO_GAIN_DECISION:
-        for v in vars:
-            if "hyperplane" in v.name or "gamma" in v.name or "beta" in v.name:
-                decision_vars_list.append(v)
-                if "hyperplane" in v.name:
+                if "hyperplane" in v.name or "_decision_" in v.name:
                     regularization_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
