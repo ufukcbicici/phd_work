@@ -93,6 +93,8 @@ class TreeNetwork:
         curr_index = 0
         is_leaf = 0 == (self.depth - 1)
         root_node = Node(index=curr_index, depth=0, is_root=True, is_leaf=is_leaf)
+        threshold_name = self.get_variable_name(name="threshold", node=root_node)
+        root_node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
         self.dagObject.add_node(node=root_node)
         self.nodes[curr_index] = root_node
         d = deque()
@@ -326,13 +328,14 @@ class TreeNetwork:
 
     def get_probability_thresholds_dict(self, feed_dict, iteration, update_thresholds):
         for node in self.topologicalSortedNodes:
-            if not node.isLeaf:
+            if node.isLeaf:
                 continue
             if update_thresholds:
                 node_degree = self.degreeList[node.depth]
                 uniform_prob = 1.0 / float(node_degree)
                 threshold = uniform_prob - node.probThresholdCalculator.value
                 feed_dict[node.probabilityThreshold] = threshold
+                print("{0} value={1}".format(node.probThresholdCalculator.name, threshold))
                 # Update the threshold calculator
                 node.probThresholdCalculator.update(iteration=iteration + 1)
             else:
