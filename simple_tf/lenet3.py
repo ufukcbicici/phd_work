@@ -9,29 +9,15 @@ from simple_tf.global_params import GradientType
 def root_func(node, network, variables=None):
     # Parameters
     node_degree = network.degreeList[node.depth]
-    if GlobalConstants.USE_RANDOM_PARAMETERS:
-        conv_weights = tf.Variable(
-            tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_FILTERS_1], stddev=0.1,
-                                seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_weight",
-                                                                                                 node=node))
-    else:
-        conv_weights = network.get_fixed_variable(name="conv_weight", node=node)
+    conv_weights = tf.Variable(
+        tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_FILTERS_1], stddev=0.1,
+                            seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_weight",
+                                                                                             node=node))
     conv_biases = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
                               name=network.get_variable_name(name="conv_bias",
                                                              node=node))
-    if GlobalConstants.USE_RANDOM_PARAMETERS:
-        hyperplane_weights = tf.Variable(
-            tf.truncated_normal([GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE, node_degree],
-                                stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="hyperplane_weights", node=node))
-    else:
-        hyperplane_weights = network.get_fixed_variable(name="hyperplane_weights", node=node)
-    # print_op = tf.Print(input_=network.dataTensor, data=[network.dataTensor], message="Print at Node:{0}".format(node.index))
-    # node.evalDict[network.get_variable_name(name="Print", node=node)] = print_op
-    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
-    node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
+    node.variablesSet = {conv_weights, conv_biases}
     # Operations
     network.mask_input_nodes(node=node)
     # F
@@ -40,8 +26,35 @@ def root_func(node, network, variables=None):
     pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     node.fOpsList.extend([conv, relu, pool])
     # H
-    flat_data = tf.contrib.layers.flatten(network.dataTensor)
-    node.hOpsList.extend([flat_data])
+    if GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE:
+        conv_h_weights = tf.Variable(
+            tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_H_FILTERS_1], stddev=0.1,
+                                seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_h_weight",
+                                                                                                 node=node))
+        conv_h_bias = tf.Variable(
+            tf.constant(0.1, shape=[GlobalConstants.NO_H_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="conv_h_bias",
+                                           node=node))
+        node.variablesSet.add(conv_h_weights)
+        node.variablesSet.add(conv_h_bias)
+        conv_h = tf.nn.conv2d(network.dataTensor, conv_h_weights, strides=[1, 1, 1, 1], padding='SAME')
+        relu_h = tf.nn.relu(tf.nn.bias_add(conv_h, conv_h_bias))
+        pool_h = tf.nn.max_pool(relu_h, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
+        flat_data = tf.contrib.layers.flatten(pool_h)
+        node.hOpsList.extend([conv_h, relu_h, pool_h])
+    else:
+        flat_data = tf.contrib.layers.flatten(network.dataTensor)
+        node.hOpsList.extend([flat_data])
+    feature_size = flat_data.get_shape().as_list()[-1]
+    hyperplane_weights = tf.Variable(
+        tf.truncated_normal([feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="hyperplane_weights", node=node))
+    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
+    node.variablesSet.add(hyperplane_weights)
+    node.variablesSet.add(hyperplane_biases)
     # Decisions
     if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
         normed_data, assign_ops = batch_norm.batch_norm(x=flat_data, iteration=network.iterationHolder,
@@ -59,39 +72,19 @@ def root_func(node, network, variables=None):
 
 
 def l1_func(node, network, variables=None):
+    if GlobalConstants.USE_CONCAT_TRICK:
+        raise NotImplementedError()
     node_degree = network.degreeList[node.depth]
     total_prev_degrees = sum(network.degreeList[0:node.depth])
     # Parameters
-    if GlobalConstants.USE_RANDOM_PARAMETERS:
-        conv_weights = tf.Variable(
-            tf.truncated_normal([5, 5, GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2], stddev=0.1,
-                                seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="conv_weight", node=node))
-    else:
-        conv_weights = network.get_fixed_variable(name="conv_weight", node=node)
+    conv_weights = tf.Variable(
+        tf.truncated_normal([5, 5, GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2], stddev=0.1,
+                            seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="conv_weight", node=node))
     conv_biases = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_FILTERS_2], dtype=GlobalConstants.DATA_TYPE),
                               name=network.get_variable_name(name="conv_bias",
                                                              node=node))
-    if GlobalConstants.USE_RANDOM_PARAMETERS:
-        if GlobalConstants.USE_CONCAT_TRICK:
-            hyperplane_weights = tf.Variable(
-                tf.truncated_normal(
-                    [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE + total_prev_degrees, node_degree],
-                    stddev=0.1,
-                    seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-                name=network.get_variable_name(name="hyperplane_weights", node=node))
-        else:
-            hyperplane_weights = tf.Variable(
-                tf.truncated_normal(
-                    [GlobalConstants.IMAGE_SIZE * GlobalConstants.IMAGE_SIZE, node_degree],
-                    stddev=0.1,
-                    seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-                name=network.get_variable_name(name="hyperplane_weights", node=node))
-    else:
-        hyperplane_weights = network.get_fixed_variable(name="hyperplane_weights", node=node)
-    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
-    node.variablesSet = {conv_weights, conv_biases, hyperplane_weights, hyperplane_biases}
+    node.variablesSet = {conv_weights, conv_biases}
     # Operations
     parent_F, parent_H = network.mask_input_nodes(node=node)
     # F
@@ -100,14 +93,37 @@ def l1_func(node, network, variables=None):
     pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     node.fOpsList.extend([conv, relu, pool])
     # H
-    node.hOpsList.extend([parent_H])
-    # Decisions
-    if GlobalConstants.USE_CONCAT_TRICK:
-        concat_list = [parent_H]
-        concat_list.extend(node.activationsDict.values())
-        h_vector = tf.concat(values=concat_list, axis=1)
+    if GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE:
+        conv_h_weights = tf.Variable(
+            tf.truncated_normal([3, 3, GlobalConstants.NO_H_FILTERS_1, GlobalConstants.NO_H_FILTERS_2], stddev=0.1,
+                                seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_h_weight",
+                                                                                                 node=node))
+        conv_h_bias = tf.Variable(
+            tf.constant(0.1, shape=[GlobalConstants.NO_H_FILTERS_2], dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="conv_h_bias",
+                                           node=node))
+        node.variablesSet.add(conv_h_weights)
+        node.variablesSet.add(conv_h_bias)
+        conv_h = tf.nn.conv2d(parent_H, conv_h_weights, strides=[1, 1, 1, 1], padding='SAME')
+        relu_h = tf.nn.relu(tf.nn.bias_add(conv_h, conv_h_bias))
+        pool_h = tf.nn.max_pool(relu_h, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        flat_data = tf.contrib.layers.flatten(pool_h)
+        node.hOpsList.extend([conv_h, relu_h, pool_h])
     else:
-        h_vector = parent_H
+        node.hOpsList.extend([parent_H])
+        flat_data = parent_H
+    feature_size = flat_data.get_shape().as_list()[-1]
+    hyperplane_weights = tf.Variable(
+        tf.truncated_normal([feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="hyperplane_weights", node=node))
+    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
+    node.variablesSet.add(hyperplane_weights)
+    node.variablesSet.add(hyperplane_biases)
+    # Decisions
+    h_vector = flat_data
     # Batch Norm
     if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
         normed_h_vector, assign_ops = batch_norm.batch_norm(x=h_vector, iteration=network.iterationHolder,
@@ -127,30 +143,17 @@ def l1_func(node, network, variables=None):
 def leaf_func(node, network, variables=None):
     total_prev_degrees = sum(network.degreeList[0:node.depth])
     # Parameters
-    if GlobalConstants.USE_RANDOM_PARAMETERS:
-        fc_weights_1 = tf.Variable(tf.truncated_normal(
-            [GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.NO_FILTERS_2,
-             GlobalConstants.NO_HIDDEN],
-            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_weights_1", node=node))
-        if GlobalConstants.USE_CONCAT_TRICK:
-            fc_weights_2 = tf.Variable(
-                tf.truncated_normal([GlobalConstants.NO_HIDDEN + total_prev_degrees, GlobalConstants.NUM_LABELS],
-                                    stddev=0.1,
-                                    seed=GlobalConstants.SEED,
-                                    dtype=GlobalConstants.DATA_TYPE),
-                name=network.get_variable_name(name="fc_weights_2", node=node))
-        else:
-            fc_weights_2 = tf.Variable(
-                tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
-                                    stddev=0.1,
-                                    seed=GlobalConstants.SEED,
-                                    dtype=GlobalConstants.DATA_TYPE),
-                name=network.get_variable_name(name="fc_weights_2", node=node))
-
-    else:
-        fc_weights_1 = network.get_fixed_variable(name="fc_weights_1", node=node)
-        fc_weights_2 = network.get_fixed_variable(name="fc_weights_2", node=node)
+    fc_weights_1 = tf.Variable(tf.truncated_normal(
+        [GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.IMAGE_SIZE // 4 * GlobalConstants.NO_FILTERS_2,
+         GlobalConstants.NO_HIDDEN],
+        stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="fc_weights_1", node=node))
+    fc_weights_2 = tf.Variable(
+        tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
+                            stddev=0.1,
+                            seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="fc_weights_2", node=node))
     fc_biases_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_HIDDEN], dtype=GlobalConstants.DATA_TYPE),
                               name=network.get_variable_name(name="fc_biases_1", node=node))
     fc_biases_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
@@ -162,16 +165,8 @@ def leaf_func(node, network, variables=None):
     flattened = tf.contrib.layers.flatten(parent_F)
     hidden_layer = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
     # Loss
-    if GlobalConstants.USE_CONCAT_TRICK:
-        # Concatenate activations from ancestors
-        concat_list = [hidden_layer]
-        concat_list.extend(node.activationsDict.values())
-        hidden_layer_concat = tf.concat(values=concat_list, axis=1)
-        logits = tf.matmul(hidden_layer_concat, fc_weights_2) + fc_biases_2
-        node.fOpsList.extend([flattened, hidden_layer, hidden_layer_concat, logits])
-    else:
-        logits = tf.matmul(hidden_layer, fc_weights_2) + fc_biases_2
-        node.fOpsList.extend([flattened, hidden_layer, logits])
+    logits = tf.matmul(hidden_layer, fc_weights_2) + fc_biases_2
+    node.fOpsList.extend([flattened, hidden_layer, logits])
     # Apply loss
     network.apply_loss(node=node, logits=logits)
     # Evaluation
@@ -202,7 +197,7 @@ def grad_func(network):
             else:
                 classification_vars_list.append(v)
                 regularization_vars_list.append(v)
-            # if not ("gamma" in v.name or "beta" in v.name):
+                # if not ("gamma" in v.name or "beta" in v.name):
     elif len(network.topologicalSortedNodes) == 1:
         for v in vars:
             classification_vars_list.append(v)

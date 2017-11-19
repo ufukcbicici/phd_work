@@ -36,6 +36,9 @@ class GlobalConstants:
     BATCH_NORM_DECAY = 0.9
     # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
     #                                           decay_period=1, min_limit=0.0)
+    USE_CONVOLUTIONAL_H_PIPELINE = True
+    NO_H_FILTERS_1 = 5
+    NO_H_FILTERS_2 = 5
 
     DATA_TYPE = tf.float32
     SEED = None
