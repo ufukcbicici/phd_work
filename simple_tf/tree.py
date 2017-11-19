@@ -260,7 +260,7 @@ class TreeNetwork:
                     leaf_true_labels_dict[node.index] = true_labels
                 else:
                     leaf_true_labels_dict[node.index] = np.concatenate((leaf_true_labels_dict[node.index], true_labels))
-            if batch_sample_count != GlobalConstants.BATCH_SIZE:
+            if batch_sample_count != GlobalConstants.EVAL_BATCH_SIZE:
                 raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
             if dataset.isNewEpoch:
                 break
@@ -390,6 +390,7 @@ class TreeNetwork:
             if not is_node_open:
                 continue
             g = classification_grads[v]
+            # print("Param:{0} Classification Grad Norm:{1}".format(k.name, np.linalg.norm(g)))
             if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
                         GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
                 main_grads[k] = g
@@ -446,6 +447,7 @@ class TreeNetwork:
             if not is_node_open:
                 continue
             d = decision_grads[v]
+            # print("Param:{0} Decision Grad Norm:{1}".format(k.name, np.linalg.norm(d)))
             if np.any(np.isnan(d)):
                 raise Exception("NAN Gradient!!!")
             d_grads[k] = d
@@ -472,7 +474,12 @@ class TreeNetwork:
             if v in main_grads:
                 total_grad += main_grads[v]
             if v in reg_grads:
-                total_grad += reg_grads[v]
+                if "hyperplane" not in v.name:
+                    total_grad += reg_grads[v]
+                elif "hyperplane" in v.name and GlobalConstants.USE_HYPERPLANE_REGULARIZER:
+                    total_grad += reg_grads[v]
+                else:
+                    print("Skipping Hyperplane update")
             if GlobalConstants.USE_INFO_GAIN_DECISION and v in decision_grads:
                 total_grad += decision_grads[v]
             self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
@@ -572,7 +579,8 @@ class TreeNetwork:
 
     def eval_network(self, sess, dataset):
         # if is_train:
-        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(
+            batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         feed_dict = {
             GlobalConstants.TRAIN_DATA_TENSOR: samples,

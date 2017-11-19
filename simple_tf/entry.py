@@ -21,6 +21,7 @@ import itertools
 
 # MNIST
 from auxillary.db_logger import DbLogger
+from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.mnist_data_set import MnistDataSet
 from simple_tf.global_params import GlobalConstants
 from simple_tf.tree import TreeNetwork
@@ -55,15 +56,17 @@ def get_explanation_string(network):
     explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
     explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
     explanation += "Hyperplane bias at 0.0\n"
+    if GlobalConstants.USE_HYPERPLANE_REGULARIZER:
+        explanation += "Regularizing Hyperplanes\n"
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
             if node.isLeaf:
                 continue
-            explanation += "********Node{0} Probability Threshold Settings********".format(node.index)
+            explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
             explanation += "Prob Threshold Initial Value:{0}\n".format(node.probThresholdCalculator.value)
             explanation += "Prob Threshold Decay Step:{0}\n".format(node.probThresholdCalculator.decayPeriod)
             explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
-            explanation += "********Node{0} Probability Threshold Settings********".format(node.index)
+            explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
 
     # Baseline
     # explanation = "Baseline.\n"
@@ -106,11 +109,14 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    wd_list = [0.02]
+    wd_list = [0.000025 * x for n in range(0, 41) for x in itertools.repeat(n, 3)]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list, [False, True]])
+    # wd_list = [0.02]
     run_id = 0
-    for wd in wd_list:
+    for tuple in cartesian_product:
         print("********************NEW RUN:{0}********************".format(run_id))
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = wd
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tuple[0]
+        GlobalConstants.USE_HYPERPLANE_REGULARIZER = tuple[1]
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,

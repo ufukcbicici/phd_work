@@ -197,6 +197,8 @@ def grad_func(network):
         for v in vars:
             if "hyperplane" in v.name or "gamma" in v.name or "beta" in v.name:
                 decision_vars_list.append(v)
+                if "hyperplane" in v.name:
+                    regularization_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
                 regularization_vars_list.append(v)

@@ -15,14 +15,14 @@ class GradientType(Enum):
 class GlobalConstants:
     EPOCH_COUNT = 150
     BATCH_SIZE = 125
-    EVAL_BATCH_SIZE = 50000
+    EVAL_BATCH_SIZE = 10000
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
-    # FOR [3, 2]
+    # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
     # NO_HIDDEN = 10  # 30
-    # FOR [2, 2]
+    TREE_DEGREE_LIST = [2, 2]
     NO_FILTERS_1 = 20
     NO_FILTERS_2 = 15  # 10
     NO_HIDDEN = 15  # 30
@@ -48,20 +48,21 @@ class GlobalConstants:
     USE_CONCAT_TRICK = False
     USE_BATCH_NORM_BEFORE_BRANCHING = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
+    USE_HYPERPLANE_REGULARIZER = False
     DECISION_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     INFO_GAIN_LOG_EPSILON = 1e-30
     SUMMARY_PERIOD = 100000000000
-    TREE_DEGREE_LIST = [2, 2]
+
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"
     # Home
     SUMMARY_DIR = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf"
     # TRAIN
-    TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
-    TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(BATCH_SIZE,))
-    TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(BATCH_SIZE, NUM_LABELS))
+    TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(None, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
+    TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,))
+    TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(None, NUM_LABELS))
     # TEST
     # TEST_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
     # TEST_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(EVAL_BATCH_SIZE,))
