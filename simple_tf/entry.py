@@ -56,6 +56,7 @@ def get_explanation_string(network):
     explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
     explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
     explanation += "Hyperplane bias at 0.0\n"
+    explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
     if GlobalConstants.USE_HYPERPLANE_REGULARIZER:
         explanation += "Regularizing Hyperplanes\n"
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
@@ -109,8 +110,9 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    wd_list = [0.000025 * x for n in range(0, 41) for x in itertools.repeat(n, 3)]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list, [False, True]])
+    # wd_list = [0.000025 * x for n in range(0, 41) for x in itertools.repeat(n, 3)]
+    wd_list = [0.0]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list, [True]])
     # wd_list = [0.02]
     run_id = 0
     for tuple in cartesian_product:

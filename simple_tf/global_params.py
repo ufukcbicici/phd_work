@@ -38,8 +38,9 @@ class GlobalConstants:
     #                                           decay_period=1, min_limit=0.0)
     USE_CONVOLUTIONAL_H_PIPELINE = True
     NO_H_FILTERS_1 = 5
+    NO_H_FC_UNITS_1 = 20
     NO_H_FILTERS_2 = 5
-
+    NO_H_FC_UNITS_2 = 20
     DATA_TYPE = tf.float32
     SEED = None
     USE_CPU = False
@@ -51,7 +52,7 @@ class GlobalConstants:
     USE_CONCAT_TRICK = False
     USE_BATCH_NORM_BEFORE_BRANCHING = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
-    USE_HYPERPLANE_REGULARIZER = False
+    USE_HYPERPLANE_REGULARIZER = True
     DECISION_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased

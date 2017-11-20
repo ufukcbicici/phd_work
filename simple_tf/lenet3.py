@@ -42,13 +42,23 @@ def root_func(node, network, variables=None):
         relu_h = tf.nn.relu(tf.nn.bias_add(conv_h, conv_h_bias))
         pool_h = tf.nn.max_pool(relu_h, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
         flat_data = tf.contrib.layers.flatten(pool_h)
+        feature_size = flat_data.get_shape().as_list()[-1]
+        fc_h_weights = tf.Variable(tf.truncated_normal(
+            [feature_size, GlobalConstants.NO_H_FC_UNITS_1],
+            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="fc_decision_weights", node=node))
+        fc_h_bias = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_H_FC_UNITS_1], dtype=GlobalConstants.DATA_TYPE),
+                                  name=network.get_variable_name(name="fc_decision_bias", node=node))
+        node.variablesSet.add(fc_h_weights)
+        node.variablesSet.add(fc_h_bias)
+        ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
         node.hOpsList.extend([conv_h, relu_h, pool_h])
     else:
-        flat_data = tf.contrib.layers.flatten(network.dataTensor)
-        node.hOpsList.extend([flat_data])
-    feature_size = flat_data.get_shape().as_list()[-1]
+        ig_feature = tf.contrib.layers.flatten(network.dataTensor)
+        node.hOpsList.extend([ig_feature])
+    ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
-        tf.truncated_normal([feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+        tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
                             dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="hyperplane_weights", node=node))
     hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
@@ -57,7 +67,7 @@ def root_func(node, network, variables=None):
     node.variablesSet.add(hyperplane_biases)
     # Decisions
     if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-        normed_data, assign_ops = batch_norm.batch_norm(x=flat_data, iteration=network.iterationHolder,
+        normed_data, assign_ops = batch_norm.batch_norm(x=ig_feature, iteration=network.iterationHolder,
                                                         is_decision_phase=network.isDecisionPhase,
                                                         is_training_phase=network.isTrain,
                                                         decay=GlobalConstants.BATCH_NORM_DECAY,
@@ -66,7 +76,7 @@ def root_func(node, network, variables=None):
         normed_activations = tf.matmul(normed_data, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = normed_activations
     else:
-        activations = tf.matmul(flat_data, hyperplane_weights) + hyperplane_biases
+        activations = tf.matmul(ig_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
     network.apply_decision(node=node)
 
@@ -109,13 +119,23 @@ def l1_func(node, network, variables=None):
         relu_h = tf.nn.relu(tf.nn.bias_add(conv_h, conv_h_bias))
         pool_h = tf.nn.max_pool(relu_h, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         flat_data = tf.contrib.layers.flatten(pool_h)
+        feature_size = flat_data.get_shape().as_list()[-1]
+        fc_h_weights = tf.Variable(tf.truncated_normal(
+            [feature_size, GlobalConstants.NO_H_FC_UNITS_2],
+            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="fc_decision_weights", node=node))
+        fc_h_bias = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_H_FC_UNITS_2], dtype=GlobalConstants.DATA_TYPE),
+                                  name=network.get_variable_name(name="fc_decision_bias", node=node))
+        node.variablesSet.add(fc_h_weights)
+        node.variablesSet.add(fc_h_bias)
+        ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
         node.hOpsList.extend([conv_h, relu_h, pool_h])
     else:
         node.hOpsList.extend([parent_H])
-        flat_data = parent_H
-    feature_size = flat_data.get_shape().as_list()[-1]
+        ig_feature = parent_H
+    ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
-        tf.truncated_normal([feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+        tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
                             dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="hyperplane_weights", node=node))
     hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
@@ -123,7 +143,7 @@ def l1_func(node, network, variables=None):
     node.variablesSet.add(hyperplane_weights)
     node.variablesSet.add(hyperplane_biases)
     # Decisions
-    h_vector = flat_data
+    h_vector = ig_feature
     # Batch Norm
     if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
         normed_h_vector, assign_ops = batch_norm.batch_norm(x=h_vector, iteration=network.iterationHolder,
