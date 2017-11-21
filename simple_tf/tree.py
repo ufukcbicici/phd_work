@@ -223,7 +223,7 @@ class TreeNetwork:
                 # self.summaryFunc(network=self)
                 # self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
 
-    def calculate_accuracy(self, sess, dataset, dataset_type, run_id):
+    def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
@@ -289,14 +289,15 @@ class TreeNetwork:
             correct_count = np.sum(predicted == true_labels)
             # Get the incorrect predictions by preparing a confusion matrix for each leaf
             sparse_confusion_matrix = {}
-            for i in range(predicted.shape[0]):
-                predicted_label = predicted[i]
+            for i in range(true_labels.shape[0]):
                 true_label = true_labels[i]
-                if (predicted_label, true_label) not in sparse_confusion_matrix:
-                    sparse_confusion_matrix[(predicted_label, true_label)] = 0
-                sparse_confusion_matrix[(predicted_label, true_label)] += 1
+                predicted_label = predicted[i]
+                label_pair = (np.asscalar(true_label), np.asscalar(predicted_label))
+                if label_pair not in sparse_confusion_matrix:
+                    sparse_confusion_matrix[label_pair] = 0
+                sparse_confusion_matrix[label_pair] += 1
             for k, v in sparse_confusion_matrix.items():
-                confusion_matrix_db_rows.append((run_id, dataset_type.value, node.index, k[0], k[1], v))
+                confusion_matrix_db_rows.append((run_id, dataset_type.value, node.index, iteration, k[0], k[1], v))
             # Overall accuracy
             total_count = true_labels.shape[0]
             overall_correct += correct_count

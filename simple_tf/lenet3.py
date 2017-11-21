@@ -51,7 +51,8 @@ def root_func(node, network, variables=None):
                                   name=network.get_variable_name(name="fc_decision_bias", node=node))
         node.variablesSet.add(fc_h_weights)
         node.variablesSet.add(fc_h_bias)
-        ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
+        raw_ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
+        ig_feature = tf.nn.relu(raw_ig_feature)
         node.hOpsList.extend([conv_h, relu_h, pool_h])
     else:
         ig_feature = tf.contrib.layers.flatten(network.dataTensor)
@@ -128,7 +129,8 @@ def l1_func(node, network, variables=None):
                                   name=network.get_variable_name(name="fc_decision_bias", node=node))
         node.variablesSet.add(fc_h_weights)
         node.variablesSet.add(fc_h_bias)
-        ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
+        raw_ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
+        ig_feature = tf.nn.relu(raw_ig_feature)
         node.hOpsList.extend([conv_h, relu_h, pool_h])
     else:
         node.hOpsList.extend([parent_H])

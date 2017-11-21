@@ -10,6 +10,7 @@ class DbLogger:
     runMetaData = "run_meta_data"
     leafInfoTable = "leaf_info_table"
     runResultsTable = "run_results"
+    confusionTable = "confusion_matrices"
 
     # Lab
     # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"

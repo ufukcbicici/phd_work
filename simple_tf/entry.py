@@ -110,8 +110,8 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    # wd_list = [0.000025 * x for n in range(0, 41) for x in itertools.repeat(n, 3)]
-    wd_list = [0.0]
+    wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 3)]
+    # wd_list = [0.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list, [True]])
     # wd_list = [0.02]
     run_id = 0
@@ -160,26 +160,26 @@ def main():
                     print("Epoch Time={0}".format(total_time))
                     training_accuracy, training_confusion = \
                         network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
-                                                   run_id=experiment_id)
+                                                   run_id=experiment_id, iteration=iteration_counter)
                     validation_accuracy, validation_confusion = \
                         network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
-                                                   run_id=experiment_id)
+                                                   run_id=experiment_id, iteration=iteration_counter)
                     DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
                                                      validation_accuracy,
                                                      0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
                     DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                     if GlobalConstants.SAVE_CONFUSION_MATRICES:
-                        DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable, col_count=6)
-                        DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable, col_count=6)
+                        DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable, col_count=7)
+                        DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable, col_count=7)
                     leaf_info_rows = []
                     break
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
-                                                                   run_id=experiment_id)
+                                                                   run_id=experiment_id, iteration=iteration_counter)
         DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable,
                                   col_count=3)
         if GlobalConstants.SAVE_CONFUSION_MATRICES:
-            DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=6)
+            DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)
         print("X")
         run_id += 1
 
