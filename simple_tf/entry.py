@@ -110,15 +110,15 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 3)]
+    wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 10)]
     # wd_list = [0.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list, [True]])
     # wd_list = [0.02]
     run_id = 0
-    for tuple in cartesian_product:
+    for tpl in cartesian_product:
         print("********************NEW RUN:{0}********************".format(run_id))
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tuple[0]
-        GlobalConstants.USE_HYPERPLANE_REGULARIZER = tuple[1]
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
+        GlobalConstants.USE_HYPERPLANE_REGULARIZER = tpl[1]
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
