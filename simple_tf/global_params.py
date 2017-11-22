@@ -36,8 +36,8 @@ class GlobalConstants:
     BATCH_NORM_DECAY = 0.9
     # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
     #                                           decay_period=1, min_limit=0.0)
-    SOFTMAX_DECAY_INITIAL = 10.0
-    SOFTMAX_DECAY_COEFFICIENT = 0.999
+    SOFTMAX_DECAY_INITIAL = 1.0
+    SOFTMAX_DECAY_COEFFICIENT = 1.0
     SOFTMAX_DECAY_PERIOD = 1
     PERCENTILE_THRESHOLD = 0.85
     ROUTE_CORRECTION_PERIOD = 5000
@@ -59,7 +59,7 @@ class GlobalConstants:
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
     USE_DECISION_REGULARIZER = True
     DECISION_LOSS_COEFFICIENT = 1.0
-    SAVE_CONFUSION_MATRICES = True
+    SAVE_CONFUSION_MATRICES = False
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     INFO_GAIN_LOG_EPSILON = 1e-30
     SUMMARY_PERIOD = 100000000000
