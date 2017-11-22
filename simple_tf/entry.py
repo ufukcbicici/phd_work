@@ -57,7 +57,7 @@ def get_explanation_string(network):
     explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
     explanation += "Hyperplane bias at 0.0\n"
     explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
-    if GlobalConstants.USE_HYPERPLANE_REGULARIZER:
+    if GlobalConstants.USE_DECISION_REGULARIZER:
         explanation += "Regularizing Hyperplanes\n"
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
@@ -118,7 +118,7 @@ def main():
     for tpl in cartesian_product:
         print("********************NEW RUN:{0}********************".format(run_id))
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
-        GlobalConstants.USE_HYPERPLANE_REGULARIZER = tpl[1]
+        GlobalConstants.USE_DECISION_REGULARIZER = tpl[1]
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
