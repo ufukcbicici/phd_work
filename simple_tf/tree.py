@@ -99,6 +99,8 @@ class TreeNetwork:
         root_node = Node(index=curr_index, depth=0, is_root=True, is_leaf=is_leaf)
         threshold_name = self.get_variable_name(name="threshold", node=root_node)
         root_node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
+        softmax_decay_name = self.get_variable_name(name="softmax_decay", node=root_node)
+        root_node.softmaxDecay = tf.placeholder(name=softmax_decay_name, dtype=tf.float32)
         self.dagObject.add_node(node=root_node)
         self.nodes[curr_index] = root_node
         d = deque()
@@ -116,6 +118,8 @@ class TreeNetwork:
                     if not child_node.isLeaf:
                         threshold_name = self.get_variable_name(name="threshold", node=child_node)
                         child_node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
+                        softmax_decay_name = self.get_variable_name(name="softmax_decay", node=child_node)
+                        child_node.softmaxDecay = tf.placeholder(name=softmax_decay_name, dtype=tf.float32)
                     self.nodes[curr_index] = child_node
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
@@ -324,18 +328,18 @@ class TreeNetwork:
                 label_distribution[label] = frequencies[label] / float(total_sample_count)
                 distribution_str += "{0}:{1:.3f} ".format(label, label_distribution[label])
             # Get modes
-            if dataset_type == DatasetTypes.training:
-                cumulative_prob = 0.0
-                sorted_distribution = sorted(label_distribution.items(), key=lambda tpl: tpl[1], reverse=True)
-                self.modesPerLeaves[node.index] = set()
-                for tpl in sorted_distribution:
-                    if cumulative_prob < GlobalConstants.PERCENTILE_THRESHOLD:
-                        self.modesPerLeaves[node.index].add(tpl[0])
-                        cumulative_prob += tpl[1]
-                total_mode_count += len(self.modesPerLeaves[node.index])
+            # if dataset_type == DatasetTypes.training:
+            #     cumulative_prob = 0.0
+            #     sorted_distribution = sorted(label_distribution.items(), key=lambda tpl: tpl[1], reverse=True)
+            #     self.modesPerLeaves[node.index] = set()
+            #     for tpl in sorted_distribution:
+            #         if cumulative_prob < GlobalConstants.PERCENTILE_THRESHOLD:
+            #             self.modesPerLeaves[node.index].add(tpl[0])
+            #             cumulative_prob += tpl[1]
+            #     total_mode_count += len(self.modesPerLeaves[node.index])
             print("Node{0} Label Distribution: {1}".format(node.index, distribution_str))
-        if dataset_type == DatasetTypes.training and total_mode_count != GlobalConstants.NUM_LABELS:
-            raise Exception("total_mode_count != GlobalConstants.NUM_LABELS")
+        # if dataset_type == DatasetTypes.training and total_mode_count != GlobalConstants.NUM_LABELS:
+        #     raise Exception("total_mode_count != GlobalConstants.NUM_LABELS")
         # Measure overall information gain
         return overall_correct / overall_count, confusion_matrix_db_rows
 
@@ -373,12 +377,12 @@ class TreeNetwork:
         # #     curr_node = self.nodes[0]
         # #     while not curr_node.isLeaf:
 
-
-    def get_probability_thresholds_dict(self, feed_dict, iteration, update_thresholds):
+    def get_probability_thresholds(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:
             if node.isLeaf:
                 continue
-            if update_thresholds:
+            if update:
+                # Probability Threshold
                 node_degree = self.degreeList[node.depth]
                 uniform_prob = 1.0 / float(node_degree)
                 threshold = uniform_prob - node.probThresholdCalculator.value
@@ -388,6 +392,18 @@ class TreeNetwork:
                 node.probThresholdCalculator.update(iteration=iteration + 1)
             else:
                 feed_dict[node.probabilityThreshold] = 0.0
+
+    def get_softmax_decays(self, feed_dict, iteration, update):
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            # Decay for Softmax
+            decay = node.softmaxDecayCalculator.value
+            feed_dict[node.softmaxDecay] = decay
+            if update:
+                print("{0} value={1}".format(node.softmaxDecayCalculator.name, decay))
+                # Update the Softmax Decay
+                node.softmaxDecayCalculator.update(iteration=iteration + 1)
 
     def get_main_and_regularization_grads(self, sess, samples, labels, one_hot_labels, iteration):
         vars = tf.trainable_variables()
@@ -407,7 +423,8 @@ class TreeNetwork:
                      self.useMasking: 1,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict
-        self.get_probability_thresholds_dict(feed_dict=feed_dict, iteration=iteration, update_thresholds=True)
+        self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
+        self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.sample_count_tensors,
@@ -474,7 +491,8 @@ class TreeNetwork:
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
-        self.get_probability_thresholds_dict(feed_dict=feed_dict, iteration=iteration, update_thresholds=False)
+        self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=False)
+        self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=False)
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
@@ -588,9 +606,12 @@ class TreeNetwork:
 
     def apply_decision(self, node):
         # node_degree = self.degreeList[node.depth]
-        p_n_given_x = tf.nn.softmax(node.activationsDict[node.index])
+        decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
+        p_n_given_x = tf.nn.softmax(decayed_activation)
         p_c_given_x = node.oneHotLabelTensor
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x)
+        node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
+        node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
         arg_max_indices = tf.argmax(p_n_given_x, axis=1)
@@ -646,7 +667,9 @@ class TreeNetwork:
             self.iterationHolder: 1000000}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
-        self.get_probability_thresholds_dict(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
+        self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
+        self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
+        # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
         # else:
         #     samples, labels, indices_list = dataset.get_next_batch(batch_size=EVAL_BATCH_SIZE)

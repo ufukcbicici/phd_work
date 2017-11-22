@@ -17,7 +17,9 @@ class Node:
         self.evalDict = {}
         self.parentNonThresholdMaskVector = None
         self.probabilityThreshold = None
+        self.softmaxDecay = None
         self.probThresholdCalculator = None
+        self.softmaxDecayCalculator = None
         # Indexed by the nodes producing them
         self.activationsDict = {}
         self.proxyLossInputDicts = {}
