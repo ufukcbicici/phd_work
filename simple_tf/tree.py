@@ -244,7 +244,7 @@ class TreeNetwork:
                     UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index, array=branch_prob)
                     if node.index not in info_gain_dict:
                         info_gain_dict[node.index] = []
-                    info_gain_dict[node.index].append(np.assc+alar(info_gain))
+                    info_gain_dict[node.index].append(np.asscalar(info_gain))
                     continue
                 if results[self.get_variable_name(name="is_open", node=node)] == 0.0:
                     continue
@@ -338,6 +338,41 @@ class TreeNetwork:
             raise Exception("total_mode_count != GlobalConstants.NUM_LABELS")
         # Measure overall information gain
         return overall_correct / overall_count, confusion_matrix_db_rows
+
+    # def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type, run_id, iteration):
+    #     dataset.set_current_data_set_type(dataset_type=dataset_type)
+    #     leaf_predicted_labels_dict = {}
+    #     leaf_true_labels_dict = {}
+    #     info_gain_dict = {}
+    #     branch_probs = {}
+    #     one_hot_branch_probs = {}
+    #     posterior_probs = {}
+    #     while True:
+    #         results = self.eval_network(sess=sess, dataset=dataset, use_masking=False)
+    #         for node in self.topologicalSortedNodes:
+    #             if not node.isLeaf:
+    #                 branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
+    #                 UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
+    #                                                      array=branch_prob)
+    #             else:
+    #                 posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
+    #                 UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+    #                                                      array=posterior_prob)
+    #         if dataset.isNewEpoch:
+    #             break
+
+
+
+
+        # for k, v in branch_probs.items():
+        #     zeros_arr = np.zeros(shape=v.shape)
+        #     arg_max_indices = np.argmax(v, axis=1)
+        #     print("X")
+        # # At this stage we have the brancing probabilities p(l|x) and posterior probabilities p(y|l,x) at hand.
+        # # for sample_id in range(dataset.get_current_sample_count()):
+        # #     curr_node = self.nodes[0]
+        # #     while not curr_node.isLeaf:
+
 
     def get_probability_thresholds_dict(self, feed_dict, iteration, update_thresholds):
         for node in self.topologicalSortedNodes:
