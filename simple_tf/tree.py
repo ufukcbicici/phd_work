@@ -1,5 +1,7 @@
 import tensorflow as tf
 import numpy as np
+
+from auxillary.constants import DatasetTypes
 from auxillary.dag_utilities import Dag
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, GradientType
@@ -42,6 +44,7 @@ class TreeNetwork:
         self.useThresholding = None
         self.iterationHolder = None
         self.isTrain = None
+        self.useMasking = None
         self.isDecisionPhase = None
         self.varToNodesDict = {}
         self.mainLossParamsDict = {}
@@ -52,6 +55,7 @@ class TreeNetwork:
         self.decisionPathSummaries = []
         self.summaryWriter = None
         self.branchingBatchNormAssignOps = []
+        self.modesPerLeaves = {}
 
     # def get_parent_index(self, node_index):
     #     parent_index = int((node_index - 1) / self.treeDegree)
@@ -120,6 +124,7 @@ class TreeNetwork:
         # Flags
         self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
+        self.useMasking = tf.placeholder(name="use_masking_flag", dtype=tf.int64)
         self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
@@ -230,19 +235,16 @@ class TreeNetwork:
         info_gain_dict = {}
         branch_probs = {}
         while True:
-            results = self.eval_network(sess=sess, dataset=dataset)
+            results = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
             batch_sample_count = 0.0
             for node in self.topologicalSortedNodes:
                 if not node.isLeaf:
                     info_gain = results[self.get_variable_name(name="info_gain", node=node)]
                     branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
-                    if node.index not in branch_probs:
-                        branch_probs[node.index] = branch_prob
-                    else:
-                        branch_probs[node.index] = np.concatenate((branch_probs[node.index], branch_prob))
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index, array=branch_prob)
                     if node.index not in info_gain_dict:
                         info_gain_dict[node.index] = []
-                    info_gain_dict[node.index].append(np.asscalar(info_gain))
+                    info_gain_dict[node.index].append(np.assc+alar(info_gain))
                     continue
                 if results[self.get_variable_name(name="is_open", node=node)] == 0.0:
                     continue
@@ -251,15 +253,10 @@ class TreeNetwork:
                 # batch_sample_count += results[self.get_variable_name(name="sample_count", node=node)]
                 predicted_labels = np.argmax(posterior_probs, axis=1)
                 batch_sample_count += predicted_labels.shape[0]
-                if node.index not in leaf_predicted_labels_dict:
-                    leaf_predicted_labels_dict[node.index] = predicted_labels
-                else:
-                    leaf_predicted_labels_dict[node.index] = np.concatenate((leaf_predicted_labels_dict[node.index],
-                                                                             predicted_labels))
-                if node.index not in leaf_true_labels_dict:
-                    leaf_true_labels_dict[node.index] = true_labels
-                else:
-                    leaf_true_labels_dict[node.index] = np.concatenate((leaf_true_labels_dict[node.index], true_labels))
+                UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                                                     array=predicted_labels)
+                UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                     array=true_labels)
             if batch_sample_count != GlobalConstants.EVAL_BATCH_SIZE:
                 raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
             if dataset.isNewEpoch:
@@ -310,7 +307,8 @@ class TreeNetwork:
         print("*************Overall {0} samples. Overall Accuracy:{1}*************"
               .format(overall_count, overall_correct / overall_count))
         total_accuracy = overall_correct / overall_count
-        # Measure overall label distribution in leaves
+        # Measure overall label distribution in leaves, get modes
+        total_mode_count = 0
         for node in self.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
@@ -318,12 +316,26 @@ class TreeNetwork:
                 continue
             true_labels = leaf_true_labels_dict[node.index]
             frequencies = {}
+            label_distribution = {}
             distribution_str = ""
             total_sample_count = true_labels.shape[0]
             for label in range(dataset.get_label_count()):
                 frequencies[label] = np.sum(true_labels == label)
-                distribution_str += "{0}:{1:.3f} ".format(label, frequencies[label] / float(total_sample_count))
+                label_distribution[label] = frequencies[label] / float(total_sample_count)
+                distribution_str += "{0}:{1:.3f} ".format(label, label_distribution[label])
+            # Get modes
+            if dataset_type == DatasetTypes.training:
+                cumulative_prob = 0.0
+                sorted_distribution = sorted(label_distribution.items(), key=lambda tpl: tpl[1], reverse=True)
+                self.modesPerLeaves[node.index] = set()
+                for tpl in sorted_distribution:
+                    if cumulative_prob < GlobalConstants.PERCENTILE_THRESHOLD:
+                        self.modesPerLeaves[node.index].add(tpl[0])
+                        cumulative_prob += tpl[1]
+                total_mode_count += len(self.modesPerLeaves[node.index])
             print("Node{0} Label Distribution: {1}".format(node.index, distribution_str))
+        if dataset_type == DatasetTypes.training and total_mode_count != GlobalConstants.NUM_LABELS:
+            raise Exception("total_mode_count != GlobalConstants.NUM_LABELS")
         # Measure overall information gain
         return overall_correct / overall_count, confusion_matrix_db_rows
 
@@ -357,6 +369,7 @@ class TreeNetwork:
                      self.useThresholding: use_threshold,
                      self.isDecisionPhase: is_decision_phase,
                      self.isTrain: 1,
+                     self.useMasking: 1,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict
         self.get_probability_thresholds_dict(feed_dict=feed_dict, iteration=iteration, update_thresholds=True)
@@ -422,6 +435,7 @@ class TreeNetwork:
                      self.useThresholding: 0,
                      self.isDecisionPhase: 1,
                      self.isTrain: 1,
+                     self.useMasking: 1,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
@@ -514,6 +528,8 @@ class TreeNetwork:
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
             mask_tensor = parent_node.maskTensors[node.index]
+            mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
+                                   tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
             node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
@@ -578,7 +594,7 @@ class TreeNetwork:
         node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
         node.lossList.append(loss)
 
-    def eval_network(self, sess, dataset):
+    def eval_network(self, sess, dataset, use_masking):
         # if is_train:
         samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(
             batch_size=GlobalConstants.EVAL_BATCH_SIZE)
@@ -591,6 +607,7 @@ class TreeNetwork:
             self.useThresholding: 0,
             self.isDecisionPhase: 0,
             self.isTrain: 0,
+            self.useMasking: int(use_masking),
             self.iterationHolder: 1000000}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.

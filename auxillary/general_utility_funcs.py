@@ -98,3 +98,10 @@ class UtilityFuncs:
     @staticmethod
     def save_npz(file_name, arr_dict):
         np.savez(file_name, **arr_dict)
+
+    @staticmethod
+    def concat_to_np_array_dict(dct, key, array):
+        if key not in dct:
+            dct[key] = array
+        else:
+            dct[key] = np.concatenate((dct[key], array))
