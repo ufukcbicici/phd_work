@@ -202,9 +202,13 @@ def leaf_func(node, network, variables=None):
     parent_F, parent_H = network.mask_input_nodes(node=node)
     flattened = tf.contrib.layers.flatten(parent_F)
     hidden_layer = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
+    if GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION:
+        hidden_layer_final = tf.nn.dropout(hidden_layer, network.classificationDropoutKeepProb)
+    else:
+        hidden_layer_final = hidden_layer
     # Loss
-    logits = tf.matmul(hidden_layer, fc_weights_2) + fc_biases_2
-    node.fOpsList.extend([flattened, hidden_layer, logits])
+    logits = tf.matmul(hidden_layer_final, fc_weights_2) + fc_biases_2
+    node.fOpsList.extend([flattened, hidden_layer_final, logits])
     # Apply loss
     network.apply_loss(node=node, logits=logits)
     # Evaluation

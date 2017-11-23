@@ -45,6 +45,7 @@ class TreeNetwork:
         self.iterationHolder = None
         self.decisionDropoutKeepProb = None
         self.decisionDropoutKeepProbCalculator = GlobalConstants.DROPOUT_CALCULATOR
+        self.classificationDropoutKeepProb = None
         self.isTrain = None
         self.useMasking = None
         self.isDecisionPhase = None
@@ -133,6 +134,7 @@ class TreeNetwork:
         self.useMasking = tf.placeholder(name="use_masking_flag", dtype=tf.int64)
         self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
         self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
+        self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -433,6 +435,7 @@ class TreeNetwork:
                      self.isDecisionPhase: is_decision_phase,
                      self.isTrain: 1,
                      self.useMasking: 1,
+                     self.classificationDropoutKeepProb: GlobalConstants.CLASSIFICATION_DROPOUT_PROB,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict
         self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
@@ -502,6 +505,7 @@ class TreeNetwork:
                      self.isDecisionPhase: 1,
                      self.isTrain: 1,
                      self.useMasking: 1,
+                     self.classificationDropoutKeepProb: 1.0,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
@@ -680,6 +684,7 @@ class TreeNetwork:
             self.isDecisionPhase: 0,
             self.isTrain: 0,
             self.useMasking: int(use_masking),
+            self.classificationDropoutKeepProb: 1.0,
             self.iterationHolder: 1000000}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
