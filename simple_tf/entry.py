@@ -64,6 +64,12 @@ def get_explanation_string(network):
     explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
     explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
     explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
+    if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+        explanation += "********Decision Dropout Schedule********\n"
+        explanation += "Iteration:{0} Probability:{1}".format(0, network.decisionDropoutKeepProbCalculator.value)
+        for tpl in GlobalConstants.DROPOUT_SCHEDULE:
+            explanation += "Iteration:{0} Probability:{1}".format(tpl[0], tpl[1])
+        explanation += "********Decision Dropout Schedule********\n"
     explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
