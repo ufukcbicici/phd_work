@@ -74,10 +74,18 @@ def root_func(node, network, variables=None):
                                                         decay=GlobalConstants.BATCH_NORM_DECAY,
                                                         node=node, network=network)
         network.branchingBatchNormAssignOps.extend(assign_ops)
-        normed_activations = tf.matmul(normed_data, hyperplane_weights) + hyperplane_biases
+        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+            dropped_normed_data = tf.nn.dropout(normed_data, network.decisionDropoutKeepProb)
+            normed_activations = tf.matmul(dropped_normed_data, hyperplane_weights) + hyperplane_biases
+        else:
+            normed_activations = tf.matmul(normed_data, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = normed_activations
     else:
-        activations = tf.matmul(ig_feature, hyperplane_weights) + hyperplane_biases
+        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+            dropped_data = tf.nn.dropout(ig_feature, network.decisionDropoutKeepProb)
+            activations = tf.matmul(dropped_data, hyperplane_weights) + hyperplane_biases
+        else:
+            activations = tf.matmul(ig_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
     network.apply_decision(node=node)
 
@@ -154,10 +162,18 @@ def l1_func(node, network, variables=None):
                                                             decay=GlobalConstants.BATCH_NORM_DECAY,
                                                             node=node, network=network)
         network.branchingBatchNormAssignOps.extend(assign_ops)
-        normed_activations = tf.matmul(normed_h_vector, hyperplane_weights) + hyperplane_biases
+        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+            dropped_normed_data = tf.nn.dropout(normed_h_vector, network.decisionDropoutKeepProb)
+            normed_activations = tf.matmul(dropped_normed_data, hyperplane_weights) + hyperplane_biases
+        else:
+            normed_activations = tf.matmul(normed_h_vector, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = normed_activations
     else:
-        activations = tf.matmul(h_vector, hyperplane_weights) + hyperplane_biases
+        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+            dropped_data =  tf.nn.dropout(h_vector, network.decisionDropoutKeepProb)
+            activations = tf.matmul(dropped_data, hyperplane_weights) + hyperplane_biases
+        else:
+            activations = tf.matmul(h_vector, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
     network.apply_decision(node=node)
 
@@ -263,11 +279,12 @@ def threshold_calculator_func(network):
         node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
         initial_value = 1.0 / float(node_degree)
         threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
-        node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.999, decay_period=1,
+        node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.9999,
+                                                         decay_period=1,
                                                          min_limit=0.0)
         # Softmax Decay
         decay_name = network.get_variable_name(name="softmax_decay", node=node)
         node.softmaxDecayCalculator = DecayingParameter(name=decay_name, value=GlobalConstants.SOFTMAX_DECAY_INITIAL,
                                                         decay=GlobalConstants.SOFTMAX_DECAY_COEFFICIENT,
                                                         decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
-                                                        min_limit=0.1)
+                                                        min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)

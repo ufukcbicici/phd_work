@@ -43,6 +43,8 @@ class TreeNetwork:
         self.weightDecayCoeff = None
         self.useThresholding = None
         self.iterationHolder = None
+        self.decisionDropoutKeepProb = None
+        self.decisionDropoutKeepProbCalculator = GlobalConstants.DROPOUT_CALCULATOR
         self.isTrain = None
         self.useMasking = None
         self.isDecisionPhase = None
@@ -130,6 +132,7 @@ class TreeNetwork:
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
         self.useMasking = tf.placeholder(name="use_masking_flag", dtype=tf.int64)
         self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
+        self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -405,6 +408,15 @@ class TreeNetwork:
                 # Update the Softmax Decay
                 node.softmaxDecayCalculator.update(iteration=iteration + 1)
 
+    def get_decision_dropout_prob(self, feed_dict, iteration, update):
+        if update:
+            prob = self.decisionDropoutKeepProbCalculator.value
+            feed_dict[self.decisionDropoutKeepProb] = prob
+            print("{0} value={1}".format(self.decisionDropoutKeepProbCalculator.name, prob))
+            self.decisionDropoutKeepProbCalculator.update(iteration=iteration + 1)
+        else:
+            feed_dict[self.decisionDropoutKeepProb] = 1.0
+
     def get_main_and_regularization_grads(self, sess, samples, labels, one_hot_labels, iteration):
         vars = tf.trainable_variables()
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
@@ -425,6 +437,8 @@ class TreeNetwork:
         # Add probability thresholds into the feed dict
         self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
         self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
+        self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration,
+                                       update=GlobalConstants.USE_DROPOUT_FOR_DECISION)
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.sample_count_tensors,
@@ -493,6 +507,7 @@ class TreeNetwork:
         # the network to operate.
         self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=False)
         self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=False)
+        self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=False)
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
@@ -670,6 +685,7 @@ class TreeNetwork:
         # the network to operate.
         self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
         self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
+        self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
         # else:

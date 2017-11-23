@@ -2,7 +2,7 @@ from enum import Enum
 
 import tensorflow as tf
 
-from auxillary.parameters import DecayingParameter
+from auxillary.parameters import DecayingParameter, DiscreteParameter
 
 
 class GradientType(Enum):
@@ -36,9 +36,12 @@ class GlobalConstants:
     BATCH_NORM_DECAY = 0.9
     # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
     #                                           decay_period=1, min_limit=0.0)
-    SOFTMAX_DECAY_INITIAL = 1.0
-    SOFTMAX_DECAY_COEFFICIENT = 1.0
+    SOFTMAX_DECAY_INITIAL = 50.0
+    SOFTMAX_DECAY_COEFFICIENT = 0.9998
     SOFTMAX_DECAY_PERIOD = 1
+    SOFTMAX_DECAY_MIN_LIMIT = 1.0
+    DROPOUT_SCHEDULE = [(15000, 0.5), (30000, 0.25), (45000, 0.125)]
+    DROPOUT_CALCULATOR = DiscreteParameter(name="DropoutScheduler", value=0.75, schedule=DROPOUT_SCHEDULE)
     PERCENTILE_THRESHOLD = 0.85
     ROUTE_CORRECTION_PERIOD = 5000
     USE_CONVOLUTIONAL_H_PIPELINE = True
@@ -52,7 +55,8 @@ class GlobalConstants:
     USE_CPU_MASKING = False
     USE_EMPTY_NODE_CRASH_PREVENTION = False
     USE_RANDOM_PARAMETERS = True
-    USE_PROBABILITY_THRESHOLD = False
+    USE_PROBABILITY_THRESHOLD = True
+    USE_DROPOUT_FOR_DECISION = True
     USE_INFO_GAIN_DECISION = True
     USE_CONCAT_TRICK = False
     USE_BATCH_NORM_BEFORE_BRANCHING = True

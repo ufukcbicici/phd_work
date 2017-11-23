@@ -62,6 +62,8 @@ def get_explanation_string(network):
     explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
     explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
     explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
+    explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+    explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
             if node.isLeaf:
@@ -113,10 +115,11 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 5)]
-    # wd_list = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list, [True, False]])
-    del cartesian_product[0:10]
+    # wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 5)]
+    wd_list = [0.000025]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list, [True, True, True, False, False,
+                                                                                    False]])
+    # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
     for tpl in cartesian_product:
