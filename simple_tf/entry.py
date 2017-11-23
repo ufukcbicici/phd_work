@@ -123,19 +123,19 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    # wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 5)]
-    wd_list = [0.0]
-    dropout_prob_list = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6, 0.7, 0.7, 0.7, 0.8, 0.8, 0.8, 0.9, 0.9, 0.9]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list, [True], dropout_prob_list])
+    wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 5)]
+    # wd_list = [0.0]
+    # dropout_prob_list = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6, 0.7, 0.7, 0.7, 0.8, 0.8, 0.8, 0.9, 0.9, 0.9]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False], wd_list])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
     for tpl in cartesian_product:
         print("********************NEW RUN:{0}********************".format(run_id))
         # Restart the network; including all annealed parameters.
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
-        GlobalConstants.USE_DECISION_REGULARIZER = tpl[1]
-        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.USE_DECISION_REGULARIZER = tpl[0]
+        # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
