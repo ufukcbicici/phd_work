@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from auxillary.parameters import DecayingParameter
+from auxillary.parameters import DecayingParameter, DiscreteParameter
 from simple_tf import batch_norm
 from simple_tf.global_params import GlobalConstants
 from simple_tf.global_params import GradientType
@@ -276,6 +276,10 @@ def tensorboard_func(network):
 
 
 def threshold_calculator_func(network):
+    # Decision Dropout Schedule
+    network.decisionDropoutKeepProbCalculator = DiscreteParameter(name="decision_dropout_calculator",
+                                                                  schedule=GlobalConstants.DROPOUT_SCHEDULE,
+                                                                  value=GlobalConstants.DROPOUT_INITIAL_PROB)
     for node in network.topologicalSortedNodes:
         if node.isLeaf:
             continue

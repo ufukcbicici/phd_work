@@ -44,7 +44,7 @@ class TreeNetwork:
         self.useThresholding = None
         self.iterationHolder = None
         self.decisionDropoutKeepProb = None
-        self.decisionDropoutKeepProbCalculator = GlobalConstants.DROPOUT_CALCULATOR
+        self.decisionDropoutKeepProbCalculator = None
         self.classificationDropoutKeepProb = None
         self.isTrain = None
         self.useMasking = None
