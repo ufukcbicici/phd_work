@@ -66,11 +66,12 @@ def get_explanation_string(network):
     explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
     if GlobalConstants.USE_DROPOUT_FOR_DECISION:
         explanation += "********Decision Dropout Schedule********\n"
-        explanation += "Iteration:{0} Probability:{1}".format(0, network.decisionDropoutKeepProbCalculator.value)
+        explanation += "Iteration:{0} Probability:{1}\n".format(0, network.decisionDropoutKeepProbCalculator.value)
         for tpl in GlobalConstants.DROPOUT_SCHEDULE:
-            explanation += "Iteration:{0} Probability:{1}".format(tpl[0], tpl[1])
+            explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
         explanation += "********Decision Dropout Schedule********\n"
     explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
+    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
             if node.isLeaf:
