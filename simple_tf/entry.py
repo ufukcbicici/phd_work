@@ -123,19 +123,16 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False],
-                                                                          [0.0000675,
-                                                                           0.000075, 0.000075, 0.000075, 0.000075,
-                                                                           0.000075, 0.0000875, 0.0000875, 0.0000875,
-                                                                           0.0000875, 0.0000875]])
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False], [0.0000375], [0.0]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
     for tpl in cartesian_product:
         print("********************NEW RUN:{0}********************".format(run_id))
         # Restart the network; including all annealed parameters.
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.USE_DECISION_REGULARIZER = tpl[0]
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[2]
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()

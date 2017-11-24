@@ -41,6 +41,7 @@ class TreeNetwork:
         self.learningRate = None
         self.globalCounter = None
         self.weightDecayCoeff = None
+        self.decisionWeightDecayCoeff = None
         self.useThresholding = None
         self.iterationHolder = None
         self.decisionDropoutKeepProb = None
@@ -189,15 +190,20 @@ class TreeNetwork:
             primary_losses.extend(node.lossList)
         # Weight decays
         self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
+        self.decisionWeightDecayCoeff = tf.placeholder(name="decision_weight_decay_coefficient", dtype=tf.float32)
         vars = tf.trainable_variables()
         l2_loss_list = []
         for v in vars:
+            is_decision_pipeline_variable = "hyperplane" in v.name or "_decision_" in v.name
             loss_tensor = tf.nn.l2_loss(v)
             self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
             if "bias" in v.name:
                 l2_loss_list.append(0.0 * loss_tensor)
             else:
-                l2_loss_list.append(self.weightDecayCoeff * loss_tensor)
+                if is_decision_pipeline_variable:
+                    l2_loss_list.append(self.decisionWeightDecayCoeff * loss_tensor)
+                else:
+                    l2_loss_list.append(self.weightDecayCoeff * loss_tensor)
         # weights_and_filters = [v for v in vars if "bias" not in v.name]
         # Proxy, decision losses
         decision_losses = []
@@ -432,6 +438,7 @@ class TreeNetwork:
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
                      self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                     self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
                      self.useThresholding: use_threshold,
                      self.isDecisionPhase: is_decision_phase,
                      self.isTrain: 1,
@@ -503,6 +510,7 @@ class TreeNetwork:
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
                      self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                     self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
                      self.useThresholding: 0,
                      self.isDecisionPhase: 1,
                      self.isTrain: 1,
@@ -683,6 +691,7 @@ class TreeNetwork:
             GlobalConstants.TRAIN_LABEL_TENSOR: labels,
             GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
             self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+            self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
             self.useThresholding: 0,
             self.isDecisionPhase: 0,
             self.isTrain: 0,
