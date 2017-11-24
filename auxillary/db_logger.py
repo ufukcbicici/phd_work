@@ -1,6 +1,7 @@
 import logging
 import sqlite3 as lite
 import threading
+import numpy as np
 import os
 
 
@@ -13,10 +14,10 @@ class DbLogger:
     confusionTable = "confusion_matrices"
 
     # Lab
-    # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
+    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Home
-    log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
+    # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Idea
     # log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
@@ -63,6 +64,25 @@ class DbLogger:
         DbLogger.lock.release()
         print("Exit get_run_id")
         return curr_id
+
+    @staticmethod
+    def read_confusion_matrix(run_id, dataset, iteration, num_of_labels, leaf_id):
+        DbLogger.lock.acquire()
+        con = lite.connect(DbLogger.log_db_path)
+        cm = np.zeros(shape=(num_of_labels, num_of_labels))
+        with con:
+            cur = con.cursor()
+            sql_command = "SELECT * FROM {0} WHERE RunId={1} AND Iteration={2} AND Dataset={3} AND LeafIndex={4}"\
+                .format(DbLogger.confusionTable, run_id, iteration, dataset, leaf_id)
+            cur.execute(sql_command)
+            rows = cur.fetchall()
+            for row in rows:
+                true_label = row[4]
+                predicted_label = row[5]
+                frequency = row[6]
+                cm[true_label, predicted_label] = frequency
+        DbLogger.lock.release()
+        return cm
 
     @staticmethod
     def log_bnn_explanation(runId, explanation_string):

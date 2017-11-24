@@ -566,8 +566,8 @@ class TreeNetwork:
                     total_grad += reg_grads[v]
                 elif is_decision_pipeline_variable and GlobalConstants.USE_DECISION_REGULARIZER:
                     total_grad += reg_grads[v]
-                else:
-                    print("Skipping {0} update".format(v.name))
+                # else:
+                #     print("Skipping {0} update".format(v.name))
             if GlobalConstants.USE_INFO_GAIN_DECISION and v in decision_grads:
                 total_grad += decision_grads[v]
             self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY

@@ -13,8 +13,9 @@ class GradientType(Enum):
 
 
 class GlobalConstants:
-    EPOCH_COUNT = 150
-    BATCH_SIZE = 125
+    EPOCH_COUNT = 1200
+    EPOCH_REPORT_PERIOD = 10
+    BATCH_SIZE = 1000
     EVAL_BATCH_SIZE = 10000
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
@@ -28,8 +29,8 @@ class GlobalConstants:
     NO_HIDDEN = 25  # 30
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
-    INITIAL_LR = 0.025
-    DECAY_STEP = 20000
+    INITIAL_LR = 0.2
+    DECAY_STEP = 10000
     DECAY_RATE = 0.5
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9

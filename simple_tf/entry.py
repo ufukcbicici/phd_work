@@ -123,10 +123,10 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 5)]
+    wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 1)]
     # wd_list = [0.0]
     # dropout_prob_list = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6, 0.7, 0.7, 0.7, 0.8, 0.8, 0.8, 0.9, 0.9, 0.9]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False], wd_list])
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False], [0.0, 0.0, 0.0, 0.0]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -175,21 +175,22 @@ def main():
                         kv_rows.append((experiment_id, iteration_counter, k, np.asscalar(v)))
                     DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
                 if dataset.isNewEpoch:
-                    print("Epoch Time={0}".format(total_time))
-                    training_accuracy, training_confusion = \
-                        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
-                                                   run_id=experiment_id, iteration=iteration_counter)
-                    validation_accuracy, validation_confusion = \
-                        network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
-                                                   run_id=experiment_id, iteration=iteration_counter)
-                    DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                     validation_accuracy,
-                                                     0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
-                    DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
-                    if GlobalConstants.SAVE_CONFUSION_MATRICES:
-                        DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable, col_count=7)
-                        DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable, col_count=7)
-                    leaf_info_rows = []
+                    if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
+                        print("Epoch Time={0}".format(total_time))
+                        training_accuracy, training_confusion = \
+                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
+                                                       run_id=experiment_id, iteration=iteration_counter)
+                        validation_accuracy, validation_confusion = \
+                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
+                                                       run_id=experiment_id, iteration=iteration_counter)
+                        DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
+                                                         validation_accuracy,
+                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
+                        DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
+                        if GlobalConstants.SAVE_CONFUSION_MATRICES:
+                            DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable, col_count=7)
+                            DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable, col_count=7)
+                        leaf_info_rows = []
                     break
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
