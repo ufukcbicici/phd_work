@@ -123,10 +123,11 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    wd_list = [0.000025 * x for n in range(0, 10) for x in itertools.repeat(n, 1)]
-    # wd_list = [0.0]
-    # dropout_prob_list = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6, 0.7, 0.7, 0.7, 0.8, 0.8, 0.8, 0.9, 0.9, 0.9]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False], [0.0, 0.0, 0.0, 0.0]])
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False],
+                                                                          [0.0000675,
+                                                                           0.000075, 0.000075, 0.000075, 0.000075,
+                                                                           0.000075, 0.0000875, 0.0000875, 0.0000875,
+                                                                           0.0000875, 0.0000875]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0

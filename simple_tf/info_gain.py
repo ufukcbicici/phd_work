@@ -20,7 +20,7 @@ class InfoGainLoss:
         return entropy, log_prob
 
     @staticmethod
-    def get_loss(p_n_given_x_2d, p_c_given_x_2d, balancing_coefficient):
+    def get_loss(p_n_given_x_2d, p_c_given_x_2d):
         p_n_given_x_3d = tf.expand_dims(input=p_n_given_x_2d, axis=1)
         p_c_given_x_3d = tf.expand_dims(input=p_c_given_x_2d, axis=2)
         unnormalized_joint_xcn = p_n_given_x_3d * p_c_given_x_3d
@@ -35,7 +35,7 @@ class InfoGainLoss:
         entropy_p_n, log_prob_p_n = InfoGainLoss.calculate_entropy(prob_distribution=marginal_p_n)
         entropy_p_c, log_prob_p_c = InfoGainLoss.calculate_entropy(prob_distribution=marginal_p_c)
         # Calculate the information gain
-        information_gain = (balancing_coefficient * entropy_p_n) + entropy_p_c - entropy_p_cn
+        information_gain = entropy_p_n + entropy_p_c - entropy_p_cn
         information_gain = -1.0 * information_gain
         return information_gain
         # return information_gain, unnormalized_joint_xcn, entropy_p_cn, entropy_p_n, entropy_p_c, \
