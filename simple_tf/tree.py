@@ -46,6 +46,7 @@ class TreeNetwork:
         self.decisionDropoutKeepProb = None
         self.decisionDropoutKeepProbCalculator = None
         self.classificationDropoutKeepProb = None
+        self.informationGainBalancingCoefficient = None
         self.isTrain = None
         self.useMasking = None
         self.isDecisionPhase = None
@@ -126,15 +127,15 @@ class TreeNetwork:
                     self.nodes[curr_index] = child_node
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
-        # Probability thresholding
+        # Flags and hyperparameters
         self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
-        # Flags
         self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
         self.useMasking = tf.placeholder(name="use_masking_flag", dtype=tf.int64)
         self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
         self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
         self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
+        self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient", dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -436,6 +437,7 @@ class TreeNetwork:
                      self.isTrain: 1,
                      self.useMasking: 1,
                      self.classificationDropoutKeepProb: GlobalConstants.CLASSIFICATION_DROPOUT_PROB,
+                     self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict
         self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
@@ -506,6 +508,7 @@ class TreeNetwork:
                      self.isTrain: 1,
                      self.useMasking: 1,
                      self.classificationDropoutKeepProb: 1.0,
+                     self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
@@ -685,6 +688,7 @@ class TreeNetwork:
             self.isTrain: 0,
             self.useMasking: int(use_masking),
             self.classificationDropoutKeepProb: 1.0,
+            self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
             self.iterationHolder: 1000000}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
@@ -693,9 +697,4 @@ class TreeNetwork:
         self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
-        # else:
-        #     samples, labels, indices_list = dataset.get_next_batch(batch_size=EVAL_BATCH_SIZE)
-        #     samples = np.expand_dims(samples, axis=3)
-        #     feed_dict = {TEST_DATA_TENSOR: samples, TEST_LABEL_TENSOR: labels}
-        #     results = sess.run(network.evalDict, feed_dict)
         return results
