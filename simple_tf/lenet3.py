@@ -170,7 +170,7 @@ def l1_func(node, network, variables=None):
         node.activationsDict[node.index] = normed_activations
     else:
         if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-            dropped_data =  tf.nn.dropout(h_vector, network.decisionDropoutKeepProb)
+            dropped_data = tf.nn.dropout(h_vector, network.decisionDropoutKeepProb)
             activations = tf.matmul(dropped_data, hyperplane_weights) + hyperplane_biases
         else:
             activations = tf.matmul(h_vector, hyperplane_weights) + hyperplane_biases

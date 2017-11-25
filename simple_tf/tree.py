@@ -340,54 +340,129 @@ class TreeNetwork:
                 label_distribution[label] = frequencies[label] / float(total_sample_count)
                 distribution_str += "{0}:{1:.3f} ".format(label, label_distribution[label])
             # Get modes
-            # if dataset_type == DatasetTypes.training:
-            #     cumulative_prob = 0.0
-            #     sorted_distribution = sorted(label_distribution.items(), key=lambda tpl: tpl[1], reverse=True)
-            #     self.modesPerLeaves[node.index] = set()
-            #     for tpl in sorted_distribution:
-            #         if cumulative_prob < GlobalConstants.PERCENTILE_THRESHOLD:
-            #             self.modesPerLeaves[node.index].add(tpl[0])
-            #             cumulative_prob += tpl[1]
-            #     total_mode_count += len(self.modesPerLeaves[node.index])
+            if dataset_type == DatasetTypes.training:
+                cumulative_prob = 0.0
+                sorted_distribution = sorted(label_distribution.items(), key=lambda lbl: lbl[1], reverse=True)
+                self.modesPerLeaves[node.index] = set()
+                for tpl in sorted_distribution:
+                    if cumulative_prob < GlobalConstants.PERCENTILE_THRESHOLD:
+                        self.modesPerLeaves[node.index].add(tpl[0])
+                        cumulative_prob += tpl[1]
+                total_mode_count += len(self.modesPerLeaves[node.index])
             print("Node{0} Label Distribution: {1}".format(node.index, distribution_str))
         # if dataset_type == DatasetTypes.training and total_mode_count != GlobalConstants.NUM_LABELS:
         #     raise Exception("total_mode_count != GlobalConstants.NUM_LABELS")
         # Measure overall information gain
         return overall_correct / overall_count, confusion_matrix_db_rows
 
-    # def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type, run_id, iteration):
-    #     dataset.set_current_data_set_type(dataset_type=dataset_type)
-    #     leaf_predicted_labels_dict = {}
-    #     leaf_true_labels_dict = {}
-    #     info_gain_dict = {}
-    #     branch_probs = {}
-    #     one_hot_branch_probs = {}
-    #     posterior_probs = {}
-    #     while True:
-    #         results = self.eval_network(sess=sess, dataset=dataset, use_masking=False)
-    #         for node in self.topologicalSortedNodes:
-    #             if not node.isLeaf:
-    #                 branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
-    #                 UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
-    #                                                      array=branch_prob)
-    #             else:
-    #                 posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
-    #                 UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
-    #                                                      array=posterior_prob)
-    #         if dataset.isNewEpoch:
-    #             break
-
-
-
-
+    def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type, run_id, iteration):
+        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        leaf_predicted_labels_dict = {}
+        leaf_true_labels_dict = {}
+        info_gain_dict = {}
+        branch_probs = {}
+        one_hot_branch_probs = {}
+        posterior_probs = {}
+        while True:
+            results = self.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            for node in self.topologicalSortedNodes:
+                if not node.isLeaf:
+                    branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
+                                                         array=branch_prob)
+                else:
+                    posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
+                    true_labels = results[self.get_variable_name(name="labels", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                                                         array=posterior_prob)
+                    # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                    #                                      array=predicted_labels)
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                         array=true_labels)
+            if dataset.isNewEpoch:
+                break
         # for k, v in branch_probs.items():
-        #     zeros_arr = np.zeros(shape=v.shape)
-        #     arg_max_indices = np.argmax(v, axis=1)
+        #     # Interval analysis
+        #     bin_size = 0.1
+        #     for j in range(v.shape[1]):
+        #         histogram = {}
+        #         for i in range(v.shape[0]):
+        #             prob = v[i, j]
+        #             bin_id = int(prob / bin_size)
+        #             # if bin_id == 10:
+        #             #     print("X")
+        #             if bin_id not in histogram:
+        #                 histogram[bin_id] = 0
+        #             histogram[bin_id] += 1
+        #         print(histogram)
+            # zeros_arr = np.zeros(shape=v.shape)
+            # arg_max_indices = np.argmax(v, axis=1)
+            # print("X")
+        root_node = self.nodes[0]
+        # for node in self.topologicalSortedNodes:
+        #     if not node.isLeaf:
+        #         continue
+        #     path = self.dagObject.get_shortest_path(source=root_node, dest=node)
         #     print("X")
-        # # At this stage we have the brancing probabilities p(l|x) and posterior probabilities p(y|l,x) at hand.
-        # # for sample_id in range(dataset.get_current_sample_count()):
-        # #     curr_node = self.nodes[0]
-        # #     while not curr_node.isLeaf:
+        sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
+        total_correct = 0
+        samples_with_non_mode_predictions = set()
+        wrong_samples_with_non_mode_predictions = set()
+        true_labels_dict = {}
+        for sample_index in range(sample_count):
+            curr_node = root_node
+            probabilities_on_path = []
+            while True:
+                if not curr_node.isLeaf:
+                    p_n_given_sample = branch_probs[curr_node.index][sample_index, :]
+                    child_nodes = self.dagObject.children(node=curr_node)
+                    child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
+                    arg_max_index = np.asscalar(np.argmax(p_n_given_sample))
+                    probabilities_on_path.append(p_n_given_sample[arg_max_index])
+                    curr_node = child_nodes_sorted[arg_max_index]
+                else:
+                    sample_posterior = posterior_probs[curr_node.index][sample_index, :]
+                    predicted_label = np.asscalar(np.argmax(sample_posterior))
+                    true_label = leaf_true_labels_dict[curr_node.index][sample_index]
+                    true_labels_dict[sample_index] = true_label
+                    if predicted_label not in self.modesPerLeaves[curr_node.index]:
+                        samples_with_non_mode_predictions.add(sample_index)
+                        # This is just for analysis.
+                        if true_label != predicted_label:
+                            wrong_samples_with_non_mode_predictions.add(sample_index)
+                    else:
+                        if true_label == predicted_label:
+                            total_correct += 1.0
+                    # if true_label == predicted_label:
+                    #     total_correct += 1.0
+                    # else:
+                    #     if sample_index in samples_with_non_mode_predictions:
+                    #         wrong_samples_with_non_mode_predictions.add(sample_index)
+                    # else:
+                    #     print("Wrong!")
+                    break
+        # Try to correct non mode estimations with a simple heuristics:
+        # 1) Check all leaves. Among the leaves which predicts the sample having a label within its modes, choose the
+        # prediction with the highest confidence.
+        # 2) If all leaves predict the sample as a non mode, pick the estimate with the highest confidence.
+        for sample_index in samples_with_non_mode_predictions:
+            curr_predicted_label = None
+            curr_prediction_confidence = 0.0
+            for node in self.topologicalSortedNodes:
+                if not node.isLeaf:
+                    continue
+                sample_posterior = posterior_probs[node.index][sample_index, :]
+                leaf_modes = self.modesPerLeaves[node.index]
+                predicted_label = np.asscalar(np.argmax(sample_posterior))
+                prediction_confidence= sample_posterior[predicted_label] + float(predicted_label in leaf_modes)
+                if prediction_confidence > curr_prediction_confidence:
+                    curr_predicted_label = predicted_label
+                    curr_prediction_confidence = prediction_confidence
+            if curr_predicted_label == true_labels_dict[sample_index]:
+                total_correct += 1
+        corrected_accuracy = total_correct / sample_count
+        print("Dataset:{0} Modified Accuracy={1}".format(dataset_type, corrected_accuracy))
+        return corrected_accuracy
 
     def get_probability_thresholds(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:

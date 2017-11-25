@@ -49,7 +49,6 @@ class ConfusionMatrixAnalyzer:
         return res_dict
 
 
-
 print("\nLeaf 3")
 cm3 = DbLogger.read_confusion_matrix(run_id=1009, dataset=1, iteration=60000, num_of_labels=10, leaf_id=3)
 res_dict_3 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm3, threshold_percentile_for_modes=0.85)
@@ -66,21 +65,20 @@ print("\nLeaf 6")
 cm6 = DbLogger.read_confusion_matrix(run_id=1009, dataset=1, iteration=60000, num_of_labels=10, leaf_id=6)
 res_dict_6 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm6, threshold_percentile_for_modes=0.85)
 
-
 overall_modes_count = res_dict_3["total_modes_count"] + res_dict_4["total_modes_count"] + \
                       res_dict_5["total_modes_count"] + res_dict_6["total_modes_count"]
 overall_correct_modes_count = res_dict_3["correct_modes"] + res_dict_4["correct_modes"] + \
                               res_dict_5["correct_modes"] + res_dict_6["correct_modes"]
 overall_non_modes_count = res_dict_3["total_non_modes_count"] + res_dict_4["total_non_modes_count"] + \
-                      res_dict_5["total_non_modes_count"] + res_dict_6["total_non_modes_count"]
+                          res_dict_5["total_non_modes_count"] + res_dict_6["total_non_modes_count"]
 overall_correct_non_modes_count = res_dict_3["correct_non_modes"] + res_dict_4["correct_non_modes"] + \
-                              res_dict_5["correct_non_modes"] + res_dict_6["correct_non_modes"]
+                                  res_dict_5["correct_non_modes"] + res_dict_6["correct_non_modes"]
 
 print("\nOverall Mode Labels Accuracy={0} Mode Count={1}".format(overall_correct_modes_count / overall_modes_count,
-                                                               overall_modes_count))
+                                                                 overall_modes_count))
 print("Overall Non Mode Labels Accuracy={0} Non Mode Count={1}".
-      format( overall_correct_non_modes_count / overall_non_modes_count,
-                                                                        overall_non_modes_count))
+      format(overall_correct_non_modes_count / overall_non_modes_count,
+             overall_non_modes_count))
 print("Overall Tree Accuracy={0}".format((overall_correct_modes_count + overall_correct_non_modes_count) /
                                          (overall_modes_count + overall_non_modes_count)))
 

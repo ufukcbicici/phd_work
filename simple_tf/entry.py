@@ -28,6 +28,7 @@ from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
 import simple_tf.baseline as baseline
 
+
 # tf.set_random_seed(1234)
 # np_seed = 88
 # np.random.seed(np_seed)
@@ -55,7 +56,8 @@ def get_explanation_string(network):
     explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
     explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
-    explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
+    explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(
+        GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
     explanation += "Hyperplane bias at 0.0\n"
     explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
     explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
@@ -108,13 +110,13 @@ def main():
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
     #                       grad_func=lenet3.grad_func,
     #                       create_new_variables=True)
-    network = TreeNetwork(# tree_degree=GlobalConstants.TREE_DEGREE,
-                          # node_build_funcs=[baseline.baseline],
-                          node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
-                          grad_func=lenet3.grad_func,
-                          threshold_func=lenet3.threshold_calculator_func,
-                          summary_func=lenet3.tensorboard_func,
-                          degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
+        # node_build_funcs=[baseline.baseline],
+        node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+        grad_func=lenet3.grad_func,
+        threshold_func=lenet3.threshold_calculator_func,
+        summary_func=lenet3.tensorboard_func,
+        degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()
     # Init
@@ -122,10 +124,7 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0000375],
-                                                                          [0.0, 0.0, 0.0,
-                                                                           0.000075, 0.000075, 0.000075,
-                                                                           0.00015, 0.00015, 0.00015]])
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0000375], [0.000075]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -182,18 +181,38 @@ def main():
                         validation_accuracy, validation_confusion = \
                             network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
                                                        run_id=experiment_id, iteration=iteration_counter)
+                        validation_accuracy_corrected = \
+                            network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
+                                                                             dataset_type=DatasetTypes.validation,
+                                                                             run_id=experiment_id,
+                                                                             iteration=iteration_counter)
+                        DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
+                                                         "Corrected Validation Accuracy",
+                                                         validation_accuracy_corrected)],
+                                                  table=DbLogger.runKvStore, col_count=4)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
                                                          validation_accuracy,
                                                          0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                         if GlobalConstants.SAVE_CONFUSION_MATRICES:
-                            DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable, col_count=7)
-                            DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable, col_count=7)
+                            DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
+                                                      col_count=7)
+                            DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
+                                                      col_count=7)
                         leaf_info_rows = []
                     break
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
                                                                    run_id=experiment_id, iteration=iteration_counter)
+        test_accuracy_corrected = \
+            network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
+                                                             dataset_type=DatasetTypes.test,
+                                                             run_id=experiment_id,
+                                                             iteration=iteration_counter)
+        DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
+                                         "Corrected Test Accuracy",
+                                         test_accuracy_corrected)],
+                                  table=DbLogger.runKvStore, col_count=4)
         DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable,
                                   col_count=3)
         if GlobalConstants.SAVE_CONFUSION_MATRICES:
