@@ -51,14 +51,13 @@ def get_explanation_string(network):
     explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
     explanation += "Param Count:{0}\n".format(total_param_count)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
     explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
     explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
     explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
     explanation += "Hyperplane bias at 0.0\n"
     explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
-    if GlobalConstants.USE_DECISION_REGULARIZER:
-        explanation += "Regularizing Decision Pipeline\n"
     explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
     explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
     explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
@@ -123,16 +122,18 @@ def main():
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False], [0.0000375], [0.0]])
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0000375],
+                                                                          [0.0, 0.0, 0.0,
+                                                                           0.000075, 0.000075, 0.000075,
+                                                                           0.00015, 0.00015, 0.00015]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
     for tpl in cartesian_product:
         print("********************NEW RUN:{0}********************".format(run_id))
         # Restart the network; including all annealed parameters.
-        GlobalConstants.USE_DECISION_REGULARIZER = tpl[0]
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[1]
-        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[2]
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()

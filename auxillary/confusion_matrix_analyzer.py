@@ -30,6 +30,7 @@ class ConfusionMatrixAnalyzer:
         for mode in modes:
             correct_modes += cm[mode, mode]
         modes_accuracy = correct_modes / total_modes_count
+        print("Modes (Dominant Labels):{0}".format(modes))
         print("Modes accuracy:{0} {1}/{2}".format(modes_accuracy, correct_modes, total_modes_count))
         # Determine non-modes
         total_non_modes_count = total - total_modes_count
@@ -40,23 +41,47 @@ class ConfusionMatrixAnalyzer:
             correct_non_modes += cm[i, i]
         non_modes_accuracy = correct_non_modes / total_non_modes_count
         print("Non Modes accuracy:{0} {1}/{2}".format(non_modes_accuracy, correct_non_modes, total_non_modes_count))
+        res_dict = {}
+        res_dict["total_modes_count"] = total_modes_count
+        res_dict["correct_modes"] = correct_modes
+        res_dict["total_non_modes_count"] = total_non_modes_count
+        res_dict["correct_non_modes"] = correct_non_modes
+        return res_dict
 
 
 
 print("\nLeaf 3")
-cm3 = DbLogger.read_confusion_matrix(run_id=1003, dataset=2, iteration=60000, num_of_labels=10, leaf_id=3)
-ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm3, threshold_percentile_for_modes=0.85)
+cm3 = DbLogger.read_confusion_matrix(run_id=1009, dataset=1, iteration=60000, num_of_labels=10, leaf_id=3)
+res_dict_3 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm3, threshold_percentile_for_modes=0.85)
 
 print("\nLeaf 4")
-cm4 = DbLogger.read_confusion_matrix(run_id=1003, dataset=2, iteration=60000, num_of_labels=10, leaf_id=4)
-ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm4, threshold_percentile_for_modes=0.85)
+cm4 = DbLogger.read_confusion_matrix(run_id=1009, dataset=1, iteration=60000, num_of_labels=10, leaf_id=4)
+res_dict_4 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm4, threshold_percentile_for_modes=0.85)
 
 print("\nLeaf 5")
-cm5 = DbLogger.read_confusion_matrix(run_id=1003, dataset=2, iteration=60000, num_of_labels=10, leaf_id=5)
-ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm5, threshold_percentile_for_modes=0.85)
+cm5 = DbLogger.read_confusion_matrix(run_id=1009, dataset=1, iteration=60000, num_of_labels=10, leaf_id=5)
+res_dict_5 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm5, threshold_percentile_for_modes=0.85)
 
 print("\nLeaf 6")
-cm6 = DbLogger.read_confusion_matrix(run_id=1003, dataset=2, iteration=60000, num_of_labels=10, leaf_id=6)
-ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm6, threshold_percentile_for_modes=0.85)
+cm6 = DbLogger.read_confusion_matrix(run_id=1009, dataset=1, iteration=60000, num_of_labels=10, leaf_id=6)
+res_dict_6 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm6, threshold_percentile_for_modes=0.85)
+
+
+overall_modes_count = res_dict_3["total_modes_count"] + res_dict_4["total_modes_count"] + \
+                      res_dict_5["total_modes_count"] + res_dict_6["total_modes_count"]
+overall_correct_modes_count = res_dict_3["correct_modes"] + res_dict_4["correct_modes"] + \
+                              res_dict_5["correct_modes"] + res_dict_6["correct_modes"]
+overall_non_modes_count = res_dict_3["total_non_modes_count"] + res_dict_4["total_non_modes_count"] + \
+                      res_dict_5["total_non_modes_count"] + res_dict_6["total_non_modes_count"]
+overall_correct_non_modes_count = res_dict_3["correct_non_modes"] + res_dict_4["correct_non_modes"] + \
+                              res_dict_5["correct_non_modes"] + res_dict_6["correct_non_modes"]
+
+print("\nOverall Mode Labels Accuracy={0} Mode Count={1}".format(overall_correct_modes_count / overall_modes_count,
+                                                               overall_modes_count))
+print("Overall Non Mode Labels Accuracy={0} Non Mode Count={1}".
+      format( overall_correct_non_modes_count / overall_non_modes_count,
+                                                                        overall_non_modes_count))
+print("Overall Tree Accuracy={0}".format((overall_correct_modes_count + overall_correct_non_modes_count) /
+                                         (overall_modes_count + overall_non_modes_count)))
 
 print("X")

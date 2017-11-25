@@ -569,14 +569,15 @@ class TreeNetwork:
         assign_dict = {}
         for v, curr_value in zip(vars, vars_current_values):
             total_grad = np.zeros(shape=v.shape)
-            is_decision_pipeline_variable = "hyperplane" in v.name or "_decision_" in v.name
+            # is_decision_pipeline_variable = "hyperplane" in v.name or "_decision_" in v.name
             if v in main_grads:
                 total_grad += main_grads[v]
             if v in reg_grads:
-                if not is_decision_pipeline_variable:
-                    total_grad += reg_grads[v]
-                elif is_decision_pipeline_variable and GlobalConstants.USE_DECISION_REGULARIZER:
-                    total_grad += reg_grads[v]
+                total_grad += reg_grads[v]
+                # if not is_decision_pipeline_variable:
+                #     total_grad += reg_grads[v]
+                # elif is_decision_pipeline_variable and GlobalConstants.USE_DECISION_REGULARIZER:
+                #     total_grad += reg_grads[v]
                 # else:
                 #     print("Skipping {0} update".format(v.name))
             if GlobalConstants.USE_INFO_GAIN_DECISION and v in decision_grads:
