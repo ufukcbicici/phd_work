@@ -381,20 +381,20 @@ class TreeNetwork:
                                                          array=true_labels)
             if dataset.isNewEpoch:
                 break
-        # for k, v in branch_probs.items():
-        #     # Interval analysis
-        #     bin_size = 0.1
-        #     for j in range(v.shape[1]):
-        #         histogram = {}
-        #         for i in range(v.shape[0]):
-        #             prob = v[i, j]
-        #             bin_id = int(prob / bin_size)
-        #             # if bin_id == 10:
-        #             #     print("X")
-        #             if bin_id not in histogram:
-        #                 histogram[bin_id] = 0
-        #             histogram[bin_id] += 1
-        #         print(histogram)
+        for k, v in branch_probs.items():
+            # Interval analysis
+            bin_size = 0.1
+            for j in range(v.shape[1]):
+                histogram = {}
+                for i in range(v.shape[0]):
+                    prob = v[i, j]
+                    bin_id = int(prob / bin_size)
+                    # if bin_id == 10:
+                    #     print("X")
+                    if bin_id not in histogram:
+                        histogram[bin_id] = 0
+                    histogram[bin_id] += 1
+                print(histogram)
             # zeros_arr = np.zeros(shape=v.shape)
             # arg_max_indices = np.argmax(v, axis=1)
             # print("X")
