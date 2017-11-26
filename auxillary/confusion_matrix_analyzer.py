@@ -48,21 +48,21 @@ class ConfusionMatrixAnalyzer:
         res_dict["correct_non_modes"] = correct_non_modes
         return res_dict
 
-
+run_id = 852
 print("\nLeaf 3")
-cm3 = DbLogger.read_confusion_matrix(run_id=846, dataset=2, iteration=60000, num_of_labels=10, leaf_id=3)
+cm3 = DbLogger.read_confusion_matrix(run_id=run_id, dataset=2, iteration=60000, num_of_labels=10, leaf_id=3)
 res_dict_3 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm3, threshold_percentile_for_modes=0.85)
 
 print("\nLeaf 4")
-cm4 = DbLogger.read_confusion_matrix(run_id=846, dataset=2, iteration=60000, num_of_labels=10, leaf_id=4)
+cm4 = DbLogger.read_confusion_matrix(run_id=run_id, dataset=2, iteration=60000, num_of_labels=10, leaf_id=4)
 res_dict_4 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm4, threshold_percentile_for_modes=0.85)
 
 print("\nLeaf 5")
-cm5 = DbLogger.read_confusion_matrix(run_id=846, dataset=2, iteration=60000, num_of_labels=10, leaf_id=5)
+cm5 = DbLogger.read_confusion_matrix(run_id=run_id, dataset=2, iteration=60000, num_of_labels=10, leaf_id=5)
 res_dict_5 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm5, threshold_percentile_for_modes=0.85)
 
 print("\nLeaf 6")
-cm6 = DbLogger.read_confusion_matrix(run_id=846, dataset=2, iteration=60000, num_of_labels=10, leaf_id=6)
+cm6 = DbLogger.read_confusion_matrix(run_id=run_id, dataset=2, iteration=60000, num_of_labels=10, leaf_id=6)
 res_dict_6 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm6, threshold_percentile_for_modes=0.85)
 
 overall_modes_count = res_dict_3["total_modes_count"] + res_dict_4["total_modes_count"] + \
