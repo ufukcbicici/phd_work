@@ -115,6 +115,7 @@ def main():
         node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
         grad_func=lenet3.grad_func,
         threshold_func=lenet3.threshold_calculator_func,
+        residue_func=lenet3.residue_network_func,
         summary_func=lenet3.tensorboard_func,
         degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()

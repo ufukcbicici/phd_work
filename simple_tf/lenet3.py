@@ -168,6 +168,7 @@ def leaf_func(node, network, variables=None):
     else:
         hidden_layer_final = hidden_layer
     # Loss
+    node.residueOutputTensor = hidden_layer_final
     logits = tf.matmul(hidden_layer_final, fc_weights_2) + fc_biases_2
     node.fOpsList.extend([flattened, hidden_layer_final, logits])
     # Apply loss
@@ -178,12 +179,37 @@ def leaf_func(node, network, variables=None):
     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
 
 
+def residue_network_func(network):
+    all_residue_features, input_labels = network.prepare_residue_input_tensors()
+    input_x = tf.stop_gradient(all_residue_features)
+    input_dim = input_x.get_shape().as_list()[-1]
+    # Residue Network Parameters
+    fc_residue_weights_1 = tf.Variable(
+        tf.truncated_normal([input_dim, 15], stddev=0.1, seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_1")
+    fc_residue_bias_1 = tf.Variable(tf.constant(0.1, shape=[15], dtype=GlobalConstants.DATA_TYPE),
+                                    name="fc_residue_bias_1")
+    fc_residue_weights_2 = tf.Variable(
+        tf.truncated_normal([15, GlobalConstants.NUM_LABELS], stddev=0.1, seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_2")
+    fc_residue_bias_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS],
+                                                dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_2")
+    # Reside Network Operations
+    residue_hidden_layer = tf.nn.relu(tf.matmul(input_x, fc_residue_weights_1) + fc_residue_bias_1)
+    residue_logits = tf.matmul(residue_hidden_layer, fc_residue_weights_2) + fc_residue_bias_2
+    cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=input_labels,
+                                                                               logits=residue_logits)
+    loss = tf.reduce_mean(cross_entropy_loss_tensor)
+    return loss
+
+
 def grad_func(network):
     # self.initOp = tf.global_variables_initializer()
     # sess.run(self.initOp)
     vars = tf.trainable_variables()
     decision_vars_list = []
     classification_vars_list = []
+    residue_vars_list = []
     regularization_vars_list = []
     if GlobalConstants.USE_INFO_GAIN_DECISION:
         for v in vars:
@@ -191,6 +217,9 @@ def grad_func(network):
                 decision_vars_list.append(v)
                 if "hyperplane" in v.name or "_decision_" in v.name:
                     regularization_vars_list.append(v)
+            elif "_residue_" in v.name:
+                residue_vars_list.append(v)
+                regularization_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
                 regularization_vars_list.append(v)
@@ -206,6 +235,8 @@ def grad_func(network):
         network.decisionParamsDict[decision_vars_list[i]] = i
     for i in range(len(classification_vars_list)):
         network.mainLossParamsDict[classification_vars_list[i]] = i
+    for i in range(len(residue_vars_list)):
+        network.residueParamsDict[residue_vars_list[i]] = i
     for i in range(len(regularization_vars_list)):
         network.regularizationParamsDict[regularization_vars_list[i]] = i
     # for i in range(len(vars)):
@@ -215,6 +246,7 @@ def grad_func(network):
         network.decisionGradients = tf.gradients(ys=network.decisionLoss, xs=decision_vars_list)
     else:
         network.decisionGradients = None
+    network.residueGradients = tf.gradients(ys=network.residueLoss, xs=residue_vars_list)
     network.regularizationGradients = tf.gradients(ys=network.regularizationLoss, xs=regularization_vars_list)
 
 

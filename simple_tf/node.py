@@ -20,6 +20,7 @@ class Node:
         self.softmaxDecay = None
         self.probThresholdCalculator = None
         self.softmaxDecayCalculator = None
+        self.residueOutputTensor = None
         # Indexed by the nodes producing them
         self.activationsDict = {}
         self.proxyLossInputDicts = {}

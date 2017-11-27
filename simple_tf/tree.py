@@ -12,7 +12,7 @@ from simple_tf import batch_norm
 
 
 class TreeNetwork:
-    def __init__(self, node_build_funcs, grad_func, threshold_func, summary_func, degree_list):
+    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list):
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
         self.depth = len(self.nodeBuildFuncs)
@@ -20,6 +20,7 @@ class TreeNetwork:
         self.topologicalSortedNodes = []
         self.gradFunc = grad_func
         self.thresholdFunc = threshold_func
+        self.residueFunc = residue_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
         self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
@@ -28,10 +29,12 @@ class TreeNetwork:
         # self.indicesTensor = indices
         self.evalDict = {}
         self.mainLoss = None
+        self.residueLoss = None
         self.decisionLoss = None
         self.regularizationLoss = None
         self.finalLoss = None
         self.classificationGradients = None
+        self.residueGradients = None
         self.regularizationGradients = None
         self.decisionGradients = None
         self.sample_count_tensors = None
@@ -54,6 +57,7 @@ class TreeNetwork:
         self.isDecisionPhase = None
         self.varToNodesDict = {}
         self.mainLossParamsDict = {}
+        self.residueParamsDict = {}
         self.regularizationParamsDict = {}
         self.decisionParamsDict = {}
         self.initOp = None
@@ -149,6 +153,8 @@ class TreeNetwork:
             GlobalConstants.USE_INFO_GAIN_DECISION = False
             GlobalConstants.USE_CONCAT_TRICK = False
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
+        else:
+            self.residueLoss = self.residueFunc(network=self)
         # Set up mechanism for probability thresholding
         self.thresholdFunc(network=self)
         # Prepare tensors to evaluate
@@ -222,6 +228,7 @@ class TreeNetwork:
         self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
         self.evalDict["RegularizerLoss"] = self.regularizationLoss
         self.evalDict["PrimaryLoss"] = self.mainLoss
+        self.evalDict["ResidueLoss"] = self.residueLoss
         self.evalDict["DecisionLoss"] = self.decisionLoss
         self.evalDict["NetworkLoss"] = self.finalLoss
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
@@ -229,6 +236,7 @@ class TreeNetwork:
         self.gradFunc(network=self)
         # Assign ops for variables
         for var in vars:
+            is_residue_variable = "_residue_" in var.name
             op_name = self.get_assign_op_name(variable=var)
             new_value = tf.placeholder(name=op_name, dtype=GlobalConstants.DATA_TYPE)
             assign_op = tf.assign(ref=var, value=new_value)
@@ -240,7 +248,7 @@ class TreeNetwork:
                     if var.name in self.varToNodesDict:
                         raise Exception("{0} is in the parameters already.".format(var.name))
                     self.varToNodesDict[var.name] = node
-            if var.name not in self.varToNodesDict:
+            if not is_residue_variable and var.name not in self.varToNodesDict:
                 raise Exception("{0} is not in the parameters!".format(var.name))
                 # Add tensorboard ops
                 # self.summaryFunc(network=self)
@@ -537,6 +545,7 @@ class TreeNetwork:
                                        update=GlobalConstants.USE_DROPOUT_FOR_DECISION)
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
+                   self.residueGradients,
                    self.sample_count_tensors,
                    vars,
                    self.learningRate,
@@ -549,10 +558,11 @@ class TreeNetwork:
         # Only calculate the derivatives for information gain losses
         classification_grads = results[0]
         regularization_grads = results[1]
-        sample_counts = results[2]
-        vars_current_values = results[3]
-        lr = results[4]
-        is_open_indicators = results[5]
+        residue_grads = results[2]
+        sample_counts = results[3]
+        vars_current_values = results[4]
+        lr = results[5]
+        is_open_indicators = results[6]
         # if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
         #     summary_list = results[6]
         #     for summary in summary_list:
@@ -576,16 +586,23 @@ class TreeNetwork:
                 gradient_modifier = float(GlobalConstants.BATCH_SIZE) / float(sample_count)
                 modified_g = gradient_modifier * g
                 main_grads[k] = modified_g
+        # Residue Loss
+        res_grads = {}
+        for k, v in self.residueParamsDict.items():
+            g = residue_grads[v]
+            res_grads[k] = g
         # Regularization loss
         reg_grads = {}
         for k, v in self.regularizationParamsDict.items():
-            node = self.varToNodesDict[k.name]
-            is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
-            if not is_node_open:
-                continue
+            is_residue_var = "_residue_" in k.name
+            if not is_residue_var:
+                node = self.varToNodesDict[k.name]
+                is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
+                if not is_node_open:
+                    continue
             r = regularization_grads[v]
             reg_grads[k] = r
-        return main_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators
+        return main_grads, res_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators
 
     def get_decision_grads(self, sess, samples, labels, one_hot_labels, iteration):
         info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
@@ -646,7 +663,7 @@ class TreeNetwork:
                                                                         one_hot_labels=one_hot_labels,
                                                                         iteration=iteration)
         # Classification network
-        main_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
+        main_grads, res_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
             self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
                                                    one_hot_labels=one_hot_labels, iteration=iteration)
         update_dict = {}
@@ -859,3 +876,17 @@ class TreeNetwork:
             else:
                 labels = np.concatenate((labels, leaf_true_labels_dict[k]))
         return transformed_samples, labels
+
+    def prepare_residue_input_tensors(self):
+        # Get all residue features and labels from leaf nodes
+        residue_features = []
+        labels = []
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            residue_features.append(node.residueOutputTensor)
+            labels.append(node.labelTensor)
+        # Concatenate residue features and labels into a batch
+        all_residue_features = tf.concat(values=residue_features, axis=0)
+        all_labels = tf.concat(values=labels, axis=0)
+        return all_residue_features, all_labels
