@@ -729,24 +729,31 @@ class TreeNetwork:
         self.branchingBatchNormAssignOps.extend(assign_ops)
         return normed_data
 
-    def add_learnable_gaussian_noise(self, node):
-        raw_activations = node.activationsDict[node.index]
-        gaussian = \
-            tf.contrib.distributions.MultivariateNormalDiag(
-                loc=np.zeros(shape=(raw_activations.get_shape().as_list())),
-                scale_diag=np.ones(shape=(raw_activations.get_shape().as_list())))
+    def add_learnable_gaussian_noise(self, node, feature):
+        final_feature = None
+        sample_count = tf.shape(feature)[0]
+        feature_dim = feature.get_shape().as_list()[-1]
+        gaussian = tf.contrib.distributions.MultivariateNormalDiag(loc=np.zeros(shape=(feature_dim,)),
+                                                                   scale_diag=np.ones(shape=(feature_dim,)))
         noise_shift = tf.Variable(
-            tf.constant(0.0, shape=raw_activations.get_shape(), dtype=GlobalConstants.DATA_TYPE),
+            tf.constant(0.0, shape=(feature_dim,), dtype=GlobalConstants.DATA_TYPE),
             name=self.get_variable_name(name="noise_shift", node=node))
         noise_scale = tf.Variable(
-            tf.constant(1.0, shape=raw_activations.get_shape(), dtype=GlobalConstants.DATA_TYPE),
+            tf.constant(1.0, shape=(feature_dim,), dtype=GlobalConstants.DATA_TYPE),
             name=self.get_variable_name(name="noise_scale", node=node))
-        # sample = gaussian.s
+        node.variablesSet.add(noise_shift)
+        node.variablesSet.add(noise_scale)
+        noise = tf.cast(gaussian.sample(sample_shape=sample_count), tf.float32)
+        z_noise = noise_scale * noise + noise_shift
+        final_feature = feature + z_noise
+        return final_feature
 
     def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
         # Apply necessary transformations before decision phase
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = self.apply_batch_norm_prior_to_decision(feature=branching_feature, node=node)
+        if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
+            branching_feature = self.add_learnable_gaussian_noise(node=node, feature=branching_feature)
         if GlobalConstants.USE_DROPOUT_FOR_DECISION:
             branching_feature = tf.nn.dropout(branching_feature, self.decisionDropoutKeepProb)
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
