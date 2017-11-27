@@ -173,6 +173,7 @@ def leaf_func(node, network, variables=None):
     # Apply loss
     network.apply_loss(node=node, logits=logits)
     # Evaluation
+    node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = hidden_layer_final
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
 

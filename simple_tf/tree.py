@@ -730,7 +730,6 @@ class TreeNetwork:
         return normed_data
 
     def add_learnable_gaussian_noise(self, node, feature):
-        final_feature = None
         sample_count = tf.shape(feature)[0]
         feature_dim = feature.get_shape().as_list()[-1]
         gaussian = tf.contrib.distributions.MultivariateNormalDiag(loc=np.zeros(shape=(feature_dim,)),
@@ -830,3 +829,33 @@ class TreeNetwork:
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
         return results
+
+    def get_transformed_data(self, sess, dataset, dataset_type):
+        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        leaf_true_labels_dict = {}
+        leaf_final_features_dict = {}
+        # network.get_variable_name(name="final_eval_feature", node=node)
+        while True:
+            results = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
+            for node in self.topologicalSortedNodes:
+                if not node.isLeaf:
+                    continue
+                final_features = results[self.get_variable_name(name="final_eval_feature", node=node)]
+                true_labels = results[self.get_variable_name(name="labels", node=node)]
+                UtilityFuncs.concat_to_np_array_dict(dct=leaf_final_features_dict, key=node.index, array=final_features)
+                UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index, array=true_labels)
+            if dataset.isNewEpoch:
+                break
+        # Concatenate all data
+        transformed_samples = None
+        labels = None
+        for k, v in leaf_final_features_dict.items():
+            if transformed_samples is None:
+                transformed_samples = np.array(v)
+            else:
+                transformed_samples = np.concatenate((transformed_samples, v))
+            if labels is None:
+                labels = np.array(leaf_true_labels_dict[k])
+            else:
+                labels = np.concatenate((labels, leaf_true_labels_dict[k]))
+        return transformed_samples, labels
