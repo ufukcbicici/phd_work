@@ -652,7 +652,7 @@ class TreeNetwork:
             d_grads[k] = d
         return d_grads, info_gain_results
 
-    def update_params_with_momentum(self, sess, dataset, iteration):
+    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         vars = tf.trainable_variables()
         samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
@@ -669,18 +669,17 @@ class TreeNetwork:
         update_dict = {}
         assign_dict = {}
         for v, curr_value in zip(vars, vars_current_values):
+            is_residue_var = "_residue_" in v.name
+            if not is_residue_var and epoch >= GlobalConstants.EPOCH_COUNT:
+                continue
             total_grad = np.zeros(shape=v.shape)
             # is_decision_pipeline_variable = "hyperplane" in v.name or "_decision_" in v.name
             if v in main_grads:
                 total_grad += main_grads[v]
+            if v in res_grads:
+                total_grad += res_grads[v]
             if v in reg_grads:
                 total_grad += reg_grads[v]
-                # if not is_decision_pipeline_variable:
-                #     total_grad += reg_grads[v]
-                # elif is_decision_pipeline_variable and GlobalConstants.USE_DECISION_REGULARIZER:
-                #     total_grad += reg_grads[v]
-                # else:
-                #     print("Skipping {0} update".format(v.name))
             if GlobalConstants.USE_INFO_GAIN_DECISION and v in decision_grads:
                 total_grad += decision_grads[v]
             self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
@@ -691,6 +690,9 @@ class TreeNetwork:
             assign_dict[op_name] = self.assignOpsDict[op_name]
         sess.run(assign_dict, feed_dict=update_dict),
         return sample_counts, lr, is_open_indicators
+
+    # if v in res_grads:
+    #     total_grad += res_grads[v]
 
     def get_variable_name(self, name, node):
         return "Node{0}_{1}".format(node.index, name)

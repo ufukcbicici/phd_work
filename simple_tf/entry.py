@@ -142,7 +142,7 @@ def main():
                                   col_count=2)
         sess.run(init)
         iteration_counter = 0
-        for epoch_id in range(GlobalConstants.EPOCH_COUNT):
+        for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
             dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
             print("*************Epoch {0}*************".format(epoch_id))
@@ -151,6 +151,7 @@ def main():
             while True:
                 start_time = time.time()
                 sample_counts, lr, is_open_indicators = network.update_params_with_momentum(sess=sess, dataset=dataset,
+                                                                                            epoch=epoch_id,
                                                                                             iteration=iteration_counter)
                 elapsed_time = time.time() - start_time
                 total_time += elapsed_time
