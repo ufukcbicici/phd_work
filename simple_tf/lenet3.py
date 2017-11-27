@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 from auxillary.parameters import DecayingParameter, DiscreteParameter
 from simple_tf import batch_norm
@@ -67,27 +68,8 @@ def root_func(node, network, variables=None):
     node.variablesSet.add(hyperplane_weights)
     node.variablesSet.add(hyperplane_biases)
     # Decisions
-    if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-        normed_data, assign_ops = batch_norm.batch_norm(x=ig_feature, iteration=network.iterationHolder,
-                                                        is_decision_phase=network.isDecisionPhase,
-                                                        is_training_phase=network.isTrain,
-                                                        decay=GlobalConstants.BATCH_NORM_DECAY,
-                                                        node=node, network=network)
-        network.branchingBatchNormAssignOps.extend(assign_ops)
-        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-            dropped_normed_data = tf.nn.dropout(normed_data, network.decisionDropoutKeepProb)
-            normed_activations = tf.matmul(dropped_normed_data, hyperplane_weights) + hyperplane_biases
-        else:
-            normed_activations = tf.matmul(normed_data, hyperplane_weights) + hyperplane_biases
-        node.activationsDict[node.index] = normed_activations
-    else:
-        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-            dropped_data = tf.nn.dropout(ig_feature, network.decisionDropoutKeepProb)
-            activations = tf.matmul(dropped_data, hyperplane_weights) + hyperplane_biases
-        else:
-            activations = tf.matmul(ig_feature, hyperplane_weights) + hyperplane_biases
-        node.activationsDict[node.index] = activations
-    network.apply_decision(node=node)
+    network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
+                           hyperplane_biases=hyperplane_biases)
 
 
 def l1_func(node, network, variables=None):
@@ -153,29 +135,8 @@ def l1_func(node, network, variables=None):
     node.variablesSet.add(hyperplane_weights)
     node.variablesSet.add(hyperplane_biases)
     # Decisions
-    h_vector = ig_feature
-    # Batch Norm
-    if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-        normed_h_vector, assign_ops = batch_norm.batch_norm(x=h_vector, iteration=network.iterationHolder,
-                                                            is_decision_phase=network.isDecisionPhase,
-                                                            is_training_phase=network.isTrain,
-                                                            decay=GlobalConstants.BATCH_NORM_DECAY,
-                                                            node=node, network=network)
-        network.branchingBatchNormAssignOps.extend(assign_ops)
-        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-            dropped_normed_data = tf.nn.dropout(normed_h_vector, network.decisionDropoutKeepProb)
-            normed_activations = tf.matmul(dropped_normed_data, hyperplane_weights) + hyperplane_biases
-        else:
-            normed_activations = tf.matmul(normed_h_vector, hyperplane_weights) + hyperplane_biases
-        node.activationsDict[node.index] = normed_activations
-    else:
-        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-            dropped_data = tf.nn.dropout(h_vector, network.decisionDropoutKeepProb)
-            activations = tf.matmul(dropped_data, hyperplane_weights) + hyperplane_biases
-        else:
-            activations = tf.matmul(h_vector, hyperplane_weights) + hyperplane_biases
-        node.activationsDict[node.index] = activations
-    network.apply_decision(node=node)
+    network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
+                           hyperplane_biases=hyperplane_biases)
 
 
 def leaf_func(node, network, variables=None):

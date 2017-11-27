@@ -8,6 +8,7 @@ from simple_tf.global_params import GlobalConstants, GradientType
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
 from collections import deque
+from simple_tf import batch_norm
 
 
 class TreeNetwork:
@@ -136,7 +137,8 @@ class TreeNetwork:
         self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
         self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
         self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
-        self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient", dtype=tf.float32)
+        self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient",
+                                                                  dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -395,9 +397,9 @@ class TreeNetwork:
                         histogram[bin_id] = 0
                     histogram[bin_id] += 1
                 print(histogram)
-            # zeros_arr = np.zeros(shape=v.shape)
-            # arg_max_indices = np.argmax(v, axis=1)
-            # print("X")
+                # zeros_arr = np.zeros(shape=v.shape)
+                # arg_max_indices = np.argmax(v, axis=1)
+                # print("X")
         root_node = self.nodes[0]
         # for node in self.topologicalSortedNodes:
         #     if not node.isLeaf:
@@ -454,7 +456,7 @@ class TreeNetwork:
                 sample_posterior = posterior_probs[node.index][sample_index, :]
                 leaf_modes = self.modesPerLeaves[node.index]
                 predicted_label = np.asscalar(np.argmax(sample_posterior))
-                prediction_confidence= sample_posterior[predicted_label] + float(predicted_label in leaf_modes)
+                prediction_confidence = sample_posterior[predicted_label] + float(predicted_label in leaf_modes)
                 if prediction_confidence > curr_prediction_confidence:
                     curr_predicted_label = predicted_label
                     curr_prediction_confidence = prediction_confidence
@@ -711,8 +713,38 @@ class TreeNetwork:
             node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
             return parent_F, parent_H
 
-    def apply_decision(self, node):
-        # node_degree = self.degreeList[node.depth]
+    def apply_batch_norm_prior_to_decision(self, feature, node):
+        normed_data, assign_ops = batch_norm.batch_norm(x=feature, iteration=self.iterationHolder,
+                                                        is_decision_phase=self.isDecisionPhase,
+                                                        is_training_phase=self.isTrain,
+                                                        decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                        node=node, network=self)
+        self.branchingBatchNormAssignOps.extend(assign_ops)
+        return normed_data
+
+    def add_learnable_gaussian_noise(self, node):
+        raw_activations = node.activationsDict[node.index]
+        gaussian = \
+            tf.contrib.distributions.MultivariateNormalDiag(
+                loc=np.zeros(shape=(raw_activations.get_shape().as_list())),
+                scale_diag=np.ones(shape=(raw_activations.get_shape().as_list())))
+        noise_shift = tf.Variable(
+            tf.constant(0.0, shape=raw_activations.get_shape(), dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="noise_shift", node=node))
+        noise_scale = tf.Variable(
+            tf.constant(1.0, shape=raw_activations.get_shape(), dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="noise_scale", node=node))
+        # sample = gaussian.s
+
+    def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+        # Apply necessary transformations before decision phase
+        if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
+            branching_feature = self.apply_batch_norm_prior_to_decision(feature=branching_feature, node=node)
+        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+            branching_feature = tf.nn.dropout(branching_feature, self.decisionDropoutKeepProb)
+        activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
+        self.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
+        node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
         p_n_given_x = tf.nn.softmax(decayed_activation)
         p_c_given_x = node.oneHotLabelTensor
