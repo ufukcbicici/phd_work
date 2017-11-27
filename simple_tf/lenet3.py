@@ -200,6 +200,8 @@ def residue_network_func(network):
     cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=input_labels,
                                                                                logits=residue_logits)
     loss = tf.reduce_mean(cross_entropy_loss_tensor)
+    network.evalDict["residue_probabilities"] = tf.nn.softmax(residue_logits)
+    network.evalDict["residue_labels"] = input_labels
     return loss
 
 

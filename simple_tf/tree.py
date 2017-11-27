@@ -481,6 +481,30 @@ class TreeNetwork:
         print("Mode prediction accuracy={0}".format(mode_prediction_accuracy))
         return corrected_accuracy
 
+    def calculate_accuracy_with_residue_network(self, sess, dataset, dataset_type):
+        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        leaf_predicted_labels_dict = {}
+        leaf_true_labels_dict = {}
+        info_gain_dict = {}
+        branch_probs = {}
+        one_hot_branch_probs = {}
+        posterior_probs = {}
+        residue_posteriors = None
+        while True:
+            results = self.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            for node in self.topologicalSortedNodes:
+                if not node.isLeaf:
+                    continue
+                else:
+                    posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
+                    true_labels = results[self.get_variable_name(name="labels", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                                                         array=posterior_prob)
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                         array=true_labels)
+            if dataset.isNewEpoch:
+                break
+
     def get_probability_thresholds(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:
             if node.isLeaf:
