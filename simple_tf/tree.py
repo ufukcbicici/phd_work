@@ -408,6 +408,8 @@ class TreeNetwork:
         #     print("X")
         sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
         total_correct = 0
+        total_mode_prediction_count = 0
+        total_correct_of_mode_predictions = 0
         samples_with_non_mode_predictions = set()
         wrong_samples_with_non_mode_predictions = set()
         true_labels_dict = {}
@@ -433,7 +435,9 @@ class TreeNetwork:
                         if true_label != predicted_label:
                             wrong_samples_with_non_mode_predictions.add(sample_index)
                     else:
+                        total_mode_prediction_count += 1.0
                         if true_label == predicted_label:
+                            total_correct_of_mode_predictions += 1.0
                             total_correct += 1.0
                     # if true_label == predicted_label:
                     #     total_correct += 1.0
@@ -464,6 +468,9 @@ class TreeNetwork:
                 total_correct += 1
         corrected_accuracy = total_correct / sample_count
         print("Dataset:{0} Modified Accuracy={1}".format(dataset_type, corrected_accuracy))
+        print("Total count of mode predictions={0}".format(total_mode_prediction_count))
+        mode_prediction_accuracy = total_correct_of_mode_predictions / total_mode_prediction_count
+        print("Mode prediction accuracy={0}".format(mode_prediction_accuracy))
         return corrected_accuracy
 
     def get_probability_thresholds(self, feed_dict, iteration, update):
