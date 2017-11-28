@@ -188,6 +188,8 @@ def main():
                                                                              dataset_type=DatasetTypes.validation,
                                                                              run_id=experiment_id,
                                                                              iteration=iteration_counter)
+                        network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+                                                                        dataset_type=DatasetTypes.validation)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
                                                          "Corrected Validation Accuracy",
                                                          validation_accuracy_corrected)],
@@ -211,6 +213,7 @@ def main():
                                                              dataset_type=DatasetTypes.test,
                                                              run_id=experiment_id,
                                                              iteration=iteration_counter)
+        network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
                                          "Corrected Test Accuracy",
                                          test_accuracy_corrected)],

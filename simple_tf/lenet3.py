@@ -176,7 +176,7 @@ def leaf_func(node, network, variables=None):
     # Evaluation
     node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = hidden_layer_final
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
-    node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
+    # node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
 
 
 def residue_network_func(network):
@@ -203,6 +203,7 @@ def residue_network_func(network):
     network.evalDict["residue_probabilities"] = tf.nn.softmax(residue_logits)
     network.evalDict["residue_labels"] = input_labels
     network.evalDict["residue_indices"] = input_indices
+    network.evalDict["residue_features"] = input_x
     return loss
 
 

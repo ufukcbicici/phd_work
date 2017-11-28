@@ -277,7 +277,7 @@ class TreeNetwork:
                 if results[self.get_variable_name(name="is_open", node=node)] == 0.0:
                     continue
                 posterior_probs = results[self.get_variable_name(name="posterior_probs", node=node)]
-                true_labels = results[self.get_variable_name(name="labels", node=node)]
+                true_labels = results["Node{0}_label_tensor".format(node.index)]
                 # batch_sample_count += results[self.get_variable_name(name="sample_count", node=node)]
                 predicted_labels = np.argmax(posterior_probs, axis=1)
                 batch_sample_count += predicted_labels.shape[0]
@@ -384,7 +384,7 @@ class TreeNetwork:
                                                          array=branch_prob)
                 else:
                     posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
-                    true_labels = results[self.get_variable_name(name="labels", node=node)]
+                    true_labels = results["Node{0}_label_tensor".format(node.index)]
                     UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
                                                          array=posterior_prob)
                     # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
@@ -485,27 +485,68 @@ class TreeNetwork:
 
     def calculate_accuracy_with_residue_network(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
-        leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
-        info_gain_dict = {}
-        branch_probs = {}
-        one_hot_branch_probs = {}
-        posterior_probs = {}
-        residue_posteriors = None
+        leaf_sample_indices_dict = {}
+        leaf_posterior_probs_dict = {}
+        residue_true_labels_dict = {}
+        residue_sample_indices_dict = {}
+        residue_posterior_probs_dict = {}
         while True:
             results = self.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            # Collect data from leaf nodes
             for node in self.topologicalSortedNodes:
                 if not node.isLeaf:
                     continue
                 else:
                     posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
-                    true_labels = results[self.get_variable_name(name="labels", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                    true_labels = results["Node{0}_label_tensor".format(node.index)]
+                    sample_indices = results["Node{0}_indices_tensor".format(node.index)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
                                                          array=posterior_prob)
                     UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
                                                          array=true_labels)
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_sample_indices_dict, key=node.index,
+                                                         array=sample_indices)
+            # Collect data from the residue network
+            residue_posterior_prob = results["residue_probabilities"]
+            residue_true_labels = results["residue_labels"]
+            residue_sample_indices = results["residue_indices"]
+            UtilityFuncs.concat_to_np_array_dict(dct=residue_posterior_probs_dict, key=-1,
+                                                 array=residue_posterior_prob)
+            UtilityFuncs.concat_to_np_array_dict(dct=residue_true_labels_dict, key=-1,
+                                                 array=residue_true_labels)
+            UtilityFuncs.concat_to_np_array_dict(dct=residue_sample_indices_dict, key=-1,
+                                                 array=residue_sample_indices)
             if dataset.isNewEpoch:
                 break
+        # Build an index for lookup into residue entries
+        residue_network_index = {}
+        residue_true_labels = residue_true_labels_dict[-1]
+        residue_posterior_prob = residue_posterior_probs_dict[-1]
+        residue_sample_indices = residue_sample_indices_dict[-1]
+        for i in range(residue_sample_indices.shape[0]):
+            residue_network_index[residue_sample_indices[i]] = i
+        # Measure Accuracy
+        mode_prediction_count = 0.0
+        mode_prediction_correct_count = 0.0
+        residue_prediction_count = 0.0
+        residue_prediction_correct_count = 0.0
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            leaf_sample_indices = leaf_sample_indices_dict[node.index]
+            leaf_true_labels = leaf_true_labels_dict[node.index]
+            leaf_posterior_prob = leaf_posterior_probs_dict[node.index]
+            for i in range(leaf_sample_indices.shape[0]):
+                sample_index = leaf_sample_indices[i]
+                leaf_posterior = leaf_posterior_prob[i]
+                leaf_true_label = leaf_true_labels[i]
+                leaf_predicted_label = np.argmax(leaf_posterior, axis=1)
+                if leaf_predicted_label in self.modesPerLeaves[node.index]:
+                    if leaf_predicted_label == leaf_true_label:
+                        mode_prediction_correct_count += 1.0
+                    mode_prediction_count += 1.0
+        print("Mode Predictions Accuracy:{0}".format(mode_prediction_correct_count / mode_prediction_count))
 
     def get_probability_thresholds(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:
@@ -576,13 +617,30 @@ class TreeNetwork:
                    self.sample_count_tensors,
                    vars,
                    self.learningRate,
-                   self.isOpenTensors,
-                   self.evalDict]
+                   self.isOpenTensors]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.classificationPathSummaries)
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING and is_decision_phase:
             run_ops.extend(self.branchingBatchNormAssignOps)
         results = sess.run(run_ops, feed_dict=feed_dict)
+        # *********************For debug purposes*********************
+        # cursor = 0
+        # eval_results_dict = results[7]
+        # residue_labels = eval_results_dict["residue_labels"]
+        # residue_indices = eval_results_dict["residue_indices"]
+        # residue_features = eval_results_dict["residue_features"]
+        # for node in self.topologicalSortedNodes:
+        #     if not node.isLeaf:
+        #         continue
+        #     node_sample_count = eval_results_dict[self.get_variable_name(name="sample_count", node=node)]
+        #     node_label_tensor = eval_results_dict["Node{0}_label_tensor".format(node.index)]
+        #     node_index_tensor = eval_results_dict["Node{0}_indices_tensor".format(node.index)]
+        #     node_final_feature_tensor = eval_results_dict[self.get_variable_name(name="final_eval_feature", node=node)]
+        #     assert np.allclose(node_label_tensor, residue_labels[cursor:cursor + int(node_sample_count)])
+        #     assert np.allclose(node_index_tensor, residue_indices[cursor:cursor + int(node_sample_count)])
+        #     assert np.allclose(node_final_feature_tensor, residue_features[cursor:cursor + int(node_sample_count)])
+        #     cursor += int(node_sample_count)
+        # *********************For debug purposes*********************
         # Only calculate the derivatives for information gain losses
         classification_grads = results[0]
         regularization_grads = results[1]
