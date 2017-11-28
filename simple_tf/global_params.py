@@ -13,8 +13,8 @@ class GradientType(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 200
-    EPOCH_COUNT = 150
+    TOTAL_EPOCH_COUNT = 350
+    EPOCH_COUNT = 300
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 10000
