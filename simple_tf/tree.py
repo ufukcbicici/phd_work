@@ -26,7 +26,7 @@ class TreeNetwork:
         self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
         self.labelTensor = GlobalConstants.TRAIN_LABEL_TENSOR
         self.oneHotLabelTensor = GlobalConstants.TRAIN_ONE_HOT_LABELS
-        # self.indicesTensor = indices
+        self.indicesTensor = GlobalConstants.TRAIN_INDEX_TENSOR
         self.evalDict = {}
         self.mainLoss = None
         self.residueLoss = None
@@ -180,6 +180,8 @@ class TreeNetwork:
             # Label outputs
             if node.labelTensor is not None:
                 self.evalDict["Node{0}_label_tensor".format(node.index)] = node.labelTensor
+            # Sample indices
+                self.evalDict["Node{0}_indices_tensor".format(node.index)] = node.indicesTensor
             # One Hot Label outputs
             if node.oneHotLabelTensor is not None:
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
@@ -542,7 +544,7 @@ class TreeNetwork:
         else:
             feed_dict[self.decisionDropoutKeepProb] = 1.0
 
-    def get_main_and_regularization_grads(self, sess, samples, labels, one_hot_labels, iteration):
+    def get_main_and_regularization_grads(self, sess, samples, labels, indices, one_hot_labels, iteration):
         vars = tf.trainable_variables()
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         if GlobalConstants.USE_INFO_GAIN_DECISION:
@@ -551,6 +553,7 @@ class TreeNetwork:
             is_decision_phase = 1
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
                      GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+                     GlobalConstants.TRAIN_INDEX_TENSOR: indices,
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
                      self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
@@ -573,7 +576,8 @@ class TreeNetwork:
                    self.sample_count_tensors,
                    vars,
                    self.learningRate,
-                   self.isOpenTensors]
+                   self.isOpenTensors,
+                   self.evalDict]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.classificationPathSummaries)
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING and is_decision_phase:
@@ -628,10 +632,11 @@ class TreeNetwork:
             reg_grads[k] = r
         return main_grads, res_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators
 
-    def get_decision_grads(self, sess, samples, labels, one_hot_labels, iteration):
+    def get_decision_grads(self, sess, samples, labels, indices, one_hot_labels, iteration):
         info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: samples,
                      GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+                     GlobalConstants.TRAIN_INDEX_TENSOR: indices,
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
                      self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
@@ -684,11 +689,13 @@ class TreeNetwork:
         decision_grads = {}
         if GlobalConstants.USE_INFO_GAIN_DECISION:
             decision_grads, info_gain_results = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
+                                                                        indices=indices_list,
                                                                         one_hot_labels=one_hot_labels,
                                                                         iteration=iteration)
         # Classification network
         main_grads, res_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
             self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
+                                                   indices=indices_list,
                                                    one_hot_labels=one_hot_labels, iteration=iteration)
         update_dict = {}
         assign_dict = {}
@@ -732,6 +739,7 @@ class TreeNetwork:
     def mask_input_nodes(self, node):
         if node.isRoot:
             node.labelTensor = self.labelTensor
+            node.indicesTensor = self.indicesTensor
             node.oneHotLabelTensor = self.oneHotLabelTensor
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
@@ -760,6 +768,7 @@ class TreeNetwork:
             for k, v in parent_node.activationsDict.items():
                 node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
             node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
             node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
             return parent_F, parent_H
 
@@ -854,6 +863,7 @@ class TreeNetwork:
         feed_dict = {
             GlobalConstants.TRAIN_DATA_TENSOR: samples,
             GlobalConstants.TRAIN_LABEL_TENSOR: labels,
+            GlobalConstants.TRAIN_INDEX_TENSOR: indices_list,
             GlobalConstants.TRAIN_ONE_HOT_LABELS: one_hot_labels,
             self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
             self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
@@ -907,12 +917,15 @@ class TreeNetwork:
         # Get all residue features and labels from leaf nodes
         residue_features = []
         labels = []
+        indices = []
         for node in self.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
             residue_features.append(node.residueOutputTensor)
             labels.append(node.labelTensor)
+            indices.append(node.indicesTensor)
         # Concatenate residue features and labels into a batch
         all_residue_features = tf.concat(values=residue_features, axis=0)
         all_labels = tf.concat(values=labels, axis=0)
-        return all_residue_features, all_labels
+        all_indices = tf.concat(values=indices, axis=0)
+        return all_residue_features, all_labels, all_indices

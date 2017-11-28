@@ -11,16 +11,16 @@ class DbLogger:
     runMetaData = "run_meta_data"
     leafInfoTable = "leaf_info_table"
     runResultsTable = "run_results"
-    confusionTable = "confusion_matrices_x"
+    confusionTable = "confusion_matrices"
 
     # Lab
     # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Home
-    # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
+    log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Idea
-    log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
+    # log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}

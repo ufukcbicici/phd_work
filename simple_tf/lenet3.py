@@ -180,7 +180,7 @@ def leaf_func(node, network, variables=None):
 
 
 def residue_network_func(network):
-    all_residue_features, input_labels = network.prepare_residue_input_tensors()
+    all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
     input_x = tf.stop_gradient(all_residue_features)
     input_dim = input_x.get_shape().as_list()[-1]
     # Residue Network Parameters
@@ -202,6 +202,7 @@ def residue_network_func(network):
     loss = tf.reduce_mean(cross_entropy_loss_tensor)
     network.evalDict["residue_probabilities"] = tf.nn.softmax(residue_logits)
     network.evalDict["residue_labels"] = input_labels
+    network.evalDict["residue_indices"] = input_indices
     return loss
 
 

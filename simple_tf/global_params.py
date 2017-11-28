@@ -82,6 +82,7 @@ class GlobalConstants:
     # TRAIN
     TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(None, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
     TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,))
+    TRAIN_INDEX_TENSOR = tf.placeholder(tf.int64, shape=(None,))
     TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(None, NUM_LABELS))
     # TEST
     # TEST_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
