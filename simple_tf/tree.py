@@ -207,7 +207,7 @@ class TreeNetwork:
             is_decision_pipeline_variable = "hyperplane" in v.name or "_decision_" in v.name
             loss_tensor = tf.nn.l2_loss(v)
             self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
-            if "bias" in v.name:
+            if "bias" in v.name or "shift" in v.name or "scale" in v.name:
                 l2_loss_list.append(0.0 * loss_tensor)
             else:
                 if is_decision_pipeline_variable:
@@ -634,6 +634,8 @@ class TreeNetwork:
             run_ops.append(self.classificationPathSummaries)
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING and is_decision_phase:
             run_ops.extend(self.branchingBatchNormAssignOps)
+        if GlobalConstants.USE_VERBOSE:
+            run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
         # *********************For debug purposes*********************
         # cursor = 0
@@ -728,6 +730,8 @@ class TreeNetwork:
             run_ops.append(self.decisionPathSummaries)
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             run_ops.extend(self.branchingBatchNormAssignOps)
+        if GlobalConstants.USE_VERBOSE:
+            run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
         decision_grads = results[0]
         sample_counts = results[1]
@@ -866,6 +870,7 @@ class TreeNetwork:
         node.variablesSet.add(noise_scale)
         noise = tf.cast(gaussian.sample(sample_shape=sample_count), tf.float32)
         z_noise = noise_scale * noise + noise_shift
+        # final_feature = tf.where(self.isDecisionPhase > 0, feature, feature + z_noise)
         final_feature = feature + z_noise
         return final_feature
 
@@ -874,11 +879,14 @@ class TreeNetwork:
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = self.apply_batch_norm_prior_to_decision(feature=branching_feature, node=node)
         if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
-            branching_feature = self.add_learnable_gaussian_noise(node=node, feature=branching_feature)
+            self.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
+            noisy_feature = self.add_learnable_gaussian_noise(node=node, feature=branching_feature)
+            self.evalDict[self.get_variable_name(name="noisy_branching_feature", node=node)] = noisy_feature
+            # branching_feature = tf.where(self.isTrain > 0, noisy_feature, branching_feature)
+            branching_feature = noisy_feature
         if GlobalConstants.USE_DROPOUT_FOR_DECISION:
             branching_feature = tf.nn.dropout(branching_feature, self.decisionDropoutKeepProb)
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
-        self.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
         p_n_given_x = tf.nn.softmax(decayed_activation)
@@ -909,7 +917,16 @@ class TreeNetwork:
             else:
                 node.maskTensors[child_index] = mask_tensor
 
-    def apply_loss(self, node, logits):
+    def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
+        final_feature_final = final_feature
+        if GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION:
+            final_feature_final = tf.nn.dropout(final_feature, self.classificationDropoutKeepProb)
+        if GlobalConstants.USE_DECISION_AUGMENTATION:
+            concat_list = [final_feature_final]
+            concat_list.extend(node.activationsDict.values())
+            final_feature_final = tf.concat(values=concat_list, axis=1)
+        node.residueOutputTensor = final_feature_final
+        logits = tf.matmul(final_feature_final, softmax_weights) + softmax_biases
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
         parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}
@@ -924,6 +941,7 @@ class TreeNetwork:
             raise NotImplementedError()
         node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
         node.lossList.append(loss)
+        return final_feature_final, logits
 
     def eval_network(self, sess, dataset, use_masking):
         # if is_train:

@@ -13,7 +13,7 @@ class GradientType(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 350
+    TOTAL_EPOCH_COUNT = 300
     EPOCH_COUNT = 300
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
@@ -56,6 +56,7 @@ class GlobalConstants:
     NO_H_FC_UNITS_2 = 20
     DATA_TYPE = tf.float32
     SEED = None
+    USE_VERBOSE = True
     USE_CPU = False
     USE_CPU_MASKING = False
     USE_EMPTY_NODE_CRASH_PREVENTION = False
@@ -65,6 +66,7 @@ class GlobalConstants:
     USE_REPARAMETRIZATION_TRICK = False
     USE_DROPOUT_FOR_CLASSIFICATION = False
     USE_INFO_GAIN_DECISION = True
+    USE_DECISION_AUGMENTATION = True
     USE_CONCAT_TRICK = False
     USE_BATCH_NORM_BEFORE_BRANCHING = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True

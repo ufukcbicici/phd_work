@@ -147,34 +147,29 @@ def leaf_func(node, network, variables=None):
          GlobalConstants.NO_HIDDEN],
         stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="fc_weights_1", node=node))
-    fc_weights_2 = tf.Variable(
-        tf.truncated_normal([GlobalConstants.NO_HIDDEN, GlobalConstants.NUM_LABELS],
+    fc_biases_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_HIDDEN], dtype=GlobalConstants.DATA_TYPE),
+                              name=network.get_variable_name(name="fc_biases_1", node=node))
+    softmax_input_dim = GlobalConstants.NO_HIDDEN
+    if GlobalConstants.USE_DECISION_AUGMENTATION:
+        softmax_input_dim += total_prev_degrees
+    fc_softmax_weights = tf.Variable(
+        tf.truncated_normal([softmax_input_dim, GlobalConstants.NUM_LABELS],
                             stddev=0.1,
                             seed=GlobalConstants.SEED,
                             dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_weights_2", node=node))
-    fc_biases_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_HIDDEN], dtype=GlobalConstants.DATA_TYPE),
-                              name=network.get_variable_name(name="fc_biases_1", node=node))
-    fc_biases_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
-                              name=network.get_variable_name(name="fc_biases_2", node=node))
-    node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2}
+        name=network.get_variable_name(name="fc_softmax_weights", node=node))
+    fc_softmax_biases = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
+                              name=network.get_variable_name(name="fc_softmax_biases", node=node))
+    node.variablesSet = {fc_weights_1, fc_biases_1, fc_softmax_weights, fc_softmax_biases}
     # Operations
     # Mask inputs
     parent_F, parent_H = network.mask_input_nodes(node=node)
     flattened = tf.contrib.layers.flatten(parent_F)
     hidden_layer = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
-    if GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION:
-        hidden_layer_final = tf.nn.dropout(hidden_layer, network.classificationDropoutKeepProb)
-    else:
-        hidden_layer_final = hidden_layer
-    # Loss
-    node.residueOutputTensor = hidden_layer_final
-    logits = tf.matmul(hidden_layer_final, fc_weights_2) + fc_biases_2
-    node.fOpsList.extend([flattened, hidden_layer_final, logits])
-    # Apply loss
-    network.apply_loss(node=node, logits=logits)
+    final_feature, logits = network.apply_loss(node=node, final_feature=hidden_layer,
+                                               softmax_weights=fc_softmax_weights, softmax_biases=fc_softmax_biases)
     # Evaluation
-    node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = hidden_layer_final
+    node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = final_feature
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     # node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
 
@@ -247,6 +242,7 @@ def residue_network_func(network):
     # network.evalDict["residue_features"] = network.dataTensor
     # return loss
 
+
 def grad_func(network):
     # self.initOp = tf.global_variables_initializer()
     # sess.run(self.initOp)
@@ -257,8 +253,12 @@ def grad_func(network):
     regularization_vars_list = []
     if GlobalConstants.USE_INFO_GAIN_DECISION:
         for v in vars:
+            if "scale" in v.name or "shift" in v.name:
+                continue
             if "hyperplane" in v.name or "gamma" in v.name or "beta" in v.name or "_decision_" in v.name:
                 decision_vars_list.append(v)
+                if GlobalConstants.USE_DECISION_AUGMENTATION:
+                    classification_vars_list.append(v)
                 if "hyperplane" in v.name or "_decision_" in v.name:
                     regularization_vars_list.append(v)
             elif "_residue_" in v.name:
