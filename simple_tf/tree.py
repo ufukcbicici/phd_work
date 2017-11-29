@@ -83,6 +83,13 @@ class TreeNetwork:
             self.decisionParamsDict[H_vars[i]] = i
         return H_vars
 
+    def is_decision_variable(self, variable):
+        if "scale" in variable.name or "shift" in variable.name or "hyperplane" in variable.name or \
+                        "gamma" in variable.name or "beta" in variable.name or "_decision_" in variable.name:
+            return True
+        else:
+            return False
+
     def build_network(self):
         # curr_index = 0
         # prev_depth_node_count = 1
@@ -180,7 +187,7 @@ class TreeNetwork:
             # Label outputs
             if node.labelTensor is not None:
                 self.evalDict["Node{0}_label_tensor".format(node.index)] = node.labelTensor
-            # Sample indices
+                # Sample indices
                 self.evalDict["Node{0}_indices_tensor".format(node.index)] = node.indicesTensor
             # One Hot Label outputs
             if node.oneHotLabelTensor is not None:
@@ -204,7 +211,7 @@ class TreeNetwork:
         vars = tf.trainable_variables()
         l2_loss_list = []
         for v in vars:
-            is_decision_pipeline_variable = "hyperplane" in v.name or "_decision_" in v.name
+            is_decision_pipeline_variable = self.is_decision_variable(variable=v)
             loss_tensor = tf.nn.l2_loss(v)
             self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
             if "bias" in v.name or "shift" in v.name or "scale" in v.name:
@@ -762,11 +769,11 @@ class TreeNetwork:
         # Decision network
         decision_grads = {}
         if GlobalConstants.USE_INFO_GAIN_DECISION:
-            decision_grads, info_gain_results, decision_sample_counts\
+            decision_grads, info_gain_results, decision_sample_counts \
                 = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
-                                                                        indices=indices_list,
-                                                                        one_hot_labels=one_hot_labels,
-                                                                        iteration=iteration)
+                                          indices=indices_list,
+                                          one_hot_labels=one_hot_labels,
+                                          iteration=iteration)
         # Classification network
         main_grads, res_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
             self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
@@ -791,6 +798,9 @@ class TreeNetwork:
             self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
             self.momentumStatesDict[v.name][:] += -lr * total_grad
             new_value = curr_value + self.momentumStatesDict[v.name]
+            if "scale" in v.name:
+                print("Magnitude of {0}= Changed from {1} to {2}".format(v.name, np.linalg.norm(curr_value),
+                                                                         np.linalg.norm(new_value)))
             op_name = self.get_assign_op_name(variable=v)
             update_dict[self.newValuesDict[op_name]] = new_value
             assign_dict[op_name] = self.assignOpsDict[op_name]
@@ -883,8 +893,8 @@ class TreeNetwork:
             self.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
             noisy_feature = self.add_learnable_gaussian_noise(node=node, feature=branching_feature)
             self.evalDict[self.get_variable_name(name="noisy_branching_feature", node=node)] = noisy_feature
-            # branching_feature = tf.where(self.isTrain > 0, noisy_feature, branching_feature)
-            branching_feature = noisy_feature
+            branching_feature = tf.where(self.isTrain > 0, noisy_feature, branching_feature)
+            # branching_feature = noisy_feature
         if GlobalConstants.USE_DROPOUT_FOR_DECISION:
             branching_feature = tf.nn.dropout(branching_feature, self.decisionDropoutKeepProb)
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases

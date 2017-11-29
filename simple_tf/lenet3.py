@@ -31,8 +31,9 @@ def root_func(node, network, variables=None):
         conv_h_weights = tf.Variable(
             tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_H_FILTERS_1], stddev=0.1,
                                 seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_decision_weight",
-                                                                                                 node=node))
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="conv_decision_weight",
+                                           node=node))
         conv_h_bias = tf.Variable(
             tf.constant(0.1, shape=[GlobalConstants.NO_H_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="conv_decision_bias",
@@ -48,8 +49,9 @@ def root_func(node, network, variables=None):
             [feature_size, GlobalConstants.NO_H_FC_UNITS_1],
             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="fc_decision_weights", node=node))
-        fc_h_bias = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_H_FC_UNITS_1], dtype=GlobalConstants.DATA_TYPE),
-                                  name=network.get_variable_name(name="fc_decision_bias", node=node))
+        fc_h_bias = tf.Variable(
+            tf.constant(0.1, shape=[GlobalConstants.NO_H_FC_UNITS_1], dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="fc_decision_bias", node=node))
         node.variablesSet.add(fc_h_weights)
         node.variablesSet.add(fc_h_bias)
         raw_ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
@@ -98,8 +100,9 @@ def l1_func(node, network, variables=None):
         conv_h_weights = tf.Variable(
             tf.truncated_normal([3, 3, GlobalConstants.NO_H_FILTERS_1, GlobalConstants.NO_H_FILTERS_2], stddev=0.1,
                                 seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_decision_weight",
-                                                                                                 node=node))
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="conv_decision_weight",
+                                           node=node))
         conv_h_bias = tf.Variable(
             tf.constant(0.1, shape=[GlobalConstants.NO_H_FILTERS_2], dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="conv_decision_bias",
@@ -115,8 +118,9 @@ def l1_func(node, network, variables=None):
             [feature_size, GlobalConstants.NO_H_FC_UNITS_2],
             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="fc_decision_weights", node=node))
-        fc_h_bias = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_H_FC_UNITS_2], dtype=GlobalConstants.DATA_TYPE),
-                                  name=network.get_variable_name(name="fc_decision_bias", node=node))
+        fc_h_bias = tf.Variable(
+            tf.constant(0.1, shape=[GlobalConstants.NO_H_FC_UNITS_2], dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="fc_decision_bias", node=node))
         node.variablesSet.add(fc_h_weights)
         node.variablesSet.add(fc_h_bias)
         raw_ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
@@ -158,8 +162,9 @@ def leaf_func(node, network, variables=None):
                             seed=GlobalConstants.SEED,
                             dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="fc_softmax_weights", node=node))
-    fc_softmax_biases = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
-                              name=network.get_variable_name(name="fc_softmax_biases", node=node))
+    fc_softmax_biases = tf.Variable(
+        tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="fc_softmax_biases", node=node))
     node.variablesSet = {fc_weights_1, fc_biases_1, fc_softmax_weights, fc_softmax_biases}
     # Operations
     # Mask inputs
@@ -253,9 +258,8 @@ def grad_func(network):
     regularization_vars_list = []
     if GlobalConstants.USE_INFO_GAIN_DECISION:
         for v in vars:
-            if "scale" in v.name or "shift" in v.name:
-                continue
-            if "hyperplane" in v.name or "gamma" in v.name or "beta" in v.name or "_decision_" in v.name:
+            if "scale" in v.name or "shift" in v.name or "hyperplane" in v.name or \
+                            "gamma" in v.name or "beta" in v.name or "_decision_" in v.name:
                 decision_vars_list.append(v)
                 if GlobalConstants.USE_DECISION_AUGMENTATION:
                     classification_vars_list.append(v)
