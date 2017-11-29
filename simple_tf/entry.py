@@ -150,15 +150,22 @@ def main():
             leaf_info_rows = []
             while True:
                 start_time = time.time()
-                sample_counts, lr, is_open_indicators = network.update_params_with_momentum(sess=sess, dataset=dataset,
-                                                                                            epoch=epoch_id,
-                                                                                            iteration=iteration_counter)
+                sample_counts, decision_sample_counts, lr, is_open_indicators = \
+                    network.update_params_with_momentum(sess=sess, dataset=dataset,
+                                                        epoch=epoch_id,
+                                                        iteration=iteration_counter)
                 elapsed_time = time.time() - start_time
                 total_time += elapsed_time
                 print("Iteration:{0}".format(iteration_counter))
                 print("Lr:{0}".format(lr))
-                # Print sample counts
-                sample_count_str = ""
+                # Print sample counts (decision)
+                decision_sample_count_str = "Decision:   "
+                for k, v in decision_sample_counts.items():
+                    decision_sample_count_str += "[{0}={1}]".format(k, v)
+                    node_index = network.get_node_from_variable_name(name=k).index
+                    # leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
+                # Print sample counts (classification)
+                sample_count_str = "Classification:   "
                 for k, v in sample_counts.items():
                     sample_count_str += "[{0}={1}]".format(k, v)
                     node_index = network.get_node_from_variable_name(name=k).index
@@ -166,6 +173,7 @@ def main():
                 indicator_str = ""
                 for k, v in is_open_indicators.items():
                     indicator_str += "[{0}={1}]".format(k, v)
+                print(decision_sample_count_str)
                 print(sample_count_str)
                 print(indicator_str)
                 iteration_counter += 1

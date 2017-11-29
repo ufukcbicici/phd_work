@@ -753,7 +753,7 @@ class TreeNetwork:
             if np.any(np.isnan(d)):
                 raise Exception("NAN Gradient!!!")
             d_grads[k] = d
-        return d_grads, info_gain_results
+        return d_grads, info_gain_results, sample_counts
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         vars = tf.trainable_variables()
@@ -762,7 +762,8 @@ class TreeNetwork:
         # Decision network
         decision_grads = {}
         if GlobalConstants.USE_INFO_GAIN_DECISION:
-            decision_grads, info_gain_results = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
+            decision_grads, info_gain_results, decision_sample_counts\
+                = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
                                                                         indices=indices_list,
                                                                         one_hot_labels=one_hot_labels,
                                                                         iteration=iteration)
@@ -794,7 +795,7 @@ class TreeNetwork:
             update_dict[self.newValuesDict[op_name]] = new_value
             assign_dict[op_name] = self.assignOpsDict[op_name]
         sess.run(assign_dict, feed_dict=update_dict),
-        return sample_counts, lr, is_open_indicators
+        return sample_counts, decision_sample_counts, lr, is_open_indicators
 
     # if v in res_grads:
     #     total_grad += res_grads[v]
