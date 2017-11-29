@@ -41,16 +41,18 @@ class MnistDataSet(DataSet):
                                                               path_lbl=self.trainLabelsPath)
         self.testSamples, self.testLabels = self.load(path_img=self.testImagesPath, path_lbl=self.testLabelsPath)
         if self.validationLoadFile is None:
-            random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount, replace=False)
+            # random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount, replace=False)
+            indices = np.arange(0, 10000)
             if self.validationSaveFile is not None:
-                UtilityFuncs.save_npz(file_name=self.validationSaveFile, arr_dict={"random_indices": random_indices})
+                UtilityFuncs.save_npz(file_name=self.validationSaveFile, arr_dict={"random_indices": indices})
         else:
-            random_indices = UtilityFuncs.load_npz(file_name=self.validationLoadFile)["random_indices"]
+            indices = UtilityFuncs.load_npz(file_name=self.validationLoadFile)["random_indices"]
         # print(random_indices[0:5])
-        self.validationSamples = self.trainingSamples[random_indices]
-        self.validationLabels = self.trainingLabels[random_indices]
-        self.trainingSamples = np.delete(self.trainingSamples, random_indices, 0)
-        self.trainingLabels = np.delete(self.trainingLabels, random_indices, 0)
+        self.validationSamples = self.trainingSamples[indices]
+        self.validationLabels = self.trainingLabels[indices]
+        self.trainingSamples = np.delete(self.trainingSamples, indices, 0)
+        self.trainingLabels = np.delete(self.trainingLabels, indices, 0)
+        print("X")
 
     def get_next_batch(self, batch_size):
         num_of_samples = self.get_current_sample_count()

@@ -894,6 +894,7 @@ class TreeNetwork:
             noisy_feature = self.add_learnable_gaussian_noise(node=node, feature=branching_feature)
             self.evalDict[self.get_variable_name(name="noisy_branching_feature", node=node)] = noisy_feature
             branching_feature = tf.where(self.isTrain > 0, noisy_feature, branching_feature)
+            self.evalDict[self.get_variable_name(name="final_branching_feature", node=node)] = branching_feature
             # branching_feature = noisy_feature
         if GlobalConstants.USE_DROPOUT_FOR_DECISION:
             branching_feature = tf.nn.dropout(branching_feature, self.decisionDropoutKeepProb)

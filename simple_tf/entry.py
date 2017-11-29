@@ -105,7 +105,7 @@ def main():
         sess = tf.Session(config=config)
     else:
         sess = tf.Session()
-    dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
+    dataset = MnistDataSet(validation_sample_count=10000, load_validation_from=None)
     # Build the network
     # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
