@@ -39,8 +39,8 @@ class GlobalConstants:
     BATCH_NORM_DECAY = 0.9
     # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
     #                                           decay_period=1, min_limit=0.0)
-    SOFTMAX_DECAY_INITIAL = 100.0
-    SOFTMAX_DECAY_COEFFICIENT = 0.9995
+    SOFTMAX_DECAY_INITIAL = 25.0
+    SOFTMAX_DECAY_COEFFICIENT = 0.9999
     SOFTMAX_DECAY_PERIOD = 2
     SOFTMAX_DECAY_MIN_LIMIT = 1.0
     DROPOUT_INITIAL_PROB = 0.75
@@ -66,7 +66,7 @@ class GlobalConstants:
     USE_REPARAMETRIZATION_TRICK = False
     USE_DROPOUT_FOR_CLASSIFICATION = False
     USE_INFO_GAIN_DECISION = True
-    USE_DECISION_AUGMENTATION = True
+    USE_DECISION_AUGMENTATION = False
     USE_CONCAT_TRICK = False
     USE_BATCH_NORM_BEFORE_BRANCHING = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
