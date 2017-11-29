@@ -227,7 +227,10 @@ def main():
                                          "Corrected Test Accuracy",
                                          test_accuracy_corrected)],
                                   table=DbLogger.runKvStore, col_count=4)
-        DbLogger.write_into_table([(experiment_id, explanation, test_accuracy)], table=DbLogger.runResultsTable,
+        DbLogger.write_into_table([
+            (experiment_id, explanation, test_accuracy, "Regular"),
+            (experiment_id, explanation, test_accuracy_corrected, "Corrected")
+        ], table=DbLogger.runResultsTable,
                                   col_count=3)
         if GlobalConstants.SAVE_CONFUSION_MATRICES:
             DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)

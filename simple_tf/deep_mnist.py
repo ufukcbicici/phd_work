@@ -32,14 +32,18 @@ import tempfile
 from tensorflow.examples.tutorials.mnist import input_data
 
 import tensorflow as tf
+import numpy as np
+
+from auxillary.constants import DatasetTypes
+from data_handling.mnist_data_set import MnistDataSet
 
 FLAGS = None
 
 globalCounter = tf.Variable(0, dtype=tf.int64, trainable=False)
 learningRate = tf.train.exponential_decay(
-    0.1,  # Base learning rate.
+    0.025,  # Base learning rate.
     globalCounter,  # Current index into the dataset.
-    5000,  # Decay step.
+    20000,  # Decay step.
     0.5,  # Decay rate.
     staircase=True)
 
@@ -91,9 +95,6 @@ def deepnn(x):
 
   # Dropout - controls the complexity of the model, prevents co-adaptation of
   # features.
-  with tf.name_scope('dropout'):
-    keep_prob = tf.placeholder(tf.float32)
-    h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
   # Map the 1024 features to 10 classes, one for each digit
   with tf.name_scope('fc2'):
@@ -101,7 +102,7 @@ def deepnn(x):
     b_fc2 = bias_variable([10])
 
     y_conv = tf.matmul(h_fc1, W_fc2) + b_fc2
-  return y_conv, keep_prob
+  return y_conv
 
 
 def conv2d(x, W):
@@ -118,36 +119,46 @@ def max_pool_2x2(x):
 def weight_variable(shape):
   """weight_variable generates a weight variable of a given shape."""
   initial = tf.truncated_normal(shape, stddev=0.1)
-  return tf.Variable(initial)
+  return tf.Variable(initial, name="conv")
 
 
 def bias_variable(shape):
   """bias_variable generates a bias variable of a given shape."""
   initial = tf.constant(0.1, shape=shape)
-  return tf.Variable(initial)
+  return tf.Variable(initial, name="bias")
 
 
 def main(_):
   # Import data
-  mnist = input_data.read_data_sets(FLAGS.data_dir, validation_size=10000, one_hot=True)
+  # mnist = input_data.read_data_sets(FLAGS.data_dir, validation_size=10000, one_hot=True)
 
   # Create the model
-  x = tf.placeholder(tf.float32, [None, 784])
+  x = tf.placeholder(tf.float32, shape=(None, 28, 28, 1))
 
   # Define loss and optimizer
   y_ = tf.placeholder(tf.float32, [None, 10])
 
   # Build the graph for the deep net
-  y_conv, keep_prob = deepnn(x)
+  y_conv = deepnn(x)
 
   with tf.name_scope('loss'):
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=y_,
                                                             logits=y_conv)
   cross_entropy = tf.reduce_mean(cross_entropy)
 
+  l2_loss_list = []
+  for v in tf.trainable_variables():
+    loss_tensor = tf.nn.l2_loss(v)
+    if "bias" in v.name:
+      l2_loss_list.append(0.0 * loss_tensor)
+    else:
+        l2_loss_list.append(0.0005 * loss_tensor)
+  l2_loss = tf.add_n(l2_loss_list)
+  final_loss = cross_entropy + l2_loss
+
   with tf.name_scope('momentum_optimizer'):
     # train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-    train_step = tf.train.MomentumOptimizer(learningRate, 0.9).minimize(cross_entropy, global_step=globalCounter)
+    train_step = tf.train.MomentumOptimizer(learningRate, 0.9).minimize(final_loss, global_step=globalCounter)
 
   with tf.name_scope('accuracy'):
     correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
@@ -159,20 +170,27 @@ def main(_):
   train_writer = tf.summary.FileWriter(graph_location)
   train_writer.add_graph(tf.get_default_graph())
 
+  dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
+  dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    for i in range(25000):
-      batch = mnist.train.next_batch(1000)
-      if i % 100 == 0:
-        train_accuracy = accuracy.eval(feed_dict={
-            x: batch[0], y_: batch[1], keep_prob: 1.0})
-        print('step %d, training accuracy %g' % (i, train_accuracy))
-      train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
+    for i in range(120000):
+      samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=125)
+      samples = np.expand_dims(samples, axis=3)
+      train_step.run(feed_dict={x: samples, y_: one_hot_labels})
       lr = sess.run([learningRate])
-      print("i={0} lr={1}".format(i, lr))
 
-    print('test accuracy %g' % accuracy.eval(feed_dict={
-        x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+
+      if dataset.isNewEpoch:
+        print("i={0} lr={1}".format(i, lr))
+        dataset.set_current_data_set_type(dataset_type=DatasetTypes.test)
+        test_samples, test_labels, test_indices_list, test_one_hot_labels = dataset.get_next_batch(batch_size=10000)
+        test_samples = np.expand_dims(test_samples, axis=3)
+        print('test accuracy %g' % accuracy.eval(feed_dict={x: test_samples, y_: test_one_hot_labels}))
+        dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+
+
+
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
