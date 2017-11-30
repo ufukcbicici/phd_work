@@ -105,7 +105,8 @@ def main():
         sess = tf.Session(config=config)
     else:
         sess = tf.Session()
-    dataset = MnistDataSet(validation_sample_count=10000, load_validation_from=None)
+        dataset = MnistDataSet(validation_sample_count=10000,
+                               load_validation_from="validation_indices")
     # Build the network
     # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
@@ -125,8 +126,15 @@ def main():
     init = tf.global_variables_initializer()
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
-    # wd_list = [x for x in itertools.repeat(0.0, 5)]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0000375], [0.0009]])
+    # # wd_list = [x for x in itertools.repeat(0.0, 5)]
+    # cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0000375, 0.0000375, 0.0000375,
+    #                                                                        0.00005, 0.00005, 0.00005,
+    #                                                                        0.000075, 0.000075, 0.000075,
+    #                                                                        0.0001, 0.0001, 0.0001,
+    #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
+    classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
+    decision_wd = [0.0]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0

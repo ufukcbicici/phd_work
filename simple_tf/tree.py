@@ -430,6 +430,7 @@ class TreeNetwork:
         samples_with_non_mode_predictions = set()
         wrong_samples_with_non_mode_predictions = set()
         true_labels_dict = {}
+        # leaf_histograms = {}
         for sample_index in range(sample_count):
             curr_node = root_node
             probabilities_on_path = []
@@ -445,6 +446,11 @@ class TreeNetwork:
                     sample_posterior = posterior_probs[curr_node.index][sample_index, :]
                     predicted_label = np.asscalar(np.argmax(sample_posterior))
                     true_label = leaf_true_labels_dict[curr_node.index][sample_index]
+                    # if curr_node.index not in leaf_histograms:
+                    #     leaf_histograms[curr_node.index] = {}
+                    # if true_label not in leaf_histograms[curr_node.index]:
+                    #     leaf_histograms[curr_node.index][true_label] = 0
+                    # leaf_histograms[curr_node.index][true_label] += 1
                     true_labels_dict[sample_index] = true_label
                     if predicted_label not in self.modesPerLeaves[curr_node.index]:
                         samples_with_non_mode_predictions.add(sample_index)
@@ -911,6 +917,7 @@ class TreeNetwork:
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
         arg_max_indices = tf.argmax(p_n_given_x, axis=1)
         child_nodes = self.dagObject.children(node=node)
+        child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
         for index in range(len(child_nodes)):
             child_node = child_nodes[index]
             child_index = child_node.index
