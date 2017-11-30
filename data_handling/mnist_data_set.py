@@ -52,7 +52,7 @@ class MnistDataSet(DataSet):
         self.validationLabels = self.trainingLabels[indices]
         self.trainingSamples = np.delete(self.trainingSamples, indices, 0)
         self.trainingLabels = np.delete(self.trainingLabels, indices, 0)
-        print("X")
+        # print("X")
 
     def get_next_batch(self, batch_size):
         num_of_samples = self.get_current_sample_count()
