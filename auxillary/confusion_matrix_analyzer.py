@@ -1,5 +1,6 @@
 import numpy as np
 
+from auxillary.confusion_matrix_grapher import ConfusionMatrixGrapher
 from auxillary.db_logger import DbLogger
 
 
@@ -53,7 +54,7 @@ class ConfusionMatrixAnalyzer:
         res_dict["total_mode_prediction_count"] = total_mode_prediction_count
         return res_dict
 
-run_id = 861
+run_id = 41
 print("\nLeaf 3")
 cm3 = DbLogger.read_confusion_matrix(run_id=run_id, dataset=2, iteration=60000, num_of_labels=10, leaf_id=3)
 res_dict_3 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm3, threshold_percentile_for_modes=0.85)
@@ -93,4 +94,7 @@ estimated_tree_accuracy = overall_correct_modes_count / overall_mode_prediction_
 print("Overall Accuracy On Samples Predicted As Modes:{0}".format(estimated_tree_accuracy))
 estimated_final_network_accuracy = 0.99*(10000.0 - overall_mode_prediction_count) + \
                                    estimated_tree_accuracy*overall_mode_prediction_count
+
+classes = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+ConfusionMatrixGrapher.plot_confusion_matrix(cm=cm3, classes=classes, title="Leaf 3 Label Frequencies")
 print("X")
