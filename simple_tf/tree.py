@@ -161,7 +161,7 @@ class TreeNetwork:
             GlobalConstants.USE_CONCAT_TRICK = False
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
         else:
-            self.residueLoss = self.residueFunc(network=self)
+            self.residueLoss = GlobalConstants.RESIDUE_LOSS_COEFFICIENT * self.residueFunc(network=self)
         # Set up mechanism for probability thresholding
         self.thresholdFunc(network=self)
         # Prepare tensors to evaluate
@@ -201,11 +201,14 @@ class TreeNetwork:
             GlobalConstants.DECAY_RATE,  # Decay rate.
             staircase=True)
         # Prepare the cost function
-        # Main losses
+
+        # ******************** Main losses ********************
         primary_losses = []
         for node in self.topologicalSortedNodes:
             primary_losses.extend(node.lossList)
-        # Weight decays
+        # ******************** Main losses ********************
+
+        # ******************** Regularization losses ********************
         self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
         self.decisionWeightDecayCoeff = tf.placeholder(name="decision_weight_decay_coefficient", dtype=tf.float32)
         vars = tf.trainable_variables()
@@ -221,8 +224,9 @@ class TreeNetwork:
                     l2_loss_list.append(self.decisionWeightDecayCoeff * loss_tensor)
                 else:
                     l2_loss_list.append(self.weightDecayCoeff * loss_tensor)
-        # weights_and_filters = [v for v in vars if "bias" not in v.name]
-        # Proxy, decision losses
+        # ******************** Regularization losses ********************
+
+        # ******************** Decision losses ********************
         decision_losses = []
         for node in self.topologicalSortedNodes:
             if node.isLeaf:
@@ -234,6 +238,7 @@ class TreeNetwork:
             self.decisionLoss = GlobalConstants.DECISION_LOSS_COEFFICIENT * tf.add_n(decision_losses)
         else:
             self.decisionLoss = tf.constant(value=0.0)
+        # ******************** Decision losses ********************
         self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
         self.evalDict["RegularizerLoss"] = self.regularizationLoss
         self.evalDict["PrimaryLoss"] = self.mainLoss

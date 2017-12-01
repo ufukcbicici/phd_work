@@ -270,6 +270,7 @@ def grad_func(network):
                 regularization_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
+                residue_vars_list.append(v)
                 regularization_vars_list.append(v)
                 # if not ("gamma" in v.name or "beta" in v.name):
     elif len(network.topologicalSortedNodes) == 1:
