@@ -181,7 +181,7 @@ def leaf_func(node, network, variables=None):
 
 def residue_network_func(network):
     all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
-    input_x = tf.stop_gradient(all_residue_features)
+    input_x = all_residue_features # tf.stop_gradient(all_residue_features)
     input_dim = input_x.get_shape().as_list()[-1]
     # Residue Network Parameters
     fc_residue_weights_1 = tf.Variable(
@@ -270,7 +270,8 @@ def grad_func(network):
                 regularization_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
-                residue_vars_list.append(v)
+                if "_softmax_" not in v.name:
+                    residue_vars_list.append(v)
                 regularization_vars_list.append(v)
                 # if not ("gamma" in v.name or "beta" in v.name):
     elif len(network.topologicalSortedNodes) == 1:
