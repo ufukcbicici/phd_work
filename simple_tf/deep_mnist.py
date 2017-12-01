@@ -170,7 +170,7 @@ def main(_):
   train_writer = tf.summary.FileWriter(graph_location)
   train_writer.add_graph(tf.get_default_graph())
 
-  dataset = MnistDataSet(validation_sample_count=10000, load_validation_from="validation_indices")
+  dataset = MnistDataSet(validation_sample_count=10000, load_validation_from=None)
   dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())

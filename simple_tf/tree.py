@@ -804,9 +804,10 @@ class TreeNetwork:
             self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
             self.momentumStatesDict[v.name][:] += -lr * total_grad
             new_value = curr_value + self.momentumStatesDict[v.name]
-            if "scale" in v.name:
-                print("Magnitude of {0}= Changed from {1} to {2}".format(v.name, np.linalg.norm(curr_value),
-                                                                         np.linalg.norm(new_value)))
+            if ("scale" in v.name or "shift" in v.name) and iteration % 10 == 0:
+                # print("Magnitude of {0}= Changed from {1} to {2}".format(v.name, np.linalg.norm(curr_value),
+                #                                                          np.linalg.norm(new_value)))
+                print("{0}={1}".format(v.name, new_value))
             op_name = self.get_assign_op_name(variable=v)
             update_dict[self.newValuesDict[op_name]] = new_value
             assign_dict[op_name] = self.assignOpsDict[op_name]
@@ -883,10 +884,11 @@ class TreeNetwork:
         noise_scale = tf.Variable(
             tf.constant(1.0, shape=(feature_dim,), dtype=GlobalConstants.DATA_TYPE),
             name=self.get_variable_name(name="noise_scale", node=node))
+        noise_scale_sqrt = tf.square(noise_scale)
         node.variablesSet.add(noise_shift)
         node.variablesSet.add(noise_scale)
         noise = tf.cast(gaussian.sample(sample_shape=sample_count), tf.float32)
-        z_noise = noise_scale * noise + noise_shift
+        z_noise = noise_scale_sqrt * noise + noise_shift
         # final_feature = tf.where(self.isDecisionPhase > 0, feature, feature + z_noise)
         final_feature = feature + z_noise
         return final_feature

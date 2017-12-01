@@ -132,9 +132,10 @@ def main():
     #                                                                        0.000075, 0.000075, 0.000075,
     #                                                                        0.0001, 0.0001, 0.0001,
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
-    classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
-    decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd])
+    # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
+    # decision_wd = [0.0]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0000375, 0.0000375, 0.0000375, 0.0000375,
+                                                                           0.0000375], [0.0009]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -239,7 +240,7 @@ def main():
             (experiment_id, explanation, test_accuracy, "Regular"),
             (experiment_id, explanation, test_accuracy_corrected, "Corrected")
         ], table=DbLogger.runResultsTable,
-                                  col_count=3)
+                                  col_count=4)
         if GlobalConstants.SAVE_CONFUSION_MATRICES:
             DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)
         print("X")
