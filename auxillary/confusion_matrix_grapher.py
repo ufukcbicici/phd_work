@@ -47,12 +47,6 @@ class ConfusionMatrixGrapher:
         plt.tight_layout()
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
-        plt.close()
-
-        plt.figure()
-        plt.text(15, 5, "Hede Hodo",
-                 horizontalalignment="center",
-                 color="black")
         plt.show()
 
     # # Compute confusion matrix
