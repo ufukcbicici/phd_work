@@ -196,7 +196,8 @@ def residue_network_func(network):
                                                 dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_2")
     # Reside Network Operations
     residue_hidden_layer = tf.nn.relu(tf.matmul(input_x, fc_residue_weights_1) + fc_residue_bias_1)
-    residue_logits = tf.matmul(residue_hidden_layer, fc_residue_weights_2) + fc_residue_bias_2
+    residue_drop = tf.nn.dropout(residue_hidden_layer, keep_prob=network.classificationDropoutKeepProb)
+    residue_logits = tf.matmul(residue_drop, fc_residue_weights_2) + fc_residue_bias_2
     cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=input_labels,
                                                                                logits=residue_logits)
     loss = tf.reduce_mean(cross_entropy_loss_tensor)
