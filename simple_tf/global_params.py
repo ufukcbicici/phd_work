@@ -33,7 +33,7 @@ class GlobalConstants:
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.025
     DECAY_STEP = 15000
-    DECAY_RATE = 0.5
+    DECAY_RATE = 0.1
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
     BATCH_NORM_DECAY = 0.9
@@ -41,7 +41,7 @@ class GlobalConstants:
     #                                           decay_period=1, min_limit=0.0)
     SOFTMAX_DECAY_INITIAL = 25.0
     SOFTMAX_DECAY_COEFFICIENT = 0.9999
-    SOFTMAX_DECAY_PERIOD = 3
+    SOFTMAX_DECAY_PERIOD = 2
     SOFTMAX_DECAY_MIN_LIMIT = 1.0
     DROPOUT_INITIAL_PROB = 0.75
     DROPOUT_SCHEDULE = [(15000, 0.5), (30000, 0.25), (45000, 0.125)]
