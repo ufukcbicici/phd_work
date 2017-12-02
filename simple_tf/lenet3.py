@@ -181,7 +181,7 @@ def leaf_func(node, network, variables=None):
 
 def residue_network_func(network):
     all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
-    input_x = all_residue_features # tf.stop_gradient(all_residue_features)
+    input_x = all_residue_features  # tf.stop_gradient(all_residue_features)
     input_dim = input_x.get_shape().as_list()[-1]
     # Residue Network Parameters
     fc_residue_weights_1 = tf.Variable(
@@ -325,6 +325,11 @@ def threshold_calculator_func(network):
     network.decisionDropoutKeepProbCalculator = DiscreteParameter(name="decision_dropout_calculator",
                                                                   schedule=GlobalConstants.DROPOUT_SCHEDULE,
                                                                   value=GlobalConstants.DROPOUT_INITIAL_PROB)
+    # Noise Coefficient
+    network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=1.0,
+                                                           decay=0.9999,
+                                                           decay_period=1,
+                                                           min_limit=0.0)
     for node in network.topologicalSortedNodes:
         if node.isLeaf:
             continue
@@ -333,7 +338,7 @@ def threshold_calculator_func(network):
         initial_value = 1.0 / float(node_degree)
         threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
         node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                                                         decay_period=20000,
+                                                         decay_period=10000,
                                                          min_limit=0.4)
         # Softmax Decay
         decay_name = network.get_variable_name(name="softmax_decay", node=node)

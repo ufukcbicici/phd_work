@@ -52,6 +52,8 @@ class TreeNetwork:
         self.decisionDropoutKeepProbCalculator = None
         self.classificationDropoutKeepProb = None
         self.informationGainBalancingCoefficient = None
+        self.noiseCoefficient = None
+        self.noiseCoefficientCalculator = None
         self.isTrain = None
         self.useMasking = None
         self.isDecisionPhase = None
@@ -150,6 +152,7 @@ class TreeNetwork:
         self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
         self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient",
                                                                   dtype=tf.float32)
+        self.noiseCoefficient = tf.placeholder(name="noise_coefficient", dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
@@ -606,6 +609,13 @@ class TreeNetwork:
                 # Update the Softmax Decay
                 node.softmaxDecayCalculator.update(iteration=iteration + 1)
 
+    def get_noise_coefficient(self, feed_dict, iteration, update):
+        noise_coeff = self.noiseCoefficientCalculator.value
+        feed_dict[self.noiseCoefficient] = noise_coeff
+        print("{0} value={1}".format(self.noiseCoefficientCalculator.name, noise_coeff))
+        if update:
+            self.noiseCoefficientCalculator.update(iteration=iteration + 1)
+
     def get_decision_dropout_prob(self, feed_dict, iteration, update):
         if update:
             prob = self.decisionDropoutKeepProbCalculator.value
@@ -641,6 +651,7 @@ class TreeNetwork:
         self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
         self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration,
                                        update=GlobalConstants.USE_DROPOUT_FOR_DECISION)
+        self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=True)
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.residueGradients,
@@ -743,6 +754,7 @@ class TreeNetwork:
         self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=False)
         self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=False)
         self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=False)
+        self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=False)
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
@@ -895,7 +907,7 @@ class TreeNetwork:
         noise = tf.cast(gaussian.sample(sample_shape=sample_count), tf.float32)
         z_noise = noise_scale_sqrt * noise + noise_shift
         # final_feature = tf.where(self.isDecisionPhase > 0, feature, feature + z_noise)
-        final_feature = feature + z_noise
+        final_feature = feature + (self.noiseCoefficient * z_noise)
         return final_feature
 
     def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
@@ -987,6 +999,7 @@ class TreeNetwork:
             self.useMasking: int(use_masking),
             self.classificationDropoutKeepProb: 1.0,
             self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
+            self.noiseCoefficient: 0.0,
             self.iterationHolder: 1000000}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
