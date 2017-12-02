@@ -23,6 +23,7 @@ import itertools
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.mnist_data_set import MnistDataSet
+from simple_tf import lenet_decision_connected_to_f
 from simple_tf.global_params import GlobalConstants
 from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
@@ -121,11 +122,12 @@ def main():
     #                       create_new_variables=True)
     network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
         # node_build_funcs=[baseline.baseline],
-        node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
-        grad_func=lenet3.grad_func,
-        threshold_func=lenet3.threshold_calculator_func,
-        residue_func=lenet3.residue_network_func,
-        summary_func=lenet3.tensorboard_func,
+        node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
+                          lenet_decision_connected_to_f.leaf_func],
+        grad_func=lenet_decision_connected_to_f.grad_func,
+        threshold_func=lenet_decision_connected_to_f.threshold_calculator_func,
+        residue_func=lenet_decision_connected_to_f.residue_network_func,
+        summary_func=lenet_decision_connected_to_f.tensorboard_func,
         degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()

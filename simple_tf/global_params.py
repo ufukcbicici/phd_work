@@ -39,9 +39,9 @@ class GlobalConstants:
     BATCH_NORM_DECAY = 0.9
     # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
     #                                           decay_period=1, min_limit=0.0)
-    SOFTMAX_DECAY_INITIAL = 25.0
-    SOFTMAX_DECAY_COEFFICIENT = 0.9999
-    SOFTMAX_DECAY_PERIOD = 2
+    SOFTMAX_DECAY_INITIAL = 1.0
+    SOFTMAX_DECAY_COEFFICIENT = 1.0
+    SOFTMAX_DECAY_PERIOD = 1
     SOFTMAX_DECAY_MIN_LIMIT = 1.0
     DROPOUT_INITIAL_PROB = 0.75
     DROPOUT_SCHEDULE = [(15000, 0.5), (30000, 0.25), (45000, 0.125)]
@@ -54,6 +54,8 @@ class GlobalConstants:
     NO_H_FC_UNITS_1 = 20
     NO_H_FILTERS_2 = 5
     NO_H_FC_UNITS_2 = 20
+    NO_H_FROM_F_UNITS_1 = 20
+    NO_H_FROM_F_UNITS_2 = 20
     DATA_TYPE = tf.float32
     SEED = None
     USE_VERBOSE = False
@@ -61,9 +63,9 @@ class GlobalConstants:
     USE_CPU_MASKING = False
     USE_EMPTY_NODE_CRASH_PREVENTION = False
     USE_RANDOM_PARAMETERS = True
-    USE_PROBABILITY_THRESHOLD = False
+    USE_PROBABILITY_THRESHOLD = True
     USE_DROPOUT_FOR_DECISION = False
-    USE_REPARAMETRIZATION_TRICK = True
+    USE_REPARAMETRIZATION_TRICK = False
     USE_DROPOUT_FOR_CLASSIFICATION = False
     USE_INFO_GAIN_DECISION = True
     USE_DECISION_AUGMENTATION = False
