@@ -41,68 +41,68 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Tree.\n"
-    explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
-    explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
-    explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
-    explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
-    explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
-    explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-    explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
-    explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
-    explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
-    explanation += "Param Count:{0}\n".format(total_param_count)
-    explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
-    explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
-    explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
-    explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
-    explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
-    explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(
-        GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
-    explanation += "Hyperplane bias at 0.0\n"
-    explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
-    explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
-    explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
-    explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
-    explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
-    explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
-    if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
-        explanation += "********Reparametrized Noise Settings********\n"
-        explanation += "Noise Coefficient Initial Value:{0}\n".format(network.noiseCoefficientCalculator.value)
-        explanation += "Noise Coefficient Decay Step:{0}\n".format(network.noiseCoefficientCalculator.decayPeriod)
-        explanation += "Noise Coefficient Decay Ratio:{0}\n".format(network.noiseCoefficientCalculator.decay)
-        explanation += "********Reparametrized Noise Settings********\n"
-    explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
-    explanation += "Use Decision Augmentation:{0}\n".format(GlobalConstants.USE_DECISION_AUGMENTATION)
-    if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-        explanation += "********Decision Dropout Schedule********\n"
-        explanation += "Iteration:{0} Probability:{1}\n".format(0, GlobalConstants.DROPOUT_INITIAL_PROB)
-        for tpl in GlobalConstants.DROPOUT_SCHEDULE:
-            explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
-        explanation += "********Decision Dropout Schedule********\n"
-    explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
-    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
-    if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-        for node in network.topologicalSortedNodes:
-            if node.isLeaf:
-                continue
-            explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-            explanation += "Prob Threshold Initial Value:{0}\n".format(node.probThresholdCalculator.value)
-            explanation += "Prob Threshold Decay Step:{0}\n".format(node.probThresholdCalculator.decayPeriod)
-            explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
-            explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-
-    # Baseline
-    # explanation = "Baseline.\n"
+    # explanation = "Tree: H connected to F, with Dropout.\n"
     # explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
+    # explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
+    # explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
+    # explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     # explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
+    # explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
     # explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
     # explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
     # explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
     # explanation += "Param Count:{0}\n".format(total_param_count)
-    # explanation += "Model: {0}Conv - {1}Conv - {2}FC\n".format(GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2,
-    #                                                          GlobalConstants.NO_HIDDEN)
     # explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    # explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
+    # explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
+    # explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
+    # explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
+    # explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(
+    #     GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
+    # explanation += "Hyperplane bias at 0.0\n"
+    # explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
+    # explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
+    # explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
+    # explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
+    # explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+    # explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
+    # if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
+    #     explanation += "********Reparametrized Noise Settings********\n"
+    #     explanation += "Noise Coefficient Initial Value:{0}\n".format(network.noiseCoefficientCalculator.value)
+    #     explanation += "Noise Coefficient Decay Step:{0}\n".format(network.noiseCoefficientCalculator.decayPeriod)
+    #     explanation += "Noise Coefficient Decay Ratio:{0}\n".format(network.noiseCoefficientCalculator.decay)
+    #     explanation += "********Reparametrized Noise Settings********\n"
+    # explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
+    # explanation += "Use Decision Augmentation:{0}\n".format(GlobalConstants.USE_DECISION_AUGMENTATION)
+    # if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+    #     explanation += "********Decision Dropout Schedule********\n"
+    #     explanation += "Iteration:{0} Probability:{1}\n".format(0, GlobalConstants.DROPOUT_INITIAL_PROB)
+    #     for tpl in GlobalConstants.DROPOUT_SCHEDULE:
+    #         explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
+    #     explanation += "********Decision Dropout Schedule********\n"
+    # explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
+    # explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
+    # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
+    #     for node in network.topologicalSortedNodes:
+    #         if node.isLeaf:
+    #             continue
+    #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
+    #         explanation += "Prob Threshold Initial Value:{0}\n".format(node.probThresholdCalculator.value)
+    #         explanation += "Prob Threshold Decay Step:{0}\n".format(node.probThresholdCalculator.decayPeriod)
+    #         explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
+    #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
+
+    # Baseline
+    explanation = "03.12.2017 Tests: Baseline.\n"
+    explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
+    explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
+    explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
+    explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
+    explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
+    explanation += "Param Count:{0}\n".format(total_param_count)
+    explanation += "Model: {0}Conv - {1}Conv - {2}FC\n".format(GlobalConstants.NO_FILTERS_1, GlobalConstants.NO_FILTERS_2,
+                                                             GlobalConstants.NO_HIDDEN)
+    explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     return explanation
 
 
@@ -121,13 +121,13 @@ def main():
     #                       grad_func=lenet3.grad_func,
     #                       create_new_variables=True)
     network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
-        # node_build_funcs=[baseline.baseline],
-        node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
-                          lenet_decision_connected_to_f.leaf_func],
-        grad_func=lenet_decision_connected_to_f.grad_func,
-        threshold_func=lenet_decision_connected_to_f.threshold_calculator_func,
-        residue_func=lenet_decision_connected_to_f.residue_network_func,
-        summary_func=lenet_decision_connected_to_f.tensorboard_func,
+        node_build_funcs=[baseline.baseline],
+        # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
+        #                   lenet_decision_connected_to_f.leaf_func],
+        grad_func=baseline.grad_func,
+        threshold_func=baseline.threshold_calculator_func,
+        residue_func=baseline.residue_network_func,
+        summary_func=baseline.tensorboard_func,
         degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()
@@ -141,18 +141,18 @@ def main():
     #                                                                        0.000075, 0.000075, 0.000075,
     #                                                                        0.0001, 0.0001, 0.0001,
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
-    # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
+    classification_wd = [0.00005 * x for n in range(0, 21) for x in itertools.repeat(n, 5)]
     # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005, 0.00005, 0.00005, 0.00005,
-                                                                           0.00005], [0.0009]])
+    # cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005],
+    #                                                                       [0.0009]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
-    for tpl in cartesian_product:
+    for wd in classification_wd:
         print("********************NEW RUN:{0}********************".format(run_id))
         # Restart the network; including all annealed parameters.
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
-        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = wd
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
@@ -178,11 +178,12 @@ def main():
                 print("Iteration:{0}".format(iteration_counter))
                 print("Lr:{0}".format(lr))
                 # Print sample counts (decision)
-                decision_sample_count_str = "Decision:   "
-                for k, v in decision_sample_counts.items():
-                    decision_sample_count_str += "[{0}={1}]".format(k, v)
-                    node_index = network.get_node_from_variable_name(name=k).index
-                    # leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
+                if decision_sample_counts is not None:
+                    decision_sample_count_str = "Decision:   "
+                    for k, v in decision_sample_counts.items():
+                        decision_sample_count_str += "[{0}={1}]".format(k, v)
+                        node_index = network.get_node_from_variable_name(name=k).index
+                        # leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
                 # Print sample counts (classification)
                 sample_count_str = "Classification:   "
                 for k, v in sample_counts.items():
@@ -192,7 +193,8 @@ def main():
                 indicator_str = ""
                 for k, v in is_open_indicators.items():
                     indicator_str += "[{0}={1}]".format(k, v)
-                print(decision_sample_count_str)
+                if decision_sample_counts is not None:
+                    print(decision_sample_count_str)
                 print(sample_count_str)
                 print(indicator_str)
                 iteration_counter += 1
@@ -210,20 +212,24 @@ def main():
                         validation_accuracy, validation_confusion = \
                             network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
                                                        run_id=experiment_id, iteration=iteration_counter)
-                        validation_accuracy_corrected = \
-                            network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
-                                                                             dataset_type=DatasetTypes.validation,
-                                                                             run_id=experiment_id,
-                                                                             iteration=iteration_counter)
-                        network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                        dataset_type=DatasetTypes.validation)
-                        DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
-                                                         "Corrected Validation Accuracy",
-                                                         validation_accuracy_corrected)],
-                                                  table=DbLogger.runKvStore, col_count=4)
+                        # validation_accuracy_corrected = \
+                        #     network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
+                        #                                                      dataset_type=DatasetTypes.validation,
+                        #                                                      run_id=experiment_id,
+                        #                                                      iteration=iteration_counter)
+                        test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                                                   dataset_type=DatasetTypes.test,
+                                                                                   run_id=experiment_id,
+                                                                                   iteration=iteration_counter)
+                        # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+                        #                                                 dataset_type=DatasetTypes.validation)
+                        # DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
+                        #                                  "Corrected Validation Accuracy",
+                        #                                  validation_accuracy_corrected)],
+                        #                           table=DbLogger.runKvStore, col_count=4)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy,
-                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
+                                                         validation_accuracy, test_accuracy,
+                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                         if GlobalConstants.SAVE_CONFUSION_MATRICES:
                             DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
@@ -235,20 +241,18 @@ def main():
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
                                                                    run_id=experiment_id, iteration=iteration_counter)
-        test_accuracy_corrected = \
-            network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
-                                                             dataset_type=DatasetTypes.test,
-                                                             run_id=experiment_id,
-                                                             iteration=iteration_counter)
+        # test_accuracy_corrected = \
+        #     network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
+        #                                                      dataset_type=DatasetTypes.test,
+        #                                                      run_id=experiment_id,
+        #                                                      iteration=iteration_counter)
         network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
-        DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
-                                         "Corrected Test Accuracy",
-                                         test_accuracy_corrected)],
-                                  table=DbLogger.runKvStore, col_count=4)
+        # DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
+        #                                  "Corrected Test Accuracy",
+        #                                  test_accuracy_corrected)],
+        #                           table=DbLogger.runKvStore, col_count=4)
         DbLogger.write_into_table([
-            (experiment_id, explanation, test_accuracy, "Regular"),
-            (experiment_id, explanation, test_accuracy_corrected, "Corrected")
-        ], table=DbLogger.runResultsTable,
+            (experiment_id, explanation, test_accuracy, "Regular")], table=DbLogger.runResultsTable,
                                   col_count=4)
         if GlobalConstants.SAVE_CONFUSION_MATRICES:
             DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)

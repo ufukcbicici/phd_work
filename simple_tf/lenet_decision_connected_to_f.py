@@ -29,7 +29,8 @@ def root_func(node, network, variables=None):
     # H
     pool_h = tf.nn.max_pool(relu, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
     flat_pool = tf.contrib.layers.flatten(pool_h)
-    feature_size = flat_pool.get_shape().as_list()[-1]
+    dropped_flat_pool = tf.nn.dropout(flat_pool, network.decisionDropoutKeepProb)
+    feature_size = dropped_flat_pool.get_shape().as_list()[-1]
     fc_h_weights = tf.Variable(tf.truncated_normal(
         [feature_size, GlobalConstants.NO_H_FROM_F_UNITS_1],
         stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
@@ -39,9 +40,9 @@ def root_func(node, network, variables=None):
         name=network.get_variable_name(name="fc_decision_bias", node=node))
     node.variablesSet.add(fc_h_weights)
     node.variablesSet.add(fc_h_bias)
-    raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
+    raw_ig_feature = tf.matmul(dropped_flat_pool, fc_h_weights) + fc_h_bias
     ig_feature = tf.nn.relu(raw_ig_feature)
-    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, ig_feature])
+    node.hOpsList.extend([pool_h, flat_pool, dropped_flat_pool, raw_ig_feature, ig_feature])
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
         tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
@@ -80,7 +81,8 @@ def l1_func(node, network, variables=None):
     # H
     pool_h = tf.nn.max_pool(relu, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
     flat_pool = tf.contrib.layers.flatten(pool_h)
-    feature_size = flat_pool.get_shape().as_list()[-1]
+    dropped_flat_pool = tf.nn.dropout(flat_pool, network.decisionDropoutKeepProb)
+    feature_size = dropped_flat_pool.get_shape().as_list()[-1]
     fc_h_weights = tf.Variable(tf.truncated_normal(
         [feature_size, GlobalConstants.NO_H_FROM_F_UNITS_2],
         stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
@@ -90,9 +92,9 @@ def l1_func(node, network, variables=None):
         name=network.get_variable_name(name="fc_decision_bias", node=node))
     node.variablesSet.add(fc_h_weights)
     node.variablesSet.add(fc_h_bias)
-    raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
+    raw_ig_feature = tf.matmul(dropped_flat_pool, fc_h_weights) + fc_h_bias
     ig_feature = tf.nn.relu(raw_ig_feature)
-    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, ig_feature])
+    node.hOpsList.extend([pool_h, flat_pool, dropped_flat_pool, raw_ig_feature, ig_feature])
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
         tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
@@ -304,7 +306,7 @@ def threshold_calculator_func(network):
         initial_value = 1.0 / float(node_degree)
         threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
         node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                                                         decay_period=10000,
+                                                         decay_period=30000,
                                                          min_limit=0.4)
         # Softmax Decay
         decay_name = network.get_variable_name(name="softmax_decay", node=node)
