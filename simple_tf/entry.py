@@ -113,8 +113,8 @@ def main():
         sess = tf.Session(config=config)
     else:
         sess = tf.Session()
-        dataset = MnistDataSet(validation_sample_count=10000,
-                               load_validation_from="validation_indices")
+        dataset = MnistDataSet(validation_sample_count=0,
+                               load_validation_from=None)
     # Build the network
     # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
@@ -141,7 +141,9 @@ def main():
     #                                                                        0.000075, 0.000075, 0.000075,
     #                                                                        0.0001, 0.0001, 0.0001,
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
-    classification_wd = [0.00005 * x for n in range(0, 21) for x in itertools.repeat(n, 5)]
+    classification_wd = [0.0009, 0.0009, 0.0009, 0.0009, 0.0009]
+    # classification_wd.extend([0.0001 * x for n in range(1, 5) for x in itertools.repeat(n, 5)])
+    # classification_wd.extend([0.0001 * x for n in range(6, 16) for x in itertools.repeat(n, 5)])
     # decision_wd = [0.0]
     # cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005],
     #                                                                       [0.0009]])
@@ -210,7 +212,7 @@ def main():
                             network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
                                                        run_id=experiment_id, iteration=iteration_counter)
                         validation_accuracy, validation_confusion = \
-                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
+                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
                                                        run_id=experiment_id, iteration=iteration_counter)
                         # validation_accuracy_corrected = \
                         #     network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
@@ -246,7 +248,7 @@ def main():
         #                                                      dataset_type=DatasetTypes.test,
         #                                                      run_id=experiment_id,
         #                                                      iteration=iteration_counter)
-        network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
+        # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
         # DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
         #                                  "Corrected Test Accuracy",
         #                                  test_accuracy_corrected)],
