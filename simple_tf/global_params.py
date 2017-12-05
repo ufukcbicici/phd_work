@@ -39,9 +39,9 @@ class GlobalConstants:
     BATCH_NORM_DECAY = 0.9
     # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
     #                                           decay_period=1, min_limit=0.0)
-    SOFTMAX_DECAY_INITIAL = 1.0
-    SOFTMAX_DECAY_COEFFICIENT = 1.0
-    SOFTMAX_DECAY_PERIOD = 1
+    SOFTMAX_DECAY_INITIAL = 25.0
+    SOFTMAX_DECAY_COEFFICIENT = 0.9999
+    SOFTMAX_DECAY_PERIOD = 2
     SOFTMAX_DECAY_MIN_LIMIT = 1.0
     DROPOUT_INITIAL_PROB = 0.75
     DROPOUT_SCHEDULE = [(15000, 0.5), (30000, 0.25), (45000, 0.125)]
