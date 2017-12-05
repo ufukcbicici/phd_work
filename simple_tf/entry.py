@@ -65,6 +65,7 @@ def get_explanation_string(network):
     explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
     explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
     explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
+    explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
     if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
         explanation += "********Reparametrized Noise Settings********\n"
         explanation += "Noise Coefficient Initial Value:{0}\n".format(network.noiseCoefficientCalculator.value)
@@ -112,8 +113,8 @@ def main():
         sess = tf.Session(config=config)
     else:
         sess = tf.Session()
-        dataset = MnistDataSet(validation_sample_count=10000,
-                               load_validation_from="validation_indices")
+        dataset = MnistDataSet(validation_sample_count=0,
+                               load_validation_from=None)
     # Build the network
     # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
@@ -140,9 +141,14 @@ def main():
     #                                                                        0.0001, 0.0001, 0.0001,
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
-    # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005, 0.00005, 0.00005, 0.00005,
-                                                                           0.00005], [0.0009]])
+    classification_wd = [0.00005]
+    decision_wd = [0.0009]
+    info_gain_balance = [1.5, 1.5, 1.5, 1.5, 1.5]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
+                                                                          info_gain_balance])
+    # cartesian_product = [tpl for tpl in itertools.repeat(tpl, 5)]
+    # cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005, 0.00005, 0.00005, 0.00005, 0.00005],
+    #                                                                       [0.0009]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -151,6 +157,7 @@ def main():
         # Restart the network; including all annealed parameters.
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
@@ -206,15 +213,15 @@ def main():
                             network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
                                                        run_id=experiment_id, iteration=iteration_counter)
                         validation_accuracy, validation_confusion = \
-                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
+                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
                                                        run_id=experiment_id, iteration=iteration_counter)
                         validation_accuracy_corrected = \
                             network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
-                                                                             dataset_type=DatasetTypes.validation,
+                                                                             dataset_type=DatasetTypes.test,
                                                                              run_id=experiment_id,
                                                                              iteration=iteration_counter)
                         network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                        dataset_type=DatasetTypes.validation)
+                                                                        dataset_type=DatasetTypes.test)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
                                                          "Corrected Validation Accuracy",
                                                          validation_accuracy_corrected)],
