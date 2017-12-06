@@ -41,7 +41,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Tree.\n"
+    explanation = "Tree H Connected to F, With Dropout in H.\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
     explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
@@ -143,8 +143,8 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005, 0.00005, 0.00005, 0.00005,
-                                                                           0.00005], [0.0009]])
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005, 0.00005, 0.00005, 0.00005, 0.00005],
+                                                                          [0.0009]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -208,15 +208,15 @@ def main():
                             network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
                                                        run_id=experiment_id, iteration=iteration_counter)
                         validation_accuracy, validation_confusion = \
-                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.validation,
+                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
                                                        run_id=experiment_id, iteration=iteration_counter)
                         validation_accuracy_corrected = \
                             network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
-                                                                             dataset_type=DatasetTypes.validation,
+                                                                             dataset_type=DatasetTypes.test,
                                                                              run_id=experiment_id,
                                                                              iteration=iteration_counter)
-                        network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                        dataset_type=DatasetTypes.validation)
+                        # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+                        #                                                 dataset_type=DatasetTypes.validation)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
                                                          "Corrected Validation Accuracy",
                                                          validation_accuracy_corrected)],
