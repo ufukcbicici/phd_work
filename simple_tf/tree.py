@@ -650,7 +650,7 @@ class TreeNetwork:
         self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
         self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
         self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration,
-                                       update=GlobalConstants.USE_DROPOUT_FOR_DECISION)
+                                       update=True)
         self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=True)
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
@@ -753,7 +753,7 @@ class TreeNetwork:
         # the network to operate.
         self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=False)
         self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=False)
-        self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=False)
+        self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
         self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=False)
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:

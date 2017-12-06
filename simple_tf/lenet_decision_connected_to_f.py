@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from auxillary.parameters import DecayingParameter, DiscreteParameter
+from auxillary.parameters import DecayingParameter, DiscreteParameter, FixedParameter
 from simple_tf import batch_norm
 from simple_tf.global_params import GlobalConstants
 from simple_tf.global_params import GradientType
@@ -40,8 +40,12 @@ def root_func(node, network, variables=None):
     node.variablesSet.add(fc_h_weights)
     node.variablesSet.add(fc_h_bias)
     raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
-    ig_feature = tf.nn.relu(raw_ig_feature)
-    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, ig_feature])
+    # ***************** Dropout *****************
+    relu_ig_feature = tf.nn.relu(raw_ig_feature)
+    drooped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = drooped_ig_feature
+    # ***************** Dropout *****************
+    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
         tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
@@ -91,8 +95,13 @@ def l1_func(node, network, variables=None):
     node.variablesSet.add(fc_h_weights)
     node.variablesSet.add(fc_h_bias)
     raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
-    ig_feature = tf.nn.relu(raw_ig_feature)
-    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, ig_feature])
+    # ig_feature = tf.nn.relu(raw_ig_feature)
+    # ***************** Dropout *****************
+    relu_ig_feature = tf.nn.relu(raw_ig_feature)
+    drooped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = drooped_ig_feature
+    # ***************** Dropout *****************
+    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
         tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
@@ -288,9 +297,10 @@ def tensorboard_func(network):
 
 def threshold_calculator_func(network):
     # Decision Dropout Schedule
-    network.decisionDropoutKeepProbCalculator = DiscreteParameter(name="decision_dropout_calculator",
-                                                                  schedule=GlobalConstants.DROPOUT_SCHEDULE,
-                                                                  value=GlobalConstants.DROPOUT_INITIAL_PROB)
+    # network.decisionDropoutKeepProbCalculator = DiscreteParameter(name="decision_dropout_calculator",
+    #                                                               schedule=GlobalConstants.DROPOUT_SCHEDULE,
+    #                                                               value=GlobalConstants.DROPOUT_INITIAL_PROB)
+    network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=0.5)
     # Noise Coefficient
     network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=1.0,
                                                            decay=0.99995,
