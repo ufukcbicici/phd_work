@@ -722,13 +722,24 @@ class TreeNetwork:
             res_grads[k] = g
         # Regularization loss
         reg_grads = {}
+        # if GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY:
+        #     for node in self.topologicalSortedNodes:
+        #         sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
+        #         sample_count = sample_counts[sample_count_entry_name]
+        #         decay_boost_rate = GlobalConstants.BATCH_SIZE / float(sample_count)
+        #         node.weightDecayModifier = \
+        #             GlobalConstants.ADAPTIVE_WEIGHT_DECAY_MIXING_RATE * node.weightDecayModifier + \
+        #             (1.0 - GlobalConstants.ADAPTIVE_WEIGHT_DECAY_MIXING_RATE) * decay_boost_rate
         for k, v in self.regularizationParamsDict.items():
             is_residue_var = "_residue_" in k.name
+            # coeff = 1.0
             if not is_residue_var:
                 node = self.varToNodesDict[k.name]
                 is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
                 if not is_node_open:
                     continue
+                # if GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY and not self.is_decision_variable(variable=k):
+                #     coeff = node.weightDecayModifier
             r = regularization_grads[v]
             reg_grads[k] = r
         return main_grads, res_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators

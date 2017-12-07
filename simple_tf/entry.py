@@ -41,7 +41,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Tree H Connected to F, With Dropout in H.\n"
+    explanation = "Tree H Connected to F, With Dropout in H. Run 2\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
     explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
@@ -66,6 +66,7 @@ def get_explanation_string(network):
     explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
     explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
     explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
+    explanation += "Adaptive Weight Decay:{0}\n".format(GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY)
     if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
         explanation += "********Reparametrized Noise Settings********\n"
         explanation += "Noise Coefficient Initial Value:{0}\n".format(network.noiseCoefficientCalculator.value)
@@ -143,7 +144,7 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005],
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005, 0.00005, 0.00005, 0.00005, 0.00005],
                                                                           [0.0009]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
