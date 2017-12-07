@@ -93,7 +93,7 @@ def get_explanation_string(network):
     #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
 
     # Baseline
-    explanation = "03.12.2017 Tests: Baseline.\n"
+    explanation = "03.12.2017 Tests: Baseline. On Full Dataset. Run 4\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
@@ -113,8 +113,7 @@ def main():
         sess = tf.Session(config=config)
     else:
         sess = tf.Session()
-        dataset = MnistDataSet(validation_sample_count=0,
-                               load_validation_from=None)
+        dataset = MnistDataSet(validation_sample_count=0, load_validation_from=None)
     # Build the network
     # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
@@ -141,8 +140,8 @@ def main():
     #                                                                        0.000075, 0.000075, 0.000075,
     #                                                                        0.0001, 0.0001, 0.0001,
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
-    classification_wd = [0.0009, 0.0009, 0.0009, 0.0009, 0.0009]
-    # classification_wd.extend([0.0001 * x for n in range(1, 5) for x in itertools.repeat(n, 5)])
+    classification_wd = [0.0007, 0.0007, 0.0007, 0.0007, 0.0007]
+    # classification_wd.extend([0.0001 * x for n in range(0, 16) for x in itertools.repeat(n, 5)])
     # classification_wd.extend([0.0001 * x for n in range(6, 16) for x in itertools.repeat(n, 5)])
     # decision_wd = [0.0]
     # cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.00005],
