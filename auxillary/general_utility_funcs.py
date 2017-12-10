@@ -105,3 +105,14 @@ class UtilityFuncs:
             dct[key] = array
         else:
             dct[key] = np.concatenate((dct[key], array))
+
+    @staticmethod
+    def get_modes_from_distribution(distribution, percentile_threshold):
+        cumulative_prob = 0.0
+        sorted_distribution = sorted(distribution.items(), key=lambda kv: kv[1], reverse=True)
+        modes = set()
+        for tpl in sorted_distribution:
+            if cumulative_prob < percentile_threshold:
+                modes.add(tpl[0])
+                cumulative_prob += tpl[1]
+        return modes

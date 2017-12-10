@@ -85,6 +85,22 @@ class DbLogger:
         return cm
 
     @staticmethod
+    def read_test_accuracy(run_id, type):
+        DbLogger.lock.acquire()
+        con = lite.connect(DbLogger.log_db_path)
+        accuracy = None
+        with con:
+            cur = con.cursor()
+            sql_command = "SELECT TestAccuracy FROM {0} WHERE RunId={1} AND Type={2}"\
+                .format(DbLogger.runResultsTable, run_id, type)
+            cur.execute(sql_command)
+            rows = cur.fetchall()
+            for row in rows:
+                accuracy = float(row[0])
+        DbLogger.lock.release()
+        return accuracy
+
+    @staticmethod
     def log_bnn_explanation(runId, explanation_string):
         print("Enter log_bnn_explanation")
         DbLogger.lock.acquire()
