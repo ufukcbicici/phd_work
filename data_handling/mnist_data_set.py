@@ -12,13 +12,21 @@ import matplotlib.pyplot as plt
 class MnistDataSet(DataSet):
     MNIST_SIZE = 28
 
-    def __init__(self, validation_sample_count, save_validation_as=None, load_validation_from=None):
+    def __init__(self,
+                 validation_sample_count,
+                 save_validation_as=None,
+                 load_validation_from=None,
+                 test_images_path = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-images-idx3-ubyte"),
+                 test_labels_path = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-labels-idx1-ubyte"),
+                 training_images_path = os.path.join(os.getcwd(), "..\\data\\mnist\\train-images-idx3-ubyte"),
+                 training_labels_path = os.path.join(os.getcwd(), "..\\data\\mnist\\train-labels-idx1-ubyte")
+                 ):
         super().__init__()
         # os_name = platform.system()
-        self.testImagesPath = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-images-idx3-ubyte")
-        self.testLabelsPath = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-labels-idx1-ubyte")
-        self.trainImagesPath = os.path.join(os.getcwd(), "..\\data\\mnist\\train-images-idx3-ubyte")
-        self.trainLabelsPath = os.path.join(os.getcwd(), "..\\data\\mnist\\train-labels-idx1-ubyte")
+        self.testImagesPath = test_images_path
+        self.testLabelsPath = test_labels_path
+        self.trainImagesPath = training_images_path
+        self.trainLabelsPath = training_labels_path
         self.trainingSamples = None
         self.trainingLabels = None
         self.testSamples = None

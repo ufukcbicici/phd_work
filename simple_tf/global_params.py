@@ -81,6 +81,12 @@ class GlobalConstants:
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     INFO_GAIN_LOG_EPSILON = 1e-30
     SUMMARY_PERIOD = 100000000000
+    # Fashion Mnist
+    FASHION_NUM_FILTERS_1 = 32
+    FASHION_NUM_FILTERS_2 = 64
+    FASHION_NUM_FILTERS_3 = 128
+    FASHION_FC_1 = 1024
+    FASHION_FC_2 = 512
 
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"
