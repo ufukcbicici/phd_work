@@ -78,9 +78,10 @@ def baseline(node, network, variables=None):
     hidden_layer_1 = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
     dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
     hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
-    logits = tf.matmul(hidden_layer_2, fc_softmax_weights) + fc_softmax_biases
+    # logits = tf.matmul(hidden_layer_2, fc_softmax_weights) + fc_softmax_biases
     # Loss
-    network.apply_loss(node=node, logits=logits)
+    final_feature, logits = network.apply_loss(node=node, final_feature=hidden_layer_2,
+                                               softmax_weights=fc_softmax_weights, softmax_biases=fc_softmax_biases)
     # Evaluation
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor

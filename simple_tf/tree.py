@@ -68,6 +68,7 @@ class TreeNetwork:
         self.summaryWriter = None
         self.branchingBatchNormAssignOps = []
         self.modesPerLeaves = {}
+        self.isBaseline = None
 
     # def get_parent_index(self, node_index):
     #     parent_index = int((node_index - 1) / self.treeDegree)
@@ -155,18 +156,21 @@ class TreeNetwork:
         self.noiseCoefficient = tf.placeholder(name="noise_coefficient", dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
+        self.isBaseline = len(self.topologicalSortedNodes) == 1
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
             self.paramsDict = UtilityFuncs.load_npz(file_name="parameters")
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
-        if len(self.topologicalSortedNodes) == 1:
+        if self.isBaseline:
             GlobalConstants.USE_INFO_GAIN_DECISION = False
             GlobalConstants.USE_CONCAT_TRICK = False
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
+            self.residueLoss = tf.constant(value=0.0)
         else:
             self.residueLoss = GlobalConstants.RESIDUE_LOSS_COEFFICIENT * self.residueFunc(network=self)
         # Set up mechanism for probability thresholding
-        self.thresholdFunc(network=self)
+        if not self.isBaseline:
+            self.thresholdFunc(network=self)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
@@ -218,6 +222,7 @@ class TreeNetwork:
         l2_loss_list = []
         for v in vars:
             is_decision_pipeline_variable = self.is_decision_variable(variable=v)
+            assert (not is_decision_pipeline_variable)
             loss_tensor = tf.nn.l2_loss(v)
             self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
             if "bias" in v.name or "shift" in v.name or "scale" in v.name:
@@ -237,7 +242,7 @@ class TreeNetwork:
             decision_losses.append(node.infoGainLoss)
         self.regularizationLoss = tf.add_n(l2_loss_list)
         self.mainLoss = tf.add_n(primary_losses)
-        if len(decision_losses) > 0:
+        if len(decision_losses) > 0 and not self.isBaseline:
             self.decisionLoss = GlobalConstants.DECISION_LOSS_COEFFICIENT * tf.add_n(decision_losses)
         else:
             self.decisionLoss = tf.constant(value=0.0)
@@ -647,11 +652,12 @@ class TreeNetwork:
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict
-        self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
-        self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
-        self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration,
-                                       update=True)
-        self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=True)
+        if not self.isBaseline:
+            self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
+            self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
+            self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration,
+                                           update=True)
+            self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=True)
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.residueGradients,
@@ -762,10 +768,11 @@ class TreeNetwork:
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
-        self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=False)
-        self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=False)
-        self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
-        self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=False)
+        if not self.isBaseline:
+            self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=False)
+            self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=False)
+            self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
+            self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=False)
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
@@ -802,6 +809,7 @@ class TreeNetwork:
         samples = np.expand_dims(samples, axis=3)
         # Decision network
         decision_grads = {}
+        decision_sample_counts = None
         if GlobalConstants.USE_INFO_GAIN_DECISION:
             decision_grads, info_gain_results, decision_sample_counts \
                 = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
@@ -1014,9 +1022,10 @@ class TreeNetwork:
             self.iterationHolder: 1000000}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
-        self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
-        self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
-        self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
+        if not self.isBaseline:
+            self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
+            self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
+            self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
         return results
