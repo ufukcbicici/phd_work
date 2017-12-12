@@ -13,8 +13,8 @@ class GradientType(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 150
-    EPOCH_COUNT = 150
+    TOTAL_EPOCH_COUNT = 100
+    EPOCH_COUNT = 100
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 10000
@@ -33,9 +33,9 @@ class GlobalConstants:
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.01
     DECAY_STEP = 150000
-    DECAY_RATE = 0.5
+    DECAY_RATE = INITIAL_LR/EPOCH_COUNT
     LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
-                                                   decay=INITIAL_LR/EPOCH_COUNT)
+                                                   decay=DECAY_RATE)
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
     BATCH_NORM_DECAY = 0.9
@@ -84,11 +84,30 @@ class GlobalConstants:
     INFO_GAIN_LOG_EPSILON = 1e-30
     SUMMARY_PERIOD = 100000000000
     # Fashion Mnist
+    # Baseline
     FASHION_NUM_FILTERS_1 = 32
     FASHION_NUM_FILTERS_2 = 64
     FASHION_NUM_FILTERS_3 = 128
+    FASHION_FILTERS_1_SIZE = 5
+    FASHION_FILTERS_2_SIZE = 5
+    FASHION_FILTERS_3_SIZE = 1
     FASHION_FC_1 = 1024
     FASHION_FC_2 = 512
+    # Conditional [2 2] Tree
+    FASHION_F_NUM_FILTERS_1 = 32
+    FASHION_F_NUM_FILTERS_2 = 64
+    FASHION_F_NUM_FILTERS_3 = 50
+    FASHION_H_NUM_FILTERS_1 = 10
+    FASHION_H_NUM_FILTERS_2 = 20
+    FASHION_H_NUM_FILTERS_3 = 40
+    FASHION_H_FILTERS_1_SIZE = 5
+    FASHION_H_FILTERS_2_SIZE = 5
+    FASHION_H_FILTERS_3_SIZE = 1
+    FASHION_H_FC_1 = 30
+    FASHION_H_FC_2 = 30
+    FASHION_F_FC_1 = 128
+    FASHION_F_FC_2 = 64
+
 
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"

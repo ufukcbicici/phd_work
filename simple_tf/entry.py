@@ -96,7 +96,7 @@ def get_explanation_string(network):
     #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
 
     # Baseline
-    explanation = "Fashion Mnist Baseline. Double Dropout.\n"
+    explanation = "Fashion Mnist Baseline. Double Dropout\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
@@ -106,6 +106,9 @@ def get_explanation_string(network):
     explanation += "Model: {0}Conv - {1}Conv - {2}Conv - {3}FC - {4}FC\n".\
         format(GlobalConstants.FASHION_NUM_FILTERS_1, GlobalConstants.FASHION_NUM_FILTERS_2,
                GlobalConstants.FASHION_NUM_FILTERS_3, GlobalConstants.FASHION_FC_1, GlobalConstants.FASHION_FC_2)
+    explanation += "Conv1 Filters:{0} Conv2 Filters:{1} Conv3 Filters:{2}".\
+        format(GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
+               GlobalConstants.FASHION_FILTERS_3_SIZE)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     explanation += "Dropout Prob:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
     return explanation
@@ -148,7 +151,7 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0],
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0, 0.0, 0.0],
                                                                           [0.0]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
@@ -229,8 +232,8 @@ def main():
                         #                                  validation_accuracy_corrected)],
                         #                           table=DbLogger.runKvStore, col_count=4)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy, validation_accuracy,
-                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
+                                                         validation_accuracy,
+                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                         if GlobalConstants.SAVE_CONFUSION_MATRICES:
                             DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
