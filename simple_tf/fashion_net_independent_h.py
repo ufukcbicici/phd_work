@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from auxillary.parameters import DiscreteParameter, DecayingParameter
 from simple_tf.global_params import GlobalConstants
 
 
@@ -244,3 +245,118 @@ def leaf_func(node, network, variables=None):
     # Evaluation
     node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = final_feature
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
+
+
+def residue_network_func(network):
+    # all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
+    # input_x = all_residue_features  # tf.stop_gradient(all_residue_features)
+    # input_dim = input_x.get_shape().as_list()[-1]
+    # # Residue Network Parameters
+    # fc_residue_weights_1 = tf.Variable(
+    #     tf.truncated_normal([input_dim, GlobalConstants.FASHION_F_FC_2], stddev=0.1, seed=GlobalConstants.SEED,
+    #                         dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_1")
+    # fc_residue_bias_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.FASHION_F_FC_2],
+    #                                             dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_1")
+    # fc_residue_weights_2 = tf.Variable(
+    #     tf.truncated_normal([GlobalConstants.FASHION_F_FC_2, GlobalConstants.NUM_LABELS], stddev=0.1,
+    #                         seed=GlobalConstants.SEED,
+    #                         dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_2")
+    # fc_residue_bias_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS],
+    #                                             dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_2")
+    # # Reside Network Operations
+    # residue_hidden_layer = tf.nn.relu(tf.matmul(input_x, fc_residue_weights_1) + fc_residue_bias_1)
+    # residue_drop = tf.nn.dropout(residue_hidden_layer, keep_prob=network.classificationDropoutKeepProb)
+    # residue_logits = tf.matmul(residue_drop, fc_residue_weights_2) + fc_residue_bias_2
+    # cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=input_labels,
+    #                                                                            logits=residue_logits)
+    # loss = tf.reduce_mean(cross_entropy_loss_tensor)
+    # network.evalDict["residue_probabilities"] = tf.nn.softmax(residue_logits)
+    # network.evalDict["residue_labels"] = input_labels
+    # network.evalDict["residue_indices"] = input_indices
+    # network.evalDict["residue_features"] = input_x
+    # return loss
+    return tf.constant(value=0.0)
+
+
+def grad_func(network):
+    # self.initOp = tf.global_variables_initializer()
+    # sess.run(self.initOp)
+    vars = tf.trainable_variables()
+    decision_vars_list = []
+    classification_vars_list = []
+    residue_vars_list = []
+    regularization_vars_list = []
+    if GlobalConstants.USE_INFO_GAIN_DECISION:
+        for v in vars:
+            if "scale" in v.name or "shift" in v.name or "hyperplane" in v.name or \
+                            "gamma" in v.name or "beta" in v.name or "_decision_" in v.name:
+                decision_vars_list.append(v)
+                if GlobalConstants.USE_DECISION_AUGMENTATION:
+                    classification_vars_list.append(v)
+                if "hyperplane" in v.name or "_decision_" in v.name:
+                    regularization_vars_list.append(v)
+            elif "_residue_" in v.name:
+                residue_vars_list.append(v)
+                regularization_vars_list.append(v)
+            else:
+                classification_vars_list.append(v)
+                if "_softmax_" not in v.name:
+                    residue_vars_list.append(v)
+                regularization_vars_list.append(v)
+                # if not ("gamma" in v.name or "beta" in v.name):
+    elif len(network.topologicalSortedNodes) == 1:
+        for v in vars:
+            classification_vars_list.append(v)
+            if not ("gamma" in v.name or "beta" in v.name):
+                regularization_vars_list.append(v)
+    else:
+        raise NotImplementedError()
+    for i in range(len(decision_vars_list)):
+        network.decisionParamsDict[decision_vars_list[i]] = i
+    for i in range(len(classification_vars_list)):
+        network.mainLossParamsDict[classification_vars_list[i]] = i
+    for i in range(len(residue_vars_list)):
+        network.residueParamsDict[residue_vars_list[i]] = i
+    for i in range(len(regularization_vars_list)):
+        network.regularizationParamsDict[regularization_vars_list[i]] = i
+    # for i in range(len(vars)):
+    #     network.regularizationParamsDict[vars[i]] = i
+    network.classificationGradients = tf.gradients(ys=network.mainLoss, xs=classification_vars_list)
+    if len(decision_vars_list) > 0:
+        network.decisionGradients = tf.gradients(ys=network.decisionLoss, xs=decision_vars_list)
+    else:
+        network.decisionGradients = None
+    network.residueGradients = tf.gradients(ys=network.residueLoss, xs=residue_vars_list)
+    network.regularizationGradients = tf.gradients(ys=network.regularizationLoss, xs=regularization_vars_list)
+
+
+def tensorboard_func(network):
+    pass
+
+
+def threshold_calculator_func(network):
+    # Decision Dropout Schedule
+    network.decisionDropoutKeepProbCalculator = DiscreteParameter(name="decision_dropout_calculator",
+                                                                  schedule=GlobalConstants.DROPOUT_SCHEDULE,
+                                                                  value=GlobalConstants.DROPOUT_INITIAL_PROB)
+    # Noise Coefficient
+    network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=1.0,
+                                                           decay=0.9999,
+                                                           decay_period=1,
+                                                           min_limit=0.0)
+    for node in network.topologicalSortedNodes:
+        if node.isLeaf:
+            continue
+        # Probability Threshold
+        node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
+        initial_value = 1.0 / float(node_degree)
+        threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
+        node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
+                                                         decay_period=12000,
+                                                         min_limit=0.4)
+        # Softmax Decay
+        decay_name = network.get_variable_name(name="softmax_decay", node=node)
+        node.softmaxDecayCalculator = DecayingParameter(name=decay_name, value=GlobalConstants.SOFTMAX_DECAY_INITIAL,
+                                                        decay=GlobalConstants.SOFTMAX_DECAY_COEFFICIENT,
+                                                        decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
+                                                        min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
