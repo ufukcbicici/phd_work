@@ -78,6 +78,21 @@ class DecayingParameter(Parameter):
                 self.value = 0.0
 
 
+class DecayingParameterV2(Parameter):
+    def __init__(self, name, value, decay, min_limit=0.0):
+        Parameter.__init__(self, name=name, value=value)
+        self.decay = decay
+        self.minLimit = min_limit
+
+    def update(self, iteration):
+        if not self.isActive:
+            return
+        if self.value > self.minLimit:
+            self.value = self.initialValue * (1.0 / (1.0 + float(iteration)*self.decay))
+        else:
+            self.value = self.minLimit
+
+
 class GrowingParameter(Parameter):
     # @staticmethod
     # def from_training_program(name, training_program):

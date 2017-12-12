@@ -68,6 +68,7 @@ class TreeNetwork:
         self.summaryWriter = None
         self.branchingBatchNormAssignOps = []
         self.modesPerLeaves = {}
+        self.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         self.isBaseline = None
 
     # def get_parent_index(self, node_index):
@@ -201,12 +202,12 @@ class TreeNetwork:
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
         # Learning rate, counter
         self.globalCounter = tf.Variable(0, dtype=GlobalConstants.DATA_TYPE, trainable=False)
-        self.learningRate = tf.train.exponential_decay(
-            GlobalConstants.INITIAL_LR,  # Base learning rate.
-            self.globalCounter,  # Current index into the dataset.
-            GlobalConstants.DECAY_STEP,  # Decay step.
-            GlobalConstants.DECAY_RATE,  # Decay rate.
-            staircase=True)
+        # self.learningRate = tf.train.exponential_decay(
+        #     GlobalConstants.INITIAL_LR,  # Base learning rate.
+        #     self.globalCounter,  # Current index into the dataset.
+        #     GlobalConstants.DECAY_STEP,  # Decay step.
+        #     GlobalConstants.DECAY_RATE,  # Decay rate.
+        #     staircase=True)
         # Prepare the cost function
 
         # ******************** Main losses ********************
@@ -663,7 +664,6 @@ class TreeNetwork:
                    self.residueGradients,
                    self.sample_count_tensors,
                    vars,
-                   self.learningRate,
                    self.isOpenTensors]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.classificationPathSummaries)
@@ -696,8 +696,7 @@ class TreeNetwork:
         residue_grads = results[2]
         sample_counts = results[3]
         vars_current_values = results[4]
-        lr = results[5]
-        is_open_indicators = results[6]
+        is_open_indicators = results[5]
         # if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
         #     summary_list = results[6]
         #     for summary in summary_list:
@@ -748,7 +747,7 @@ class TreeNetwork:
                 #     coeff = node.weightDecayModifier
             r = regularization_grads[v]
             reg_grads[k] = r
-        return main_grads, res_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators
+        return main_grads, res_grads, reg_grads, vars_current_values, sample_counts, is_open_indicators
 
     def get_decision_grads(self, sess, samples, labels, indices, one_hot_labels, iteration):
         info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
@@ -817,12 +816,14 @@ class TreeNetwork:
                                           one_hot_labels=one_hot_labels,
                                           iteration=iteration)
         # Classification network
-        main_grads, res_grads, reg_grads, lr, vars_current_values, sample_counts, is_open_indicators = \
+        main_grads, res_grads, reg_grads, vars_current_values, sample_counts, is_open_indicators = \
             self.get_main_and_regularization_grads(sess=sess, samples=samples, labels=labels,
                                                    indices=indices_list,
                                                    one_hot_labels=one_hot_labels, iteration=iteration)
         update_dict = {}
         assign_dict = {}
+        self.learningRateCalculator.update(iteration=iteration)
+        lr = self.learningRateCalculator.value
         for v, curr_value in zip(vars, vars_current_values):
             is_residue_var = "_residue_" in v.name
             if not is_residue_var and epoch >= GlobalConstants.EPOCH_COUNT:
@@ -847,7 +848,7 @@ class TreeNetwork:
             op_name = self.get_assign_op_name(variable=v)
             update_dict[self.newValuesDict[op_name]] = new_value
             assign_dict[op_name] = self.assignOpsDict[op_name]
-        sess.run(assign_dict, feed_dict=update_dict),
+        sess.run(assign_dict, feed_dict=update_dict)
         return sample_counts, decision_sample_counts, lr, is_open_indicators
 
     # if v in res_grads:

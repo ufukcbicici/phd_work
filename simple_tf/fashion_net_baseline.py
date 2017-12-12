@@ -6,7 +6,7 @@ def baseline(node, network, variables=None):
     # Parameters - Convolution Layers
     # Convolution 1
     conv1_weights = tf.Variable(
-        tf.truncated_normal([7, 7, GlobalConstants.NUM_CHANNELS, GlobalConstants.FASHION_NUM_FILTERS_1], stddev=0.1,
+        tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.FASHION_NUM_FILTERS_1], stddev=0.1,
                             seed=GlobalConstants.SEED,
                             dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv1_weight",
                                                                                              node=node))
@@ -26,7 +26,7 @@ def baseline(node, network, variables=None):
                                        node=node))
     # Convolution 3
     conv3_weights = tf.Variable(
-        tf.truncated_normal([3, 3, GlobalConstants.FASHION_NUM_FILTERS_2, GlobalConstants.FASHION_NUM_FILTERS_3],
+        tf.truncated_normal([1, 1, GlobalConstants.FASHION_NUM_FILTERS_2, GlobalConstants.FASHION_NUM_FILTERS_3],
                             stddev=0.1,
                             seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="conv2_weight", node=node))
@@ -78,9 +78,10 @@ def baseline(node, network, variables=None):
     hidden_layer_1 = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
     dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
     hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
+    dropped_layer_2 = tf.nn.dropout(hidden_layer_2, network.classificationDropoutKeepProb)
     # logits = tf.matmul(hidden_layer_2, fc_softmax_weights) + fc_softmax_biases
     # Loss
-    final_feature, logits = network.apply_loss(node=node, final_feature=hidden_layer_2,
+    final_feature, logits = network.apply_loss(node=node, final_feature=dropped_layer_2,
                                                softmax_weights=fc_softmax_weights, softmax_biases=fc_softmax_biases)
     # Evaluation
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)

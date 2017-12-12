@@ -2,7 +2,7 @@ from enum import Enum
 
 import tensorflow as tf
 
-from auxillary.parameters import DecayingParameter, DiscreteParameter
+from auxillary.parameters import DecayingParameter, DiscreteParameter, DecayingParameterV2
 
 
 class GradientType(Enum):
@@ -13,8 +13,8 @@ class GradientType(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 100
-    EPOCH_COUNT = 100
+    TOTAL_EPOCH_COUNT = 150
+    EPOCH_COUNT = 150
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 10000
@@ -31,9 +31,11 @@ class GlobalConstants:
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
-    INITIAL_LR = 0.025
-    DECAY_STEP = 15000
+    INITIAL_LR = 0.01
+    DECAY_STEP = 150000
     DECAY_RATE = 0.5
+    LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
+                                                   decay=INITIAL_LR/EPOCH_COUNT)
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
     BATCH_NORM_DECAY = 0.9

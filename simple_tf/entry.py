@@ -96,7 +96,7 @@ def get_explanation_string(network):
     #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
 
     # Baseline
-    explanation = "Fashion Mnist Baseline.\n"
+    explanation = "Fashion Mnist Baseline. Double Dropout.\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
@@ -229,8 +229,8 @@ def main():
                         #                                  validation_accuracy_corrected)],
                         #                           table=DbLogger.runKvStore, col_count=4)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy,
-                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
+                                                         validation_accuracy, validation_accuracy,
+                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                         if GlobalConstants.SAVE_CONFUSION_MATRICES:
                             DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
