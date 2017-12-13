@@ -24,7 +24,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
-from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline
+from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline, fashion_net_independent_h
 from simple_tf.global_params import GlobalConstants
 from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
@@ -55,6 +55,7 @@ def get_explanation_string(network):
     explanation += "Param Count:{0}\n".format(total_param_count)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
+    explanation += "Residue Loss Coefficient:{0}\n".format(GlobalConstants.RESIDUE_LOSS_COEFFICIENT)
     explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
     explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
@@ -102,6 +103,7 @@ def get_explanation_string(network):
                                                          GlobalConstants.FASHION_F_NUM_FILTERS_3)
     explanation += "F FC1:{0} Units".format(GlobalConstants.FASHION_F_FC_1)
     explanation += "F FC2:{0} Units".format(GlobalConstants.FASHION_F_FC_2)
+    explanation += "F Residue FC:{0} Units".format(GlobalConstants.FASHION_F_RESIDUE)
     explanation += "H Conv1:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
                                                          GlobalConstants.FASHION_H_NUM_FILTERS_1)
     explanation += "H Conv2:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
@@ -141,15 +143,24 @@ def main():
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
     #                       grad_func=lenet3.grad_func,
     #                       create_new_variables=True)
-    network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
-        # node_build_funcs=[baseline.baseline],
-        # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
-        #                   lenet_decision_connected_to_f.leaf_func],
-        node_build_funcs=[fashion_net_baseline.baseline],
-        grad_func=fashion_net_baseline.grad_func,
-        threshold_func=fashion_net_baseline.threshold_calculator_func,
-        residue_func=fashion_net_baseline.residue_network_func,
-        summary_func=fashion_net_baseline.tensorboard_func,
+    # network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
+    #     # node_build_funcs=[baseline.baseline],
+    #     # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
+    #     #                   lenet_decision_connected_to_f.leaf_func],
+    #     node_build_funcs=[fashion_net_baseline.baseline],
+    #     grad_func=fashion_net_baseline.grad_func,
+    #     threshold_func=fashion_net_baseline.threshold_calculator_func,
+    #     residue_func=fashion_net_baseline.residue_network_func,
+    #     summary_func=fashion_net_baseline.tensorboard_func,
+    #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    network = TreeNetwork(
+        node_build_funcs=[fashion_net_independent_h.root_func,
+                          fashion_net_independent_h.l1_func,
+                          fashion_net_independent_h.leaf_func],
+        grad_func=fashion_net_independent_h.grad_func,
+        threshold_func=fashion_net_independent_h.threshold_calculator_func,
+        residue_func=fashion_net_independent_h.residue_network_func,
+        summary_func=fashion_net_independent_h.tensorboard_func,
         degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()

@@ -201,11 +201,12 @@ def l1_func(node, network, variables=None):
 def leaf_func(node, network, variables=None):
     total_prev_degrees = sum(network.degreeList[0:node.depth])
     parent_F, parent_H = network.mask_input_nodes(node=node)
-    parent_F_feature_size = parent_F.get_shape().as_list()[-1]
+    flattened = tf.contrib.layers.flatten(parent_F)
+    flattened_F_feature_size = flattened.get_shape().as_list()[-1]
     # Parameters
     # OK
     fc_weights_1 = tf.Variable(tf.truncated_normal(
-        [parent_F_feature_size,
+        [flattened_F_feature_size,
          GlobalConstants.FASHION_F_FC_1],
         stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="fc_weights_1", node=node))
@@ -235,7 +236,6 @@ def leaf_func(node, network, variables=None):
         name=network.get_variable_name(name="fc_softmax_biases", node=node))
     node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2, fc_softmax_weights, fc_softmax_biases}
     # F Operations
-    flattened = tf.contrib.layers.flatten(parent_F)
     hidden_layer_1 = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
     dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
     hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
@@ -248,34 +248,34 @@ def leaf_func(node, network, variables=None):
 
 
 def residue_network_func(network):
-    # all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
-    # input_x = all_residue_features  # tf.stop_gradient(all_residue_features)
-    # input_dim = input_x.get_shape().as_list()[-1]
-    # # Residue Network Parameters
-    # fc_residue_weights_1 = tf.Variable(
-    #     tf.truncated_normal([input_dim, GlobalConstants.FASHION_F_FC_2], stddev=0.1, seed=GlobalConstants.SEED,
-    #                         dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_1")
-    # fc_residue_bias_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.FASHION_F_FC_2],
-    #                                             dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_1")
-    # fc_residue_weights_2 = tf.Variable(
-    #     tf.truncated_normal([GlobalConstants.FASHION_F_FC_2, GlobalConstants.NUM_LABELS], stddev=0.1,
-    #                         seed=GlobalConstants.SEED,
-    #                         dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_2")
-    # fc_residue_bias_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS],
-    #                                             dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_2")
-    # # Reside Network Operations
-    # residue_hidden_layer = tf.nn.relu(tf.matmul(input_x, fc_residue_weights_1) + fc_residue_bias_1)
-    # residue_drop = tf.nn.dropout(residue_hidden_layer, keep_prob=network.classificationDropoutKeepProb)
-    # residue_logits = tf.matmul(residue_drop, fc_residue_weights_2) + fc_residue_bias_2
-    # cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=input_labels,
-    #                                                                            logits=residue_logits)
-    # loss = tf.reduce_mean(cross_entropy_loss_tensor)
-    # network.evalDict["residue_probabilities"] = tf.nn.softmax(residue_logits)
-    # network.evalDict["residue_labels"] = input_labels
-    # network.evalDict["residue_indices"] = input_indices
-    # network.evalDict["residue_features"] = input_x
-    # return loss
-    return tf.constant(value=0.0)
+    all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
+    input_x = all_residue_features  # tf.stop_gradient(all_residue_features)
+    input_dim = input_x.get_shape().as_list()[-1]
+    # Residue Network Parameters
+    fc_residue_weights_1 = tf.Variable(
+        tf.truncated_normal([input_dim, GlobalConstants.FASHION_F_RESIDUE], stddev=0.1, seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_1")
+    fc_residue_bias_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.FASHION_F_RESIDUE],
+                                                dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_1")
+    fc_residue_weights_2 = tf.Variable(
+        tf.truncated_normal([GlobalConstants.FASHION_F_RESIDUE, GlobalConstants.NUM_LABELS], stddev=0.1,
+                            seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_2")
+    fc_residue_bias_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS],
+                                                dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_2")
+    # Reside Network Operations
+    residue_hidden_layer = tf.nn.relu(tf.matmul(input_x, fc_residue_weights_1) + fc_residue_bias_1)
+    residue_drop = tf.nn.dropout(residue_hidden_layer, keep_prob=network.classificationDropoutKeepProb)
+    residue_logits = tf.matmul(residue_drop, fc_residue_weights_2) + fc_residue_bias_2
+    cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=input_labels,
+                                                                               logits=residue_logits)
+    loss = tf.reduce_mean(cross_entropy_loss_tensor)
+    network.evalDict["residue_probabilities"] = tf.nn.softmax(residue_logits)
+    network.evalDict["residue_labels"] = input_labels
+    network.evalDict["residue_indices"] = input_indices
+    network.evalDict["residue_features"] = input_x
+    return loss
+    # return tf.constant(value=0.0)
 
 
 def grad_func(network):

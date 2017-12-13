@@ -223,7 +223,7 @@ class TreeNetwork:
         l2_loss_list = []
         for v in vars:
             is_decision_pipeline_variable = self.is_decision_variable(variable=v)
-            assert (not is_decision_pipeline_variable)
+            # assert (not is_decision_pipeline_variable)
             loss_tensor = tf.nn.l2_loss(v)
             self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
             if "bias" in v.name or "shift" in v.name or "scale" in v.name:
