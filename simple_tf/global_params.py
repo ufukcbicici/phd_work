@@ -32,10 +32,13 @@ class GlobalConstants:
     WEIGHT_DECAY_COEFFICIENT = 0.0
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.01
-    DECAY_STEP = 150000
+    DECAY_STEP = 15000
     DECAY_RATE = INITIAL_LR/EPOCH_COUNT
     LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
                                                    decay=DECAY_RATE)
+    # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
+    #                                              decay_period=DECAY_STEP)
+
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
     BATCH_NORM_DECAY = 0.9
