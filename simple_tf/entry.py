@@ -42,75 +42,89 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    # explanation = "Tree H Connected to F, With Dropout in H. Run 1\n"
-    # explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
-    # explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
-    # explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
-    # explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
-    # explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
-    # explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-    # explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
-    # explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
-    # explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
-    # explanation += "Param Count:{0}\n".format(total_param_count)
-    # explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
-    # explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
-    # explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
-    # explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
-    # explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
-    # explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(
-    #     GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
-    # explanation += "Hyperplane bias at 0.0\n"
-    # explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
-    # explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
-    # explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
-    # explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
-    # explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
-    # explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
-    # explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
-    # explanation += "Adaptive Weight Decay:{0}\n".format(GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY)
-    # if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
-    #     explanation += "********Reparametrized Noise Settings********\n"
-    #     explanation += "Noise Coefficient Initial Value:{0}\n".format(network.noiseCoefficientCalculator.value)
-    #     explanation += "Noise Coefficient Decay Step:{0}\n".format(network.noiseCoefficientCalculator.decayPeriod)
-    #     explanation += "Noise Coefficient Decay Ratio:{0}\n".format(network.noiseCoefficientCalculator.decay)
-    #     explanation += "********Reparametrized Noise Settings********\n"
-    # explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
-    # explanation += "Use Decision Augmentation:{0}\n".format(GlobalConstants.USE_DECISION_AUGMENTATION)
-    # if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-    #     explanation += "********Decision Dropout Schedule********\n"
-    #     explanation += "Iteration:{0} Probability:{1}\n".format(0, GlobalConstants.DROPOUT_INITIAL_PROB)
-    #     for tpl in GlobalConstants.DROPOUT_SCHEDULE:
-    #         explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
-    #     explanation += "********Decision Dropout Schedule********\n"
-    # explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
-    # explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
-    # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-    #     for node in network.topologicalSortedNodes:
-    #         if node.isLeaf:
-    #             continue
-    #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-    #         explanation += "Prob Threshold Initial Value:{0}\n".format(node.probThresholdCalculator.value)
-    #         explanation += "Prob Threshold Decay Step:{0}\n".format(node.probThresholdCalculator.decayPeriod)
-    #         explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
-    #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-
-    # Baseline
-    explanation = "Fashion Mnist Baseline. Double Dropout\n"
+    explanation = "Fashion Mnist Tree, H Independent of F\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
+    explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
+    explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
+    explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
+    explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
     explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
     explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
     explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
     explanation += "Param Count:{0}\n".format(total_param_count)
-    explanation += "Model: {0}Conv - {1}Conv - {2}Conv - {3}FC - {4}FC\n".\
-        format(GlobalConstants.FASHION_NUM_FILTERS_1, GlobalConstants.FASHION_NUM_FILTERS_2,
-               GlobalConstants.FASHION_NUM_FILTERS_3, GlobalConstants.FASHION_FC_1, GlobalConstants.FASHION_FC_2)
-    explanation += "Conv1 Filters:{0} Conv2 Filters:{1} Conv3 Filters:{2}".\
-        format(GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
-               GlobalConstants.FASHION_FILTERS_3_SIZE)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
-    explanation += "Dropout Prob:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
+    explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
+    explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
+    explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
+    explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
+    explanation += "Use Trainable Batch Norm Parameters:{0}\n".format(
+        GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
+    explanation += "Hyperplane bias at 0.0\n"
+    explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
+    explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
+    explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
+    explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
+    explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+    explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
+    explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
+    explanation += "Adaptive Weight Decay:{0}\n".format(GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY)
+    if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
+        explanation += "********Reparametrized Noise Settings********\n"
+        explanation += "Noise Coefficient Initial Value:{0}\n".format(network.noiseCoefficientCalculator.value)
+        explanation += "Noise Coefficient Decay Step:{0}\n".format(network.noiseCoefficientCalculator.decayPeriod)
+        explanation += "Noise Coefficient Decay Ratio:{0}\n".format(network.noiseCoefficientCalculator.decay)
+        explanation += "********Reparametrized Noise Settings********\n"
+    explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
+    explanation += "Use Decision Augmentation:{0}\n".format(GlobalConstants.USE_DECISION_AUGMENTATION)
+    if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+        explanation += "********Decision Dropout Schedule********\n"
+        explanation += "Iteration:{0} Probability:{1}\n".format(0, GlobalConstants.DROPOUT_INITIAL_PROB)
+        for tpl in GlobalConstants.DROPOUT_SCHEDULE:
+            explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
+        explanation += "********Decision Dropout Schedule********\n"
+    explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
+    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
+    if GlobalConstants.USE_PROBABILITY_THRESHOLD:
+        for node in network.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
+            explanation += "Prob Threshold Initial Value:{0}\n".format(node.probThresholdCalculator.value)
+            explanation += "Prob Threshold Decay Step:{0}\n".format(node.probThresholdCalculator.decayPeriod)
+            explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
+            explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
+    explanation += "F Conv1:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
+                                                         GlobalConstants.FASHION_F_NUM_FILTERS_1)
+    explanation += "F Conv2:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
+                                                         GlobalConstants.FASHION_F_NUM_FILTERS_2)
+    explanation += "F Conv3:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_FILTERS_3_SIZE,
+                                                         GlobalConstants.FASHION_F_NUM_FILTERS_3)
+    explanation += "F FC1:{0} Units".format(GlobalConstants.FASHION_F_FC_1)
+    explanation += "F FC2:{0} Units".format(GlobalConstants.FASHION_F_FC_2)
+    explanation += "H Conv1:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
+                                                         GlobalConstants.FASHION_H_NUM_FILTERS_1)
+    explanation += "H Conv2:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
+                                                         GlobalConstants.FASHION_H_NUM_FILTERS_2)
+    explanation += "H FC1:{0} Units".format(GlobalConstants.FASHION_H_FC_1)
+    explanation += "H FC2:{0} Units".format(GlobalConstants.FASHION_H_FC_2)
+
+    # Baseline
+    # explanation = "Fashion Mnist Baseline. Double Dropout\n"
+    # explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
+    # explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
+    # explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
+    # explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
+    # explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
+    # explanation += "Param Count:{0}\n".format(total_param_count)
+    # explanation += "Model: {0}Conv - {1}Conv - {2}Conv - {3}FC - {4}FC\n".\
+    #     format(GlobalConstants.FASHION_NUM_FILTERS_1, GlobalConstants.FASHION_NUM_FILTERS_2,
+    #            GlobalConstants.FASHION_NUM_FILTERS_3, GlobalConstants.FASHION_FC_1, GlobalConstants.FASHION_FC_2)
+    # explanation += "Conv1 Filters:{0} Conv2 Filters:{1} Conv3 Filters:{2}".\
+    #     format(GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
+    #            GlobalConstants.FASHION_FILTERS_3_SIZE)
+    # explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
+    # explanation += "Dropout Prob:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
     return explanation
 
 
