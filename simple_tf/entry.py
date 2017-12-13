@@ -95,21 +95,21 @@ def get_explanation_string(network):
             explanation += "Prob Threshold Decay Step:{0}\n".format(node.probThresholdCalculator.decayPeriod)
             explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-    explanation += "F Conv1:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
+    explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
                                                          GlobalConstants.FASHION_F_NUM_FILTERS_1)
-    explanation += "F Conv2:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
+    explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
                                                          GlobalConstants.FASHION_F_NUM_FILTERS_2)
-    explanation += "F Conv3:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_FILTERS_3_SIZE,
+    explanation += "F Conv3:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_3_SIZE,
                                                          GlobalConstants.FASHION_F_NUM_FILTERS_3)
-    explanation += "F FC1:{0} Units".format(GlobalConstants.FASHION_F_FC_1)
-    explanation += "F FC2:{0} Units".format(GlobalConstants.FASHION_F_FC_2)
-    explanation += "F Residue FC:{0} Units".format(GlobalConstants.FASHION_F_RESIDUE)
-    explanation += "H Conv1:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
+    explanation += "F FC1:{0} Units\n".format(GlobalConstants.FASHION_F_FC_1)
+    explanation += "F FC2:{0} Units\n".format(GlobalConstants.FASHION_F_FC_2)
+    explanation += "F Residue FC:{0} Units\n".format(GlobalConstants.FASHION_F_RESIDUE)
+    explanation += "H Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
                                                          GlobalConstants.FASHION_H_NUM_FILTERS_1)
-    explanation += "H Conv2:{0}x{0}, {1} Filters".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
+    explanation += "H Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
                                                          GlobalConstants.FASHION_H_NUM_FILTERS_2)
-    explanation += "H FC1:{0} Units".format(GlobalConstants.FASHION_H_FC_1)
-    explanation += "H FC2:{0} Units".format(GlobalConstants.FASHION_H_FC_2)
+    explanation += "H FC1:{0} Units\n".format(GlobalConstants.FASHION_H_FC_1)
+    explanation += "H FC2:{0} Units\n".format(GlobalConstants.FASHION_H_FC_2)
 
     # Baseline
     # explanation = "Fashion Mnist Baseline. Double Dropout\n"
