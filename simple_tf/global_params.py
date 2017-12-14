@@ -108,8 +108,8 @@ class GlobalConstants:
     FASHION_H_FILTERS_3_SIZE = 1
     FASHION_H_FC_1 = 30
     FASHION_H_FC_2 = 30
-    FASHION_F_FC_1 = 96
-    FASHION_F_FC_2 = 48
+    FASHION_F_FC_1 = 128
+    FASHION_F_FC_2 = 64
     FASHION_F_RESIDUE = 32
 
 
