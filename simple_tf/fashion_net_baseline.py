@@ -6,7 +6,8 @@ def baseline(node, network, variables=None):
     # Parameters - Convolution Layers
     # Convolution 1
     conv1_weights = tf.Variable(
-        tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.FASHION_NUM_FILTERS_1], stddev=0.1,
+        tf.truncated_normal([GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_1_SIZE,
+                             GlobalConstants.NUM_CHANNELS, GlobalConstants.FASHION_NUM_FILTERS_1], stddev=0.1,
                             seed=GlobalConstants.SEED,
                             dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv1_weight",
                                                                                              node=node))
@@ -16,7 +17,8 @@ def baseline(node, network, variables=None):
                                        node=node))
     # Convolution 2
     conv2_weights = tf.Variable(
-        tf.truncated_normal([5, 5, GlobalConstants.FASHION_NUM_FILTERS_1, GlobalConstants.FASHION_NUM_FILTERS_2],
+        tf.truncated_normal([GlobalConstants.FASHION_FILTERS_2_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
+                             GlobalConstants.FASHION_NUM_FILTERS_1, GlobalConstants.FASHION_NUM_FILTERS_2],
                             stddev=0.1,
                             seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="conv2_weight", node=node))
@@ -26,7 +28,8 @@ def baseline(node, network, variables=None):
                                        node=node))
     # Convolution 3
     conv3_weights = tf.Variable(
-        tf.truncated_normal([1, 1, GlobalConstants.FASHION_NUM_FILTERS_2, GlobalConstants.FASHION_NUM_FILTERS_3],
+        tf.truncated_normal([GlobalConstants.FASHION_FILTERS_3_SIZE, GlobalConstants.FASHION_FILTERS_3_SIZE,
+                             GlobalConstants.FASHION_NUM_FILTERS_2, GlobalConstants.FASHION_NUM_FILTERS_3],
                             stddev=0.1,
                             seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="conv2_weight", node=node))
