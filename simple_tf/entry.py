@@ -183,7 +183,7 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0, 0.0],
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0, 0.0, 0.0],
                                                                           [0.0]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
@@ -272,8 +272,8 @@ def main():
                         #                                  validation_accuracy_corrected)],
                         #                           table=DbLogger.runKvStore, col_count=4)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy,
-                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
+                                                         validation_accuracy, validation_accuracy,
+                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                         if GlobalConstants.SAVE_CONFUSION_MATRICES:
                             DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,

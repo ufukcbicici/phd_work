@@ -157,6 +157,9 @@ class TreeNetwork:
         self.isBaseline = len(self.topologicalSortedNodes) == 1
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
             self.paramsDict = UtilityFuncs.load_npz(file_name="parameters")
+        # Set up mechanism for probability thresholding
+        if not self.isBaseline:
+            self.thresholdFunc(network=self)
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
         if self.isBaseline:
@@ -166,9 +169,6 @@ class TreeNetwork:
             self.residueLoss = tf.constant(value=0.0)
         else:
             self.residueLoss = GlobalConstants.RESIDUE_LOSS_COEFFICIENT * self.residueFunc(network=self)
-        # Set up mechanism for probability thresholding
-        if not self.isBaseline:
-            self.thresholdFunc(network=self)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
