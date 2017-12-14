@@ -822,7 +822,7 @@ class TreeNetwork:
                                                    one_hot_labels=one_hot_labels, iteration=iteration)
         update_dict = {}
         assign_dict = {}
-        self.learningRateCalculator.update(iteration=iteration)
+        self.learningRateCalculator.update(iteration=iteration + 1.0)
         lr = self.learningRateCalculator.value
         for v, curr_value in zip(vars, vars_current_values):
             is_residue_var = "_residue_" in v.name

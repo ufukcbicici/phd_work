@@ -22,6 +22,7 @@ import itertools
 # MNIST
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
+from auxillary.parameters import DecayingParameterV2, DecayingParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
 from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline
@@ -96,14 +97,15 @@ def get_explanation_string(network):
     #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
 
     # Baseline
-    explanation = "Fashion Mnist Baseline. Double Dropout.\n"
+    explanation = "Fashion Mnist Baseline. Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
+                  "(Lr=0.01, - Decay 0.1 at each 15000. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
     explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
     explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
     explanation += "Param Count:{0}\n".format(total_param_count)
-    explanation += "Model: {0}Conv - {1}Conv - {2}Conv - {3}FC - {4}FC\n".\
+    explanation += "Model: {0}Conv - {1}Conv - {2}Conv - {3}FC - {4}FC\n". \
         format(GlobalConstants.FASHION_NUM_FILTERS_1, GlobalConstants.FASHION_NUM_FILTERS_2,
                GlobalConstants.FASHION_NUM_FILTERS_3, GlobalConstants.FASHION_FC_1, GlobalConstants.FASHION_FC_2)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
@@ -148,7 +150,7 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0],
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0, 0.0, 0.0, 0.0, 0.0],
                                                                           [0.0]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
@@ -158,6 +160,14 @@ def main():
         # Restart the network; including all annealed parameters.
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.INITIAL_LR,
+                                                                     decay=GlobalConstants.DECAY_RATE,
+                                                                     decay_period=GlobalConstants.DECAY_STEP)
+        network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
+        # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
+        #                                                                value=GlobalConstants.INITIAL_LR,
+        #                                                                decay=GlobalConstants.DECAY_RATE)
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()

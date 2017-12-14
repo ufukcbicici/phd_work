@@ -88,7 +88,7 @@ class DecayingParameterV2(Parameter):
         if not self.isActive:
             return
         if self.value > self.minLimit:
-            self.value = self.initialValue * (1.0 / (1.0 + float(iteration)*self.decay))
+            self.value = self.initialValue * (1.0 / (1.0 + float(iteration - 1.0)*self.decay))
         else:
             self.value = self.minLimit
 
