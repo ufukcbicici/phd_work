@@ -183,7 +183,7 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0, 0.0],
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0, 0.0, 0.0],
                                                                           [0.0]])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
