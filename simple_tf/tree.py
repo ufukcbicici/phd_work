@@ -51,7 +51,6 @@ class TreeNetwork:
         self.decisionDropoutKeepProb = None
         self.decisionDropoutKeepProbCalculator = None
         self.classificationDropoutKeepProb = None
-        self.informationGainBalancingCoefficient = None
         self.noiseCoefficient = None
         self.noiseCoefficientCalculator = None
         self.isTrain = None
@@ -152,8 +151,6 @@ class TreeNetwork:
         self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
         self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
         self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
-        self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient",
-                                                                  dtype=tf.float32)
         self.noiseCoefficient = tf.placeholder(name="noise_coefficient", dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
@@ -650,7 +647,6 @@ class TreeNetwork:
                      self.isTrain: 1,
                      self.useMasking: 1,
                      self.classificationDropoutKeepProb: GlobalConstants.CLASSIFICATION_DROPOUT_PROB,
-                     self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict
         if not self.isBaseline:
@@ -763,7 +759,6 @@ class TreeNetwork:
                      self.isTrain: 1,
                      self.useMasking: 1,
                      self.classificationDropoutKeepProb: 1.0,
-                     self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for
         # the network to operate.
@@ -948,8 +943,9 @@ class TreeNetwork:
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
         p_n_given_x = tf.nn.softmax(decayed_activation)
         p_c_given_x = node.oneHotLabelTensor
+        info_gain_balance_coeff = node.infoGainBalanceCoefficient
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x,
-                                                  balance_coefficient=self.informationGainBalancingCoefficient)
+                                                  balance_coefficient=info_gain_balance_coeff)
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
@@ -1018,7 +1014,6 @@ class TreeNetwork:
             self.isTrain: 0,
             self.useMasking: int(use_masking),
             self.classificationDropoutKeepProb: 1.0,
-            self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
             self.noiseCoefficient: 0.0,
             self.iterationHolder: 1000000}
         # Add probability thresholds into the feed dict: They are disabled for decision phase, but still needed for

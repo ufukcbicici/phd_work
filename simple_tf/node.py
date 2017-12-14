@@ -22,6 +22,7 @@ class Node:
         self.softmaxDecayCalculator = None
         self.residueOutputTensor = None
         self.weightDecayModifier = 1.0
+        self.infoGainBalanceCoefficient = None
         # Indexed by the nodes producing them
         self.activationsDict = {}
         self.proxyLossInputDicts = {}

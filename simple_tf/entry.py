@@ -45,7 +45,7 @@ def get_explanation_string(network):
     # Tree
     explanation = "Fashion Mnist Tree, H Independent of F. Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
                   "(Lr=0.01, - Decay 0.5 at each 15000. iteration)\n"
-                  #"(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
+    # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
     explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
@@ -71,7 +71,11 @@ def get_explanation_string(network):
     explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
     explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
     explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
-    explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
+    for node in network.topologicalSortedNodes:
+        if node.isLeaf:
+            continue
+        explanation += "Node {0} Info Gain Balance Coefficient:{1}\n".format(node.index,
+                                                                             node.infoGainBalanceCoefficient)
     explanation += "Adaptive Weight Decay:{0}\n".format(GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY)
     if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
         explanation += "********Reparametrized Noise Settings********\n"
@@ -99,18 +103,18 @@ def get_explanation_string(network):
             explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
     explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
-                                                         GlobalConstants.FASHION_F_NUM_FILTERS_1)
+                                                           GlobalConstants.FASHION_F_NUM_FILTERS_1)
     explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
-                                                         GlobalConstants.FASHION_F_NUM_FILTERS_2)
+                                                           GlobalConstants.FASHION_F_NUM_FILTERS_2)
     explanation += "F Conv3:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_3_SIZE,
-                                                         GlobalConstants.FASHION_F_NUM_FILTERS_3)
+                                                           GlobalConstants.FASHION_F_NUM_FILTERS_3)
     explanation += "F FC1:{0} Units\n".format(GlobalConstants.FASHION_F_FC_1)
     explanation += "F FC2:{0} Units\n".format(GlobalConstants.FASHION_F_FC_2)
     explanation += "F Residue FC:{0} Units\n".format(GlobalConstants.FASHION_F_RESIDUE)
     explanation += "H Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
-                                                         GlobalConstants.FASHION_H_NUM_FILTERS_1)
+                                                           GlobalConstants.FASHION_H_NUM_FILTERS_1)
     explanation += "H Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
-                                                         GlobalConstants.FASHION_H_NUM_FILTERS_2)
+                                                           GlobalConstants.FASHION_H_NUM_FILTERS_2)
     explanation += "H FC1:{0} Units\n".format(GlobalConstants.FASHION_H_FC_1)
     explanation += "H FC2:{0} Units\n".format(GlobalConstants.FASHION_H_FC_2)
 
