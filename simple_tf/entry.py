@@ -22,6 +22,7 @@ import itertools
 # MNIST
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
+from auxillary.parameters import DecayingParameterV2, DecayingParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
 from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline, fashion_net_independent_h
@@ -42,7 +43,9 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist Tree, H Independent of F\n"
+    explanation = "Fashion Mnist Tree, H Independent of F. Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
+                  "(Lr=0.01, - Decay 0.5 at each 15000. iteration)\n"
+                  #"(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
     explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
@@ -186,6 +189,14 @@ def main():
         # Restart the network; including all annealed parameters.
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.INITIAL_LR,
+                                                                     decay=GlobalConstants.DECAY_RATE,
+                                                                     decay_period=GlobalConstants.DECAY_STEP)
+        network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
+        # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
+        #                                                                value=GlobalConstants.INITIAL_LR,
+        #                                                                decay=GlobalConstants.DECAY_RATE)
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()

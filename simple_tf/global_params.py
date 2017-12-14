@@ -33,11 +33,11 @@ class GlobalConstants:
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.01
     DECAY_STEP = 15000
-    DECAY_RATE = INITIAL_LR/EPOCH_COUNT
-    LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
-                                                   decay=DECAY_RATE)
-    # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
-    #                                              decay_period=DECAY_STEP)
+    DECAY_RATE = 0.5 # INITIAL_LR/EPOCH_COUNT
+    # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
+    #                                                decay=DECAY_RATE)
+    LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
+                                                 decay_period=DECAY_STEP)
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
@@ -52,7 +52,7 @@ class GlobalConstants:
     DROPOUT_SCHEDULE = [(15000, 0.5), (30000, 0.25), (45000, 0.125)]
     CLASSIFICATION_DROPOUT_PROB = 0.5
     INFO_GAIN_BALANCE_COEFFICIENT = 1.0
-    PERCENTILE_THRESHOLD = 0.85
+    PERCENTILE_THRESHOLD = 0.95
     ROUTE_CORRECTION_PERIOD = 5000
     USE_CONVOLUTIONAL_H_PIPELINE = True
     NO_H_FILTERS_1 = 5
