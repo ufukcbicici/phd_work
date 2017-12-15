@@ -184,8 +184,11 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[0.0, 0.0, 0.0],
-                                                                          [0.0]])
+    classification_wd = [0.0, 0.0, 0.0]
+    decision_wd = [0.0]
+    info_gain_balance_coeffs = [2.0, 3.0, 4.0, 5.0]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
+                                                                          info_gain_balance_coeffs])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -194,6 +197,7 @@ def main():
         # Restart the network; including all annealed parameters.
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
                                                                      decay=GlobalConstants.DECAY_RATE,
