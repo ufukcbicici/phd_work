@@ -336,9 +336,9 @@ def tensorboard_func(network):
 
 def threshold_calculator_func(network):
     # Information Gain Balance Coefficients
-    network.nodes[0].infoGainBalanceCoefficient = 1.0
-    network.nodes[1].infoGainBalanceCoefficient = 1.0
-    network.nodes[2].infoGainBalanceCoefficient = 1.0
+    # network.nodes[0].infoGainBalanceCoefficient = 1.0
+    # network.nodes[1].infoGainBalanceCoefficient = 1.0
+    # network.nodes[2].infoGainBalanceCoefficient = 1.0
 
     # Decision Dropout Schedule
     network.decisionDropoutKeepProbCalculator = DiscreteParameter(name="decision_dropout_calculator",

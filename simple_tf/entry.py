@@ -71,11 +71,12 @@ def get_explanation_string(network):
     explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
     explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
     explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
-    for node in network.topologicalSortedNodes:
-        if node.isLeaf:
-            continue
-        explanation += "Node {0} Info Gain Balance Coefficient:{1}\n".format(node.index,
-                                                                             node.infoGainBalanceCoefficient)
+    # for node in network.topologicalSortedNodes:
+    #     if node.isLeaf:
+    #         continue
+    #     explanation += "Node {0} Info Gain Balance Coefficient:{1}\n".format(node.index,
+    #                                                                          node.infoGainBalanceCoefficient)
+    explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
     explanation += "Adaptive Weight Decay:{0}\n".format(GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY)
     if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
         explanation += "********Reparametrized Noise Settings********\n"
