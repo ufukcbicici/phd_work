@@ -184,9 +184,9 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    classification_wd = [0.0, 0.0, 0.0]
+    classification_wd = [0.0]
     decision_wd = [0.0]
-    info_gain_balance_coeffs = [2.0, 3.0, 4.0, 5.0]
+    info_gain_balance_coeffs = [2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0, 5.0, 5.0, 5.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs])
     # del cartesian_product[0:10]
