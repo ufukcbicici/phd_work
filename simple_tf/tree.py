@@ -547,73 +547,102 @@ class TreeNetwork:
         residue_sample_indices_dict = {}
         residue_posterior_probs_dict = {}
         while True:
-            results = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
-            # Collect data from leaf nodes
+            results = self.eval_network(sess=sess, dataset=dataset, use_masking=False)
             for node in self.topologicalSortedNodes:
                 if not node.isLeaf:
-                    continue
+                    branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
+                                                         array=branch_prob)
                 else:
                     posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
                     true_labels = results["Node{0}_label_tensor".format(node.index)]
-                    sample_indices = results["Node{0}_indices_tensor".format(node.index)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
+                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
                                                          array=posterior_prob)
+                    # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                    #                                      array=predicted_labels)
                     UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
                                                          array=true_labels)
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_sample_indices_dict, key=node.index,
-                                                         array=sample_indices)
-            # Collect data from the residue network
-            residue_posterior_prob = results["residue_probabilities"]
-            residue_true_labels = results["residue_labels"]
-            residue_sample_indices = results["residue_indices"]
-            UtilityFuncs.concat_to_np_array_dict(dct=residue_posterior_probs_dict, key=-1,
-                                                 array=residue_posterior_prob)
-            UtilityFuncs.concat_to_np_array_dict(dct=residue_true_labels_dict, key=-1,
-                                                 array=residue_true_labels)
-            UtilityFuncs.concat_to_np_array_dict(dct=residue_sample_indices_dict, key=-1,
-                                                 array=residue_sample_indices)
             if dataset.isNewEpoch:
                 break
+
+
+
+        # while True:
+        #     results = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
+        #     # Collect data from leaf nodes
+        #     for node in self.topologicalSortedNodes:
+        #         if not node.isLeaf:
+        #             continue
+        #         else:
+        #             posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
+        #             true_labels = results["Node{0}_label_tensor".format(node.index)]
+        #             sample_indices = results["Node{0}_indices_tensor".format(node.index)]
+        #             UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
+        #                                                  array=posterior_prob)
+        #             UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+        #                                                  array=true_labels)
+        #             UtilityFuncs.concat_to_np_array_dict(dct=leaf_sample_indices_dict, key=node.index,
+        #                                                  array=sample_indices)
+        #     # Collect data from the residue network
+        #     residue_posterior_prob = results["residue_probabilities"]
+        #     residue_true_labels = results["residue_labels"]
+        #     residue_sample_indices = results["residue_indices"]
+        #     UtilityFuncs.concat_to_np_array_dict(dct=residue_posterior_probs_dict, key=-1,
+        #                                          array=residue_posterior_prob)
+        #     UtilityFuncs.concat_to_np_array_dict(dct=residue_true_labels_dict, key=-1,
+        #                                          array=residue_true_labels)
+        #     UtilityFuncs.concat_to_np_array_dict(dct=residue_sample_indices_dict, key=-1,
+        #                                          array=residue_sample_indices)
+        #     if dataset.isNewEpoch:
+        #         break
         # Build an index for lookup into residue entries
         residue_network_index = {}
         residue_true_labels = residue_true_labels_dict[-1]
         residue_posterior_prob = residue_posterior_probs_dict[-1]
         residue_sample_indices = residue_sample_indices_dict[-1]
-        for i in range(residue_sample_indices.shape[0]):
-            residue_network_index[residue_sample_indices[i]] = i
-        # Measure Accuracy
-        mode_prediction_count = 0.0
-        mode_prediction_correct_count = 0.0
-        residue_prediction_count = 0.0
-        residue_prediction_correct_count = 0.0
-        for node in self.topologicalSortedNodes:
-            if not node.isLeaf:
-                continue
-            leaf_sample_indices = leaf_sample_indices_dict[node.index]
-            leaf_true_labels = leaf_true_labels_dict[node.index]
-            leaf_posterior_prob = leaf_posterior_probs_dict[node.index]
-            for i in range(leaf_sample_indices.shape[0]):
-                sample_index = leaf_sample_indices[i]
-                leaf_posterior = leaf_posterior_prob[i]
-                leaf_true_label = leaf_true_labels[i]
-                leaf_predicted_label = np.argmax(leaf_posterior)
-                if leaf_predicted_label in self.modesPerLeaves[node.index]:
-                    if leaf_predicted_label == leaf_true_label:
-                        mode_prediction_correct_count += 1.0
-                    mode_prediction_count += 1.0
-                else:
-                    residue_index = residue_network_index[sample_index]
-                    residue_posterior = residue_posterior_prob[residue_index]
-                    residue_true_label = residue_true_labels[residue_index]
-                    assert residue_true_label == leaf_true_label
-                    residue_predicted_label = np.argmax(residue_posterior)
-                    if residue_predicted_label == residue_true_label:
-                        residue_prediction_correct_count += 1.0
-                    residue_prediction_count += 1.0
-        print("Mode Predictions Accuracy:{0}".format(mode_prediction_correct_count / mode_prediction_count))
-        print("Residue Predictions Accuracy:{0}".format(residue_prediction_correct_count / residue_prediction_count))
-        print("Total Accuracy:{0}".format((mode_prediction_correct_count + residue_prediction_correct_count)
-                                          / (mode_prediction_count + residue_prediction_count)))
+
+
+
+
+
+
+
+
+        # for i in range(residue_sample_indices.shape[0]):
+        #     residue_network_index[residue_sample_indices[i]] = i
+        # # Measure Accuracy
+        # mode_prediction_count = 0.0
+        # mode_prediction_correct_count = 0.0
+        # residue_prediction_count = 0.0
+        # residue_prediction_correct_count = 0.0
+        # for node in self.topologicalSortedNodes:
+        #     if not node.isLeaf:
+        #         continue
+        #     leaf_sample_indices = leaf_sample_indices_dict[node.index]
+        #     leaf_true_labels = leaf_true_labels_dict[node.index]
+        #     leaf_posterior_prob = leaf_posterior_probs_dict[node.index]
+        #     for i in range(leaf_sample_indices.shape[0]):
+        #         sample_index = leaf_sample_indices[i]
+        #         leaf_posterior = leaf_posterior_prob[i]
+        #         leaf_true_label = leaf_true_labels[i]
+        #         leaf_predicted_label = np.argmax(leaf_posterior)
+        #         if leaf_predicted_label in self.modesPerLeaves[node.index]:
+        #             if leaf_predicted_label == leaf_true_label:
+        #                 mode_prediction_correct_count += 1.0
+        #             mode_prediction_count += 1.0
+        #         else:
+        #             residue_index = residue_network_index[sample_index]
+        #             residue_posterior = residue_posterior_prob[residue_index]
+        #             residue_true_label = residue_true_labels[residue_index]
+        #             assert residue_true_label == leaf_true_label
+        #             residue_predicted_label = np.argmax(residue_posterior)
+        #             if residue_predicted_label == residue_true_label:
+        #                 residue_prediction_correct_count += 1.0
+        #             residue_prediction_count += 1.0
+        # print("Mode Predictions Accuracy:{0}".format(mode_prediction_correct_count / mode_prediction_count))
+        # print("Residue Predictions Accuracy:{0}".format(residue_prediction_correct_count / residue_prediction_count))
+        # print("Total Accuracy:{0}".format((mode_prediction_correct_count + residue_prediction_correct_count)
+        #                                   / (mode_prediction_count + residue_prediction_count)))
 
     def get_probability_thresholds(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:

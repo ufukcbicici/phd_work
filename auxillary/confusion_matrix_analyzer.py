@@ -54,8 +54,8 @@ class ConfusionMatrixAnalyzer:
         res_dict["total_mode_prediction_count"] = total_mode_prediction_count
         return res_dict
 
-run_id = 923
-iteration = 40000
+run_id = 1229
+iteration = 48000
 print("\nLeaf 3")
 cm3 = DbLogger.read_confusion_matrix(run_id=run_id, dataset=2, iteration=iteration, num_of_labels=10, leaf_id=3)
 res_dict_3 = ConfusionMatrixAnalyzer.analyze_confusion_matrix(cm=cm3, threshold_percentile_for_modes=0.85)
