@@ -23,6 +23,7 @@ class Node:
         self.residueOutputTensor = None
         self.weightDecayModifier = 1.0
         self.infoGainBalanceCoefficient = None
+        self.p_n_given_x = None
         # Indexed by the nodes producing them
         self.activationsDict = {}
         self.proxyLossInputDicts = {}

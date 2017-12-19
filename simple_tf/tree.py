@@ -431,6 +431,9 @@ class TreeNetwork:
                 # zeros_arr = np.zeros(shape=v.shape)
                 # arg_max_indices = np.argmax(v, axis=1)
                 # print("X")
+        label_dict = list(leaf_true_labels_dict.values())[0]
+        for v in leaf_true_labels_dict.values():
+            assert np.allclose(v, label_dict)
         root_node = self.nodes[0]
         # for node in self.topologicalSortedNodes:
         #     if not node.isLeaf:
@@ -488,6 +491,7 @@ class TreeNetwork:
         # 1) Check all leaves. Among the leaves which predicts the sample having a label within its modes, choose the
         # prediction with the highest confidence.
         # 2) If all leaves predict the sample as a non mode, pick the estimate with the highest confidence.
+        # First Method
         for sample_index in samples_with_non_mode_predictions:
             curr_predicted_label = None
             curr_prediction_confidence = 0.0
@@ -508,7 +512,31 @@ class TreeNetwork:
         print("Total count of mode predictions={0}".format(total_mode_prediction_count))
         mode_prediction_accuracy = total_correct_of_mode_predictions / total_mode_prediction_count
         print("Mode prediction accuracy={0}".format(mode_prediction_accuracy))
-        return corrected_accuracy
+        # Second Method
+        avg_total_correct = 0
+        for sample_index in samples_with_non_mode_predictions:
+            selection_prob_dict = {root_node.index: 1.0}
+            avg_posterior = None
+            for node in self.topologicalSortedNodes:
+                if not node.isLeaf:
+                    p_n_given_sample = branch_probs[node.index][sample_index, :]
+                    child_nodes = self.dagObject.children(node=node)
+                    child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
+                    for child_index in range(len(child_nodes_sorted)):
+                        selection_prob_dict[child_nodes_sorted[child_index].index] = \
+                            selection_prob_dict[node.index] * p_n_given_sample[child_index]
+                else:
+                    sample_posterior = posterior_probs[node.index][sample_index, :]
+                    if avg_posterior is None:
+                        avg_posterior = selection_prob_dict[node.index] * sample_posterior
+                    else:
+                        avg_posterior = avg_posterior + (selection_prob_dict[node.index] * sample_posterior)
+            avg_predicted_label = np.asscalar(np.argmax(avg_posterior))
+            if avg_predicted_label == true_labels_dict[sample_index]:
+                avg_total_correct += 1
+        marginalized_corrected_accuracy = (total_correct_of_mode_predictions + avg_total_correct) / sample_count
+        print("Marginalized prediction accuracy={0}".format(marginalized_corrected_accuracy))
+        return corrected_accuracy, marginalized_corrected_accuracy
 
     def calculate_accuracy_with_residue_network(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
@@ -955,6 +983,7 @@ class TreeNetwork:
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
+        self.p_n_given_x = p_n_given_x
         arg_max_indices = tf.argmax(p_n_given_x, axis=1)
         child_nodes = self.dagObject.children(node=node)
         child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)

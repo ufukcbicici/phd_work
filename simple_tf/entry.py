@@ -186,9 +186,11 @@ def main():
     # decision_wd = [0.0]
     classification_wd = [0.0]
     decision_wd = [0.0]
-    info_gain_balance_coeffs = [2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0, 5.0, 5.0, 5.0]
+    info_gain_balance_coeffs = [5.0]
+    classification_dropout_prob = [0.35, 0.35, 0.35, 0.4, 0.4, 0.4, 0.45, 0.45, 0.45, 0.5, 0.5, 0.5]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
-                                                                          info_gain_balance_coeffs])
+                                                                          info_gain_balance_coeffs,
+                                                                          classification_dropout_prob])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -198,6 +200,7 @@ def main():
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
+        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
         GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
                                                                      decay=GlobalConstants.DECAY_RATE,
@@ -265,11 +268,13 @@ def main():
                             network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
                                                        run_id=experiment_id, iteration=iteration_counter)
                         if not network.isBaseline:
-                            validation_accuracy_corrected = \
+                            validation_accuracy_corrected, validation_marginal_corrected = \
                                 network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
                                                                                  dataset_type=DatasetTypes.test,
                                                                                  run_id=experiment_id,
                                                                                  iteration=iteration_counter)
+                            network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+                                                                            dataset_type=DatasetTypes.test)
                         # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                         #                                                 dataset_type=DatasetTypes.validation)
                         # DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
@@ -277,8 +282,8 @@ def main():
                         #                                  validation_accuracy_corrected)],
                         #                           table=DbLogger.runKvStore, col_count=4)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy, validation_accuracy,
-                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
+                                                         validation_accuracy,
+                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                         if GlobalConstants.SAVE_CONFUSION_MATRICES:
                             DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
@@ -292,7 +297,7 @@ def main():
                                                                    run_id=experiment_id, iteration=iteration_counter)
         result_rows = [(experiment_id, explanation, test_accuracy, "Regular")]
         if not network.isBaseline:
-            test_accuracy_corrected = \
+            test_accuracy_corrected, test_marginal_corrected = \
                 network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
                                                                  dataset_type=DatasetTypes.test,
                                                                  run_id=experiment_id,
@@ -303,6 +308,7 @@ def main():
                                              test_accuracy_corrected)],
                                       table=DbLogger.runKvStore, col_count=4)
             result_rows.append((experiment_id, explanation, test_accuracy_corrected, "Corrected"))
+            result_rows.append((experiment_id, explanation, test_marginal_corrected, "Marginal"))
         DbLogger.write_into_table(result_rows, table=DbLogger.runResultsTable, col_count=4)
         if GlobalConstants.SAVE_CONFUSION_MATRICES:
             DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)
