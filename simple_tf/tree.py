@@ -556,16 +556,72 @@ class TreeNetwork:
                 else:
                     posterior_prob = results[self.get_variable_name(name="posterior_probs", node=node)]
                     true_labels = results["Node{0}_label_tensor".format(node.index)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
                                                          array=posterior_prob)
                     # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
                     #                                      array=predicted_labels)
                     UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
                                                          array=true_labels)
+            residue_posterior_prob = results["residue_probabilities"]
+            residue_true_labels = results["residue_labels"]
+            residue_sample_indices = results["residue_indices"]
+            UtilityFuncs.concat_to_np_array_dict(dct=residue_posterior_probs_dict, key=-1,
+                                                 array=residue_posterior_prob)
+            UtilityFuncs.concat_to_np_array_dict(dct=residue_true_labels_dict, key=-1,
+                                                 array=residue_true_labels)
+            UtilityFuncs.concat_to_np_array_dict(dct=residue_sample_indices_dict, key=-1,
+                                                 array=residue_sample_indices)
             if dataset.isNewEpoch:
                 break
-
-
+        label_dict = list(leaf_true_labels_dict.values())[0]
+        residue_true_labels = residue_true_labels_dict[-1]
+        residue_posterior_prob = residue_posterior_probs_dict[-1]
+        residue_sample_indices = residue_sample_indices_dict[-1]
+        for v in leaf_true_labels_dict.values():
+            assert np.allclose(v, label_dict)
+        assert np.allclose(label_dict, residue_true_labels)
+        sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
+        root_node = self.nodes[0]
+        # Accuracy measurements
+        mode_samples_count = 0
+        non_mode_samples_count = 0
+        true_labels_dict = {}
+        samples_with_non_mode_predictions = set()
+        wrong_samples_with_non_mode_predictions = set()
+        for sample_index in range(sample_count):
+            curr_node = root_node
+            probabilities_on_path = []
+            for node in self.topologicalSortedNodes:
+                while True:
+                    if not curr_node.isLeaf:
+                        p_n_given_sample = leaf_posterior_probs_dict[curr_node.index][sample_index, :]
+                        child_nodes = self.dagObject.children(node=curr_node)
+                        child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
+                        arg_max_index = np.asscalar(np.argmax(p_n_given_sample))
+                        probabilities_on_path.append(p_n_given_sample[arg_max_index])
+                        curr_node = child_nodes_sorted[arg_max_index]
+                    else:
+                        sample_posterior = leaf_posterior_probs_dict[curr_node.index][sample_index, :]
+                        predicted_label = np.asscalar(np.argmax(sample_posterior))
+                        true_label = leaf_true_labels_dict[curr_node.index][sample_index]
+                        true_labels_dict[sample_index] = true_label
+                        if predicted_label not in self.modesPerLeaves[curr_node.index]:
+                            samples_with_non_mode_predictions.add(sample_index)
+                        #     if true_label != predicted_label:
+                        #         wrong_samples_with_non_mode_predictions.add(sample_index)
+                        # else:
+                        #     total_mode_prediction_count += 1.0
+                        #     if true_label == predicted_label:
+                        #         total_correct_of_mode_predictions += 1.0
+                        #         total_correct += 1.0
+                        # if true_label == predicted_label:
+                        #     total_correct += 1.0
+                        # else:
+                        #     if sample_index in samples_with_non_mode_predictions:
+                        #         wrong_samples_with_non_mode_predictions.add(sample_index)
+                        # else:
+                        #     print("Wrong!")
+                        break
 
         # while True:
         #     results = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
