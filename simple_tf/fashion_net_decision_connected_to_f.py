@@ -48,8 +48,8 @@ def root_func(node, network, variables=None):
     # ***************** F: Convolution Layers *****************
 
     # ***************** H: Connected to F *****************
-    pool_h = tf.nn.max_pool(relu2, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
-    flat_pool = tf.contrib.layers.flatten(pool_h)
+    # pool_h = tf.nn.max_pool(relu2, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
+    flat_pool = tf.contrib.layers.flatten(pool2)
     feature_size = flat_pool.get_shape().as_list()[-1]
     fc_h_weights = tf.Variable(tf.truncated_normal(
         [feature_size, GlobalConstants.FASHION_NO_H_FROM_F_UNITS_1],
@@ -66,7 +66,8 @@ def root_func(node, network, variables=None):
     drooped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
     ig_feature = drooped_ig_feature
     # ***************** Dropout *****************
-    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
+    # node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
+    node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
         tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
@@ -108,8 +109,8 @@ def l1_func(node, network, variables=None):
     # ***************** F: Convolution Layer *****************
 
     # ***************** H: Connected to F *****************
-    pool_h = tf.nn.max_pool(relu3, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
-    flat_pool = tf.contrib.layers.flatten(pool_h)
+    # pool_h = tf.nn.max_pool(relu3, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
+    flat_pool = tf.contrib.layers.flatten(pool3)
     feature_size = flat_pool.get_shape().as_list()[-1]
     fc_h_weights = tf.Variable(tf.truncated_normal(
         [feature_size, GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2],
@@ -127,7 +128,8 @@ def l1_func(node, network, variables=None):
     drooped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
     ig_feature = drooped_ig_feature
     # ***************** Dropout *****************
-    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
+    # node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
+    node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
         tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
