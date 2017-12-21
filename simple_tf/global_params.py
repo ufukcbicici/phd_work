@@ -36,8 +36,10 @@ class GlobalConstants:
     DECAY_RATE = 0.5 # INITIAL_LR/EPOCH_COUNT
     # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
     #                                                decay=DECAY_RATE)
-    LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
-                                                 decay_period=DECAY_STEP)
+    # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
+    #                                              decay_period=DECAY_STEP)
+    LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator", value=INITIAL_LR,
+                                                 schedule=[(15000, 0.005), (30000, 0.0025), (40000, 0.00025)])
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
@@ -81,7 +83,7 @@ class GlobalConstants:
     USE_BATCH_NORM_BEFORE_BRANCHING = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
     USE_DECISION_REGULARIZER = True
-    DECISION_LOSS_COEFFICIENT = 0.75
+    DECISION_LOSS_COEFFICIENT = 1.0
     RESIDUE_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = True
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased

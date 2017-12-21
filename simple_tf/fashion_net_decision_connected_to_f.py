@@ -304,7 +304,7 @@ def threshold_calculator_func(network):
         initial_value = 1.0 / float(node_degree)
         threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
         node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                                                         decay_period=12000,
+                                                         decay_period=36000,
                                                          min_limit=0.4)
         # Softmax Decay
         decay_name = network.get_variable_name(name="softmax_decay", node=node)

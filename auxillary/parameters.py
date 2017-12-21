@@ -143,7 +143,7 @@ class DiscreteParameter(Parameter):
             self.schedule.remove(tpl[0])
 
     def get_explanation(self):
-        explanation = ""
+        explanation = "Iteration:{0} Value:{1}\n".format(0, self.value)
         for tpl in self.schedule:
             explanation += "Iteration:{0} Value:{1}\n".format(tpl[0], tpl[1])
         return explanation

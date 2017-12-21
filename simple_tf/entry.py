@@ -22,7 +22,7 @@ import itertools
 # MNIST
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DecayingParameterV2, DecayingParameter
+from auxillary.parameters import DecayingParameterV2, DecayingParameter, DiscreteParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
 from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline, fashion_net_independent_h, \
@@ -53,9 +53,9 @@ def get_explanation_string(network):
     explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-    explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
-    explanation += "Decay Steps:{0}\n".format(GlobalConstants.DECAY_STEP)
-    explanation += "Decay Rate:{0}\n".format(GlobalConstants.DECAY_RATE)
+    explanation += "********Lr Settings********\n"
+    explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
+    explanation += "********Lr Settings********\n"
     explanation += "Param Count:{0}\n".format(total_param_count)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
@@ -186,7 +186,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.35, 0.35, 0.35]
+    classification_dropout_prob = [0.35]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -200,10 +200,14 @@ def main():
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
-        GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
+        # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
+        #                                                              value=GlobalConstants.INITIAL_LR,
+        #                                                              decay=GlobalConstants.DECAY_RATE,
+        #                                                              decay_period=GlobalConstants.DECAY_STEP)
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     decay=GlobalConstants.DECAY_RATE,
-                                                                     decay_period=GlobalConstants.DECAY_STEP)
+                                                                     schedule=[(15000, 0.005), (30000, 0.0025),
+                                                                               (40000, 0.00025)])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
         #                                                                value=GlobalConstants.INITIAL_LR,
@@ -272,8 +276,8 @@ def main():
                                                                                  dataset_type=DatasetTypes.test,
                                                                                  run_id=experiment_id,
                                                                                  iteration=iteration_counter)
-                            network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                            dataset_type=DatasetTypes.test)
+                            # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+                            #                                                 dataset_type=DatasetTypes.test)
                         # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                         #                                                 dataset_type=DatasetTypes.validation)
                         # DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
@@ -301,7 +305,7 @@ def main():
                                                                  dataset_type=DatasetTypes.test,
                                                                  run_id=experiment_id,
                                                                  iteration=iteration_counter)
-            network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
+            # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
             DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
                                              "Corrected Test Accuracy",
                                              test_accuracy_corrected)],
