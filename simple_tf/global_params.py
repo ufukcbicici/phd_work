@@ -81,7 +81,7 @@ class GlobalConstants:
     USE_BATCH_NORM_BEFORE_BRANCHING = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
     USE_DECISION_REGULARIZER = True
-    DECISION_LOSS_COEFFICIENT = 1.0
+    DECISION_LOSS_COEFFICIENT = 0.75
     RESIDUE_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = True
     GRADIENT_TYPE = GradientType.mixture_of_experts_biased
@@ -112,6 +112,8 @@ class GlobalConstants:
     FASHION_F_FC_1 = 128
     FASHION_F_FC_2 = 64
     FASHION_F_RESIDUE = 128
+    FASHION_NO_H_FROM_F_UNITS_1 = 30
+    FASHION_NO_H_FROM_F_UNITS_2 = 30
 
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"

@@ -25,7 +25,8 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameterV2, DecayingParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
-from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline, fashion_net_independent_h
+from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline, fashion_net_independent_h, \
+    fashion_net_decision_connected_to_f
 from simple_tf.global_params import GlobalConstants
 from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
@@ -43,7 +44,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist Tree, H Independent of F. Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
+    explanation = "Fashion Mnist Tree, H is connected to F. Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
                   "(Lr=0.01, - Decay 0.5 at each 15000. iteration)\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -162,13 +163,13 @@ def main():
     #     summary_func=fashion_net_baseline.tensorboard_func,
     #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network = TreeNetwork(
-        node_build_funcs=[fashion_net_independent_h.root_func,
-                          fashion_net_independent_h.l1_func,
-                          fashion_net_independent_h.leaf_func],
-        grad_func=fashion_net_independent_h.grad_func,
-        threshold_func=fashion_net_independent_h.threshold_calculator_func,
-        residue_func=fashion_net_independent_h.residue_network_func,
-        summary_func=fashion_net_independent_h.tensorboard_func,
+        node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
+                          fashion_net_decision_connected_to_f.l1_func,
+                          fashion_net_decision_connected_to_f.leaf_func],
+        grad_func=fashion_net_decision_connected_to_f.grad_func,
+        threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
+        residue_func=fashion_net_decision_connected_to_f.residue_network_func,
+        summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
         degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()
@@ -187,7 +188,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.35, 0.35, 0.35, 0.4, 0.4, 0.4, 0.45, 0.45, 0.45, 0.5, 0.5, 0.5]
+    classification_dropout_prob = [0.35, 0.35, 0.35]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -282,8 +283,8 @@ def main():
                         #                                  validation_accuracy_corrected)],
                         #                           table=DbLogger.runKvStore, col_count=4)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy,
-                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=8)
+                                                         validation_accuracy, validation_marginal_corrected,
+                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                         if GlobalConstants.SAVE_CONFUSION_MATRICES:
                             DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
