@@ -277,6 +277,22 @@ class TreeNetwork:
                 # self.summaryFunc(network=self)
                 # self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
 
+    def calculate_branch_probability_histograms(self, branch_probs):
+        for k, v in branch_probs.items():
+            # Interval analysis
+            print("Node:{0}".format(k))
+            bin_size = 0.1
+            for j in range(v.shape[1]):
+                histogram = {}
+                for i in range(v.shape[0]):
+                    prob = v[i, j]
+                    bin_id = int(prob / bin_size)
+                    if bin_id not in histogram:
+                        histogram[bin_id] = 0
+                    histogram[bin_id] += 1
+                sorted_histogram = sorted(list(histogram.items()), key=lambda e: e[0], reverse=False)
+                print(histogram)
+
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_predicted_labels_dict = {}
@@ -319,6 +335,8 @@ class TreeNetwork:
         for k, v in branch_probs.items():
             p_n = np.mean(v, axis=0)
             print("p_{0}(n)={1}".format(k, p_n))
+        # Measure The Histogram of Branching Probabilities
+        self.calculate_branch_probability_histograms(branch_probs=branch_probs)
         # Measure Accuracy
         overall_count = 0.0
         overall_correct = 0.0
@@ -414,23 +432,6 @@ class TreeNetwork:
                                                          array=true_labels)
             if dataset.isNewEpoch:
                 break
-        for k, v in branch_probs.items():
-            # Interval analysis
-            bin_size = 0.1
-            for j in range(v.shape[1]):
-                histogram = {}
-                for i in range(v.shape[0]):
-                    prob = v[i, j]
-                    bin_id = int(prob / bin_size)
-                    # if bin_id == 10:
-                    #     print("X")
-                    if bin_id not in histogram:
-                        histogram[bin_id] = 0
-                    histogram[bin_id] += 1
-                print(histogram)
-                # zeros_arr = np.zeros(shape=v.shape)
-                # arg_max_indices = np.argmax(v, axis=1)
-                # print("X")
         label_dict = list(leaf_true_labels_dict.values())[0]
         for v in leaf_true_labels_dict.values():
             assert np.allclose(v, label_dict)
