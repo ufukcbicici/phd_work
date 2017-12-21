@@ -693,6 +693,21 @@ class TreeNetwork:
         else:
             feed_dict[self.decisionDropoutKeepProb] = 1.0
 
+    def get_effective_sample_counts(self, sample_counts):
+        effective_sample_counts = {}
+        for node in self.topologicalSortedNodes:
+            effective_sample_counts[self.get_variable_name(name="sample_count", node=node)] = 0.0
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            sample_count = sample_counts[self.get_variable_name(name="sample_count", node=node)]
+            effective_sample_counts[self.get_variable_name(name="sample_count", node=node)] = sample_count
+            ancestors = self.dagObject.ancestors(node=node)
+            for ancestor in ancestors:
+                effective_sample_counts[self.get_variable_name(name="sample_count", node=ancestor)] += \
+                    (0.0 + sample_count)
+        return effective_sample_counts
+
     def get_main_and_regularization_grads(self, sess, samples, labels, indices, one_hot_labels, iteration):
         vars = tf.trainable_variables()
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
@@ -759,6 +774,7 @@ class TreeNetwork:
         sample_counts = results[3]
         vars_current_values = results[4]
         is_open_indicators = results[5]
+        effective_sample_counts = self.get_effective_sample_counts(sample_counts=sample_counts)
         # if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
         #     summary_list = results[6]
         #     for summary in summary_list:
@@ -778,7 +794,10 @@ class TreeNetwork:
                 main_grads[k] = g
             elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
                 sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
-                sample_count = sample_counts[sample_count_entry_name]
+                if GlobalConstants.USE_EFFECTIVE_SAMPLE_COUNTS:
+                    sample_count = effective_sample_counts[sample_count_entry_name]
+                else:
+                    sample_count = sample_counts[sample_count_entry_name]
                 gradient_modifier = float(GlobalConstants.BATCH_SIZE) / float(sample_count)
                 modified_g = gradient_modifier * g
                 main_grads[k] = modified_g
