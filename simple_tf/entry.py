@@ -100,9 +100,7 @@ def get_explanation_string(network):
             if node.isLeaf:
                 continue
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-            explanation += "Prob Threshold Initial Value:{0}\n".format(node.probThresholdCalculator.value)
-            explanation += "Prob Threshold Decay Step:{0}\n".format(node.probThresholdCalculator.decayPeriod)
-            explanation += "Prob Threshold Decay Ratio:{0}\n".format(node.probThresholdCalculator.decay)
+            explanation += node.probThresholdCalculator.get_explanation()
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
     explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_F_NUM_FILTERS_1)

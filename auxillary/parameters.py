@@ -31,6 +31,9 @@ class Parameter:
     def update(self, iteration):
         pass
 
+    def get_explanation(self):
+        pass
+
 
 class GaussianParameter(Parameter):
     def __init__(self, name, value, std, always_positive=False):
@@ -76,6 +79,13 @@ class DecayingParameter(Parameter):
         if self.epsilon_value is not None:
             if self.value < self.epsilon_value:
                 self.value = 0.0
+
+    def get_explanation(self):
+        explanation = ""
+        explanation += "Initial Value:{0}\n".format(self.value)
+        explanation += "Decay Step:{0}\n".format(self.decayPeriod)
+        explanation += "Decay Ratio:{0}\n".format(self.decay)
+        return explanation
 
 
 class DecayingParameterV2(Parameter):
@@ -131,6 +141,12 @@ class DiscreteParameter(Parameter):
         if tpl:
             self.value = tpl[0][1]
             self.schedule.remove(tpl[0])
+
+    def get_explanation(self):
+        explanation = ""
+        for tpl in self.schedule:
+            explanation += "Iteration:{0} Value:{1}\n".format(tpl[0], tpl[1])
+        return explanation
 
 
 class SinusoidalParameter(Parameter):
