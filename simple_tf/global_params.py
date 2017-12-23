@@ -115,8 +115,8 @@ class GlobalConstants:
     FASHION_F_FC_1 = 128
     FASHION_F_FC_2 = 64
     FASHION_F_RESIDUE = 128
-    FASHION_NO_H_FROM_F_UNITS_1 = 64
-    FASHION_NO_H_FROM_F_UNITS_2 = 64
+    FASHION_NO_H_FROM_F_UNITS_1 = 32
+    FASHION_NO_H_FROM_F_UNITS_2 = 32
 
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"
