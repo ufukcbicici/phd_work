@@ -44,7 +44,8 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist Tree, H is connected to F. Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
+    explanation = "Fashion Mnist Tree, H is connected to F. Dropout in IG Features. IG Features 32 Dimensional" \
+                  "Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
                   "(Lr=0.01, - Decay 0.5 at each 15000. iteration)\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -116,8 +117,8 @@ def get_explanation_string(network):
                                                            GlobalConstants.FASHION_H_NUM_FILTERS_1)
     explanation += "H Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
                                                            GlobalConstants.FASHION_H_NUM_FILTERS_2)
-    explanation += "H FC1:{0} Units\n".format(GlobalConstants.FASHION_H_FC_1)
-    explanation += "H FC2:{0} Units\n".format(GlobalConstants.FASHION_H_FC_2)
+    explanation += "FASHION_NO_H_FROM_F_UNITS_1:{0} Units\n".format(GlobalConstants.FASHION_H_FC_1)
+    explanation += "FASHION_NO_H_FROM_F_UNITS_2:{0} Units\n".format(GlobalConstants.FASHION_H_FC_2)
 
     # Baseline
     # explanation = "Fashion Mnist Baseline. Double Dropout\n"
@@ -187,7 +188,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.35, 0.35]
+    classification_dropout_prob = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])

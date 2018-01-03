@@ -87,7 +87,7 @@ class GlobalConstants:
     DECISION_LOSS_COEFFICIENT = 1.0
     RESIDUE_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = True
-    GRADIENT_TYPE = GradientType.mixture_of_experts_biased
+    GRADIENT_TYPE = GradientType.mixture_of_experts_unbiased
     INFO_GAIN_LOG_EPSILON = 1e-30
     SUMMARY_PERIOD = 100000000000
     # Fashion Mnist
@@ -112,8 +112,8 @@ class GlobalConstants:
     FASHION_H_FILTERS_3_SIZE = 1
     FASHION_H_FC_1 = 30
     FASHION_H_FC_2 = 30
-    FASHION_F_FC_1 = 128
-    FASHION_F_FC_2 = 64
+    FASHION_F_FC_1 = 192
+    FASHION_F_FC_2 = 96
     FASHION_F_RESIDUE = 128
     FASHION_NO_H_FROM_F_UNITS_1 = 32
     FASHION_NO_H_FROM_F_UNITS_2 = 32

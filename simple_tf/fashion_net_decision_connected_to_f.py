@@ -63,11 +63,12 @@ def root_func(node, network, variables=None):
     raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
     # ***************** Dropout *****************
     relu_ig_feature = tf.nn.relu(raw_ig_feature)
-    drooped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
-    ig_feature = drooped_ig_feature
+    dropped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = dropped_ig_feature
     # ***************** Dropout *****************
     # node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
-    node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
+    node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, dropped_ig_feature, ig_feature])
+    # node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, ig_feature])
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
         tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
@@ -125,11 +126,12 @@ def l1_func(node, network, variables=None):
     # ig_feature = tf.nn.relu(raw_ig_feature)
     # ***************** Dropout *****************
     relu_ig_feature = tf.nn.relu(raw_ig_feature)
-    drooped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
-    ig_feature = drooped_ig_feature
+    dropped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = dropped_ig_feature
     # ***************** Dropout *****************
     # node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
-    node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
+    node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, dropped_ig_feature, ig_feature])
+    # node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, ig_feature])
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     hyperplane_weights = tf.Variable(
         tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
@@ -304,7 +306,7 @@ def threshold_calculator_func(network):
         initial_value = 1.0 / float(node_degree)
         threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
         node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                                                         decay_period=36000,
+                                                         decay_period=12000,
                                                          min_limit=0.4)
         # Softmax Decay
         decay_name = network.get_variable_name(name="softmax_decay", node=node)
