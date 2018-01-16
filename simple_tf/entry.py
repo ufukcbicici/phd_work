@@ -44,7 +44,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist Tree, H is connected to F. Dropout in IG Features. IG Features 32 Dimensional" \
+    explanation = "Fashion Mnist Tree, H is connected to F. Dropout in IG Features." \
                   "Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
                   "(Lr=0.01, - Decay 0.5 at each 15000. iteration)\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
@@ -97,6 +97,7 @@ def get_explanation_string(network):
         explanation += "********Decision Dropout Schedule********\n"
     explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
     explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
+    explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_PROB)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
             if node.isLeaf:
@@ -117,11 +118,11 @@ def get_explanation_string(network):
                                                            GlobalConstants.FASHION_H_NUM_FILTERS_1)
     explanation += "H Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
                                                            GlobalConstants.FASHION_H_NUM_FILTERS_2)
-    explanation += "FASHION_NO_H_FROM_F_UNITS_1:{0} Units\n".format(GlobalConstants.FASHION_H_FC_1)
-    explanation += "FASHION_NO_H_FROM_F_UNITS_2:{0} Units\n".format(GlobalConstants.FASHION_H_FC_2)
+    explanation += "FASHION_NO_H_FROM_F_UNITS_1:{0} Units\n".format(GlobalConstants.FASHION_NO_H_FROM_F_UNITS_1)
+    explanation += "FASHION_NO_H_FROM_F_UNITS_2:{0} Units\n".format(GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2)
 
     # Baseline
-    # explanation = "Fashion Mnist Baseline. Double Dropout\n"
+    # explanation = "Fashion Mnist Baseline. Double Dropout, Discrete learning rate\n"
     # explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     # explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     # explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
@@ -188,7 +189,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    classification_dropout_prob = [0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -278,6 +279,9 @@ def main():
                                                                                  dataset_type=DatasetTypes.test,
                                                                                  run_id=experiment_id,
                                                                                  iteration=iteration_counter)
+                        else:
+                            validation_accuracy_corrected = 0.0
+                            validation_marginal_corrected = 0.0
                             # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                             #                                                 dataset_type=DatasetTypes.test)
                         # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
@@ -287,7 +291,7 @@ def main():
                         #                                  validation_accuracy_corrected)],
                         #                           table=DbLogger.runKvStore, col_count=4)
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy, validation_marginal_corrected,
+                                                         validation_accuracy, validation_accuracy_corrected,
                                                          0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                         if GlobalConstants.SAVE_CONFUSION_MATRICES:

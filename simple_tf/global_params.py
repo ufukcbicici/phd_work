@@ -53,6 +53,7 @@ class GlobalConstants:
     DROPOUT_INITIAL_PROB = 0.75
     DROPOUT_SCHEDULE = [(15000, 0.5), (30000, 0.25), (45000, 0.125)]
     CLASSIFICATION_DROPOUT_PROB = 0.5
+    DECISION_DROPOUT_PROB = 0.1
     # INFO_GAIN_BALANCE_COEFFICIENT = 1.0
     PERCENTILE_THRESHOLD = 0.85
     ROUTE_CORRECTION_PERIOD = 5000
@@ -87,7 +88,7 @@ class GlobalConstants:
     DECISION_LOSS_COEFFICIENT = 1.0
     RESIDUE_LOSS_COEFFICIENT = 1.0
     SAVE_CONFUSION_MATRICES = True
-    GRADIENT_TYPE = GradientType.mixture_of_experts_unbiased
+    GRADIENT_TYPE = GradientType.mixture_of_experts_biased
     INFO_GAIN_LOG_EPSILON = 1e-30
     SUMMARY_PERIOD = 100000000000
     # Fashion Mnist
@@ -112,11 +113,11 @@ class GlobalConstants:
     FASHION_H_FILTERS_3_SIZE = 1
     FASHION_H_FC_1 = 30
     FASHION_H_FC_2 = 30
-    FASHION_F_FC_1 = 192
-    FASHION_F_FC_2 = 96
+    FASHION_F_FC_1 = 128
+    FASHION_F_FC_2 = 64
     FASHION_F_RESIDUE = 128
-    FASHION_NO_H_FROM_F_UNITS_1 = 32
-    FASHION_NO_H_FROM_F_UNITS_2 = 32
+    FASHION_NO_H_FROM_F_UNITS_1 = 16
+    FASHION_NO_H_FROM_F_UNITS_2 = 16
 
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"

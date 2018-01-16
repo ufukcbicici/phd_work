@@ -292,7 +292,8 @@ def threshold_calculator_func(network):
     # network.nodes[2].infoGainBalanceCoefficient = 1.0
 
     # Decision Dropout Schedule
-    network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - 0.35)
+    network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                               value=1.0 - GlobalConstants.DECISION_DROPOUT_PROB)
     # Noise Coefficient
     network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=1.0,
                                                            decay=0.9999,
