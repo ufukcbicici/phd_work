@@ -6,19 +6,19 @@ class Dag:
         self.dag_object = nx.DiGraph()
 
     def parents(self, node):
-        parents = self.dag_object.predecessors(node)
+        parents = list(self.dag_object.predecessors(node))
         return parents
 
     def children(self, node):
-        children = self.dag_object.successors(node)
+        children = list(self.dag_object.successors(node))
         return children
 
     def ancestors(self, node):
-        ancestors = nx.ancestors(self.dag_object, node)
+        ancestors = list(nx.ancestors(self.dag_object, node))
         return ancestors
 
     def descendants(self, node):
-        descendants = nx.descendants(self.dag_object, node)
+        descendants = list(nx.descendants(self.dag_object, node))
         return descendants
 
     def get_leaves(self):
@@ -36,7 +36,7 @@ class Dag:
         self.dag_object.add_edge(parent, child)
 
     def get_topological_sort(self):
-        return nx.topological_sort(self.dag_object)
+        return list(nx.topological_sort(self.dag_object))
 
     def get_shortest_path(self, source, dest):
         return nx.shortest_path(self.dag_object, source, dest)
