@@ -44,9 +44,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist Tree, H is connected to F. Dropout in IG Features." \
-                  "Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
-                  "(Lr=0.01, - Decay 0.5 at each 15000. iteration)\n"
+    explanation = "Fashion Mnist Tree, H is independent. v2\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -122,7 +120,8 @@ def get_explanation_string(network):
     explanation += "FASHION_NO_H_FROM_F_UNITS_2:{0} Units\n".format(GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2)
 
     # Baseline
-    # explanation = "Fashion Mnist Baseline. Double Dropout, Discrete learning rate\n"
+    # explanation = "Fashion Mnist Baseline. Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
+    #               "(Lr=0.01, - Decay 0.5 at each 15000. iteration\n"
     # explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     # explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
     # explanation += "Initial Lr:{0}\n".format(GlobalConstants.INITIAL_LR)
@@ -132,9 +131,9 @@ def get_explanation_string(network):
     # explanation += "Model: {0}Conv - {1}Conv - {2}Conv - {3}FC - {4}FC\n".\
     #     format(GlobalConstants.FASHION_NUM_FILTERS_1, GlobalConstants.FASHION_NUM_FILTERS_2,
     #            GlobalConstants.FASHION_NUM_FILTERS_3, GlobalConstants.FASHION_FC_1, GlobalConstants.FASHION_FC_2)
-    # explanation += "Conv1 Filters:{0} Conv2 Filters:{1} Conv3 Filters:{2}".\
-    #     format(GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
-    #            GlobalConstants.FASHION_FILTERS_3_SIZE)
+    # # explanation += "Conv1 Filters:{0} Conv2 Filters:{1} Conv3 Filters:{2}\n".\
+    # #     format(GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
+    # #            GlobalConstants.FASHION_FILTERS_3_SIZE)
     # explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     # explanation += "Dropout Prob:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
     return explanation
@@ -164,14 +163,23 @@ def main():
     #     summary_func=fashion_net_baseline.tensorboard_func,
     #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network = TreeNetwork(
-        node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
-                          fashion_net_decision_connected_to_f.l1_func,
-                          fashion_net_decision_connected_to_f.leaf_func],
-        grad_func=fashion_net_decision_connected_to_f.grad_func,
-        threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
-        residue_func=fashion_net_decision_connected_to_f.residue_network_func,
-        summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
+        node_build_funcs=[fashion_net_independent_h.root_func,
+                          fashion_net_independent_h.l1_func,
+                          fashion_net_independent_h.leaf_func],
+        grad_func=fashion_net_independent_h.grad_func,
+        threshold_func=fashion_net_independent_h.threshold_calculator_func,
+        residue_func=fashion_net_independent_h.residue_network_func,
+        summary_func=fashion_net_independent_h.tensorboard_func,
         degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    # network = TreeNetwork(
+    #     node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
+    #                       fashion_net_decision_connected_to_f.l1_func,
+    #                       fashion_net_decision_connected_to_f.leaf_func],
+    #     grad_func=fashion_net_decision_connected_to_f.grad_func,
+    #     threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
+    #     residue_func=fashion_net_decision_connected_to_f.residue_network_func,
+    #     summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
+    #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()
     # Init
@@ -190,9 +198,12 @@ def main():
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     classification_dropout_prob = [0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
+    decision_strengths = [1.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
-                                                                          classification_dropout_prob])
+                                                                          classification_dropout_prob,
+                                                                          decision_strengths])
+
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -203,13 +214,15 @@ def main():
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        GlobalConstants.DECISION_LOSS_COEFFICIENT = tpl[4]
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
         #                                                              value=GlobalConstants.INITIAL_LR,
         #                                                              decay=GlobalConstants.DECAY_RATE,
         #                                                              decay_period=GlobalConstants.DECAY_STEP)
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(15000, 0.005), (30000, 0.0025),
+                                                                     schedule=[(15000, 0.005),
+                                                                               (30000, 0.0025),
                                                                                (40000, 0.00025)])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
@@ -279,9 +292,6 @@ def main():
                                                                                  dataset_type=DatasetTypes.test,
                                                                                  run_id=experiment_id,
                                                                                  iteration=iteration_counter)
-                        else:
-                            validation_accuracy_corrected = 0.0
-                            validation_marginal_corrected = 0.0
                             # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                             #                                                 dataset_type=DatasetTypes.test)
                         # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
