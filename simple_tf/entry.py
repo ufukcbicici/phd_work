@@ -308,6 +308,9 @@ def main():
                                                       col_count=7)
                         leaf_info_rows = []
                     break
+
+
+
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
                                                                    run_id=experiment_id, iteration=iteration_counter)
