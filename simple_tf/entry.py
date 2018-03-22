@@ -28,6 +28,7 @@ from data_handling.mnist_data_set import MnistDataSet
 from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline, fashion_net_independent_h, \
     fashion_net_decision_connected_to_f
 from simple_tf.global_params import GlobalConstants
+from simple_tf.softmax_compresser import SoftmaxCompresser
 from simple_tf.tree import TreeNetwork
 import simple_tf.lenet3 as lenet3
 import simple_tf.baseline as baseline
@@ -308,9 +309,9 @@ def main():
                                                       col_count=7)
                         leaf_info_rows = []
                     break
-
-
-
+            # Compress softmax classifiers
+            if epoch_id == GlobalConstants.COMPRESSION_EPOCH:
+                SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset)
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
                                                                    run_id=experiment_id, iteration=iteration_counter)
