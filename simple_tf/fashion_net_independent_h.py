@@ -253,7 +253,8 @@ def leaf_func(node, network, variables=None):
     # Evaluation
     node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = final_feature
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
-
+    node.evalDict[network.get_variable_name(name="fc_softmax_weights", node=node)] = fc_softmax_weights
+    node.evalDict[network.get_variable_name(name="fc_softmax_biases", node=node)] = fc_softmax_biases
 
 def residue_network_func(network):
     all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
