@@ -45,7 +45,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist Tree, H is independent form F. v2"
+    explanation = "Fashion Mnist Tree, H is independent form F. After ICPR 2"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)

@@ -193,6 +193,7 @@ def leaf_func(node, network, variables=None):
                                                softmax_weights=fc_softmax_weights, softmax_biases=fc_softmax_biases)
     # Evaluation
     node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = final_feature
+    node.evalDict[network.get_variable_name(name="logits", node=node)] = logits
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="fc_softmax_weights", node=node)] = fc_softmax_weights
     node.evalDict[network.get_variable_name(name="fc_softmax_biases", node=node)] = fc_softmax_biases

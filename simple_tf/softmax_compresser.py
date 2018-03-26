@@ -3,6 +3,8 @@ from auxillary.general_utility_funcs import UtilityFuncs
 import numpy as np
 import tensorflow as tf
 
+from simple_tf.global_params import GlobalConstants
+
 
 class SoftmaxCompresser:
     def __init__(self):
@@ -12,6 +14,7 @@ class SoftmaxCompresser:
     def compress_network_softmax(network, sess, dataset):
         # Get all final feature vectors for all leaves, for the complete training set.
         featureVectorsDict = {}
+        logitsDict = {}
         posteriorsDict = {}
         oneHotLabelsDict = {}
         softmaxWeights = {}
@@ -34,10 +37,15 @@ class SoftmaxCompresser:
                 one_hot_labels = results[one_hot_label_ref]
                 UtilityFuncs.concat_to_np_array_dict(dct=oneHotLabelsDict, key=leaf_node.index,
                                                      array=one_hot_labels)
+                logits_ref = network.get_variable_name(name="logits", node=leaf_node)
+                logits = results[logits_ref]
+                UtilityFuncs.concat_to_np_array_dict(dct=logitsDict, key=leaf_node.index,
+                                                     array=logits)
                 softmax_weights_ref = network.get_variable_name(name="fc_softmax_weights", node=leaf_node)
                 softmaxWeights[leaf_node.index] = results[softmax_weights_ref]
                 softmax_biases_ref = network.get_variable_name(name="fc_softmax_biases", node=leaf_node)
                 softmaxBiases[leaf_node.index] = results[softmax_biases_ref]
+
             if dataset.isNewEpoch:
                 break
         # Train all leaf classifiers by distillation
@@ -48,19 +56,69 @@ class SoftmaxCompresser:
             softmax_weight = softmaxWeights[leaf_node.index]
             softmax_bias = softmaxBiases[leaf_node.index]
             feature_vectors = featureVectorsDict[leaf_node.index]
+            logits = logitsDict[leaf_node.index]
             probs = posteriorsDict[leaf_node.index]
             # Unit Test
             SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
-                                                      features=feature_vectors, probs=probs)
+                                                      features=feature_vectors, logits=logits, probs=probs)
+            # Create symbolic network for distillation
+
+
+
+
+
+
+
         print("X")
 
+    @staticmethod
+    def assert_prob_correctness(softmax_weights, softmax_biases, features, logits, probs):
+        logits_np = np.dot(features, softmax_weights) + softmax_biases
+        exp_logits = np.exp(logits_np)
+        logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
+        manual_probs1 = exp_logits / logit_sums
+
+        exp_logits2 = np.exp(logits)
+        logit_sums2 = np.sum(exp_logits2, 1).reshape(exp_logits2.shape[0], 1)
+        manual_probs2 = exp_logits2 / logit_sums2
+
+        is_equal1 = np.allclose(probs, manual_probs1)
+        print("is_equal1={0}".format(is_equal1))
+
+        is_equal2 = np.allclose(probs, manual_probs2)
+        print("is_equal2={0}".format(is_equal2))
+
+        assert is_equal1
+        assert is_equal2
 
     @staticmethod
-    def assert_prob_correctness(softmax_weights, softmax_biases, features, probs):
-        logits = np.dot(features, softmax_weights) + softmax_biases
-        exp_logits = np.exp(logits)
-        logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
-        manual_probs = exp_logits / logit_sums
-        is_equal = np.allclose(probs, manual_probs)
-        print("is_equal={0}".format(is_equal))
-        assert is_equal
+    def build_distillation_network(network, leaf_node, logits, one_hot_labels, features):
+        logit_dim = logits.shape[1]
+        features_dim = features.shape[1]
+        logits_tensor = tf.placeholder(tf.float32, shape=(None, logit_dim))
+        features_tensor = tf.placeholder(tf.float32, shape=(None, features_dim))
+        hard_labels_cost_weight = tf.placeholder(tf.float32)
+        soft_labels_temperature = tf.placeholder(tf.float32)
+        # Soft labels cost - Divide by temperature
+        tempered_logits = logits_tensor / soft_labels_temperature
+        p = tf.nn.softmax(tempered_logits)
+        t = tf.placeholder(tf.float32, shape=(None, one_hot_labels.shape[1]))
+        # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
+        compressed_class_count = len(network.modesPerLeaves[leaf_node.index]) + 1
+        softmax_weights = tf.Variable(
+            tf.truncated_normal([features_dim, compressed_class_count],
+                                stddev=0.1,
+                                seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
+        softmax_biases = tf.Variable(
+            tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+
+    @staticmethod
+    def build_compressed_probabilities(network, leaf_node, posteriors, one_hot_labels):
+        # Order mode labels from small to large, assign the smallest label to "0", next one to "1" and so on.
+        # If there are N modes, Outlier class will have N as the label.
+        sorted_modes = sorted(network.modesPerLeaves[leaf_node.index])
+
+
