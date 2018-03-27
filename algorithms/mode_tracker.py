@@ -82,7 +82,7 @@ class ModeTracker:
         curr_modes = self.modesHistory[-1]
         for v in curr_modes.values():
             total_mode_count += len(v)
-        if total_mode_count != label_count
+        if total_mode_count != label_count:
             return False
         return True
 
