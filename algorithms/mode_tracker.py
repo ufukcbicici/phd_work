@@ -73,6 +73,18 @@ class ModeTracker:
         else:
             prev_modes = self.modesHistory[-2]
             curr_modes = self.modesHistory[-1]
+            if self.modes_changed(prev_modes=prev_modes, curr_modes=curr_modes):
+                self.unchangedEpochCount = 1
+            else:
+                self.unchangedEpochCount += 1
+        if self.unchangedEpochCount != GlobalConstants.MODE_WAIT_EPOCHS:
+            return False
+        curr_modes = self.modesHistory[-1]
+        for v in curr_modes.values():
+            total_mode_count += len(v)
+        if total_mode_count != label_count
+            return False
+        return True
 
 
 
