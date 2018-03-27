@@ -3,6 +3,7 @@ import numpy as np
 
 from auxillary.constants import DatasetTypes
 from auxillary.dag_utilities import Dag
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, GradientType
 from simple_tf.info_gain import InfoGainLoss
@@ -328,9 +329,15 @@ class TreeNetwork:
                 break
         print("****************Dataset:{0}****************".format(dataset_type))
         # Measure Information Gain
+        total_info_gain = 0.0
+        kv_rows = []
         for k, v in info_gain_dict.items():
             avg_info_gain = sum(v) / float(len(v))
             print("IG_{0}={1}".format(k, -avg_info_gain))
+            total_info_gain -= avg_info_gain
+            kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
+        kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         # Measure Branching Probabilities
         for k, v in branch_probs.items():
             p_n = np.mean(v, axis=0)

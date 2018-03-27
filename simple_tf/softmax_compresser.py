@@ -58,9 +58,13 @@ class SoftmaxCompresser:
             feature_vectors = featureVectorsDict[leaf_node.index]
             logits = logitsDict[leaf_node.index]
             probs = posteriorsDict[leaf_node.index]
+            one_hot_labels = oneHotLabelsDict[leaf_node.index]
             # Unit Test
             SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
                                                       features=feature_vectors, logits=logits, probs=probs)
+            # Create compressed probabilities
+            SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node, posteriors=probs,
+                                                             one_hot_labels=one_hot_labels)
             # Create symbolic network for distillation
 
 
@@ -119,6 +123,13 @@ class SoftmaxCompresser:
     def build_compressed_probabilities(network, leaf_node, posteriors, one_hot_labels):
         # Order mode labels from small to large, assign the smallest label to "0", next one to "1" and so on.
         # If there are N modes, Outlier class will have N as the label.
+        label_count = one_hot_labels.shape[1]
         sorted_modes = sorted(network.modesPerLeaves[leaf_node.index])
+        non_mode_labels = [l for l in range(label_count) if l not in network.modesPerLeaves[leaf_node.index]]
+        mode_probs = posteriors[:, sorted_modes]
+        outlier_probs = np.sum(posteriors[:, non_mode_labels], 1)
+        compressed_probability = np.concatenate((mode_probs, outlier_probs), axis=1)
+        print("X")
+
 
 

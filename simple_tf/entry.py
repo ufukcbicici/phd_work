@@ -197,7 +197,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    classification_dropout_prob = [0.2]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -267,11 +267,11 @@ def main():
                     indicator_str += "[{0}={1}]".format(k, v)
                 print(indicator_str)
                 iteration_counter += 1
-                if iteration_counter % 50 == 0:
-                    kv_rows = []
-                    for k, v in sample_counts.items():
-                        kv_rows.append((experiment_id, iteration_counter, k, np.asscalar(v)))
-                    DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+                # if iteration_counter % 50 == 0:
+                #     kv_rows = []
+                #     for k, v in sample_counts.items():
+                #         kv_rows.append((experiment_id, iteration_counter, k, np.asscalar(v)))
+                #     DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
                 if dataset.isNewEpoch:
                     if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
                         print("Epoch Time={0}".format(total_time))
@@ -310,8 +310,8 @@ def main():
                         leaf_info_rows = []
                     break
             # Compress softmax classifiers
-            if epoch_id == GlobalConstants.COMPRESSION_EPOCH:
-                SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset)
+            # if epoch_id == GlobalConstants.COMPRESSION_EPOCH:
+            #     SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset)
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
                                                                    run_id=experiment_id, iteration=iteration_counter)
