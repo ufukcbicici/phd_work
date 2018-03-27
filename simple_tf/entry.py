@@ -3,35 +3,20 @@ from __future__ import division
 from __future__ import print_function
 
 from auxillary.constants import DatasetTypes
-from auxillary.dag_utilities import Dag
 
-import argparse
-import gzip
-import os
-import sys
 import time
-import networkx as nx
 
-import numpy
-from six.moves import urllib
-from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 import numpy as np
-import itertools
 
 # MNIST
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DecayingParameterV2, DecayingParameter, DiscreteParameter
+from auxillary.parameters import DiscreteParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
-from data_handling.mnist_data_set import MnistDataSet
-from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline, fashion_net_independent_h, \
-    fashion_net_decision_connected_to_f
-from simple_tf.global_params import GlobalConstants
-from simple_tf.softmax_compresser import SoftmaxCompresser
+from simple_tf import fashion_net_independent_h
+from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
-import simple_tf.lenet3 as lenet3
-import simple_tf.baseline as baseline
 
 
 # tf.set_random_seed(1234)
@@ -277,16 +262,20 @@ def main():
                         print("Epoch Time={0}".format(total_time))
                         training_accuracy, training_confusion = \
                             network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
-                                                       run_id=experiment_id, iteration=iteration_counter)
+                                                       run_id=experiment_id, iteration=iteration_counter,
+                                                       calculation_type=AccuracyCalcType.regular)
                         validation_accuracy, validation_confusion = \
                             network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
-                                                       run_id=experiment_id, iteration=iteration_counter)
+                                                       run_id=experiment_id, iteration=iteration_counter,
+                                                       calculation_type=AccuracyCalcType.regular)
                         if not network.isBaseline:
                             validation_accuracy_corrected, validation_marginal_corrected = \
-                                network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
-                                                                                 dataset_type=DatasetTypes.test,
-                                                                                 run_id=experiment_id,
-                                                                                 iteration=iteration_counter)
+                                network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                           dataset_type=DatasetTypes.test,
+                                                           run_id=experiment_id,
+                                                           iteration=iteration_counter,
+                                                           calculation_type=
+                                                           AccuracyCalcType.route_correction)
                         else:
                             validation_accuracy_corrected = 0.0
                             validation_marginal_corrected = 0.0
@@ -314,14 +303,17 @@ def main():
             #     SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset)
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
-                                                                   run_id=experiment_id, iteration=iteration_counter)
+                                                                   run_id=experiment_id, iteration=iteration_counter,
+                                                                   calculation_type=AccuracyCalcType.regular)
         result_rows = [(experiment_id, explanation, test_accuracy, "Regular")]
         if not network.isBaseline:
             test_accuracy_corrected, test_marginal_corrected = \
-                network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
-                                                                 dataset_type=DatasetTypes.test,
-                                                                 run_id=experiment_id,
-                                                                 iteration=iteration_counter)
+                network.calculate_accuracy(sess=sess, dataset=dataset,
+                                           dataset_type=DatasetTypes.test,
+                                           run_id=experiment_id,
+                                           iteration=iteration_counter,
+                                           calculation_type=
+                                           AccuracyCalcType.route_correction)
             # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
             DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
                                              "Corrected Test Accuracy",

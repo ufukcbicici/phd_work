@@ -1,0 +1,53 @@
+import numpy as np
+
+from auxillary.constants import DatasetTypes
+from simple_tf.global_params import GlobalConstants
+
+
+class ModeTracker:
+    def __init__(self, network):
+        self.network = network
+        self.modesHistory = []
+
+    def get_modes(self):
+        return self.modesHistory[-1]
+
+    def calculate_modes(self, leaf_true_labels_dict, dataset, dataset_type, kv_rows, run_id, iteration):
+        # Measure overall label distribution in leaves, get modes
+        total_mode_count = 0
+        modes_per_leaves = {}
+        for node in self.network.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            if node.index not in leaf_true_labels_dict:
+                continue
+            true_labels = leaf_true_labels_dict[node.index]
+            frequencies = {}
+            label_distribution = {}
+            distribution_str = ""
+            total_sample_count = true_labels.shape[0]
+            for label in range(dataset.get_label_count()):
+                frequencies[label] = np.sum(true_labels == label)
+                label_distribution[label] = frequencies[label] / float(total_sample_count)
+                distribution_str += "{0}:{1:.3f} ".format(label, label_distribution[label])
+            # Get modes
+            if dataset_type == DatasetTypes.training:
+                cumulative_prob = 0.0
+                sorted_distribution = sorted(label_distribution.items(), key=lambda lbl: lbl[1], reverse=True)
+                modes_per_leaves[node.index] = set()
+                mode_txt = ""
+                for tpl in sorted_distribution:
+                    if cumulative_prob < GlobalConstants.PERCENTILE_THRESHOLD:
+                        modes_per_leaves[node.index].add(tpl[0])
+                        mode_txt += str(tpl[0]) + ","
+                        cumulative_prob += tpl[1]
+                mode_txt = mode_txt[0:len(mode_txt) - 1]
+                total_mode_count += len(modes_per_leaves[node.index])
+                kv_rows.append((run_id, iteration, "Leaf {0} Modes".format(node.index), mode_txt))
+            print("Node{0} Label Distribution: {1}".format(node.index, distribution_str))
+        # if dataset_type == DatasetTypes.training and total_mode_count != GlobalConstants.NUM_LABELS:
+        #     raise Exception("total_mode_count != GlobalConstants.NUM_LABELS")
+        # Measure overall information gain
+        if dataset_type == DatasetTypes.training:
+            kv_rows.append((run_id, iteration, "Total Mode Count", total_mode_count))
+        self.modesHistory.append(modes_per_leaves)

@@ -12,6 +12,12 @@ class GradientType(Enum):
     parallel_dnns_biased = 3
 
 
+class AccuracyCalcType(Enum):
+    regular = 0
+    route_correction = 1
+    with_residue_network = 2
+
+
 class GlobalConstants:
     TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
@@ -57,6 +63,7 @@ class GlobalConstants:
     # INFO_GAIN_BALANCE_COEFFICIENT = 1.0
     PERCENTILE_THRESHOLD = 0.85
     COMPRESSION_EPOCH = 10
+    MODE_WAIT_EPOCHS = 5
     ROUTE_CORRECTION_PERIOD = 5000
     USE_CONVOLUTIONAL_H_PIPELINE = True
     NO_H_FILTERS_1 = 5
@@ -65,6 +72,7 @@ class GlobalConstants:
     NO_H_FC_UNITS_2 = 20
     NO_H_FROM_F_UNITS_1 = 20
     NO_H_FROM_F_UNITS_2 = 20
+
     DATA_TYPE = tf.float32
     SEED = None
     USE_VERBOSE = False
