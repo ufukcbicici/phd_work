@@ -96,19 +96,18 @@ class SoftmaxCompresser:
         assert is_equal2
 
     @staticmethod
-    def build_distillation_network(network, leaf_node, logits, one_hot_labels, features):
+    def train_distillation_network( network, leaf_node, logits, features):
         logit_dim = logits.shape[1]
         features_dim = features.shape[1]
-        logits_tensor = tf.placeholder(tf.float32, shape=(None, logit_dim))
+        # p: The tempered posteriors, which have been squashed.
+        p = tf.placeholder(tf.float32, shape=(None, logit_dim))
+        # t: The squashed one hot labels
+        t = tf.placeholder(tf.float32, shape=(None, logit_dim))
         features_tensor = tf.placeholder(tf.float32, shape=(None, features_dim))
+        soft_labels_cost_weight = tf.placeholder(tf.float32)
         hard_labels_cost_weight = tf.placeholder(tf.float32)
-        soft_labels_temperature = tf.placeholder(tf.float32)
-        # Soft labels cost - Divide by temperature
-        tempered_logits = logits_tensor / soft_labels_temperature
-        p = tf.nn.softmax(tempered_logits)
-        t = tf.placeholder(tf.float32, shape=(None, one_hot_labels.shape[1]))
-        # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
         compressed_class_count = len(network.modesPerLeaves[leaf_node.index]) + 1
+        # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
         softmax_weights = tf.Variable(
             tf.truncated_normal([features_dim, compressed_class_count],
                                 stddev=0.1,
@@ -118,6 +117,37 @@ class SoftmaxCompresser:
         softmax_biases = tf.Variable(
             tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+        # Compressed softmax probabilities
+        logits = tf.matmul(features_tensor, softmax_weights) + softmax_biases
+        # Prepare the loss function, according to Hinton's Distillation Recipe
+        # Term 1: Cross entropy between the tempered, squashed posteriors p and q: H(p,q)
+        soft_loss_vec = tf.nn.softmax_cross_entropy_with_logits(labels=p, logits=logits)
+        soft_loss = soft_labels_cost_weight * tf.reduce_mean(soft_loss_vec)
+        # Term 2: Cross entropy between the hard labels and q
+        hard_loss_vec = tf.nn.softmax_cross_entropy_with_logits(labels=t, logits=logits)
+        hard_loss = hard_labels_cost_weight * tf.reduce_mean(hard_loss_vec)
+        distillation_loss = soft_loss + hard_loss
+        global_step = tf.Variable(0, trainable=False)
+
+        # trainer = tf.train.MomentumOptimizer(GlobalConstants., 0.9).minimize(distillation_loss, global_step=global_step)
+
+
+        # soft_labels_temperature = tf.placeholder(tf.float32)
+        # # Soft labels cost - Divide by temperature
+        # tempered_logits = logits_tensor / soft_labels_temperature
+        # p = tf.nn.softmax(tempered_logits)
+        # t = tf.placeholder(tf.float32, shape=(None, one_hot_labels.shape[1]))
+        # # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
+        # compressed_class_count = len(network.modesPerLeaves[leaf_node.index]) + 1
+        # softmax_weights = tf.Variable(
+        #     tf.truncated_normal([features_dim, compressed_class_count],
+        #                         stddev=0.1,
+        #                         seed=GlobalConstants.SEED,
+        #                         dtype=GlobalConstants.DATA_TYPE),
+        #     name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
+        # softmax_biases = tf.Variable(
+        #     tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
+        #     name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
 
     @staticmethod
     def build_compressed_probabilities(network, leaf_node, posteriors, one_hot_labels):
@@ -126,10 +156,14 @@ class SoftmaxCompresser:
         label_count = one_hot_labels.shape[1]
         sorted_modes = sorted(network.modesPerLeaves[leaf_node.index])
         non_mode_labels = [l for l in range(label_count) if l not in network.modesPerLeaves[leaf_node.index]]
-        mode_probs = posteriors[:, sorted_modes]
-        outlier_probs = np.sum(posteriors[:, non_mode_labels], 1)
-        compressed_probability = np.concatenate((mode_probs, outlier_probs), axis=1)
+        mode_posteriors = posteriors[:, sorted_modes]
+        outlier_posteriors = np.sum(posteriors[:, non_mode_labels], 1)
+        compressed_posteriors = np.concatenate((mode_posteriors, outlier_posteriors), axis=1)
+        mode_one_hot_entries = one_hot_labels[:, sorted_modes]
+        outlier_one_hot_entries = np.sum(one_hot_labels[:, non_mode_labels], 1)
+        compressed_one_hot_entries = np.concatenate((mode_one_hot_entries, outlier_one_hot_entries), axis=1)
         print("X")
+        return compressed_posteriors, compressed_one_hot_entries
 
 
 

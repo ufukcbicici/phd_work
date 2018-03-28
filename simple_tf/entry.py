@@ -299,8 +299,9 @@ def main():
                         leaf_info_rows = []
                     break
             # Compress softmax classifiers
-            # if epoch_id == GlobalConstants.COMPRESSION_EPOCH:
-            #     SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset)
+            if GlobalConstants.USE_SOFTMAX_DISTILLATION:
+                network.check_for_compression(dataset=dataset, run_id=experiment_id, iteration=iteration_counter)
+
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,
                                                                    run_id=experiment_id, iteration=iteration_counter,
