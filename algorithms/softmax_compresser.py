@@ -62,17 +62,15 @@ class SoftmaxCompresser:
             # Unit Test
             SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
                                                       features=feature_vectors, logits=logits, probs=probs)
-            # Create compressed probabilities
-            SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node, posteriors=probs,
-                                                             one_hot_labels=one_hot_labels)
-            # Create symbolic network for distillation
+            # Train compresser
+            SoftmaxCompresser.train_distillation_network(network=network, leaf_node=leaf_node, logits=logits,
+                                                         one_hot_labels=one_hot_labels, features=feature_vectors)
 
 
-
-
-
-
-
+            # # Create compressed probabilities
+            # SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node, posteriors=probs,
+            #                                                  one_hot_labels=one_hot_labels)
+            # # Create symbolic network for distillation
         print("X")
 
     @staticmethod
@@ -96,7 +94,9 @@ class SoftmaxCompresser:
         assert is_equal2
 
     @staticmethod
-    def train_distillation_network( network, leaf_node, logits, features):
+    def train_distillation_network(network, leaf_node, logits, one_hot_labels, features):
+        assert logits.shape[0] == one_hot_labels.shape[0]
+        assert logits.shape[0] == features.shape[0]
         logit_dim = logits.shape[1]
         features_dim = features.shape[1]
         # p: The tempered posteriors, which have been squashed.
@@ -107,7 +107,8 @@ class SoftmaxCompresser:
         soft_labels_cost_weight = tf.placeholder(tf.float32)
         hard_labels_cost_weight = tf.placeholder(tf.float32)
         l2_loss_weight = tf.placeholder(tf.float32)
-        compressed_class_count = len(network.modesPerLeaves[leaf_node.index]) + 1
+        modesPerLeaves = network.modeTracker.get_modes()
+        compressed_class_count = len(modesPerLeaves[leaf_node.index]) + 1
         # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
         softmax_weights = tf.Variable(
             tf.truncated_normal([features_dim, compressed_class_count],
@@ -131,12 +132,40 @@ class SoftmaxCompresser:
         weight_l2 = l2_loss_weight * tf.nn.l2_loss(softmax_weights)
         # Total loss
         distillation_loss = soft_loss + hard_loss + weight_l2
+        # Gradients (For debug purposes)
+        grad_soft_loss  = tf.gradients(ys=soft_loss, xs=[softmax_weights, softmax_biases])
+        grad_hard_loss  = tf.gradients(ys=hard_loss, xs=[softmax_weights, softmax_biases])
+        grad_sm_weights = tf.gradients(ys=weight_l2, xs=[softmax_weights])
+        # Optimizer
         global_step = tf.Variable(0, trainable=False)
         learning_rate = tf.train.exponential_decay(GlobalConstants.SOFTMAX_DISTILLATION_INITIAL_LR, global_step,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_DECAY, staircase=True)
         trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(distillation_loss, global_step=global_step)
-
+        # Train by cross-validation
+        temperature_list = [1.0]
+        soft_loss_weights = [1.0]
+        hard_loss_weights = [1.0]
+        l2_weights = [0.0]
+        cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[temperature_list, soft_loss_weights,
+                                                                              hard_loss_weights,
+                                                                              l2_weights])
+        for tpl in cartesian_product:
+            temperature = tpl[0]
+            soft_loss_weight = tpl[1]
+            hard_loss_weight = tpl[2]
+            l2_weight = tpl[3]
+            # Build the tempered posteriors
+            tempered_logits = logits / temperature
+            exp_logits = np.exp(tempered_logits)
+            logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
+            tempered_posteriors = exp_logits / logit_sums
+            # Get the compressed probabilities
+            compressed_posteriors, compressed_one_hot_entries = \
+                SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
+                                                                 posteriors=tempered_posteriors,
+                                                                 one_hot_labels=one_hot_labels)
+            print("X")
 
 
     @staticmethod

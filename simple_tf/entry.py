@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from algorithms.softmax_compresser import SoftmaxCompresser
 from auxillary.constants import DatasetTypes
 
 import time
@@ -300,7 +301,12 @@ def main():
                     break
             # Compress softmax classifiers
             if GlobalConstants.USE_SOFTMAX_DISTILLATION:
-                network.check_for_compression(dataset=dataset, run_id=experiment_id, iteration=iteration_counter)
+                do_compress = network.check_for_compression(dataset=dataset, run_id=experiment_id,
+                                                            iteration=iteration_counter)
+                if do_compress:
+                    print("**********************Compressing the network**********************")
+                    SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset)
+                    print("**********************Compressing the network**********************")
 
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                    dataset_type=DatasetTypes.test,

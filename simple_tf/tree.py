@@ -305,6 +305,7 @@ class TreeNetwork:
         do_compress = self.modeTracker.check_for_compression_start(dataset=dataset)
         kv_rows = [(run_id, iteration, "Compressed Softmax", do_compress)]
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+        return do_compress
 
     def calculate_branch_probability_histograms(self, branch_probs):
         for k, v in branch_probs.items():
