@@ -106,6 +106,7 @@ class SoftmaxCompresser:
         features_tensor = tf.placeholder(tf.float32, shape=(None, features_dim))
         soft_labels_cost_weight = tf.placeholder(tf.float32)
         hard_labels_cost_weight = tf.placeholder(tf.float32)
+        l2_loss_weight = tf.placeholder(tf.float32)
         compressed_class_count = len(network.modesPerLeaves[leaf_node.index]) + 1
         # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
         softmax_weights = tf.Variable(
@@ -126,28 +127,17 @@ class SoftmaxCompresser:
         # Term 2: Cross entropy between the hard labels and q
         hard_loss_vec = tf.nn.softmax_cross_entropy_with_logits(labels=t, logits=logits)
         hard_loss = hard_labels_cost_weight * tf.reduce_mean(hard_loss_vec)
-        distillation_loss = soft_loss + hard_loss
+        # Term 3: L2 loss for softmax weights
+        weight_l2 = l2_loss_weight * tf.nn.l2_loss(softmax_weights)
+        # Total loss
+        distillation_loss = soft_loss + hard_loss + weight_l2
         global_step = tf.Variable(0, trainable=False)
+        learning_rate = tf.train.exponential_decay(GlobalConstants.SOFTMAX_DISTILLATION_INITIAL_LR, global_step,
+                                                   GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
+                                                   GlobalConstants.SOFTMAX_DISTILLATION_DECAY, staircase=True)
+        trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(distillation_loss, global_step=global_step)
 
-        # trainer = tf.train.MomentumOptimizer(GlobalConstants., 0.9).minimize(distillation_loss, global_step=global_step)
 
-
-        # soft_labels_temperature = tf.placeholder(tf.float32)
-        # # Soft labels cost - Divide by temperature
-        # tempered_logits = logits_tensor / soft_labels_temperature
-        # p = tf.nn.softmax(tempered_logits)
-        # t = tf.placeholder(tf.float32, shape=(None, one_hot_labels.shape[1]))
-        # # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
-        # compressed_class_count = len(network.modesPerLeaves[leaf_node.index]) + 1
-        # softmax_weights = tf.Variable(
-        #     tf.truncated_normal([features_dim, compressed_class_count],
-        #                         stddev=0.1,
-        #                         seed=GlobalConstants.SEED,
-        #                         dtype=GlobalConstants.DATA_TYPE),
-        #     name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
-        # softmax_biases = tf.Variable(
-        #     tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
-        #     name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
 
     @staticmethod
     def build_compressed_probabilities(network, leaf_node, posteriors, one_hot_labels):
