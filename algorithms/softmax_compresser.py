@@ -165,6 +165,7 @@ class SoftmaxCompresser:
                 SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
                                                                  posteriors=tempered_posteriors,
                                                                  one_hot_labels=one_hot_labels)
+
             print("X")
 
 
