@@ -180,7 +180,7 @@ class SoftmaxCompresser:
         outlier_posteriors = np.sum(posteriors[:, non_mode_labels], 1).reshape(posteriors.shape[0], 1)
         compressed_posteriors = np.concatenate((mode_posteriors, outlier_posteriors), axis=1)
         mode_one_hot_entries = one_hot_labels[:, sorted_modes]
-        outlier_one_hot_entries = np.sum(one_hot_labels[:, non_mode_labels], 1)
+        outlier_one_hot_entries = np.sum(one_hot_labels[:, non_mode_labels], 1).reshape(one_hot_labels.shape[0], 1)
         compressed_one_hot_entries = np.concatenate((mode_one_hot_entries, outlier_one_hot_entries), axis=1)
         print("X")
         return compressed_posteriors, compressed_one_hot_entries
