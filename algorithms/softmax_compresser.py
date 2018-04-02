@@ -1,3 +1,4 @@
+from algorithms.cross_validation import CrossValidation
 from auxillary.constants import DatasetTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 import numpy as np
@@ -150,21 +151,37 @@ class SoftmaxCompresser:
         cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[temperature_list, soft_loss_weights,
                                                                               hard_loss_weights,
                                                                               l2_weights])
-        for tpl in cartesian_product:
-            temperature = tpl[0]
-            soft_loss_weight = tpl[1]
-            hard_loss_weight = tpl[2]
-            l2_weight = tpl[3]
-            # Build the tempered posteriors
-            tempered_logits = logits / temperature
-            exp_logits = np.exp(tempered_logits)
-            logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
-            tempered_posteriors = exp_logits / logit_sums
-            # Get the compressed probabilities
-            compressed_posteriors, compressed_one_hot_entries = \
-                SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
-                                                                 posteriors=tempered_posteriors,
-                                                                 one_hot_labels=one_hot_labels)
+        # Prepare cross validation scheme
+        sample_count = one_hot_labels.shape[0]
+        cross_validation = CrossValidation(fold_count=GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT,
+                                           sample_count=sample_count)
+        results_dict = {}
+        for test_indices in cross_validation:
+            for tpl in cartesian_product:
+                temperature = tpl[0]
+                soft_loss_weight = tpl[1]
+                hard_loss_weight = tpl[2]
+                l2_weight = tpl[3]
+                # Build the tempered posteriors
+                tempered_logits = logits / temperature
+                exp_logits = np.exp(tempered_logits)
+                logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
+                tempered_posteriors = exp_logits / logit_sums
+                # Get the compressed probabilities
+                compressed_posteriors, compressed_one_hot_entries = \
+                    SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
+                                                                     posteriors=tempered_posteriors,
+                                                                     one_hot_labels=one_hot_labels)
+                # Prepare training and validation sets
+                validation_posteriors = compressed_posteriors[test_indices]
+                validation_one_hot_labels = compressed_one_hot_entries[test_indices]
+                training_indices = set(range(sample_count)).difference(set(test_indices))
+                training_posteriors = compressed_posteriors[training_indices]
+                training_one_hot_labels = compressed_one_hot_entries[training_indices]
+                # Train
+
+
+
 
             print("X")
 
