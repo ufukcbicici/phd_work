@@ -95,7 +95,7 @@ class SoftmaxCompresser:
         assert is_equal2
 
     @staticmethod
-    def train_distillation_network(network, leaf_node, logits, one_hot_labels, features):
+    def train_distillation_network(sess, network, leaf_node, logits, one_hot_labels, features):
         assert logits.shape[0] == one_hot_labels.shape[0]
         assert logits.shape[0] == features.shape[0]
         logit_dim = logits.shape[1]
@@ -120,6 +120,8 @@ class SoftmaxCompresser:
         softmax_biases = tf.Variable(
             tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+        # Init softmax values
+        init_softmax_op = tf.initialize_variables([softmax_weights, softmax_biases])
         # Compressed softmax probabilities
         compressed_logits = tf.matmul(features_tensor, softmax_weights) + softmax_biases
         # Prepare the loss function, according to Hinton's Distillation Recipe
@@ -173,16 +175,42 @@ class SoftmaxCompresser:
                                                                      posteriors=tempered_posteriors,
                                                                      one_hot_labels=one_hot_labels)
                 # Prepare training and validation sets
+                # Validation Set
                 validation_posteriors = compressed_posteriors[test_indices]
                 validation_one_hot_labels = compressed_one_hot_entries[test_indices]
-                training_indices = set(range(sample_count)).difference(set(test_indices))
+                validation_features = features[test_indices]
+                # Training sets
+                training_indices = list(set(range(sample_count)).difference(set(test_indices)))
+                training_sample_count = len(training_indices)
+                random_indices = np.random.uniform(0, training_sample_count,
+                                                   GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE).tolist()
+                training_indices.extend(random_indices)
                 training_posteriors = compressed_posteriors[training_indices]
                 training_one_hot_labels = compressed_one_hot_entries[training_indices]
+                training_features = features[training_indices]
+
                 # Train
-
-
-
-
+                batch_size = GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE
+                # Init softmax parameters
+                sess.run(init_softmax_op)
+                for epoch_id in range(GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT):
+                    curr_index = 0
+                    while True:
+                        p_batch = training_posteriors[curr_index:curr_index+batch_size]
+                        t_batch = training_one_hot_labels[curr_index:curr_index+batch_size]
+                        features_batch = training_features[curr_index:curr_index+batch_size]
+                        feed_dict = {p: p_batch, t: t_batch, features_tensor: features_batch,
+                                     soft_labels_cost_weight: soft_loss_weight, hard_labels_cost_weight: hard_loss_weight,
+                                     l2_loss_weight: l2_weight}
+                        run_ops = [grad_soft_loss,
+                                   grad_hard_loss,
+                                   grad_sm_weights,
+                                   learning_rate]
+                        results = sess.run(run_ops, feed_dict=feed_dict)
+                        curr_index += batch_size
+                        if curr_index >= training_sample_count:
+                            print("X")
+                            break
             print("X")
 
 
