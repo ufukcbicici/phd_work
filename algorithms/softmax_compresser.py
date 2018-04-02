@@ -64,9 +64,8 @@ class SoftmaxCompresser:
             SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
                                                       features=feature_vectors, logits=logits, probs=probs)
             # Train compresser
-            SoftmaxCompresser.train_distillation_network(network=network, leaf_node=leaf_node, logits=logits,
+            SoftmaxCompresser.train_distillation_network(sess=sess, network=network, leaf_node=leaf_node, logits=logits,
                                                          one_hot_labels=one_hot_labels, features=feature_vectors)
-
 
             # # Create compressed probabilities
             # SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node, posteriors=probs,
@@ -100,16 +99,16 @@ class SoftmaxCompresser:
         assert logits.shape[0] == features.shape[0]
         logit_dim = logits.shape[1]
         features_dim = features.shape[1]
+        modes_per_leaves = network.modeTracker.get_modes()
+        compressed_class_count = len(modes_per_leaves[leaf_node.index]) + 1
         # p: The tempered posteriors, which have been squashed.
-        p = tf.placeholder(tf.float32, shape=(None, logit_dim))
+        p = tf.placeholder(tf.float32, shape=(None, compressed_class_count))
         # t: The squashed one hot labels
-        t = tf.placeholder(tf.float32, shape=(None, logit_dim))
+        t = tf.placeholder(tf.float32, shape=(None, compressed_class_count))
         features_tensor = tf.placeholder(tf.float32, shape=(None, features_dim))
         soft_labels_cost_weight = tf.placeholder(tf.float32)
         hard_labels_cost_weight = tf.placeholder(tf.float32)
         l2_loss_weight = tf.placeholder(tf.float32)
-        modes_per_leaves = network.modeTracker.get_modes()
-        compressed_class_count = len(modes_per_leaves[leaf_node.index]) + 1
         # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
         softmax_weights = tf.Variable(
             tf.truncated_normal([features_dim, compressed_class_count],
@@ -120,8 +119,6 @@ class SoftmaxCompresser:
         softmax_biases = tf.Variable(
             tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
-        # Init softmax values
-        init_softmax_op = tf.initialize_variables([softmax_weights, softmax_biases])
         # Compressed softmax probabilities
         compressed_logits = tf.matmul(features_tensor, softmax_weights) + softmax_biases
         # Prepare the loss function, according to Hinton's Distillation Recipe
@@ -136,15 +133,17 @@ class SoftmaxCompresser:
         # Total loss
         distillation_loss = soft_loss + hard_loss + weight_l2
         # Gradients (For debug purposes)
-        grad_soft_loss  = tf.gradients(ys=soft_loss, xs=[softmax_weights, softmax_biases])
-        grad_hard_loss  = tf.gradients(ys=hard_loss, xs=[softmax_weights, softmax_biases])
+        grad_soft_loss = tf.gradients(ys=soft_loss, xs=[softmax_weights, softmax_biases])
+        grad_hard_loss = tf.gradients(ys=hard_loss, xs=[softmax_weights, softmax_biases])
         grad_sm_weights = tf.gradients(ys=weight_l2, xs=[softmax_weights])
         # Optimizer
-        global_step = tf.Variable(0, trainable=False)
+        global_step = tf.Variable(name="global_step", initial_value=0, trainable=False)
         learning_rate = tf.train.exponential_decay(GlobalConstants.SOFTMAX_DISTILLATION_INITIAL_LR, global_step,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_DECAY, staircase=True)
         trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(distillation_loss, global_step=global_step)
+        # Init softmax values
+        init_softmax_op = tf.variables_initializer([softmax_weights, softmax_biases, global_step])
         # Train by cross-validation
         temperature_list = [1.0]
         soft_loss_weights = [1.0]
@@ -183,7 +182,7 @@ class SoftmaxCompresser:
                 training_indices = list(set(range(sample_count)).difference(set(test_indices)))
                 training_sample_count = len(training_indices)
                 random_indices = np.random.uniform(0, training_sample_count,
-                                                   GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE).tolist()
+                                                   GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE).astype(int).tolist()
                 training_indices.extend(random_indices)
                 training_posteriors = compressed_posteriors[training_indices]
                 training_one_hot_labels = compressed_one_hot_entries[training_indices]
@@ -196,23 +195,33 @@ class SoftmaxCompresser:
                 for epoch_id in range(GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT):
                     curr_index = 0
                     while True:
-                        p_batch = training_posteriors[curr_index:curr_index+batch_size]
-                        t_batch = training_one_hot_labels[curr_index:curr_index+batch_size]
-                        features_batch = training_features[curr_index:curr_index+batch_size]
+                        p_batch = training_posteriors[curr_index:curr_index + batch_size]
+                        t_batch = training_one_hot_labels[curr_index:curr_index + batch_size]
+                        features_batch = training_features[curr_index:curr_index + batch_size]
                         feed_dict = {p: p_batch, t: t_batch, features_tensor: features_batch,
-                                     soft_labels_cost_weight: soft_loss_weight, hard_labels_cost_weight: hard_loss_weight,
+                                     soft_labels_cost_weight: soft_loss_weight,
+                                     hard_labels_cost_weight: hard_loss_weight,
                                      l2_loss_weight: l2_weight}
                         run_ops = [grad_soft_loss,
                                    grad_hard_loss,
                                    grad_sm_weights,
                                    learning_rate]
                         results = sess.run(run_ops, feed_dict=feed_dict)
+
+                        grad_soft_loss_weight_mag = np.linalg.norm(results[0][0])
+                        grad_soft_loss_bias_mag = np.linalg.norm(results[0][1])
+                        grad_hard_loss_weight_mag = np.linalg.norm(results[1][0])
+                        grad_hard_loss_bias_mag = np.linalg.norm(results[1][1])
+                        print("grad_soft_loss_weight_mag="+grad_soft_loss_weight_mag)
+                        print("grad_soft_loss_bias_mag=" + grad_soft_loss_bias_mag)
+                        print("grad_hard_loss_weight_mag=" + grad_hard_loss_weight_mag)
+                        print("grad_hard_loss_bias_mag=" + grad_hard_loss_bias_mag)
+
                         curr_index += batch_size
                         if curr_index >= training_sample_count:
                             print("X")
                             break
             print("X")
-
 
     @staticmethod
     def build_compressed_probabilities(network, leaf_node, posteriors, one_hot_labels):
@@ -230,6 +239,3 @@ class SoftmaxCompresser:
         compressed_one_hot_entries = np.concatenate((mode_one_hot_entries, outlier_one_hot_entries), axis=1)
         print("X")
         return compressed_posteriors, compressed_one_hot_entries
-
-
-
