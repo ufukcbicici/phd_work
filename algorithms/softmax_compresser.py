@@ -132,6 +132,8 @@ class SoftmaxCompresser:
         weight_l2 = l2_loss_weight * tf.nn.l2_loss(softmax_weights)
         # Total loss
         distillation_loss = soft_loss + hard_loss + weight_l2
+        # Softmax Output
+        compressed_softmax_output = tf.nn.softmax(compressed_logits)
         # Gradients (For debug purposes)
         grad_soft_loss = tf.gradients(ys=soft_loss, xs=[softmax_weights, softmax_biases])
         grad_hard_loss = tf.gradients(ys=hard_loss, xs=[softmax_weights, softmax_biases])
@@ -183,11 +185,19 @@ class SoftmaxCompresser:
                 training_sample_count = len(training_indices)
                 random_indices = np.random.uniform(0, training_sample_count,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE).astype(int).tolist()
-                training_indices.extend(random_indices)
                 training_posteriors = compressed_posteriors[training_indices]
                 training_one_hot_labels = compressed_one_hot_entries[training_indices]
                 training_features = features[training_indices]
-
+                training_indices.extend(random_indices)
+                training_posteriors_wrapped = compressed_posteriors[training_indices]
+                training_one_hot_labels_wrapped = compressed_one_hot_entries[training_indices]
+                training_features_wrapped = features[training_indices]
+                # Calculate accuracy on the training set
+                SoftmaxCompresser.calculate_compressed_accuracy(posteriors=training_posteriors,
+                                                                one_hot_labels=training_one_hot_labels)
+                # Calculate accuracy on the validation set
+                SoftmaxCompresser.calculate_compressed_accuracy(posteriors=validation_posteriors,
+                                                                one_hot_labels=validation_one_hot_labels)
                 # Train
                 batch_size = GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE
                 # Init softmax parameters
@@ -195,9 +205,9 @@ class SoftmaxCompresser:
                 for epoch_id in range(GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT):
                     curr_index = 0
                     while True:
-                        p_batch = training_posteriors[curr_index:curr_index + batch_size]
-                        t_batch = training_one_hot_labels[curr_index:curr_index + batch_size]
-                        features_batch = training_features[curr_index:curr_index + batch_size]
+                        p_batch = training_posteriors_wrapped[curr_index:curr_index + batch_size]
+                        t_batch = training_one_hot_labels_wrapped[curr_index:curr_index + batch_size]
+                        features_batch = training_features_wrapped[curr_index:curr_index + batch_size]
                         feed_dict = {p: p_batch, t: t_batch, features_tensor: features_batch,
                                      soft_labels_cost_weight: soft_loss_weight,
                                      hard_labels_cost_weight: hard_loss_weight,
@@ -205,6 +215,7 @@ class SoftmaxCompresser:
                         run_ops = [grad_soft_loss,
                                    grad_hard_loss,
                                    grad_sm_weights,
+                                   trainer,
                                    learning_rate]
                         results = sess.run(run_ops, feed_dict=feed_dict)
 
@@ -212,13 +223,22 @@ class SoftmaxCompresser:
                         grad_soft_loss_bias_mag = np.linalg.norm(results[0][1])
                         grad_hard_loss_weight_mag = np.linalg.norm(results[1][0])
                         grad_hard_loss_bias_mag = np.linalg.norm(results[1][1])
-                        print("grad_soft_loss_weight_mag="+grad_soft_loss_weight_mag)
-                        print("grad_soft_loss_bias_mag=" + grad_soft_loss_bias_mag)
-                        print("grad_hard_loss_weight_mag=" + grad_hard_loss_weight_mag)
-                        print("grad_hard_loss_bias_mag=" + grad_hard_loss_bias_mag)
+                        print("grad_soft_loss_weight_mag={0}".format(grad_soft_loss_weight_mag))
+                        print("grad_soft_loss_bias_mag={0}".format(grad_soft_loss_bias_mag))
+                        print("grad_hard_loss_weight_mag={0}".format(grad_hard_loss_weight_mag))
+                        print("grad_hard_loss_bias_mag={0}".format(grad_hard_loss_bias_mag))
 
                         curr_index += batch_size
                         if curr_index >= training_sample_count:
+                            # Evaluate on training set
+                            training_results = sess.run([compressed_softmax_output, distillation_loss],
+                                                        feed_dict={p: training_posteriors,
+                                                                   t: training_one_hot_labels,
+                                                                   features_tensor: training_features,
+                                                                   soft_labels_cost_weight: soft_loss_weight,
+                                                                   hard_labels_cost_weight: hard_loss_weight,
+                                                                   l2_loss_weight: l2_weight})
+
                             print("X")
                             break
             print("X")
@@ -239,3 +259,11 @@ class SoftmaxCompresser:
         compressed_one_hot_entries = np.concatenate((mode_one_hot_entries, outlier_one_hot_entries), axis=1)
         print("X")
         return compressed_posteriors, compressed_one_hot_entries
+
+    @staticmethod
+    def calculate_compressed_accuracy(posteriors, one_hot_labels):
+        assert posteriors.shape[0] == one_hot_labels.shape[0]
+        posterior_max = np.argmax(posteriors, axis=1)
+        one_hot_max = np.argmax(one_hot_labels, axis=1)
+        correct_count = np.sum(posterior_max == one_hot_max)
+        print("Accuracy:[0}".format(float(correct_count) / float(posteriors.shape[0])))
