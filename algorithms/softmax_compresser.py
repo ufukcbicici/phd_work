@@ -144,8 +144,11 @@ class SoftmaxCompresser:
                                                    GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_DECAY, staircase=True)
         trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(distillation_loss, global_step=global_step)
+        all_variables = tf.global_variables()
+        vars_to_init = [var for var in all_variables if "/Momentum:" in var.name]
+        vars_to_init.extend([softmax_weights, softmax_biases, global_step])
         # Init softmax values
-        init_softmax_op = tf.variables_initializer([softmax_weights, softmax_biases, global_step])
+        init_softmax_op = tf.variables_initializer(vars_to_init)
         # Train by cross-validation
         temperature_list = [1.0]
         soft_loss_weights = [1.0]
