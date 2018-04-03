@@ -266,4 +266,4 @@ class SoftmaxCompresser:
         posterior_max = np.argmax(posteriors, axis=1)
         one_hot_max = np.argmax(one_hot_labels, axis=1)
         correct_count = np.sum(posterior_max == one_hot_max)
-        print("Accuracy:[0}".format(float(correct_count) / float(posteriors.shape[0])))
+        print("Accuracy:{0}".format(float(correct_count) / float(posteriors.shape[0])))
