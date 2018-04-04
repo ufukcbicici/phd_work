@@ -3,8 +3,17 @@ from auxillary.constants import DatasetTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 import numpy as np
 import tensorflow as tf
+import itertools
 
 from simple_tf.global_params import GlobalConstants
+
+
+class NetworkOutputs:
+    def __init__(self):
+        self.featureVectorsDict = {}
+        self.logitsDict = {}
+        self.posteriorsDict = {}
+        self.oneHotLabelsDict = {}
 
 
 class SoftmaxCompresser:
@@ -14,58 +23,60 @@ class SoftmaxCompresser:
     @staticmethod
     def compress_network_softmax(network, sess, dataset):
         # Get all final feature vectors for all leaves, for the complete training set.
-        feature_vectors_dict = {}
-        logits_dict = {}
-        posteriors_dict = {}
-        one_hot_labels_dict = {}
         softmax_weights = {}
         softmax_biases = {}
-        dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
-        while True:
-            results = network.eval_network(sess=sess, dataset=dataset, use_masking=True)
-            for node in network.topologicalSortedNodes:
-                if not node.isLeaf:
-                    continue
-                leaf_node = node
-                posterior_ref = network.get_variable_name(name="posterior_probs", node=leaf_node)
-                posterior_probs = results[posterior_ref]
-                UtilityFuncs.concat_to_np_array_dict(dct=posteriors_dict, key=leaf_node.index, array=posterior_probs)
-                final_feature_ref = network.get_variable_name(name="final_eval_feature", node=leaf_node)
-                final_leaf_features = results[final_feature_ref]
-                UtilityFuncs.concat_to_np_array_dict(dct=feature_vectors_dict, key=leaf_node.index,
-                                                     array=final_leaf_features)
-                one_hot_label_ref = "Node{0}_one_hot_label_tensor".format(leaf_node.index)
-                one_hot_labels = results[one_hot_label_ref]
-                UtilityFuncs.concat_to_np_array_dict(dct=one_hot_labels_dict, key=leaf_node.index,
-                                                     array=one_hot_labels)
-                logits_ref = network.get_variable_name(name="logits", node=leaf_node)
-                logits = results[logits_ref]
-                UtilityFuncs.concat_to_np_array_dict(dct=logits_dict, key=leaf_node.index,
-                                                     array=logits)
-                softmax_weights_ref = network.get_variable_name(name="fc_softmax_weights", node=leaf_node)
-                softmax_weights[leaf_node.index] = results[softmax_weights_ref]
-                softmax_biases_ref = network.get_variable_name(name="fc_softmax_biases", node=leaf_node)
-                softmax_biases[leaf_node.index] = results[softmax_biases_ref]
-
-            if dataset.isNewEpoch:
-                break
+        network_outputs = {}
+        for dataset_type in [DatasetTypes.training, DatasetTypes.test]:
+            network_output = NetworkOutputs()
+            dataset.set_current_data_set_type(dataset_type=dataset_type)
+            while True:
+                results = network.eval_network(sess=sess, dataset=dataset, use_masking=True)
+                for node in network.topologicalSortedNodes:
+                    if not node.isLeaf:
+                        continue
+                    leaf_node = node
+                    posterior_ref = network.get_variable_name(name="posterior_probs", node=leaf_node)
+                    posterior_probs = results[posterior_ref]
+                    UtilityFuncs.concat_to_np_array_dict(dct=network_output.posteriorsDict, key=leaf_node.index,
+                                                         array=posterior_probs)
+                    final_feature_ref = network.get_variable_name(name="final_eval_feature", node=leaf_node)
+                    final_leaf_features = results[final_feature_ref]
+                    UtilityFuncs.concat_to_np_array_dict(dct=network_output.featureVectorsDict, key=leaf_node.index,
+                                                         array=final_leaf_features)
+                    one_hot_label_ref = "Node{0}_one_hot_label_tensor".format(leaf_node.index)
+                    one_hot_labels = results[one_hot_label_ref]
+                    UtilityFuncs.concat_to_np_array_dict(dct=network_output.oneHotLabelsDict, key=leaf_node.index,
+                                                         array=one_hot_labels)
+                    logits_ref = network.get_variable_name(name="logits", node=leaf_node)
+                    logits = results[logits_ref]
+                    UtilityFuncs.concat_to_np_array_dict(dct=network_output.logitsDict, key=leaf_node.index,
+                                                         array=logits)
+                    softmax_weights_ref = network.get_variable_name(name="fc_softmax_weights", node=leaf_node)
+                    softmax_weights[leaf_node.index] = results[softmax_weights_ref]
+                    softmax_biases_ref = network.get_variable_name(name="fc_softmax_biases", node=leaf_node)
+                    softmax_biases[leaf_node.index] = results[softmax_biases_ref]
+                if dataset.isNewEpoch:
+                    network_outputs[dataset_type] = network_output
+                    break
         # Train all leaf classifiers by distillation
+        training_data = network_outputs[DatasetTypes.training]
         for node in network.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
             leaf_node = node
             softmax_weight = softmax_weights[leaf_node.index]
             softmax_bias = softmax_biases[leaf_node.index]
-            feature_vectors = feature_vectors_dict[leaf_node.index]
-            logits = logits_dict[leaf_node.index]
-            probs = posteriors_dict[leaf_node.index]
-            one_hot_labels = one_hot_labels_dict[leaf_node.index]
+            feature_vectors = training_data.featureVectorsDict[leaf_node.index]
+            logits = training_data.logitsDict[leaf_node.index]
+            probs = training_data.posteriorsDict[leaf_node.index]
+            one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
             # Unit Test
             SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
                                                       features=feature_vectors, logits=logits, probs=probs)
             # Train compresser
-            SoftmaxCompresser.train_distillation_network(sess=sess, network=network, leaf_node=leaf_node, logits=logits,
-                                                         one_hot_labels=one_hot_labels, features=feature_vectors)
+            SoftmaxCompresser.train_distillation_network(sess=sess, network=network, leaf_node=leaf_node,
+                                                         training_data=network_outputs[DatasetTypes.training],
+                                                         test_data=network_outputs[DatasetTypes.test])
 
             # # Create compressed probabilities
             # SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node, posteriors=probs,
@@ -94,11 +105,17 @@ class SoftmaxCompresser:
         assert is_equal2
 
     @staticmethod
-    def train_distillation_network(sess, network, leaf_node, logits, one_hot_labels, features):
-        assert logits.shape[0] == one_hot_labels.shape[0]
-        assert logits.shape[0] == features.shape[0]
-        logit_dim = logits.shape[1]
-        features_dim = features.shape[1]
+    def train_distillation_network(sess, network, leaf_node, training_data, test_data):
+        training_logits = training_data.logitsDict[leaf_node.index]
+        training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
+        training_features = training_data.featureVectorsDict[leaf_node.index]
+        test_logits = test_data.logitsDict[leaf_node.index]
+        test_one_hot_labels = test_data.oneHotLabelsDict[leaf_node.index]
+        test_features = test_data.featureVectorsDict[leaf_node.index]
+        assert training_logits.shape[0] == training_one_hot_labels.shape[0]
+        assert training_logits.shape[0] == training_features.shape[0]
+        logit_dim = training_logits.shape[1]
+        features_dim = training_features.shape[1]
         modes_per_leaves = network.modeTracker.get_modes()
         compressed_class_count = len(modes_per_leaves[leaf_node.index]) + 1
         # p: The tempered posteriors, which have been squashed.
@@ -154,97 +171,121 @@ class SoftmaxCompresser:
         soft_loss_weights = [1.0]
         hard_loss_weights = [1.0]
         l2_weights = [0.0]
+        cross_validation_repeat_count = 10
         cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[temperature_list, soft_loss_weights,
                                                                               hard_loss_weights,
                                                                               l2_weights])
-        # Prepare cross validation scheme
-        sample_count = one_hot_labels.shape[0]
-        cross_validation = CrossValidation(fold_count=GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT,
-                                           sample_count=sample_count)
+        duplicate_cartesians = []
+        for tpl in cartesian_product:
+            duplicate_cartesians.extend(list(itertools.repeat(tpl, cross_validation_repeat_count)))
         results_dict = {}
-        for test_indices in cross_validation:
-            for tpl in cartesian_product:
-                temperature = tpl[0]
-                soft_loss_weight = tpl[1]
-                hard_loss_weight = tpl[2]
-                l2_weight = tpl[3]
-                # Build the tempered posteriors
-                tempered_logits = logits / temperature
-                exp_logits = np.exp(tempered_logits)
-                logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
-                tempered_posteriors = exp_logits / logit_sums
-                # Get the compressed probabilities
-                compressed_posteriors, compressed_one_hot_entries = \
-                    SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
-                                                                     posteriors=tempered_posteriors,
-                                                                     one_hot_labels=one_hot_labels)
-                # Prepare training and validation sets
-                # Validation Set
-                validation_posteriors = compressed_posteriors[test_indices]
-                validation_one_hot_labels = compressed_one_hot_entries[test_indices]
-                validation_features = features[test_indices]
-                # Training sets
-                training_indices = list(set(range(sample_count)).difference(set(test_indices)))
-                training_sample_count = len(training_indices)
-                random_indices = np.random.uniform(0, training_sample_count,
-                                                   GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE).astype(int).tolist()
-                training_posteriors = compressed_posteriors[training_indices]
-                training_one_hot_labels = compressed_one_hot_entries[training_indices]
-                training_features = features[training_indices]
-                training_indices.extend(random_indices)
-                training_posteriors_wrapped = compressed_posteriors[training_indices]
-                training_one_hot_labels_wrapped = compressed_one_hot_entries[training_indices]
-                training_features_wrapped = features[training_indices]
-                # Calculate accuracy on the training set
+        for tpl in duplicate_cartesians:
+            temperature = tpl[0]
+            soft_loss_weight = tpl[1]
+            hard_loss_weight = tpl[2]
+            l2_weight = tpl[3]
+            # Build the tempered posteriors
+            training_tempered_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=training_logits,
+                                                                                        temperature=temperature)
+            test_tempered_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=test_logits,
+                                                                                    temperature=temperature)
+            # Get the compressed probabilities
+            training_compressed_posteriors, training_compressed_one_hot_entries = \
+                SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
+                                                                 posteriors=training_tempered_posteriors,
+                                                                 one_hot_labels=training_one_hot_labels)
+            test_compressed_posteriors, test_compressed_one_hot_entries = \
+                SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
+                                                                 posteriors=test_tempered_posteriors,
+                                                                 one_hot_labels=test_one_hot_labels)
+
+            # Training sets
+            training_sample_count = training_features.shape[0]
+            training_indices = list(range(training_sample_count))
+            random_indices = np.random.uniform(0, training_sample_count,
+                                               GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE).astype(int).tolist()
+            training_posteriors = training_compressed_posteriors[training_indices]
+            training_one_hot_labels = training_compressed_one_hot_entries[training_indices]
+            training_features = training_features[training_indices]
+            training_indices.extend(random_indices)
+            training_posteriors_wrapped = training_compressed_posteriors[training_indices]
+            training_one_hot_labels_wrapped = training_compressed_one_hot_entries[training_indices]
+            training_features_wrapped = training_features[training_indices]
+            # Test sets
+            test_sample_count = test_features.shape[0]
+            test_indices = list(range(test_sample_count))
+            test_posteriors = test_compressed_posteriors[test_indices]
+            test_one_hot_labels = test_compressed_one_hot_entries[test_indices]
+            test_features = test_features[test_indices]
+            # Calculate accuracy on the training set
+            training_accuracy_full = \
                 SoftmaxCompresser.calculate_compressed_accuracy(posteriors=training_posteriors,
                                                                 one_hot_labels=training_one_hot_labels)
-                # Calculate accuracy on the validation set
-                SoftmaxCompresser.calculate_compressed_accuracy(posteriors=validation_posteriors,
-                                                                one_hot_labels=validation_one_hot_labels)
-                # Train
-                batch_size = GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE
-                # Init softmax parameters
-                sess.run(init_softmax_op)
-                for epoch_id in range(GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT):
-                    curr_index = 0
-                    while True:
-                        p_batch = training_posteriors_wrapped[curr_index:curr_index + batch_size]
-                        t_batch = training_one_hot_labels_wrapped[curr_index:curr_index + batch_size]
-                        features_batch = training_features_wrapped[curr_index:curr_index + batch_size]
-                        feed_dict = {p: p_batch, t: t_batch, features_tensor: features_batch,
-                                     soft_labels_cost_weight: soft_loss_weight,
-                                     hard_labels_cost_weight: hard_loss_weight,
-                                     l2_loss_weight: l2_weight}
-                        run_ops = [grad_soft_loss,
-                                   grad_hard_loss,
-                                   grad_sm_weights,
-                                   trainer,
-                                   learning_rate]
-                        results = sess.run(run_ops, feed_dict=feed_dict)
-
-                        grad_soft_loss_weight_mag = np.linalg.norm(results[0][0])
-                        grad_soft_loss_bias_mag = np.linalg.norm(results[0][1])
-                        grad_hard_loss_weight_mag = np.linalg.norm(results[1][0])
-                        grad_hard_loss_bias_mag = np.linalg.norm(results[1][1])
-                        print("grad_soft_loss_weight_mag={0}".format(grad_soft_loss_weight_mag))
-                        print("grad_soft_loss_bias_mag={0}".format(grad_soft_loss_bias_mag))
-                        print("grad_hard_loss_weight_mag={0}".format(grad_hard_loss_weight_mag))
-                        print("grad_hard_loss_bias_mag={0}".format(grad_hard_loss_bias_mag))
-
-                        curr_index += batch_size
-                        if curr_index >= training_sample_count:
-                            # Evaluate on training set
-                            training_results = sess.run([compressed_softmax_output, distillation_loss],
-                                                        feed_dict={p: training_posteriors,
-                                                                   t: training_one_hot_labels,
-                                                                   features_tensor: training_features,
-                                                                   soft_labels_cost_weight: soft_loss_weight,
-                                                                   hard_labels_cost_weight: hard_loss_weight,
-                                                                   l2_loss_weight: l2_weight})
-
-                            print("X")
-                            break
-            print("X")
+            # Calculate accuracy on the validation set
+            test_accuracy_full = \
+                SoftmaxCompresser.calculate_compressed_accuracy(posteriors=test_compressed_posteriors,
+                                                                one_hot_labels=test_compressed_one_hot_entries)
+            # Train
+            batch_size = int(float(training_sample_count) * GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO)
+            # GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE
+            # Init softmax parameters
+            sess.run(init_softmax_op)
+            iteration = 0
+            for epoch_id in range(GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT):
+                curr_index = 0
+                while True:
+                    p_batch = training_posteriors_wrapped[curr_index:curr_index + batch_size]
+                    t_batch = training_one_hot_labels_wrapped[curr_index:curr_index + batch_size]
+                    features_batch = training_features_wrapped[curr_index:curr_index + batch_size]
+                    feed_dict = {p: p_batch, t: t_batch, features_tensor: features_batch,
+                                 soft_labels_cost_weight: soft_loss_weight,
+                                 hard_labels_cost_weight: hard_loss_weight,
+                                 l2_loss_weight: l2_weight}
+                    run_ops = [grad_soft_loss,
+                               grad_hard_loss,
+                               grad_sm_weights,
+                               trainer,
+                               learning_rate]
+                    results = sess.run(run_ops, feed_dict=feed_dict)
+                    iteration += 1
+                    print("Iteration:{0} Learning Rate:{1}".format(iteration, results[-1]))
+                    # grad_soft_loss_weight_mag = np.linalg.norm(results[0][0])
+                    # grad_soft_loss_bias_mag = np.linalg.norm(results[0][1])
+                    # grad_hard_loss_weight_mag = np.linalg.norm(results[1][0])
+                    # grad_hard_loss_bias_mag = np.linalg.norm(results[1][1])
+                    # print("grad_soft_loss_weight_mag={0}".format(grad_soft_loss_weight_mag))
+                    # print("grad_soft_loss_bias_mag={0}".format(grad_soft_loss_bias_mag))
+                    # print("grad_hard_loss_weight_mag={0}".format(grad_hard_loss_weight_mag))
+                    # print("grad_hard_loss_bias_mag={0}".format(grad_hard_loss_bias_mag))
+                    curr_index += batch_size
+                    if curr_index >= training_sample_count:
+                        # Evaluate on training set
+                        training_results = sess.run([compressed_softmax_output, distillation_loss],
+                                                    feed_dict={p: training_posteriors,
+                                                               t: training_one_hot_labels,
+                                                               features_tensor: training_features,
+                                                               soft_labels_cost_weight: soft_loss_weight,
+                                                               hard_labels_cost_weight: hard_loss_weight,
+                                                               l2_loss_weight: l2_weight})
+                        training_accuracy = SoftmaxCompresser.calculate_compressed_accuracy(
+                            posteriors=training_results[0], one_hot_labels=training_one_hot_labels)
+                        # Evaluate on test set
+                        test_results = sess.run([compressed_softmax_output, distillation_loss],
+                                                feed_dict={p: test_posteriors,
+                                                           t: test_one_hot_labels,
+                                                           features_tensor: test_features,
+                                                           soft_labels_cost_weight: soft_loss_weight,
+                                                           hard_labels_cost_weight: hard_loss_weight,
+                                                           l2_loss_weight: l2_weight})
+                        test_accuracy = SoftmaxCompresser.calculate_compressed_accuracy(
+                            posteriors=test_results[0], one_hot_labels=test_one_hot_labels)
+                        print("Uncompressed Training Accuracy:{0}".format(training_accuracy_full))
+                        print("Uncompressed Test Accuracy:{0}".format(test_accuracy_full))
+                        print("Compressed Training Accuracy:{0}".format(training_accuracy))
+                        print("Compressed Test Accuracy:{0}".format(test_accuracy))
+                        break
+            print("End of training.")
+        print("X")
 
     @staticmethod
     def build_compressed_probabilities(network, leaf_node, posteriors, one_hot_labels):
@@ -269,4 +310,14 @@ class SoftmaxCompresser:
         posterior_max = np.argmax(posteriors, axis=1)
         one_hot_max = np.argmax(one_hot_labels, axis=1)
         correct_count = np.sum(posterior_max == one_hot_max)
-        print("Accuracy:{0}".format(float(correct_count) / float(posteriors.shape[0])))
+        accuracy = float(correct_count) / float(posteriors.shape[0])
+        # print("Accuracy:{0}".format(accuracy))
+        return accuracy
+
+    @staticmethod
+    def get_tempered_probabilities(logits, temperature):
+        tempered_logits = logits / temperature
+        exp_logits = np.exp(tempered_logits)
+        logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
+        tempered_posteriors = exp_logits / logit_sums
+        return tempered_posteriors
