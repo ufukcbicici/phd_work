@@ -706,6 +706,8 @@ class TreeNetwork:
         info_gain_balance_coeff = node.infoGainBalanceCoefficient
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x,
                                                   balance_coefficient=self.informationGainBalancingCoefficient)
+        node.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
+        node.evalDict[self.get_variable_name(name="activations", node=node)] = activations
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
@@ -731,6 +733,7 @@ class TreeNetwork:
                                                              x=tf.constant(value=False, dtype=tf.bool), y=mask_tensor))
             else:
                 node.maskTensors[child_index] = mask_tensor
+            node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
     def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
         final_feature_final = final_feature

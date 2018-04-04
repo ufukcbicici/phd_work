@@ -155,35 +155,40 @@ class SoftmaxCompresser:
         grad_soft_loss = tf.gradients(ys=soft_loss, xs=[softmax_weights, softmax_biases])
         grad_hard_loss = tf.gradients(ys=hard_loss, xs=[softmax_weights, softmax_biases])
         grad_sm_weights = tf.gradients(ys=weight_l2, xs=[softmax_weights])
-        # Optimizer
-        global_step = tf.Variable(name="global_step", initial_value=0, trainable=False)
-        learning_rate = tf.train.exponential_decay(GlobalConstants.SOFTMAX_DISTILLATION_INITIAL_LR, global_step,
-                                                   GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
-                                                   GlobalConstants.SOFTMAX_DISTILLATION_DECAY, staircase=True)
-        trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(distillation_loss, global_step=global_step)
-        all_variables = tf.global_variables()
-        vars_to_init = [var for var in all_variables if "/Momentum:" in var.name]
-        vars_to_init.extend([softmax_weights, softmax_biases, global_step])
-        # Init softmax values
-        init_softmax_op = tf.variables_initializer(vars_to_init)
         # Train by cross-validation
         temperature_list = [1.0]
         soft_loss_weights = [1.0]
         hard_loss_weights = [1.0]
         l2_weights = [0.0]
+        learning_rates = [0.01]
         cross_validation_repeat_count = 10
         cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[temperature_list, soft_loss_weights,
                                                                               hard_loss_weights,
-                                                                              l2_weights])
+                                                                              l2_weights, learning_rates])
         duplicate_cartesians = []
         for tpl in cartesian_product:
             duplicate_cartesians.extend(list(itertools.repeat(tpl, cross_validation_repeat_count)))
         results_dict = {}
+        # A new run for each tuple
         for tpl in duplicate_cartesians:
             temperature = tpl[0]
             soft_loss_weight = tpl[1]
             hard_loss_weight = tpl[2]
             l2_weight = tpl[3]
+            lr = tpl[4]
+            # Build the optimizer
+            global_step = tf.Variable(name="global_step", initial_value=0, trainable=False)
+            learning_rate = tf.train.exponential_decay(lr, global_step,
+                                                       GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
+                                                       GlobalConstants.SOFTMAX_DISTILLATION_DECAY, staircase=True)
+            trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(distillation_loss,
+                                                                              global_step=global_step)
+            # Init variables
+            all_variables = tf.global_variables()
+            vars_to_init = [var for var in all_variables if "/Momentum:" in var.name]
+            vars_to_init.extend([softmax_weights, softmax_biases, global_step])
+            # Init variables
+            init_op = tf.variables_initializer(vars_to_init)
             # Build the tempered posteriors
             training_tempered_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=training_logits,
                                                                                         temperature=temperature)
@@ -229,7 +234,7 @@ class SoftmaxCompresser:
             batch_size = int(float(training_sample_count) * GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO)
             # GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE
             # Init softmax parameters
-            sess.run(init_softmax_op)
+            sess.run(init_op)
             iteration = 0
             for epoch_id in range(GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT):
                 curr_index = 0
