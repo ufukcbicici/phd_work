@@ -5,6 +5,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 import numpy as np
 import tensorflow as tf
 import itertools
+from random import shuffle
 
 from simple_tf.global_params import GlobalConstants
 
@@ -220,6 +221,7 @@ class SoftmaxCompresser:
             # Training sets
             training_sample_count = training_features.shape[0]
             training_indices = list(range(training_sample_count))
+            shuffle(training_indices)
             random_indices = np.random.uniform(0, training_sample_count,
                                                GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE).astype(int).tolist()
             training_p = training_compressed_posteriors[training_indices]
