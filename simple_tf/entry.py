@@ -305,7 +305,8 @@ def main():
                                                             iteration=iteration_counter)
                 if do_compress:
                     print("**********************Compressing the network**********************")
-                    SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset)
+                    SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset,
+                                                               run_id=run_id)
                     print("**********************Compressing the network**********************")
 
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,

@@ -98,10 +98,9 @@ class AccuracyCalculator:
               .format(overall_count, overall_correct / overall_count))
         total_accuracy = overall_correct / overall_count
         # Calculate modes
-        if dataset_type == DatasetTypes.training:
-            self.network.modeTracker.calculate_modes(leaf_true_labels_dict=leaf_true_labels_dict,
-                                                     dataset=dataset, dataset_type=dataset_type, kv_rows=kv_rows,
-                                                     run_id=run_id, iteration=iteration)
+        self.network.modeTracker.calculate_modes(leaf_true_labels_dict=leaf_true_labels_dict,
+                                                 dataset=dataset, dataset_type=dataset_type, kv_rows=kv_rows,
+                                                 run_id=run_id, iteration=iteration)
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return overall_correct / overall_count, confusion_matrix_db_rows
 

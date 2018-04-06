@@ -59,7 +59,7 @@ class ModeTracker:
         # Measure overall information gain
         if dataset_type == DatasetTypes.training:
             kv_rows.append((run_id, iteration, "Total Mode Count", total_mode_count))
-        self.modesHistory.append(modes_per_leaves)
+            self.modesHistory.append(modes_per_leaves)
 
     def check_for_compression_start(self, dataset):
         label_count = dataset.get_label_count()
