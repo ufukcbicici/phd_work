@@ -157,6 +157,8 @@ class SoftmaxCompresser:
         grad_soft_loss = tf.gradients(ys=soft_loss, xs=[softmax_weights, softmax_biases])
         grad_hard_loss = tf.gradients(ys=hard_loss, xs=[softmax_weights, softmax_biases])
         grad_sm_weights = tf.gradients(ys=weight_l2, xs=[softmax_weights])
+        # Counter
+        global_step = tf.Variable(name="global_step", initial_value=0, trainable=False)
         # Train by cross-validation
         temperature_list = [1.0]
         soft_loss_weights = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
@@ -166,9 +168,10 @@ class SoftmaxCompresser:
         learning_rates = [0.001, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05,
                           0.055, 0.06, 0.065, 0.07, 0.075, 0.08, 0.085, 0.09, 0.095, 0.1]
         cross_validation_repeat_count = 10
-        cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[temperature_list, soft_loss_weights,
+        cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
+                                                                              temperature_list, soft_loss_weights,
                                                                               hard_loss_weights,
-                                                                              l2_weights, learning_rates])
+                                                                              l2_weights])
         duplicate_cartesians = []
         for tpl in cartesian_product:
             duplicate_cartesians.extend(list(itertools.repeat(tpl, cross_validation_repeat_count)))
@@ -181,22 +184,23 @@ class SoftmaxCompresser:
         # # Measure overall information gain
         # if dataset_type == DatasetTypes.training:
         #     kv_rows.append((run_id, iteration, "Total Mode Count", total_mode_count))
-
+        curr_lr = 0.0
         # A new run for each tuple
         for tpl in duplicate_cartesians:
-            temperature = tpl[0]
-            soft_loss_weight = tpl[1]
-            hard_loss_weight = tpl[2]
-            l2_weight = tpl[3]
-            lr = tpl[4]
+            lr = tpl[0]
+            temperature = tpl[1]
+            soft_loss_weight = tpl[2]
+            hard_loss_weight = tpl[3]
+            l2_weight = tpl[4]
             kv_rows = []
             # Build the optimizer
-            global_step = tf.Variable(name="global_step", initial_value=0, trainable=False)
-            learning_rate = tf.train.exponential_decay(lr, global_step,
-                                                       GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
-                                                       GlobalConstants.SOFTMAX_DISTILLATION_DECAY, staircase=True)
-            trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(distillation_loss,
-                                                                              global_step=global_step)
+            if curr_lr != lr:
+                learning_rate = tf.train.exponential_decay(lr, global_step,
+                                                           GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
+                                                           GlobalConstants.SOFTMAX_DISTILLATION_DECAY, staircase=True)
+                trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(distillation_loss,
+                                                                                  global_step=global_step)
+                curr_lr = lr
             # Init variables
             all_variables = tf.global_variables()
             vars_to_init = [var for var in all_variables if "/Momentum" in var.name]
