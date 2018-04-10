@@ -177,12 +177,26 @@ class SoftmaxCompresser:
         test_features = test_data.featureVectorsDict[leaf_node.index]
         assert training_logits.shape[0] == training_one_hot_labels.shape[0]
         assert training_logits.shape[0] == training_features.shape[0]
+        # Build the tempered posteriors
+        training_tempered_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=training_logits,
+                                                                                    temperature=1.0)
+        test_tempered_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=test_logits,
+                                                                                temperature=1.0)
+        # Get the compressed probabilities
+        training_compressed_posteriors, training_compressed_one_hot_entries = \
+            SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
+                                                             posteriors=training_tempered_posteriors,
+                                                             one_hot_labels=training_one_hot_labels)
+        test_compressed_posteriors, test_compressed_one_hot_entries = \
+            SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
+                                                             posteriors=test_tempered_posteriors,
+                                                             one_hot_labels=test_one_hot_labels)
         npz_file_name = "npz_node_{0}_final_features".format(leaf_node.index)
         UtilityFuncs.save_npz(npz_file_name,
                               arr_dict={"training_features": training_features,
-                                        "training_one_hot_labels": training_one_hot_labels,
+                                        "training_one_hot_labels": training_compressed_one_hot_entries,
                                         "test_features": test_features,
-                                        "test_one_hot_labels": test_one_hot_labels})
+                                        "test_one_hot_labels": test_compressed_one_hot_entries})
         logit_dim = training_logits.shape[1]
         features_dim = training_features.shape[1]
         modes_per_leaves = network.modeTracker.get_modes()
