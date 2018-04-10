@@ -121,10 +121,10 @@ class SoftmaxCompresser:
             logits = training_data.logitsDict[leaf_node.index]
             probs = training_data.posteriorsDict[leaf_node.index]
             one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
-            # Unit Test
-            SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
-                                                      features=feature_vectors, logits=logits, probs=probs,
-                                                      leaf_node=leaf_node)
+            # # Unit Test
+            # SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
+            #                                           features=feature_vectors, logits=logits, probs=probs,
+            #                                           leaf_node=leaf_node)
             # Train compresser
             SoftmaxCompresser.train_distillation_network(sess=sess, network=network, leaf_node=leaf_node,
                                                          training_data=network_outputs[DatasetTypes.training],
@@ -177,6 +177,12 @@ class SoftmaxCompresser:
         test_features = test_data.featureVectorsDict[leaf_node.index]
         assert training_logits.shape[0] == training_one_hot_labels.shape[0]
         assert training_logits.shape[0] == training_features.shape[0]
+        npz_file_name = "npz_node_{0}_final_features".format(leaf_node.index)
+        UtilityFuncs.save_npz(npz_file_name,
+                              arr_dict={"training_features": training_features,
+                                        "training_one_hot_labels": training_one_hot_labels,
+                                        "test_features": test_features,
+                                        "test_one_hot_labels": test_one_hot_labels})
         logit_dim = training_logits.shape[1]
         features_dim = training_features.shape[1]
         modes_per_leaves = network.modeTracker.get_modes()
@@ -221,11 +227,16 @@ class SoftmaxCompresser:
         # Counter
         global_step = tf.Variable(name="global_step", initial_value=0, trainable=False)
         # Train by cross-validation
+        # temperature_list = [1.0]
+        # soft_loss_weights = [0.0, 0.25, 0.5, 0.75, 1.0]
+        # hard_loss_weights = [1.0]
+        # l2_weights = [0.0, 0.0001, 0.00025, 0.0005, 0.00075, 0.001]
+        # learning_rates = [0.001, 0.005, 0.025, 0.05, 0.075, 0.1]
         temperature_list = [1.0]
-        soft_loss_weights = [1.0]
+        soft_loss_weights = [0.0]
         hard_loss_weights = [1.0]
         l2_weights = [0.0]
-        learning_rates = [0.075]
+        learning_rates = [0.005]
         cross_validation_repeat_count = 10
         cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
                                                                               temperature_list, soft_loss_weights,
@@ -278,15 +289,15 @@ class SoftmaxCompresser:
                     .minimize(distillation_loss,
                               global_step=global_step)
                 curr_lr = lr
-                # Run the algorithm
-                final_softmax_weights, final_softmax_biases, final_training_accuracy, final_test_accuracy = \
-                    SoftmaxCompresser.train_for_params(network=network, leaf_node=leaf_node, run_id=run_id,
-                                                       lr=lr, temperature=temperature,
-                                                       soft_loss_weight=soft_loss_weight,
-                                                       hard_loss_weight=hard_loss_weight, l2_weight=l2_weight,
-                                                       tf_objects=tf_object, data_objects=data_object, kv_rows=kv_rows)
-                if GlobalConstants.USE_SOFTMAX_DISTILLATION_VERBOSE:
-                    DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+            # Run the algorithm
+            final_softmax_weights, final_softmax_biases, final_training_accuracy, final_test_accuracy = \
+                SoftmaxCompresser.train_for_params(network=network, leaf_node=leaf_node, run_id=run_id,
+                                                   lr=lr, temperature=temperature,
+                                                   soft_loss_weight=soft_loss_weight,
+                                                   hard_loss_weight=hard_loss_weight, l2_weight=l2_weight,
+                                                   tf_objects=tf_object, data_objects=data_object, kv_rows=kv_rows)
+            if GlobalConstants.USE_SOFTMAX_DISTILLATION_VERBOSE:
+                DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         # # Pick the best result
         # averaged_results = []
         # for k, v in results_dict.items():
@@ -332,6 +343,12 @@ class SoftmaxCompresser:
         training_p = training_compressed_posteriors[training_indices]
         training_t = training_compressed_one_hot_entries[training_indices]
         training_x = data_objects.trainingFeatures[training_indices]
+        max_feature_entry = np.max(training_x)
+        min_feature_entry = np.min(training_x)
+        kv_rows.append((run_id, -1,
+                        "Leaf:{0} max_feature_entry".format(leaf_node.index), max_feature_entry))
+        kv_rows.append((run_id, -1,
+                        "Leaf:{0} min_feature_entry".format(leaf_node.index), min_feature_entry))
         training_indices.extend(random_indices)
         training_p_wrapped = training_compressed_posteriors[training_indices]
         training_t_wrapped = training_compressed_one_hot_entries[training_indices]

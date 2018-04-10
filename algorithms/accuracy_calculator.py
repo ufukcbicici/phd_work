@@ -15,6 +15,7 @@ class AccuracyCalculator:
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
+        final_features_dict = {}
         info_gain_dict = {}
         branch_probs = {}
         while True:
@@ -33,6 +34,7 @@ class AccuracyCalculator:
                     continue
                 posterior_probs = results[self.network.get_variable_name(name="posterior_probs", node=node)]
                 true_labels = results["Node{0}_label_tensor".format(node.index)]
+                final_features = results[self.network.get_variable_name(name="final_feature_final", node=node)]
                 # batch_sample_count += results[self.get_variable_name(name="sample_count", node=node)]
                 predicted_labels = np.argmax(posterior_probs, axis=1)
                 batch_sample_count += predicted_labels.shape[0]
@@ -40,14 +42,37 @@ class AccuracyCalculator:
                                                      array=predicted_labels)
                 UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
                                                      array=true_labels)
+                UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
+                                                     array=final_features)
             if batch_sample_count != GlobalConstants.EVAL_BATCH_SIZE:
                 raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
             if dataset.isNewEpoch:
                 break
         print("****************Dataset:{0}****************".format(dataset_type))
+        kv_rows = []
+        # Measure final feature statistics
+        for k, v in final_features_dict.items():
+            max_feature_entry = np.max(v)
+            min_feature_entry = np.min(v)
+            feature_magnitudes = np.array([np.linalg.norm(v[i, :]) for i in range(v.shape[0])])
+            mean_feature_magnitude = np.mean(feature_magnitudes)
+            max_feature_magnitude = np.max(feature_magnitudes)
+            min_feature_magnitude = np.min(feature_magnitudes)
+            std_feature_magnitude = np.std(feature_magnitudes)
+            kv_rows.append((run_id, iteration, "Leaf {0} {1} max_feature_entry".format(k, dataset_type),
+                            np.asscalar(max_feature_entry)))
+            kv_rows.append((run_id, iteration, "Leaf {0} {1} min_feature_entry".format(k, dataset_type),
+                            np.asscalar(min_feature_entry)))
+            kv_rows.append((run_id, iteration, "Leaf {0} {1} mean_feature_magnitude".format(k, dataset_type),
+                            np.asscalar(mean_feature_magnitude)))
+            kv_rows.append((run_id, iteration, "Leaf {0} {1} max_feature_magnitude".format(k, dataset_type),
+                            np.asscalar(max_feature_magnitude)))
+            kv_rows.append((run_id, iteration, "Leaf {0} {1} min_feature_magnitude".format(k, dataset_type),
+                            np.asscalar(min_feature_magnitude)))
+            kv_rows.append((run_id, iteration, "Leaf {0} {1} std_feature_magnitude".format(k, dataset_type),
+                            np.asscalar(std_feature_magnitude)))
         # Measure Information Gain
         total_info_gain = 0.0
-        kv_rows = []
         for k, v in info_gain_dict.items():
             avg_info_gain = sum(v) / float(len(v))
             print("IG_{0}={1}".format(k, -avg_info_gain))
