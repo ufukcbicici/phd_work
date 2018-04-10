@@ -301,8 +301,8 @@ class TreeNetwork:
         else:
             raise NotImplementedError()
 
-    def check_for_compression(self, run_id, iteration, dataset):
-        do_compress = self.modeTracker.check_for_compression_start(dataset=dataset)
+    def check_for_compression(self, run_id, epoch, iteration, dataset):
+        do_compress = self.modeTracker.check_for_compression_start(dataset=dataset, epoch=epoch)
         kv_rows = [(run_id, iteration, "Compressed Softmax", do_compress)]
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return do_compress
@@ -744,6 +744,8 @@ class TreeNetwork:
             concat_list.extend(node.activationsDict.values())
             final_feature_final = tf.concat(values=concat_list, axis=1)
         node.residueOutputTensor = final_feature_final
+        node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature_final
+        node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature_final)
         logits = tf.matmul(final_feature_final, softmax_weights) + softmax_biases
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
@@ -789,6 +791,9 @@ class TreeNetwork:
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
+        for k, v in results.items():
+            if "final_feature_mag" in k:
+                print("{0}={1}".format(k, v))
         return results
 
     def get_transformed_data(self, sess, dataset, dataset_type):

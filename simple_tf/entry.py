@@ -302,7 +302,7 @@ def main():
             # Compress softmax classifiers
             if GlobalConstants.USE_SOFTMAX_DISTILLATION:
                 do_compress = network.check_for_compression(dataset=dataset, run_id=experiment_id,
-                                                            iteration=iteration_counter)
+                                                            iteration=iteration_counter, epoch=epoch_id)
                 if do_compress:
                     print("**********************Compressing the network**********************")
                     SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset,

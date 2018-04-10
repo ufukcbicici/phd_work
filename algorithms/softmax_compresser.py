@@ -123,7 +123,8 @@ class SoftmaxCompresser:
             one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
             # Unit Test
             SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
-                                                      features=feature_vectors, logits=logits, probs=probs)
+                                                      features=feature_vectors, logits=logits, probs=probs,
+                                                      leaf_node=leaf_node)
             # Train compresser
             SoftmaxCompresser.train_distillation_network(sess=sess, network=network, leaf_node=leaf_node,
                                                          training_data=network_outputs[DatasetTypes.training],
@@ -136,7 +137,18 @@ class SoftmaxCompresser:
         print("X")
 
     @staticmethod
-    def assert_prob_correctness(softmax_weights, softmax_biases, features, logits, probs):
+    def assert_prob_correctness(softmax_weights, softmax_biases, features, logits, probs, leaf_node):
+        print("max features entry:{0}".format(np.max(features)))
+        print("max softmax_weights entry:{0}".format(np.max(softmax_weights)))
+        print("min softmax_weights entry:{0}".format(np.min(softmax_weights)))
+        print("max softmax_biases entry:{0}".format(np.max(softmax_biases)))
+        print("min softmax_biases entry:{0}".format(np.min(softmax_biases)))
+        npz_file_name = "npz_node_{0}_distillation".format(leaf_node.index)
+        UtilityFuncs.save_npz(npz_file_name,
+                              arr_dict={"softmax_weights": softmax_weights,
+                                        "softmax_biases": softmax_biases,
+                                        "features": features,
+                                        "logits": logits, "probs": probs})
         logits_np = np.dot(features, softmax_weights) + softmax_biases
         exp_logits = np.exp(logits_np)
         logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
