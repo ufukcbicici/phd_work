@@ -144,11 +144,11 @@ class SoftmaxCompresser:
         print("max softmax_biases entry:{0}".format(np.max(softmax_biases)))
         print("min softmax_biases entry:{0}".format(np.min(softmax_biases)))
         npz_file_name = "npz_node_{0}_distillation".format(leaf_node.index)
-        UtilityFuncs.save_npz(npz_file_name,
-                              arr_dict={"softmax_weights": softmax_weights,
-                                        "softmax_biases": softmax_biases,
-                                        "features": features,
-                                        "logits": logits, "probs": probs})
+        # UtilityFuncs.save_npz(npz_file_name,
+        #                       arr_dict={"softmax_weights": softmax_weights,
+        #                                 "softmax_biases": softmax_biases,
+        #                                 "features": features,
+        #                                 "logits": logits, "probs": probs})
         logits_np = np.dot(features, softmax_weights) + softmax_biases
         exp_logits = np.exp(logits_np)
         logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
