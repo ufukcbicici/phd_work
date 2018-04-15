@@ -28,6 +28,7 @@ from simple_tf.global_params import GlobalConstants
 class_count = 4
 features_dim = 64
 node_index = 3
+rund_id = 0
 
 node_3_features_dict = UtilityFuncs.load_npz(file_name="npz_node_3_final_features")
 
@@ -86,9 +87,9 @@ training_accuracy_full = \
 test_accuracy_full = \
     SoftmaxCompresser.calculate_compressed_accuracy(posteriors=test_compressed_posteriors,
                                                     one_hot_labels=test_one_hot_labels)
-kv_rows.append((-1, -1,
+kv_rows.append((rund_id, -1,
                 "Leaf:{0} Training Accuracy Full".format(node_index), training_accuracy_full))
-kv_rows.append((-1, -1,
+kv_rows.append((rund_id, -1,
                 "Leaf:{0} Test Accuracy Full".format(node_index), test_accuracy_full))
 DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
 
@@ -214,9 +215,9 @@ for tpl in duplicate_cartesians:
                                                                                           hard_loss_weight,
                                                                                           l2_weight, lr
                                                                                           )
-                    kv_rows.append((-1, iteration, "Training Accuracy {0}".format(kv_table_key),
+                    kv_rows.append((rund_id, iteration, "Training Accuracy {0}".format(kv_table_key),
                                     training_accuracy))
-                    kv_rows.append((-1, iteration, "Test Accuracy {0}".format(kv_table_key),
+                    kv_rows.append((rund_id, iteration, "Test Accuracy {0}".format(kv_table_key),
                                     test_accuracy))
                 # if is_last_epoch:
                 #     final_softmax_weights = hyperplane_weights
