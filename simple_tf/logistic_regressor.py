@@ -6,22 +6,45 @@ import numpy as np
 import tensorflow as tf
 import itertools
 from random import shuffle
+from sklearn.preprocessing import RobustScaler
 
 from simple_tf.global_params import GlobalConstants
 
-class_count = 3
+# class_count = 3
+# features_dim = 64
+# node_index = 5
+
+
+# node_5_features_dict = UtilityFuncs.load_npz(file_name="npz_node_5_final_features")
+#
+# training_features = node_5_features_dict["training_features"]
+# training_one_hot_labels = node_5_features_dict["training_one_hot_labels"]
+# training_compressed_posteriors = node_5_features_dict["training_compressed_posteriors"]
+#
+# test_features = node_5_features_dict["test_features"]
+# test_one_hot_labels = node_5_features_dict["test_one_hot_labels"]
+# test_compressed_posteriors = node_5_features_dict["test_compressed_posteriors"]
+
+class_count = 4
 features_dim = 64
-node_index = 5
+node_index = 3
 
-node_5_features_dict = UtilityFuncs.load_npz(file_name="npz_node_5_final_features")
+node_3_features_dict = UtilityFuncs.load_npz(file_name="npz_node_3_final_features")
 
-training_features = node_5_features_dict["training_features"]
-training_one_hot_labels = node_5_features_dict["training_one_hot_labels"]
-training_compressed_posteriors = node_5_features_dict["training_compressed_posteriors"]
+training_features = node_3_features_dict["training_features"]
+training_one_hot_labels = node_3_features_dict["training_one_hot_labels"]
+training_compressed_posteriors = node_3_features_dict["training_compressed_posteriors"]
 
-test_features = node_5_features_dict["test_features"]
-test_one_hot_labels = node_5_features_dict["test_one_hot_labels"]
-test_compressed_posteriors = node_5_features_dict["test_compressed_posteriors"]
+test_features = node_3_features_dict["test_features"]
+test_one_hot_labels = node_3_features_dict["test_one_hot_labels"]
+test_compressed_posteriors = node_3_features_dict["test_compressed_posteriors"]
+
+data_scaler = RobustScaler()
+normalized_training_features = data_scaler.fit_transform(training_features)
+normalized_test_features = data_scaler.transform(test_features)
+
+training_features = normalized_training_features
+test_features = normalized_test_features
 
 training_sample_count = training_features.shape[0]
 test_sample_count = test_features.shape[0]
@@ -51,7 +74,6 @@ hard_loss = tf.reduce_mean(hard_loss_vec)
 # Term 3: L2 loss for softmax weights
 weight_l2 = l2_loss_weight * tf.nn.l2_loss(softmax_weights)
 
-
 total_loss = hard_loss + weight_l2
 global_step = tf.Variable(name="global_step", initial_value=0, trainable=False)
 batch_size = int(float(training_sample_count) * GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO)
@@ -70,11 +92,24 @@ kv_rows.append((-1, -1,
                 "Leaf:{0} Test Accuracy Full".format(node_index), test_accuracy_full))
 DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
 
+# temperature_list = [1.0]
+# soft_loss_weights = [0.0, 0.25, 0.5, 0.75, 1.0]
+# hard_loss_weights = [1.0]
+# l2_weights = [0.0, 0.0001, 0.00025, 0.0005, 0.00075, 0.001]
+# learning_rates = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+# cross_validation_repeat_count = 10
+
 temperature_list = [1.0]
-soft_loss_weights = [0.0, 0.25, 0.5, 0.75, 1.0]
+soft_loss_weights = [0.0]  # [0.0, 0.25, 0.5, 0.75, 1.0]
 hard_loss_weights = [1.0]
-l2_weights = [0.0, 0.0001, 0.00025, 0.0005, 0.00075, 0.001]
-learning_rates = [0.0001, 0.0005, 0.001, 0.005, 0.025, 0.05, 0.075, 0.1]
+l2_weights = [0.0, 0.0001, 0.00025, 0.0005, 0.00075, 0.001, 0.00125, 0.0015, 0.00175, 0.002]
+learning_rates = [0.0025, 0.005,
+                  0.01, 0.025, 0.05,
+                  0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+# [0.00001, 0.000025, 0.00005,
+#                  0.0001, 0.00025, 0.0005,
+#                  0.001,
+
 cross_validation_repeat_count = 10
 
 cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
@@ -103,13 +138,12 @@ for tpl in duplicate_cartesians:
                                                    GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_DECAY,
                                                    staircase=True)
-        trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(total_loss, global_step=global_step)
+        trainer = tf.train.MomentumOptimizer(learning_rate, 0.0).minimize(total_loss, global_step=global_step)
         curr_lr = lr
     # Training sets
     training_indices = list(range(training_sample_count))
     shuffle(training_indices)
-    random_indices = np.random.uniform(0, training_sample_count,
-                                       GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE).astype(int).tolist()
+    random_indices = np.random.uniform(0, training_sample_count, batch_size).astype(int).tolist()
     training_t = training_one_hot_labels[training_indices]
     training_x = training_features[training_indices]
     training_indices.extend(random_indices)
@@ -121,11 +155,14 @@ for tpl in duplicate_cartesians:
     test_x = test_features[test_indices]
     # Init parameters
     all_variables = tf.global_variables()
-    vars_to_init = [var for var in all_variables if "/Momentum" in var.name]
+    momentum_vars = [var for var in all_variables if "/Momentum" in var.name]
+    vars_to_init = []
+    vars_to_init.extend(momentum_vars)
     vars_to_init.extend([softmax_weights, softmax_biases, global_step])
     # Init variables
     init_op = tf.variables_initializer(vars_to_init)
     sess.run(init_op)
+    # momentum_values_after_init = sess.run(momentum_vars)
     iteration = 0
     lr_last = lr
     for epoch_id in range(GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT):
@@ -138,6 +175,7 @@ for tpl in duplicate_cartesians:
                          l2_loss_weight: l2_weight}
             run_ops = [trainer, learning_rate]
             results = sess.run(run_ops, feed_dict=feed_dict)
+            # momentum_values = sess.run(momentum_vars)
             iteration += 1
             # print("Iteration:{0} Learning Rate:{1}".format(iteration, results[-1]))
             if results[-1] != lr_last:
@@ -191,4 +229,3 @@ for tpl in duplicate_cartesians:
             print("Training Accuracy:{0}".format(training_accuracy))
             print("Test Accuracy:{0}".format(test_accuracy))
     DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
-

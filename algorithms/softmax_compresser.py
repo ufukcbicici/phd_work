@@ -196,9 +196,11 @@ class SoftmaxCompresser:
                               arr_dict={"training_features": training_features,
                                         "training_one_hot_labels": training_compressed_one_hot_entries,
                                         "training_compressed_posteriors": training_compressed_posteriors,
+                                        "training_logits": training_logits,
                                         "test_features": test_features,
                                         "test_one_hot_labels": test_compressed_one_hot_entries,
-                                        "test_compressed_posteriors": test_compressed_posteriors})
+                                        "test_compressed_posteriors": test_compressed_posteriors,
+                                        "test_logits": test_logits})
         logit_dim = training_logits.shape[1]
         features_dim = training_features.shape[1]
         modes_per_leaves = network.modeTracker.get_modes()
