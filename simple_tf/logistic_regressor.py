@@ -25,10 +25,10 @@ from simple_tf.global_params import GlobalConstants
 # test_one_hot_labels = node_5_features_dict["test_one_hot_labels"]
 # test_compressed_posteriors = node_5_features_dict["test_compressed_posteriors"]
 
-class_count = 4
-features_dim = 64
+# class_count = 4
+# features_dim = 64
 node_index = 3
-rund_id = 0
+run_id = 2
 
 node_3_features_dict = UtilityFuncs.load_npz(file_name="npz_node_3_final_features")
 
@@ -40,22 +40,25 @@ test_features = node_3_features_dict["test_features"]
 test_one_hot_labels = node_3_features_dict["test_one_hot_labels"]
 test_compressed_posteriors = node_3_features_dict["test_compressed_posteriors"]
 
-data_scaler = RobustScaler()
-normalized_training_features = data_scaler.fit_transform(training_features)
-normalized_test_features = data_scaler.transform(test_features)
+features_dim = training_features.shape[1]
+class_count = training_one_hot_labels.shape[1]
+# data_scaler = RobustScaler()
+# normalized_training_features = data_scaler.fit_transform(training_features)
+# normalized_test_features = data_scaler.transform(test_features)
 
-training_features = normalized_training_features
-test_features = normalized_test_features
+# training_features = normalized_training_features
+# test_features = normalized_test_features
 
 training_sample_count = training_features.shape[0]
 test_sample_count = test_features.shape[0]
-kv_rows = []
+db_rows = []
 
 sess = tf.Session()
 # t: The squashed one hot labels
 t = tf.placeholder(tf.float32, shape=(None, class_count))
 features_tensor = tf.placeholder(tf.float32, shape=(None, features_dim))
 l2_loss_weight = tf.placeholder(tf.float32)
+keep_prob_tensor = tf.placeholder(tf.float32)
 # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
 softmax_weights = tf.Variable(
     tf.truncated_normal([features_dim, class_count],
@@ -67,7 +70,9 @@ softmax_biases = tf.Variable(
     tf.constant(0.1, shape=[class_count], dtype=GlobalConstants.DATA_TYPE),
     name="softmax_biases")
 # Compressed softmax probabilities
-logits = tf.matmul(features_tensor, softmax_weights) + softmax_biases
+
+features_dropped = tf.nn.dropout(features_tensor, keep_prob=keep_prob_tensor)
+logits = tf.matmul(features_dropped, softmax_weights) + softmax_biases
 result_probs = tf.nn.softmax(logits)
 # Term 2: Cross entropy between the hard labels and q
 hard_loss_vec = tf.nn.softmax_cross_entropy_with_logits(labels=t, logits=logits)
@@ -87,11 +92,9 @@ training_accuracy_full = \
 test_accuracy_full = \
     SoftmaxCompresser.calculate_compressed_accuracy(posteriors=test_compressed_posteriors,
                                                     one_hot_labels=test_one_hot_labels)
-kv_rows.append((rund_id, -1,
-                "Leaf:{0} Training Accuracy Full".format(node_index), training_accuracy_full))
-kv_rows.append((rund_id, -1,
-                "Leaf:{0} Test Accuracy Full".format(node_index), test_accuracy_full))
-DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+db_rows.append((run_id, -1, node_index, -1, -1, -1, -1, -1, -1, -1, -1, 0, training_accuracy_full))
+db_rows.append((run_id, -1, node_index, -1, -1, -1, -1, -1, -1, -1, -1, 1, test_accuracy_full))
+DbLogger.write_into_table(rows=db_rows, table=DbLogger.compressionTestsTable, col_count=13)
 
 # temperature_list = [1.0]
 # soft_loss_weights = [0.0, 0.25, 0.5, 0.75, 1.0]
@@ -103,20 +106,24 @@ DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
 temperature_list = [1.0]
 soft_loss_weights = [0.0]  # [0.0, 0.25, 0.5, 0.75, 1.0]
 hard_loss_weights = [1.0]
-l2_weights = [0.0, 0.0001, 0.00025, 0.0005, 0.00075, 0.001, 0.00125, 0.0015, 0.00175, 0.002]
-learning_rates = [0.0025, 0.005,
-                  0.01, 0.025, 0.05,
+# l2_weights = [0.0, 0.0001, 0.00025, 0.0005, 0.00075, 0.001, 0.00125, 0.0015,
+#               0.00175, 0.0018, 0.00185, 0.0019, 0.00195, 0.002, 0.00205, 0.0021, 0.00215,
+#               0.0022, 0.00225, 0.0023, 0.00235, 0.0024, 0.00245, 0.0025, 0.00255, 0.0026, 0.00265, 0.0027, 0.00275,
+#               0.0028, 0.00285, 0.0029, 0.00295, 0.003]
+# learning_rates = [0.01]
+# l2_weights = [0.0, 0.0001, 0.00025, 0.0005, 0.00075, 0.001, 0.00125, 0.0015, 0.00175, 0.002, 0.0025, 0.003, 0.005]
+l2_weights = [0.0]
+keep_probabilities = [1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5]
+learning_rates = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05,
                   0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-# [0.00001, 0.000025, 0.00005,
-#                  0.0001, 0.00025, 0.0005,
-#                  0.001,
-
 cross_validation_repeat_count = 10
 
 cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
-                                                                      temperature_list, soft_loss_weights,
+                                                                      temperature_list,
+                                                                      soft_loss_weights,
                                                                       hard_loss_weights,
-                                                                      l2_weights])
+                                                                      l2_weights,
+                                                                      keep_probabilities])
 
 duplicate_cartesians = []
 for tpl in cartesian_product:
@@ -133,13 +140,14 @@ for tpl in duplicate_cartesians:
     soft_loss_weight = tpl[2]
     hard_loss_weight = tpl[3]
     l2_weight = tpl[4]
-    kv_rows = []
+    keep = tpl[5]
+    db_rows = []
     if curr_lr != lr:
         learning_rate = tf.train.exponential_decay(lr, global_step,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT,
                                                    GlobalConstants.SOFTMAX_DISTILLATION_DECAY,
                                                    staircase=True)
-        trainer = tf.train.MomentumOptimizer(learning_rate, 0.0).minimize(total_loss, global_step=global_step)
+        trainer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(total_loss, global_step=global_step)
         curr_lr = lr
     # Training sets
     training_indices = list(range(training_sample_count))
@@ -173,7 +181,8 @@ for tpl in duplicate_cartesians:
             features_batch = training_x_wrapped[curr_index:curr_index + batch_size]
             feed_dict = {t: t_batch,
                          features_tensor: features_batch,
-                         l2_loss_weight: l2_weight}
+                         l2_loss_weight: l2_weight,
+                         keep_prob_tensor: keep}
             run_ops = [trainer, learning_rate]
             results = sess.run(run_ops, feed_dict=feed_dict)
             # momentum_values = sess.run(momentum_vars)
@@ -190,7 +199,8 @@ for tpl in duplicate_cartesians:
                     [result_probs, total_loss, softmax_weights, softmax_biases],
                     feed_dict={t: training_t,
                                features_tensor: training_x,
-                               l2_loss_weight: l2_weight})
+                               l2_loss_weight: l2_weight,
+                               keep_prob_tensor: 1.0})
                 training_accuracy = SoftmaxCompresser.calculate_compressed_accuracy(
                     posteriors=training_results[0], one_hot_labels=training_t)
                 # Evaluate on test set
@@ -198,7 +208,8 @@ for tpl in duplicate_cartesians:
                     [result_probs, total_loss, softmax_weights, softmax_biases],
                     feed_dict={t: test_t,
                                features_tensor: test_x,
-                               l2_loss_weight: l2_weight})
+                               l2_loss_weight: l2_weight,
+                               keep_prob_tensor: 1.0})
                 test_accuracy = SoftmaxCompresser.calculate_compressed_accuracy(
                     posteriors=test_results[0], one_hot_labels=test_t)
                 # # Get resulting linear classifiers
@@ -209,16 +220,12 @@ for tpl in duplicate_cartesians:
                 # print("Compressed Training Accuracy:{0}".format(training_accuracy))
                 # print("Compressed Test Accuracy:{0}".format(test_accuracy))
                 if GlobalConstants.USE_SOFTMAX_DISTILLATION_VERBOSE:
-                    kv_table_key = "Leaf:{0} T:{1} slW:{2} hlW:{3} l2W:{4} lr:{5}".format(node_index,
-                                                                                          temperature,
-                                                                                          soft_loss_weight,
-                                                                                          hard_loss_weight,
-                                                                                          l2_weight, lr
-                                                                                          )
-                    kv_rows.append((rund_id, iteration, "Training Accuracy {0}".format(kv_table_key),
-                                    training_accuracy))
-                    kv_rows.append((rund_id, iteration, "Test Accuracy {0}".format(kv_table_key),
-                                    test_accuracy))
+                    db_rows.append((run_id, iteration, node_index, temperature, soft_loss_weight, hard_loss_weight,
+                                    l2_weight, lr, keep, GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT,
+                                    GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT, 0, training_accuracy))
+                    db_rows.append((run_id, iteration, node_index, temperature, soft_loss_weight, hard_loss_weight,
+                                    l2_weight, lr, keep, GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT,
+                                    GlobalConstants.SOFTMAX_DISTILLATION_STEP_COUNT, 1, test_accuracy))
                 # if is_last_epoch:
                 #     final_softmax_weights = hyperplane_weights
                 #     final_softmax_biases = hyperplane_biases
@@ -229,4 +236,4 @@ for tpl in duplicate_cartesians:
         if epoch_id == GlobalConstants.SOFTMAX_DISTILLATION_EPOCH_COUNT - 1:
             print("Training Accuracy:{0}".format(training_accuracy))
             print("Test Accuracy:{0}".format(test_accuracy))
-    DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+    DbLogger.write_into_table(rows=db_rows, table=DbLogger.compressionTestsTable, col_count=13)
