@@ -492,6 +492,16 @@ class SoftmaxCompresser:
         return compressed_posteriors, compressed_one_hot_entries
 
     @staticmethod
+    def compress_probability(modes, probability):
+        dim = probability.shape[1]
+        sorted_modes = sorted(modes)
+        non_mode_labels = [l for l in range(dim) if l not in modes]
+        mode_probs = probability[:, sorted_modes]
+        outlier_probs = np.sum(probability[:, non_mode_labels], 1).reshape(probability.shape[0], 1)
+        compressed_probs = np.concatenate((mode_probs, outlier_probs), axis=1)
+        return compressed_probs
+
+    @staticmethod
     def calculate_compressed_accuracy(posteriors, one_hot_labels):
         assert posteriors.shape[0] == one_hot_labels.shape[0]
         posterior_max = np.argmax(posteriors, axis=1)
