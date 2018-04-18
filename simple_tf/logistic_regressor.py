@@ -28,11 +28,12 @@ from simple_tf.global_params import GlobalConstants
 # class_count = 4
 # features_dim = 64
 node_index = 3
-run_id = 4
+run_id = 11
 modes = set()
 modes.add(8)
 modes.add(9)
-hidden_feature_dim = 128
+hidden_feature_dim = 512
+layer_count = 3
 
 node_3_features_dict = UtilityFuncs.load_npz(file_name="npz_node_3_final_features")
 
@@ -78,15 +79,6 @@ hard_labels_cost_weight = tf.placeholder(tf.float32)
 l2_loss_weight = tf.placeholder(tf.float32)
 keep_prob_tensor = tf.placeholder(tf.float32)
 # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
-hidden_weights = tf.Variable(
-    tf.truncated_normal([features_dim, hidden_feature_dim],
-                        stddev=0.1,
-                        seed=GlobalConstants.SEED,
-                        dtype=GlobalConstants.DATA_TYPE),
-    name="hidden_weights")
-hidden_biases = tf.Variable(
-    tf.constant(0.1, shape=[hidden_feature_dim], dtype=GlobalConstants.DATA_TYPE),
-    name="hidden_biases")
 softmax_weights = tf.Variable(
     tf.truncated_normal([hidden_feature_dim, class_count],
                         stddev=0.1,
@@ -97,11 +89,32 @@ softmax_biases = tf.Variable(
     tf.constant(0.1, shape=[class_count], dtype=GlobalConstants.DATA_TYPE),
     name="softmax_biases")
 
+hidden_weights_list = []
+hidden_biases_list = []
+curr_output = None
+for layer in range(layer_count):
+    if layer == 0:
+        input_dim = features_dim
+    else:
+        input_dim = hidden_feature_dim
+    hidden_weights = tf.Variable(
+        tf.truncated_normal([input_dim, hidden_feature_dim],
+                            stddev=0.1,
+                            seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE),
+        name="hidden_weights_{0}".format(layer))
+    hidden_weights_list.append(hidden_weights)
+    hidden_biases = tf.Variable(
+        tf.constant(0.1, shape=[hidden_feature_dim], dtype=GlobalConstants.DATA_TYPE),
+        name="hidden_biases_{0}".format(layer))
+    hidden_biases_list.append(hidden_biases)
+    if layer == 0:
+        curr_output = tf.nn.relu(tf.matmul(features_tensor, hidden_weights) + hidden_biases)
+    else:
+        curr_output = tf.nn.relu(tf.matmul(curr_output, hidden_weights) + hidden_biases)
 # NN
-hidden_layer = tf.nn.relu(tf.matmul(features_tensor, hidden_weights) + hidden_biases)
-hidden_layer_dropped = tf.nn.dropout(hidden_layer, keep_prob=keep_prob_tensor)
-logits = tf.matmul(hidden_layer_dropped, softmax_weights) + softmax_biases
-
+curr_output_dropped = tf.nn.dropout(curr_output, keep_prob=keep_prob_tensor)
+logits = tf.matmul(curr_output_dropped, softmax_weights) + softmax_biases
 result_probs = tf.nn.softmax(logits)
 # Term 1: Cross entropy between the soft labels and q
 soft_loss_vec = tf.nn.softmax_cross_entropy_with_logits(labels=p, logits=logits)
@@ -110,7 +123,9 @@ soft_loss = soft_labels_cost_weight * tf.reduce_mean(soft_loss_vec)
 hard_loss_vec = tf.nn.softmax_cross_entropy_with_logits(labels=t, logits=logits)
 hard_loss = hard_labels_cost_weight * tf.reduce_mean(hard_loss_vec)
 # Term 3: L2 loss for softmax weights
-regularization_loss = tf.add_n([tf.nn.l2_loss(softmax_weights), tf.nn.l2_loss(hidden_weights)])
+loss_list = [tf.nn.l2_loss(W) for W in hidden_weights_list]
+loss_list.append(tf.nn.l2_loss(softmax_weights))
+regularization_loss = tf.add_n(loss_list)
 weight_l2 = l2_loss_weight * regularization_loss
 # Total loss
 total_loss = soft_loss + hard_loss + weight_l2
@@ -140,15 +155,15 @@ DbLogger.write_into_table(rows=db_rows, table=DbLogger.compressionTestsTable, co
 temperature_list = [1.0]
 soft_loss_weights = [0.0]
 hard_loss_weights = [1.0]
-# l2_weights = [0.0, 0.00001, 0.00005]
-# l2_weights.extend([(i + 1) * 0.0001 for i in range(30)])
-l2_weights = [0.0]
-keep_probabilities = [1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5]
-learning_rates = [0.00001, 0.000025, 0.00005,
-                  0.0001, 0.00025, 0.0005,
-                  0.001, 0.0025, 0.005,
-                  0.01, 0.025, 0.05,
-                  0.1, 0.25, 0.5]
+l2_weights = [0.0, 0.00001, 0.00002, 0.00003, 0.00004]
+l2_weights.extend([(i + 1) * 0.00005 for i in range(30)])
+# l2_weights = [0.0]
+keep_probabilities = [1.0]
+learning_rates = [0.00002, 0.00003, 0.00004, 0.00005]
+                  # 0.0001, 0.00025, 0.0005,
+                  # 0.001, 0.0025, 0.005,
+                  # 0.01, 0.025, 0.05,
+                  # 0.1, 0.25, 0.5]
 cross_validation_repeat_count = 10
 
 cartesian_product_soft_loss_changing = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
@@ -157,15 +172,15 @@ cartesian_product_soft_loss_changing = UtilityFuncs.get_cartesian_product(list_o
                                                                                          hard_loss_weights,
                                                                                          l2_weights,
                                                                                          keep_probabilities])
-cartesian_product_hard_loss_changing = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
-                                                                                         temperature_list,
-                                                                                         hard_loss_weights,
-                                                                                         soft_loss_weights,
-                                                                                         l2_weights,
-                                                                                         keep_probabilities])
+# cartesian_product_hard_loss_changing = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
+#                                                                                          temperature_list,
+#                                                                                          hard_loss_weights,
+#                                                                                          soft_loss_weights,
+#                                                                                          l2_weights,
+#                                                                                          keep_probabilities])
 all_cartesian_products = []
 all_cartesian_products.extend(cartesian_product_soft_loss_changing)
-all_cartesian_products.extend(cartesian_product_hard_loss_changing)
+# all_cartesian_products.extend(cartesian_product_hard_loss_changing)
 all_cartesian_products = sorted(all_cartesian_products, key=lambda params_tuple: params_tuple[0])
 duplicate_cartesians = []
 for tpl in all_cartesian_products:
@@ -219,7 +234,9 @@ for tpl in duplicate_cartesians:
     momentum_vars = [var for var in all_variables if "/Momentum" in var.name]
     vars_to_init = []
     vars_to_init.extend(momentum_vars)
-    vars_to_init.extend([hidden_weights, hidden_biases, softmax_weights, softmax_biases, global_step])
+    vars_to_init.extend(hidden_weights_list)
+    vars_to_init.extend(hidden_biases_list)
+    vars_to_init.extend([softmax_weights, softmax_biases, global_step])
     # Init variables
     init_op = tf.variables_initializer(vars_to_init)
     sess.run(init_op)
