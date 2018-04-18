@@ -28,7 +28,7 @@ from simple_tf.global_params import GlobalConstants
 # class_count = 4
 # features_dim = 64
 node_index = 3
-run_id = 12
+run_id = 15
 modes = set()
 modes.add(8)
 modes.add(9)
@@ -112,9 +112,10 @@ for layer in range(layer_count):
         curr_output = tf.nn.relu(tf.matmul(features_tensor, hidden_weights) + hidden_biases)
     else:
         curr_output = tf.nn.relu(tf.matmul(curr_output, hidden_weights) + hidden_biases)
+    curr_output = tf.nn.dropout(curr_output, keep_prob=keep_prob_tensor)
 # NN
-curr_output_dropped = tf.nn.dropout(curr_output, keep_prob=keep_prob_tensor)
-logits = tf.matmul(curr_output_dropped, softmax_weights) + softmax_biases
+# curr_output_dropped = tf.nn.dropout(curr_output, keep_prob=keep_prob_tensor)
+logits = tf.matmul(curr_output, softmax_weights) + softmax_biases
 result_probs = tf.nn.softmax(logits)
 # Term 1: Cross entropy between the soft labels and q
 soft_loss_vec = tf.nn.softmax_cross_entropy_with_logits(labels=p, logits=logits)
@@ -157,9 +158,9 @@ soft_loss_weights = [0.0]
 hard_loss_weights = [1.0]
 # l2_weights = [0.0, 0.00001, 0.00002, 0.00003, 0.00004]
 # l2_weights.extend([(i + 1) * 0.00005 for i in range(30)])
-l2_weights = []
-l2_weights.extend([i * 0.00001 for i in range(51)])
-keep_probabilities = [1.0]
+l2_weights = [0.0]
+# l2_weights.extend([i * 0.00001 for i in range(51)])
+keep_probabilities = [1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5]
 learning_rates = [0.00008, 0.00017]
 # [0.00016, 0.00017, 0.00018, 0.00019, 0.0002]
 # [0.00011, 0.00012, 0.00013, 0.00014, 0.00015]
