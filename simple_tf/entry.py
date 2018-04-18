@@ -15,7 +15,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf import fashion_net_independent_h
+from simple_tf import fashion_net_independent_h, fashion_net_baseline
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
 
@@ -31,7 +31,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist Tree, H is independent form F. After ICPR 2"
+    explanation = "Fashion Mnist Baseline - Camera Ready ICPR - Thin"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -138,16 +138,16 @@ def main():
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
     #                       grad_func=lenet3.grad_func,
     #                       create_new_variables=True)
-    # network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
-    #     # node_build_funcs=[baseline.baseline],
-    #     # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
-    #     #                   lenet_decision_connected_to_f.leaf_func],
-    #     node_build_funcs=[fashion_net_baseline.baseline],
-    #     grad_func=fashion_net_baseline.grad_func,
-    #     threshold_func=fashion_net_baseline.threshold_calculator_func,
-    #     residue_func=fashion_net_baseline.residue_network_func,
-    #     summary_func=fashion_net_baseline.tensorboard_func,
-    #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
+        # node_build_funcs=[baseline.baseline],
+        # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
+        #                   lenet_decision_connected_to_f.leaf_func],
+        node_build_funcs=[fashion_net_baseline.baseline],
+        grad_func=fashion_net_baseline.grad_func,
+        threshold_func=fashion_net_baseline.threshold_calculator_func,
+        residue_func=fashion_net_baseline.residue_network_func,
+        summary_func=fashion_net_baseline.tensorboard_func,
+        degree_list=GlobalConstants.TREE_DEGREE_LIST)
     # network = TreeNetwork(
     #     node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
     #                       fashion_net_decision_connected_to_f.l1_func,
@@ -157,15 +157,15 @@ def main():
     #     residue_func=fashion_net_decision_connected_to_f.residue_network_func,
     #     summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
     #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
-    network = TreeNetwork(
-        node_build_funcs=[fashion_net_independent_h.root_func,
-                          fashion_net_independent_h.l1_func,
-                          fashion_net_independent_h.leaf_func],
-        grad_func=fashion_net_independent_h.grad_func,
-        threshold_func=fashion_net_independent_h.threshold_calculator_func,
-        residue_func=fashion_net_independent_h.residue_network_func,
-        summary_func=fashion_net_independent_h.tensorboard_func,
-        degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    # network = TreeNetwork(
+    #     node_build_funcs=[fashion_net_independent_h.root_func,
+    #                       fashion_net_independent_h.l1_func,
+    #                       fashion_net_independent_h.leaf_func],
+    #     grad_func=fashion_net_independent_h.grad_func,
+    #     threshold_func=fashion_net_independent_h.threshold_calculator_func,
+    #     residue_func=fashion_net_independent_h.residue_network_func,
+    #     summary_func=fashion_net_independent_h.tensorboard_func,
+    #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()
     # Init
@@ -183,7 +183,24 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.2]
+    classification_dropout_prob = [0.65, 0.65, 0.65, 0.65, 0.65, 0.65,
+                                   0.7, 0.7, 0.7, 0.7, 0.7, 0.7,
+                                   0.75, 0.75, 0.75, 0.75, 0.75, 0.75,
+                                   0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
+                                   0.85, 0.85, 0.85, 0.85, 0.85, 0.85,
+                                   0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
+                                   0.95, 0.95, 0.95, 0.95, 0.95, 0.95]
+    # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+    # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    # 0.55, 0.55, 0.55, 0.55, 0.55, 0.55,
+    # 0.6, 0.6, 0.6, 0.6, 0.6, 0.6,
+    # 0.65, 0.65, 0.65, 0.65, 0.65, 0.65,
+    # 0.7, 0.7, 0.7, 0.7, 0.7, 0.7,
+    # 0.75, 0.75, 0.75, 0.75, 0.75, 0.75,
+    # 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
+    # 0.85, 0.85, 0.85, 0.85, 0.85, 0.85,
+    # 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
+    # 0.95, 0.95, 0.95, 0.95, 0.95, 0.95]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])

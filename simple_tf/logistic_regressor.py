@@ -28,11 +28,11 @@ from simple_tf.global_params import GlobalConstants
 # class_count = 4
 # features_dim = 64
 node_index = 3
-run_id = 11
+run_id = 12
 modes = set()
 modes.add(8)
 modes.add(9)
-hidden_feature_dim = 512
+hidden_feature_dim = 1024
 layer_count = 3
 
 node_3_features_dict = UtilityFuncs.load_npz(file_name="npz_node_3_final_features")
@@ -155,11 +155,16 @@ DbLogger.write_into_table(rows=db_rows, table=DbLogger.compressionTestsTable, co
 temperature_list = [1.0]
 soft_loss_weights = [0.0]
 hard_loss_weights = [1.0]
-l2_weights = [0.0, 0.00001, 0.00002, 0.00003, 0.00004]
-l2_weights.extend([(i + 1) * 0.00005 for i in range(30)])
-# l2_weights = [0.0]
+# l2_weights = [0.0, 0.00001, 0.00002, 0.00003, 0.00004]
+# l2_weights.extend([(i + 1) * 0.00005 for i in range(30)])
+l2_weights = []
+l2_weights.extend([i * 0.00001 for i in range(51)])
 keep_probabilities = [1.0]
-learning_rates = [0.00002, 0.00003, 0.00004, 0.00005]
+learning_rates = [0.00008, 0.00017]
+# [0.00016, 0.00017, 0.00018, 0.00019, 0.0002]
+# [0.00011, 0.00012, 0.00013, 0.00014, 0.00015]
+# [0.00006, 0.00007, 0.00008, 0.00009, 0.0001]
+# [0.00001, 0.00002, 0.00003, 0.00004, 0.00005]
                   # 0.0001, 0.00025, 0.0005,
                   # 0.001, 0.0025, 0.005,
                   # 0.01, 0.025, 0.05,
