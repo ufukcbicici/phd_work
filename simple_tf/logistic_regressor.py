@@ -28,7 +28,7 @@ from simple_tf.global_params import GlobalConstants
 # class_count = 4
 # features_dim = 64
 node_index = 3
-run_id = 2
+run_id = 100
 modes = set()
 modes.add(8)
 modes.add(9)
@@ -124,8 +124,8 @@ DbLogger.write_into_table(rows=db_rows, table=DbLogger.compressionTestsTable, co
 # learning_rates = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
 # cross_validation_repeat_count = 10
 
-temperature_list = [1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 25.0, 50.0, 100.0]
-soft_loss_weights = [0.0, 0.25, 0.5, 0.75, 1.0]
+temperature_list = [1.0]
+soft_loss_weights = [0.0]
 hard_loss_weights = [1.0]
 # l2_weights = [0.0, 0.00001, 0.00005]
 # l2_weights.extend([(i + 1) * 0.0001 for i in range(30)])
@@ -145,15 +145,15 @@ cartesian_product_soft_loss_changing = UtilityFuncs.get_cartesian_product(list_o
                                                                                          hard_loss_weights,
                                                                                          l2_weights,
                                                                                          keep_probabilities])
-cartesian_product_hard_loss_changing = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
-                                                                                         temperature_list,
-                                                                                         hard_loss_weights,
-                                                                                         soft_loss_weights,
-                                                                                         l2_weights,
-                                                                                         keep_probabilities])
+# cartesian_product_hard_loss_changing = UtilityFuncs.get_cartesian_product(list_of_lists=[learning_rates,
+#                                                                                          temperature_list,
+#                                                                                          hard_loss_weights,
+#                                                                                          soft_loss_weights,
+#                                                                                          l2_weights,
+#                                                                                          keep_probabilities])
 all_cartesian_products = []
 all_cartesian_products.extend(cartesian_product_soft_loss_changing)
-all_cartesian_products.extend(cartesian_product_hard_loss_changing)
+# all_cartesian_products.extend(cartesian_product_hard_loss_changing)
 all_cartesian_products = sorted(all_cartesian_products, key=lambda params_tuple: params_tuple[0])
 duplicate_cartesians = []
 for tpl in all_cartesian_products:
