@@ -27,23 +27,23 @@ from simple_tf.global_params import GlobalConstants
 
 # class_count = 4
 # features_dim = 64
-node_index = 3
-run_id = 100
+node_index = 4
+run_id = 102
 modes = set()
-modes.add(8)
-modes.add(9)
+modes.add(5)
+modes.add(7)
 
-node_3_features_dict = UtilityFuncs.load_npz(file_name="npz_node_3_final_features")
+node_4_features_dict = UtilityFuncs.load_npz(file_name="npz_node_4_final_features")
 
-training_features = node_3_features_dict["training_features"]
-training_one_hot_labels = node_3_features_dict["training_one_hot_labels"]
-training_compressed_posteriors = node_3_features_dict["training_compressed_posteriors"]
-training_logits = node_3_features_dict["training_logits"]
+training_features = node_4_features_dict["training_features"]
+training_one_hot_labels = node_4_features_dict["training_one_hot_labels"]
+training_compressed_posteriors = node_4_features_dict["training_compressed_posteriors"]
+training_logits = node_4_features_dict["training_logits"]
 
-test_features = node_3_features_dict["test_features"]
-test_one_hot_labels = node_3_features_dict["test_one_hot_labels"]
-test_compressed_posteriors = node_3_features_dict["test_compressed_posteriors"]
-test_logits = node_3_features_dict["test_logits"]
+test_features = node_4_features_dict["test_features"]
+test_one_hot_labels = node_4_features_dict["test_one_hot_labels"]
+test_compressed_posteriors = node_4_features_dict["test_compressed_posteriors"]
+test_logits = node_4_features_dict["test_logits"]
 
 features_dim = training_features.shape[1]
 class_count = training_one_hot_labels.shape[1]
@@ -128,9 +128,10 @@ temperature_list = [1.0]
 soft_loss_weights = [0.0]
 hard_loss_weights = [1.0]
 # l2_weights = [0.0, 0.00001, 0.00005]
-# l2_weights.extend([(i + 1) * 0.0001 for i in range(30)])
-l2_weights = [0.0]
-keep_probabilities = [1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5]
+l2_weights = []
+l2_weights.extend([i * 0.00001 for i in range(31)])
+# l2_weights = [0.0]
+keep_probabilities = [1.0]
 learning_rates = [
     0.00001, 0.000025, 0.00005,
     0.0001, 0.00025, 0.0005,
