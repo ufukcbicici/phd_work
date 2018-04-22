@@ -133,24 +133,25 @@ def main():
         sess = tf.Session(config=config)
     else:
         sess = tf.Session()
-        # dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
-        dataset = MnistDataSet(validation_sample_count=0, load_validation_from=None)
+        dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
+        # dataset = MnistDataSet(validation_sample_count=0, load_validation_from=None)
     # Build the network
     # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
     #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
     #                       grad_func=lenet3.grad_func,
     #                       create_new_variables=True)
 
-    network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
-        node_build_funcs=[lenet_baseline.baseline],
-        # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
-        #                   lenet_decision_connected_to_f.leaf_func],
-        # node_build_funcs=[fashion_net_baseline.baseline],
-        grad_func=lenet_baseline.grad_func,
-        threshold_func=lenet_baseline.threshold_calculator_func,
-        residue_func=lenet_baseline.residue_network_func,
-        summary_func=lenet_baseline.tensorboard_func,
-        degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    # Mnist Baseline
+    # network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
+    #     node_build_funcs=[lenet_baseline.baseline],
+    #     # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
+    #     #                   lenet_decision_connected_to_f.leaf_func],
+    #     # node_build_funcs=[fashion_net_baseline.baseline],
+    #     grad_func=lenet_baseline.grad_func,
+    #     threshold_func=lenet_baseline.threshold_calculator_func,
+    #     residue_func=lenet_baseline.residue_network_func,
+    #     summary_func=lenet_baseline.tensorboard_func,
+    #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
 
     # Fashion Mnist H connected to F
     # network = TreeNetwork(
@@ -164,15 +165,15 @@ def main():
     #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
 
     # Fashion Mnist H independent
-    # network = TreeNetwork(
-    #     node_build_funcs=[fashion_net_independent_h.root_func,
-    #                       fashion_net_independent_h.l1_func,
-    #                       fashion_net_independent_h.leaf_func],
-    #     grad_func=fashion_net_independent_h.grad_func,
-    #     threshold_func=fashion_net_independent_h.threshold_calculator_func,
-    #     residue_func=fashion_net_independent_h.residue_network_func,
-    #     summary_func=fashion_net_independent_h.tensorboard_func,
-    #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    network = TreeNetwork(
+        node_build_funcs=[fashion_net_independent_h.root_func,
+                          fashion_net_independent_h.l1_func,
+                          fashion_net_independent_h.leaf_func],
+        grad_func=fashion_net_independent_h.grad_func,
+        threshold_func=fashion_net_independent_h.threshold_calculator_func,
+        residue_func=fashion_net_independent_h.residue_network_func,
+        summary_func=fashion_net_independent_h.tensorboard_func,
+        degree_list=GlobalConstants.TREE_DEGREE_LIST)
 
     network.build_network()
 

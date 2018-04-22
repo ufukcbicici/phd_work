@@ -1,3 +1,5 @@
+from sklearn.linear_model import LogisticRegression
+
 from algorithms.cross_validation import CrossValidation
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
@@ -7,7 +9,7 @@ import tensorflow as tf
 import itertools
 from random import shuffle
 
-from simple_tf.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants, SoftmaxCompressionStrategy
 
 
 class NetworkOutputs:
@@ -77,7 +79,7 @@ class SoftmaxCompresser:
         softmax_weights = {}
         softmax_biases = {}
         network_outputs = {}
-        for dataset_type in [DatasetTypes.training, DatasetTypes.test]:
+        for dataset_type in [DatasetTypes.training, DatasetTypes.validation, DatasetTypes.test]:
             network_output = NetworkOutputs()
             dataset.set_current_data_set_type(dataset_type=dataset_type)
             while True:
@@ -109,31 +111,40 @@ class SoftmaxCompresser:
                 if dataset.isNewEpoch:
                     network_outputs[dataset_type] = network_output
                     break
+
         # Train all leaf classifiers by distillation
         training_data = network_outputs[DatasetTypes.training]
         for node in network.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
             leaf_node = node
-            softmax_weight = softmax_weights[leaf_node.index]
-            softmax_bias = softmax_biases[leaf_node.index]
-            feature_vectors = training_data.featureVectorsDict[leaf_node.index]
-            logits = training_data.logitsDict[leaf_node.index]
-            probs = training_data.posteriorsDict[leaf_node.index]
-            one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
-            # # Unit Test
-            # SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
-            #                                           features=feature_vectors, logits=logits, probs=probs,
-            #                                           leaf_node=leaf_node)
-            # Train compresser
-            SoftmaxCompresser.train_distillation_network(sess=sess, network=network, leaf_node=leaf_node,
-                                                         training_data=network_outputs[DatasetTypes.training],
-                                                         test_data=network_outputs[DatasetTypes.test], run_id=run_id)
+            if GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_logistic_layer:
+                SoftmaxCompresser.train_logistic_layer(training_data=network_outputs[DatasetTypes.training],
+                                                       validation_data=network_outputs[DatasetTypes.validation],
+                                                       test_data=network_outputs[DatasetTypes.test],
+                                                       network=network,
+                                                       leaf_node=leaf_node)
 
-            # # Create compressed probabilities
-            # SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node, posteriors=probs,
-            #                                                  one_hot_labels=one_hot_labels)
-            # # Create symbolic network for distillation
+
+                # softmax_weight = softmax_weights[leaf_node.index]
+                # softmax_bias = softmax_biases[leaf_node.index]
+                # feature_vectors = training_data.featureVectorsDict[leaf_node.index]
+                # logits = training_data.logitsDict[leaf_node.index]
+                # probs = training_data.posteriorsDict[leaf_node.index]
+                # one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
+                # # Unit Test
+                # SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
+                #                                           features=feature_vectors, logits=logits, probs=probs,
+                #                                           leaf_node=leaf_node)
+                # Train compresser
+                # SoftmaxCompresser.train_distillation_network(sess=sess, network=network, leaf_node=leaf_node,
+                #                                              training_data=network_outputs[DatasetTypes.training],
+                #                                              test_data=network_outputs[DatasetTypes.test], run_id=run_id)
+
+                # # Create compressed probabilities
+                # SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node, posteriors=probs,
+                #                                                  one_hot_labels=one_hot_labels)
+                # # Create symbolic network for distillation
         print("X")
 
     @staticmethod
@@ -191,20 +202,21 @@ class SoftmaxCompresser:
             SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
                                                              posteriors=test_tempered_posteriors,
                                                              one_hot_labels=test_one_hot_labels)
+        logit_dim = training_logits.shape[1]
+        features_dim = training_features.shape[1]
+        modes_per_leaves = network.modeTracker.get_modes()
+        compressed_class_count = len(modes_per_leaves[leaf_node.index]) + 1
         npz_file_name = "npz_node_{0}_final_features".format(leaf_node.index)
         UtilityFuncs.save_npz(npz_file_name,
                               arr_dict={"training_features": training_features,
                                         "training_one_hot_labels": training_compressed_one_hot_entries,
                                         "training_compressed_posteriors": training_compressed_posteriors,
                                         "training_logits": training_logits,
+                                        "leaf_modes": np.array(modes_per_leaves[leaf_node.index]),
                                         "test_features": test_features,
                                         "test_one_hot_labels": test_compressed_one_hot_entries,
                                         "test_compressed_posteriors": test_compressed_posteriors,
                                         "test_logits": test_logits})
-        logit_dim = training_logits.shape[1]
-        features_dim = training_features.shape[1]
-        modes_per_leaves = network.modeTracker.get_modes()
-        compressed_class_count = len(modes_per_leaves[leaf_node.index]) + 1
         # p: The tempered posteriors, which have been squashed.
         p = tf.placeholder(tf.float32, shape=(None, compressed_class_count))
         # t: The squashed one hot labels
@@ -519,3 +531,66 @@ class SoftmaxCompresser:
         logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
         tempered_posteriors = exp_logits / logit_sums
         return tempered_posteriors
+
+    @staticmethod
+    def train_logistic_layer(training_data, validation_data, test_data, network, leaf_node):
+        modes_per_leaves = network.modeTracker.get_modes()
+        sorted_modes = sorted(modes_per_leaves[leaf_node.index])
+        training_logits = training_data.logitsDict[leaf_node.index]
+        training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
+        training_features = training_data.featureVectorsDict[leaf_node.index]
+        training_labels = np.argmax(training_one_hot_labels, axis=1)
+        training_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=training_logits, temperature=1.0)
+        training_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
+                                                                                probability=training_posteriors)
+
+        validation_logits = validation_data.logitsDict[leaf_node.index]
+        validation_one_hot_labels = validation_data.oneHotLabelsDict[leaf_node.index]
+        validation_features = validation_data.featureVectorsDict[leaf_node.index]
+        validation_labels = np.argmax(validation_one_hot_labels, axis=1)
+        validation_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=validation_logits, temperature=1.0)
+        validation_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
+                                                                                  probability=validation_posteriors)
+
+        test_logits = test_data.logitsDict[leaf_node.index]
+        test_one_hot_labels = test_data.oneHotLabelsDict[leaf_node.index]
+        test_features = test_data.featureVectorsDict[leaf_node.index]
+        test_labels = np.argmax(test_one_hot_labels, axis=1)
+        test_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=test_logits, temperature=1.0)
+        test_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
+                                                                            probability=test_posteriors)
+
+        regularizer_weights = [0.00001, 0.000025, 0.00005,
+                               0.0001, 0.00025, 0.0005,
+                               0.001, 0.0025, 0.005,
+                               0.01, 0.025, 0.05,
+                               0.1, 0.25, 0.5,
+                               1.0, 1.25, 1.5,
+                               2.5, 3.0, 3.5,
+                               4.5, 5.0, 10.0]
+
+        for regularizer_weight in regularizer_weights:
+            logistic_regression = LogisticRegression(solver="newton-cg", multi_class="multinomial",
+                                                     C=regularizer_weight, max_iter=1000)
+            logistic_regression.fit(X=training_features, y=training_labels)
+            iteration = np.asscalar(logistic_regression.n_iter_)
+            score_training = logistic_regression.score(X=training_features, y=training_labels)
+            score_validation = logistic_regression.score(X=validation_features, y=validation_labels)
+            score_test = logistic_regression.score(X=test_features, y=test_labels)
+
+
+
+            # training_features = features_dict["training_features"]
+            # training_one_hot_labels = features_dict["training_one_hot_labels"]
+            # training_compressed_posteriors = features_dict["training_compressed_posteriors"]
+            # training_logits = features_dict["training_logits"]
+            # training_labels = np.argmax(training_one_hot_labels, axis=1)
+            #
+            # test_features = features_dict["test_features"]
+            # test_one_hot_labels = features_dict["test_one_hot_labels"]
+            # test_compressed_posteriors = features_dict["test_compressed_posteriors"]
+            # test_logits = features_dict["test_logits"]
+            # test_labels = np.argmax(test_one_hot_labels, axis=1)
+            #
+            # modes = features_dict["leaf_modes"]
+            # features_dim = training_features.shape[1]

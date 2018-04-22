@@ -18,6 +18,11 @@ class AccuracyCalcType(Enum):
     with_residue_network = 2
 
 
+class SoftmaxCompressionStrategy(Enum):
+    random_start = 0
+    fit_logistic_layer = 1
+
+
 class GlobalConstants:
     TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
@@ -78,12 +83,13 @@ class GlobalConstants:
     # SOFTMAX_DISTILLATION_STEP_COUNT = 6000
     # SOFTMAX_DISTILLATION_EPOCH_COUNT = 200
 
+    SOFTMAX_COMPRESSION_STRATEGY = SoftmaxCompressionStrategy.fit_logistic_layer
     SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO = 0.05
     SOFTMAX_DISTILLATION_STEP_COUNT = 75 * int(1.0 / SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO)
     SOFTMAX_DISTILLATION_EPOCH_COUNT = 300
 
     SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT = 10
-    USE_SOFTMAX_DISTILLATION = False
+    USE_SOFTMAX_DISTILLATION = True
     # Softmax Compression Parameters
 
     ROUTE_CORRECTION_PERIOD = 5000
