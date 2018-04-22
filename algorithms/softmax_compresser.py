@@ -514,7 +514,8 @@ class SoftmaxCompresser:
     @staticmethod
     def get_tempered_probabilities(logits, temperature):
         tempered_logits = logits / temperature
-        exp_logits = np.exp(tempered_logits)
+        max_logits = np.max(tempered_logits, axis=1).reshape(tempered_logits.shape[0], 1)
+        exp_logits = np.exp(tempered_logits - max_logits)
         logit_sums = np.sum(exp_logits, 1).reshape(exp_logits.shape[0], 1)
         tempered_posteriors = exp_logits / logit_sums
         return tempered_posteriors
