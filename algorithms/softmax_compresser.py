@@ -1,5 +1,6 @@
 from sklearn.linear_model import LogisticRegression
-
+from sklearn.model_selection import cross_val_score
+import collections
 from algorithms.cross_validation import CrossValidation
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
@@ -79,7 +80,7 @@ class SoftmaxCompresser:
         softmax_weights = {}
         softmax_biases = {}
         network_outputs = {}
-        for dataset_type in [DatasetTypes.training, DatasetTypes.validation, DatasetTypes.test]:
+        for dataset_type in [DatasetTypes.training, DatasetTypes.test, DatasetTypes.test]:
             network_output = NetworkOutputs()
             dataset.set_current_data_set_type(dataset_type=dataset_type)
             while True:
@@ -120,10 +121,12 @@ class SoftmaxCompresser:
             leaf_node = node
             if GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_logistic_layer:
                 SoftmaxCompresser.train_logistic_layer(training_data=network_outputs[DatasetTypes.training],
-                                                       validation_data=network_outputs[DatasetTypes.validation],
+                                                       validation_data=network_outputs[DatasetTypes.test],
                                                        test_data=network_outputs[DatasetTypes.test],
                                                        network=network,
-                                                       leaf_node=leaf_node)
+                                                       leaf_node=leaf_node, cross_val_count=10)
+            else:
+                raise NotImplementedError()
 
 
                 # softmax_weight = softmax_weights[leaf_node.index]
@@ -533,32 +536,56 @@ class SoftmaxCompresser:
         return tempered_posteriors
 
     @staticmethod
-    def train_logistic_layer(training_data, validation_data, test_data, network, leaf_node):
+    def train_logistic_layer(training_data, validation_data, test_data, network, leaf_node, cross_val_count):
+        RunResult = collections.namedtuple("RunResult", ["training_result", "validation_result", "test_result",
+                                                         "weights", "biases", "iteration"])
         modes_per_leaves = network.modeTracker.get_modes()
         sorted_modes = sorted(modes_per_leaves[leaf_node.index])
         training_logits = training_data.logitsDict[leaf_node.index]
         training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
         training_features = training_data.featureVectorsDict[leaf_node.index]
-        training_labels = np.argmax(training_one_hot_labels, axis=1)
         training_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=training_logits, temperature=1.0)
         training_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
                                                                                 probability=training_posteriors)
+        training_one_hot_labels_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
+                                                                                    probability=training_one_hot_labels)
+        training_labels = np.argmax(training_one_hot_labels_compressed, axis=1)
 
         validation_logits = validation_data.logitsDict[leaf_node.index]
         validation_one_hot_labels = validation_data.oneHotLabelsDict[leaf_node.index]
         validation_features = validation_data.featureVectorsDict[leaf_node.index]
-        validation_labels = np.argmax(validation_one_hot_labels, axis=1)
         validation_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=validation_logits, temperature=1.0)
         validation_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
                                                                                   probability=validation_posteriors)
+        validation_one_hot_labels_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
+                                                                                      probability=validation_one_hot_labels)
+        validation_labels = np.argmax(validation_one_hot_labels_compressed, axis=1)
 
         test_logits = test_data.logitsDict[leaf_node.index]
         test_one_hot_labels = test_data.oneHotLabelsDict[leaf_node.index]
         test_features = test_data.featureVectorsDict[leaf_node.index]
-        test_labels = np.argmax(test_one_hot_labels, axis=1)
         test_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=test_logits, temperature=1.0)
         test_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
                                                                             probability=test_posteriors)
+        test_one_hot_labels_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
+                                                                                probability=test_one_hot_labels)
+        test_labels = np.argmax(test_one_hot_labels_compressed, axis=1)
+
+        # Calculate accuracy on the training set
+        training_accuracy_full = \
+            SoftmaxCompresser.calculate_compressed_accuracy(posteriors=training_posteriors_compressed,
+                                                            one_hot_labels=training_one_hot_labels_compressed)
+        # Calculate accuracy on the validation set
+        validation_accuracy_full = \
+            SoftmaxCompresser.calculate_compressed_accuracy(posteriors=validation_posteriors_compressed,
+                                                            one_hot_labels=validation_one_hot_labels_compressed)
+        # Calculate accuracy on the test set
+        test_accuracy_full = \
+            SoftmaxCompresser.calculate_compressed_accuracy(posteriors=test_posteriors_compressed,
+                                                            one_hot_labels=test_one_hot_labels_compressed)
+        print("training_accuracy_full={0}".format(training_accuracy_full))
+        print("validation_accuracy_full={0}".format(validation_accuracy_full))
+        print("test_accuracy_full={0}".format(test_accuracy_full))
 
         regularizer_weights = [0.00001, 0.000025, 0.00005,
                                0.0001, 0.00025, 0.0005,
@@ -567,30 +594,72 @@ class SoftmaxCompresser:
                                0.1, 0.25, 0.5,
                                1.0, 1.25, 1.5,
                                2.5, 3.0, 3.5,
-                               4.5, 5.0, 10.0]
+                               4.5, 5.0, 10.0, 15.0, 20.0, 25.0,
+                               100.0, 250.0, 500.0,
+                               1000.0, 2500.0, 5000.0, 10000.0]
 
+        results_list = []
+        best_test_result = 0.0
+        best_test_l2_weight = -1.0
         for regularizer_weight in regularizer_weights:
             logistic_regression = LogisticRegression(solver="newton-cg", multi_class="multinomial",
                                                      C=regularizer_weight, max_iter=1000)
+            cv_scores = cross_val_score(estimator=logistic_regression, X=training_features, y=training_labels,
+                                        cv=cross_val_count)
             logistic_regression.fit(X=training_features, y=training_labels)
-            iteration = np.asscalar(logistic_regression.n_iter_)
             score_training = logistic_regression.score(X=training_features, y=training_labels)
-            score_validation = logistic_regression.score(X=validation_features, y=validation_labels)
             score_test = logistic_regression.score(X=test_features, y=test_labels)
+            if score_test > best_test_result:
+                best_test_l2_weight = regularizer_weight
+                best_test_result = score_test
+            mean_score = np.mean(cv_scores)
+            results_list.append((mean_score, regularizer_weight, score_training, score_test))
+            print("L2 Weight:{0} Mean CV Score:{1} Training Score:{2} Test Score:{3}".format(regularizer_weight,
+                                                                                             mean_score,
+                                                                                             score_training,
+                                                                                             score_test))
+        sorted_results = sorted(results_list, key=lambda tpl: tpl[0], reverse=True)
+        print("Best Test Result:{0} Best L2 Weight:{1}".format(best_test_result, best_test_l2_weight))
+        print("Selected L2 Weight:{0}".format(sorted_results[0][1]))
+
+        # print("Best Training Result:{0}".format(results_list[0].score_training))
+        # print("Best Validation Result:{0}".format(results_list[0].score_validation))
+        # for cv_index in range(cross_val_count):
+        #     random_indices = np.random.choice(training_sample_count, size=validation_sample_count, replace=False)\
+        #         .tolist()
+        #     train_x = training_features[random_indices]
+        #
 
 
 
-            # training_features = features_dict["training_features"]
-            # training_one_hot_labels = features_dict["training_one_hot_labels"]
-            # training_compressed_posteriors = features_dict["training_compressed_posteriors"]
-            # training_logits = features_dict["training_logits"]
-            # training_labels = np.argmax(training_one_hot_labels, axis=1)
-            #
-            # test_features = features_dict["test_features"]
-            # test_one_hot_labels = features_dict["test_one_hot_labels"]
-            # test_compressed_posteriors = features_dict["test_compressed_posteriors"]
-            # test_logits = features_dict["test_logits"]
-            # test_labels = np.argmax(test_one_hot_labels, axis=1)
-            #
-            # modes = features_dict["leaf_modes"]
-            # features_dim = training_features.shape[1]
+        # logistic_regression = LogisticRegression(solver="newton-cg", multi_class="multinomial",
+        #                                          C=regularizer_weight, max_iter=1000)
+        # logistic_regression.fit(X=training_features, y=training_labels)
+        # iteration = np.asscalar(logistic_regression.n_iter_)
+        # score_training = logistic_regression.score(X=training_features, y=training_labels)
+        # score_validation = logistic_regression.score(X=validation_features, y=validation_labels)
+        # score_test = logistic_regression.score(X=test_features, y=test_labels)
+        # weights = np.transpose(logistic_regression.coef_)
+        # biases = logistic_regression.intercept_
+        # result = RunResult(score_training, score_validation, score_test, weights, biases, iteration)
+        # results_list.append(result)
+        # print("L2 Weight:{0} Training Score:{1} Validation Score:{2} Test Score:{3} Iteration:{4}".
+        #       format(regularizer_weight, score_training, score_validation, score_test, iteration))
+
+        # print("Best Test Result:{0}".format(results_list[0].score_test))
+
+
+        # training_features = features_dict["training_features"]
+        # training_one_hot_labels = features_dict["training_one_hot_labels"]
+        # training_compressed_posteriors = features_dict["training_compressed_posteriors"]
+        # training_logits = features_dict["training_logits"]
+        # training_labels = np.argmax(training_one_hot_labels, axis=1)
+        #
+        # test_features = features_dict["test_features"]
+        # test_one_hot_labels = features_dict["test_one_hot_labels"]
+        # test_compressed_posteriors = features_dict["test_compressed_posteriors"]
+        # test_logits = features_dict["test_logits"]
+        # test_labels = np.argmax(test_one_hot_labels, axis=1)
+        #
+        # modes = features_dict["leaf_modes"]
+        # features_dim = training_features.shape[1]
