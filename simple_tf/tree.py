@@ -3,6 +3,7 @@ import numpy as np
 
 from algorithms.accuracy_calculator import AccuracyCalculator
 from algorithms.mode_tracker import ModeTracker
+from algorithms.variable_manager import VariableManager
 from auxillary.constants import DatasetTypes
 from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
@@ -75,6 +76,7 @@ class TreeNetwork:
         # Algorithms
         self.modeTracker = ModeTracker(network=self)
         self.accuracyCalculator = AccuracyCalculator(network=self)
+        self.variableManager = VariableManager(network=self)
 
     # def get_parent_index(self, node_index):
     #     parent_index = int((node_index - 1) / self.treeDegree)
@@ -86,7 +88,7 @@ class TreeNetwork:
         return tf.Variable(cnst, name=complete_name)
 
     def get_decision_parameters(self):
-        vars = tf.trainable_variables()
+        vars = self.variableManager.trainable_variables()
         H_vars = [v for v in vars if "hyperplane" in v.name]
         for i in range(len(H_vars)):
             self.decisionParamsDict[H_vars[i]] = i
@@ -100,25 +102,6 @@ class TreeNetwork:
             return False
 
     def build_network(self):
-        # curr_index = 0
-        # prev_depth_node_count = 1
-        # for depth in range(0, self.depth):
-        #     degree = self.degreeList[depth]
-        #     if depth == 0:
-        #         node_count_in_depth = 1
-        #     else:
-        #         node_count_in_depth =
-        #     for i in range(0, node_count_in_depth):
-        #         is_root = depth == 0
-        #         is_leaf = depth == (self.depth - 1)
-        #         node = Node(index=curr_index, depth=depth, is_root=is_root, is_leaf=is_leaf)
-        #         self.nodes[curr_index] = node
-        #         if not is_root:
-        #             parent_index = self.get_parent_index(node_index=curr_index)
-        #             self.dagObject.add_edge(parent=self.nodes[parent_index], child=node)
-        #         else:
-        #             self.dagObject.add_node(node=node)
-        #         curr_index += 1
         # Create itself
         curr_index = 0
         is_leaf = 0 == (self.depth - 1)
@@ -207,14 +190,9 @@ class TreeNetwork:
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
         # Learning rate, counter
         self.globalCounter = tf.Variable(0, dtype=GlobalConstants.DATA_TYPE, trainable=False)
-        # self.learningRate = tf.train.exponential_decay(
-        #     GlobalConstants.INITIAL_LR,  # Base learning rate.
-        #     self.globalCounter,  # Current index into the dataset.
-        #     GlobalConstants.DECAY_STEP,  # Decay step.
-        #     GlobalConstants.DECAY_RATE,  # Decay rate.
-        #     staircase=True)
+        # Save all trainable variables
+        self.variableManager.save_trainable_variables()
         # Prepare the cost function
-
         # ******************** Main losses ********************
         primary_losses = []
         for node in self.topologicalSortedNodes:
@@ -224,7 +202,7 @@ class TreeNetwork:
         # ******************** Regularization losses ********************
         self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
         self.decisionWeightDecayCoeff = tf.placeholder(name="decision_weight_decay_coefficient", dtype=tf.float32)
-        vars = tf.trainable_variables()
+        vars = self.variableManager.trainable_variables()
         l2_loss_list = []
         for v in vars:
             is_decision_pipeline_variable = self.is_decision_variable(variable=v)
@@ -383,7 +361,7 @@ class TreeNetwork:
         return effective_sample_counts
 
     def get_main_and_regularization_grads(self, sess, samples, labels, indices, one_hot_labels, iteration):
-        vars = tf.trainable_variables()
+        vars = self.variableManager.trainable_variables()
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         if GlobalConstants.USE_INFO_GAIN_DECISION:
             is_decision_phase = 0
@@ -558,7 +536,7 @@ class TreeNetwork:
         return d_grads, info_gain_results, sample_counts
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
-        vars = tf.trainable_variables()
+        vars = self.variableManager.trainable_variables()
         samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         samples = np.expand_dims(samples, axis=3)
         # Decision network

@@ -120,7 +120,8 @@ class SoftmaxCompresser:
                 continue
             leaf_node = node
             if GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_logistic_layer:
-                SoftmaxCompresser.train_logistic_layer(training_data=network_outputs[DatasetTypes.training],
+                SoftmaxCompresser.train_logistic_layer(sess=sess,
+                                                       training_data=network_outputs[DatasetTypes.training],
                                                        validation_data=network_outputs[DatasetTypes.test],
                                                        test_data=network_outputs[DatasetTypes.test],
                                                        network=network,
@@ -536,7 +537,7 @@ class SoftmaxCompresser:
         return tempered_posteriors
 
     @staticmethod
-    def train_logistic_layer(training_data, validation_data, test_data, network, leaf_node, cross_val_count):
+    def train_logistic_layer(sess, training_data, validation_data, test_data, network, leaf_node, cross_val_count):
         RunResult = collections.namedtuple("RunResult", ["training_result", "validation_result", "test_result",
                                                          "weights", "biases", "iteration"])
         modes_per_leaves = network.modeTracker.get_modes()
@@ -613,53 +614,35 @@ class SoftmaxCompresser:
                 best_test_l2_weight = regularizer_weight
                 best_test_result = score_test
             mean_score = np.mean(cv_scores)
-            results_list.append((mean_score, regularizer_weight, score_training, score_test))
+            results_list.append((mean_score, logistic_regression, regularizer_weight, score_training, score_test))
             print("L2 Weight:{0} Mean CV Score:{1} Training Score:{2} Test Score:{3}".format(regularizer_weight,
                                                                                              mean_score,
                                                                                              score_training,
                                                                                              score_test))
         sorted_results = sorted(results_list, key=lambda tpl: tpl[0], reverse=True)
         print("Best Test Result:{0} Best L2 Weight:{1}".format(best_test_result, best_test_l2_weight))
-        print("Selected L2 Weight:{0}".format(sorted_results[0][1]))
-
-        # print("Best Training Result:{0}".format(results_list[0].score_training))
-        # print("Best Validation Result:{0}".format(results_list[0].score_validation))
-        # for cv_index in range(cross_val_count):
-        #     random_indices = np.random.choice(training_sample_count, size=validation_sample_count, replace=False)\
-        #         .tolist()
-        #     train_x = training_features[random_indices]
-        #
-
-
-
-        # logistic_regression = LogisticRegression(solver="newton-cg", multi_class="multinomial",
-        #                                          C=regularizer_weight, max_iter=1000)
-        # logistic_regression.fit(X=training_features, y=training_labels)
-        # iteration = np.asscalar(logistic_regression.n_iter_)
-        # score_training = logistic_regression.score(X=training_features, y=training_labels)
-        # score_validation = logistic_regression.score(X=validation_features, y=validation_labels)
-        # score_test = logistic_regression.score(X=test_features, y=test_labels)
-        # weights = np.transpose(logistic_regression.coef_)
-        # biases = logistic_regression.intercept_
-        # result = RunResult(score_training, score_validation, score_test, weights, biases, iteration)
-        # results_list.append(result)
-        # print("L2 Weight:{0} Training Score:{1} Validation Score:{2} Test Score:{3} Iteration:{4}".
-        #       format(regularizer_weight, score_training, score_validation, score_test, iteration))
-
-        # print("Best Test Result:{0}".format(results_list[0].score_test))
-
-
-        # training_features = features_dict["training_features"]
-        # training_one_hot_labels = features_dict["training_one_hot_labels"]
-        # training_compressed_posteriors = features_dict["training_compressed_posteriors"]
-        # training_logits = features_dict["training_logits"]
-        # training_labels = np.argmax(training_one_hot_labels, axis=1)
-        #
-        # test_features = features_dict["test_features"]
-        # test_one_hot_labels = features_dict["test_one_hot_labels"]
-        # test_compressed_posteriors = features_dict["test_compressed_posteriors"]
-        # test_logits = features_dict["test_logits"]
-        # test_labels = np.argmax(test_one_hot_labels, axis=1)
-        #
-        # modes = features_dict["leaf_modes"]
-        # features_dim = training_features.shape[1]
+        best_result = sorted_results[0]
+        print("Selected L2 Weight:{0}".format(best_result[2]))
+        if GlobalConstants.SOFTMAX_DISTILLATION_VERBOSE:
+            features_dim = training_features.shape[1]
+            compressed_class_count = training_one_hot_labels_compressed.shape[1]
+            selected_logistic_model = best_result[1]
+            x_tensor = tf.placeholder(tf.float32)
+            softmax_weights = tf.Variable(
+                tf.truncated_normal([features_dim, compressed_class_count],
+                                    stddev=0.1,
+                                    seed=GlobalConstants.SEED,
+                                    dtype=GlobalConstants.DATA_TYPE),
+                name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
+            softmax_biases = tf.Variable(
+                tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
+                name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+            compressed_logits = tf.matmul(x_tensor, softmax_weights) + softmax_biases
+            logistic_weight = np.transpose(selected_logistic_model.coef_)
+            logistic_bias = selected_logistic_model.intercept_
+            result = sess.run([compressed_logits], feed_dict={x_tensor: training_features,
+                                                              softmax_weights: logistic_weight,
+                                                              softmax_biases: logistic_bias})
+            tensorflow_response = result[0]
+            scilearn_response = selected_logistic_model.decision_function(training_features)
+            assert np.allclose(tensorflow_response, scilearn_response)

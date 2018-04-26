@@ -28,7 +28,7 @@ from simple_tf.tree import TreeNetwork
 
 def get_explanation_string(network):
     total_param_count = 0
-    for v in tf.trainable_variables():
+    for v in network.variableManager.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree

@@ -292,7 +292,7 @@ def residue_network_func(network):
 def grad_func(network):
     # self.initOp = tf.global_variables_initializer()
     # sess.run(self.initOp)
-    vars = tf.trainable_variables()
+    vars = network.variableManager.trainable_variables()
     decision_vars_list = []
     classification_vars_list = []
     residue_vars_list = []

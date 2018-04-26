@@ -225,7 +225,7 @@ def residue_network_func(network):
 def grad_func(network):
     # self.initOp = tf.global_variables_initializer()
     # sess.run(self.initOp)
-    vars = tf.trainable_variables()
+    vars = network.variableManager.trainable_variables()
     decision_vars_list = []
     classification_vars_list = []
     residue_vars_list = []
@@ -287,7 +287,7 @@ def tensorboard_func(network):
             network.decisionPathSummaries.append(tf.summary.scalar(info_gain_name, info_gain_output))
             network.decisionPathSummaries.append(tf.summary.histogram(branch_prob_name, branch_prob_output))
     # Hyperplane norms
-    vars = tf.trainable_variables()
+    vars = network.variableManager.trainable_variables()
     for v in vars:
         if "hyperplane" in v.name:
             loss_name = "l2_loss_{0}".format(v.name)
