@@ -645,4 +645,8 @@ class SoftmaxCompresser:
                                                               softmax_biases: logistic_bias})
             tensorflow_response = result[0]
             scilearn_response = selected_logistic_model.decision_function(training_features)
-            assert np.allclose(tensorflow_response, scilearn_response)
+            # assert np.allclose(tensorflow_response, scilearn_response)
+            diff_matrix = np.abs(tensorflow_response - scilearn_response)
+            ind = np.unravel_index(np.argmax(diff_matrix, axis=None), diff_matrix.shape)
+            print("Most different tensorflow entry:{0}".format(tensorflow_response[ind]))
+            print("Most different scilearn entry:{0}".format(scilearn_response[ind]))
