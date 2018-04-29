@@ -114,42 +114,28 @@ class SoftmaxCompresser:
                     break
 
         # Train all leaf classifiers by distillation
-        training_data = network_outputs[DatasetTypes.training]
+        compressed_layers_dict = {}
         for node in network.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
             leaf_node = node
             if GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_logistic_layer:
-                SoftmaxCompresser.train_logistic_layer(sess=sess,
-                                                       training_data=network_outputs[DatasetTypes.training],
-                                                       validation_data=network_outputs[DatasetTypes.test],
-                                                       test_data=network_outputs[DatasetTypes.test],
-                                                       network=network,
-                                                       leaf_node=leaf_node, cross_val_count=10)
+                logistic_weights, logistic_bias = SoftmaxCompresser.train_logistic_layer(sess=sess,
+                                                                                         training_data=network_outputs[
+                                                                                             DatasetTypes.training],
+                                                                                         validation_data=
+                                                                                         network_outputs[
+                                                                                             DatasetTypes.test],
+                                                                                         test_data=network_outputs[
+                                                                                             DatasetTypes.test],
+                                                                                         network=network,
+                                                                                         leaf_node=leaf_node,
+                                                                                         cross_val_count=10)
+                compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
+
             else:
                 raise NotImplementedError()
-
-
-                # softmax_weight = softmax_weights[leaf_node.index]
-                # softmax_bias = softmax_biases[leaf_node.index]
-                # feature_vectors = training_data.featureVectorsDict[leaf_node.index]
-                # logits = training_data.logitsDict[leaf_node.index]
-                # probs = training_data.posteriorsDict[leaf_node.index]
-                # one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
-                # # Unit Test
-                # SoftmaxCompresser.assert_prob_correctness(softmax_weights=softmax_weight, softmax_biases=softmax_bias,
-                #                                           features=feature_vectors, logits=logits, probs=probs,
-                #                                           leaf_node=leaf_node)
-                # Train compresser
-                # SoftmaxCompresser.train_distillation_network(sess=sess, network=network, leaf_node=leaf_node,
-                #                                              training_data=network_outputs[DatasetTypes.training],
-                #                                              test_data=network_outputs[DatasetTypes.test], run_id=run_id)
-
-                # # Create compressed probabilities
-                # SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node, posteriors=probs,
-                #                                                  one_hot_labels=one_hot_labels)
-                # # Create symbolic network for distillation
-        print("X")
+        return compressed_layers_dict
 
     @staticmethod
     def assert_prob_correctness(softmax_weights, softmax_biases, features, logits, probs, leaf_node):
@@ -620,29 +606,25 @@ class SoftmaxCompresser:
                                                                                              score_training,
                                                                                              score_test))
         sorted_results = sorted(results_list, key=lambda tpl: tpl[0], reverse=True)
-        print("Best Test Result:{0} Best L2 Weight:{1}".format(best_test_result, best_test_l2_weight))
         best_result = sorted_results[0]
+        selected_logistic_model = best_result[1]
+        features_dim = training_features.shape[1]
+        compressed_class_count = training_one_hot_labels_compressed.shape[1]
+        logistic_weight = np.transpose(selected_logistic_model.coef_)
+        logistic_bias = selected_logistic_model.intercept_
+        softmax_weights = tf.Variable(
+            tf.constant(logistic_weight, dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
+        softmax_biases = tf.Variable(
+            tf.constant(logistic_bias, dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+        sess.run([softmax_weights.initializer, softmax_biases.initializer])
+        print("Best Test Result:{0} Best L2 Weight:{1}".format(best_test_result, best_test_l2_weight))
         print("Selected L2 Weight:{0}".format(best_result[2]))
         if GlobalConstants.SOFTMAX_DISTILLATION_VERBOSE:
-            features_dim = training_features.shape[1]
-            compressed_class_count = training_one_hot_labels_compressed.shape[1]
-            selected_logistic_model = best_result[1]
             x_tensor = tf.placeholder(tf.float32)
-            softmax_weights = tf.Variable(
-                tf.truncated_normal([features_dim, compressed_class_count],
-                                    stddev=0.1,
-                                    seed=GlobalConstants.SEED,
-                                    dtype=GlobalConstants.DATA_TYPE),
-                name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
-            softmax_biases = tf.Variable(
-                tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
-                name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
             compressed_logits = tf.matmul(x_tensor, softmax_weights) + softmax_biases
-            logistic_weight = np.transpose(selected_logistic_model.coef_)
-            logistic_bias = selected_logistic_model.intercept_
-            result = sess.run([compressed_logits], feed_dict={x_tensor: training_features,
-                                                              softmax_weights: logistic_weight,
-                                                              softmax_biases: logistic_bias})
+            result = sess.run([compressed_logits], feed_dict={x_tensor: training_features})
             tensorflow_response = result[0]
             scilearn_response = selected_logistic_model.decision_function(training_features)
             # assert np.allclose(tensorflow_response, scilearn_response)
@@ -650,3 +632,6 @@ class SoftmaxCompresser:
             ind = np.unravel_index(np.argmax(diff_matrix, axis=None), diff_matrix.shape)
             print("Most different tensorflow entry:{0}".format(tensorflow_response[ind]))
             print("Most different scilearn entry:{0}".format(scilearn_response[ind]))
+        logistic_weight = np.transpose(selected_logistic_model.coef_)
+        logistic_bias = selected_logistic_model.intercept_
+        return logistic_weight, logistic_bias

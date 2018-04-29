@@ -190,10 +190,10 @@ def main():
     #                                                                        0.000125, 0.000125, 0.000125], [0.0009]])
     # classification_wd = [0.00005 * x for n in range(0, 16) for x in itertools.repeat(n, 3)]
     # decision_wd = [0.0]
-    classification_wd = [0.0, 0.0, 0.0, 0.0, 0.0, 0.00005, 0.00005, 0.00005, 0.00005, 0.00005]
+    classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.0]
+    classification_dropout_prob = [0.2]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -207,14 +207,14 @@ def main():
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
-        GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
-                                                                     value=GlobalConstants.INITIAL_LR,
-                                                                     decay=GlobalConstants.DECAY_RATE,
-                                                                     decay_period=GlobalConstants.DECAY_STEP)
-        # GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+        # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
         #                                                              value=GlobalConstants.INITIAL_LR,
-        #                                                              schedule=[(15000, 0.005), (30000, 0.0025),
-        #                                                                        (40000, 0.00025)])
+        #                                                              decay=GlobalConstants.DECAY_RATE,
+        #                                                              decay_period=GlobalConstants.DECAY_STEP)
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.INITIAL_LR,
+                                                                     schedule=[(15000, 0.005), (30000, 0.0025),
+                                                                               (40000, 0.00025)])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
         #                                                                value=GlobalConstants.INITIAL_LR,

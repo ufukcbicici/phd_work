@@ -9,6 +9,7 @@ class ModeTracker:
         self.network = network
         self.unchangedEpochCount = 0
         self.modesHistory = []
+        self.isCompressed = False
 
     def get_modes(self):
         return self.modesHistory[-1]
@@ -84,6 +85,9 @@ class ModeTracker:
             total_mode_count += len(v)
         if total_mode_count != label_count:
             return False
+        if self.isCompressed:
+            return False
+        self.isCompressed = True
         return True
         # if epoch == GlobalConstants.EPOCH_COUNT - 1:
         #     return True
