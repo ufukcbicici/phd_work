@@ -132,9 +132,21 @@ class SoftmaxCompresser:
                                                                                          leaf_node=leaf_node,
                                                                                          cross_val_count=10)
                 compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
-
+            elif GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.random_start:
+                logistic_weights, logistic_bias = SoftmaxCompresser.init_random_logistic_layer(sess=sess,
+                                                                                               network=network,
+                                                                                               training_data=
+                                                                                               network_outputs[
+                                                                                                   DatasetTypes.training],
+                                                                                               leaf_node=leaf_node)
+                compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
             else:
                 raise NotImplementedError()
+
+
+
+
+
         return compressed_layers_dict
 
     @staticmethod
@@ -494,6 +506,15 @@ class SoftmaxCompresser:
         return compressed_posteriors, compressed_one_hot_entries
 
     @staticmethod
+    def get_compressed_probability_mapping(modes):
+        sorted_modes = sorted(modes)
+        label_mapping = {}
+        for i in range(len(sorted_modes)):
+            label_mapping[i] = sorted_modes[i]
+        label_mapping[len(sorted_modes)] = -1
+        return label_mapping
+
+    @staticmethod
     def compress_probability(modes, probability):
         dim = probability.shape[1]
         sorted_modes = sorted(modes)
@@ -524,10 +545,9 @@ class SoftmaxCompresser:
 
     @staticmethod
     def train_logistic_layer(sess, training_data, validation_data, test_data, network, leaf_node, cross_val_count):
-        RunResult = collections.namedtuple("RunResult", ["training_result", "validation_result", "test_result",
-                                                         "weights", "biases", "iteration"])
         modes_per_leaves = network.modeTracker.get_modes()
         sorted_modes = sorted(modes_per_leaves[leaf_node.index])
+        label_mapping = SoftmaxCompresser.get_compressed_probability_mapping(modes=sorted_modes)
         training_logits = training_data.logitsDict[leaf_node.index]
         training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
         training_features = training_data.featureVectorsDict[leaf_node.index]
@@ -634,4 +654,32 @@ class SoftmaxCompresser:
             print("Most different scilearn entry:{0}".format(scilearn_response[ind]))
         logistic_weight = np.transpose(selected_logistic_model.coef_)
         logistic_bias = selected_logistic_model.intercept_
-        return logistic_weight, logistic_bias
+        return softmax_weights, softmax_biases
+
+    @staticmethod
+    def init_random_logistic_layer(sess, network, training_data, leaf_node):
+        modes_per_leaves = network.modeTracker.get_modes()
+        sorted_modes = sorted(modes_per_leaves[leaf_node.index])
+        training_logits = training_data.logitsDict[leaf_node.index]
+        training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
+        training_features = training_data.featureVectorsDict[leaf_node.index]
+        training_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=training_logits, temperature=1.0)
+        training_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
+                                                                                probability=training_posteriors)
+        training_one_hot_labels_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
+                                                                                    probability=training_one_hot_labels)
+        training_labels = np.argmax(training_one_hot_labels_compressed, axis=1)
+
+        features_dim = training_features.shape[1]
+        compressed_class_count = training_one_hot_labels_compressed.shape[1]
+        softmax_weights = tf.Variable(
+            tf.truncated_normal([features_dim, compressed_class_count],
+                                stddev=0.1,
+                                seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
+        softmax_biases = tf.Variable(
+            tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+        sess.run([softmax_weights.initializer, softmax_biases.initializer])
+        return softmax_weights, softmax_biases

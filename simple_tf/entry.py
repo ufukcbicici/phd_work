@@ -32,7 +32,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Mnist Reduced Baseline, ICPR Camera Ready"
+    explanation = "Fashion Mnist - Independent H - Tests - Softmax Compression"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -91,6 +91,7 @@ def get_explanation_string(network):
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
             explanation += node.probThresholdCalculator.get_explanation()
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
+    explanation += "Use Softmax Compression:{0}".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
     explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_F_NUM_FILTERS_1)
     explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
@@ -315,8 +316,10 @@ def main():
                                                             iteration=iteration_counter, epoch=epoch_id)
                 if do_compress:
                     print("**********************Compressing the network**********************")
-                    SoftmaxCompresser.compress_network_softmax(network=network, sess=sess, dataset=dataset,
-                                                               run_id=experiment_id)
+                    compressed_layers_dict = SoftmaxCompresser.compress_network_softmax(network=network,
+                                                                                        sess=sess,
+                                                                                        dataset=dataset,
+                                                                                        run_id=experiment_id)
                     print("**********************Compressing the network**********************")
 
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
