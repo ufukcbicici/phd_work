@@ -115,10 +115,15 @@ class SoftmaxCompresser:
 
         # Train all leaf classifiers by distillation
         compressed_layers_dict = {}
+        label_mappings = {}
         for node in network.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
             leaf_node = node
+            modes_per_leaves = network.modeTracker.get_modes()
+            sorted_modes = sorted(modes_per_leaves[leaf_node.index])
+            label_mapping = SoftmaxCompresser.get_compressed_probability_mapping(modes=sorted_modes, dataset=dataset)
+            label_mappings[leaf_node.index] = label_mapping
             if GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_logistic_layer:
                 logistic_weights, logistic_bias = SoftmaxCompresser.train_logistic_layer(sess=sess,
                                                                                          training_data=network_outputs[
@@ -142,10 +147,6 @@ class SoftmaxCompresser:
                 compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
             else:
                 raise NotImplementedError()
-
-
-
-
 
         return compressed_layers_dict
 
@@ -506,12 +507,15 @@ class SoftmaxCompresser:
         return compressed_posteriors, compressed_one_hot_entries
 
     @staticmethod
-    def get_compressed_probability_mapping(modes):
+    def get_compressed_probability_mapping(modes, dataset):
+        label_count = dataset.get_label_count()
         sorted_modes = sorted(modes)
-        label_mapping = {}
+        label_mapping = np.zeros(shape=(label_count, ), dtype=np.int32)
         for i in range(len(sorted_modes)):
-            label_mapping[i] = sorted_modes[i]
-        label_mapping[len(sorted_modes)] = -1
+            label_mapping[sorted_modes[i]] = i
+        for l in range(label_count):
+            if l not in sorted_modes:
+                label_mapping[l] = len(sorted_modes)
         return label_mapping
 
     @staticmethod
@@ -547,7 +551,6 @@ class SoftmaxCompresser:
     def train_logistic_layer(sess, training_data, validation_data, test_data, network, leaf_node, cross_val_count):
         modes_per_leaves = network.modeTracker.get_modes()
         sorted_modes = sorted(modes_per_leaves[leaf_node.index])
-        label_mapping = SoftmaxCompresser.get_compressed_probability_mapping(modes=sorted_modes)
         training_logits = training_data.logitsDict[leaf_node.index]
         training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
         training_features = training_data.featureVectorsDict[leaf_node.index]
