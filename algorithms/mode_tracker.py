@@ -11,6 +11,11 @@ class ModeTracker:
         self.modesHistory = []
         self.isCompressed = False
 
+    def reset(self):
+        self.unchangedEpochCount = 0
+        self.modesHistory = []
+        self.isCompressed = False
+
     def get_modes(self):
         return self.modesHistory[-1]
 

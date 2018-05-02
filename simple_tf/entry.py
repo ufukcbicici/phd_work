@@ -229,6 +229,7 @@ def main():
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
+        network.reset_network(dataset=dataset, run_id=experiment_id)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -318,10 +319,7 @@ def main():
                                                             iteration=iteration_counter, epoch=epoch_id)
                 if do_compress:
                     print("**********************Compressing the network**********************")
-                    compressed_layers_dict = SoftmaxCompresser.compress_network_softmax(network=network,
-                                                                                        sess=sess,
-                                                                                        dataset=dataset,
-                                                                                        run_id=experiment_id)
+                    compressed_layers_dict = network.softmaxCompresser.compress_network_softmax(sess=sess)
                     print("**********************Compressing the network**********************")
 
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,

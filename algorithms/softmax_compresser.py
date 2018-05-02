@@ -1,15 +1,14 @@
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
-import collections
-from algorithms.cross_validation import CrossValidation
-from auxillary.constants import DatasetTypes
-from auxillary.db_logger import DbLogger
-from auxillary.general_utility_funcs import UtilityFuncs
-import numpy as np
-import tensorflow as tf
 import itertools
 from random import shuffle
 
+import numpy as np
+import tensorflow as tf
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+
+from auxillary.constants import DatasetTypes
+from auxillary.db_logger import DbLogger
+from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, SoftmaxCompressionStrategy
 
 
@@ -19,6 +18,7 @@ class NetworkOutputs:
         self.logitsDict = {}
         self.posteriorsDict = {}
         self.oneHotLabelsDict = {}
+        self.labelMappings = {}
 
 
 # class RunData:
@@ -71,29 +71,31 @@ class DataObjects:
 
 
 class SoftmaxCompresser:
-    def __init__(self):
+    def __init__(self, network, dataset, run_id):
+        self.network = network
+        self.dataset = dataset
+        self.runId = run_id
         pass
 
-    @staticmethod
-    def compress_network_softmax(network, sess, dataset, run_id):
+    def compress_network_softmax(self, sess):
         # Get all final feature vectors for all leaves, for the complete training set.
         softmax_weights = {}
         softmax_biases = {}
         network_outputs = {}
         for dataset_type in [DatasetTypes.training, DatasetTypes.test, DatasetTypes.test]:
             network_output = NetworkOutputs()
-            dataset.set_current_data_set_type(dataset_type=dataset_type)
+            self.dataset.set_current_data_set_type(dataset_type=dataset_type)
             while True:
-                results = network.eval_network(sess=sess, dataset=dataset, use_masking=True)
-                for node in network.topologicalSortedNodes:
+                results = self.network.eval_network(sess=sess, dataset=self.dataset, use_masking=True)
+                for node in self.network.topologicalSortedNodes:
                     if not node.isLeaf:
                         continue
                     leaf_node = node
-                    posterior_ref = network.get_variable_name(name="posterior_probs", node=leaf_node)
+                    posterior_ref = self.network.get_variable_name(name="posterior_probs", node=leaf_node)
                     posterior_probs = results[posterior_ref]
                     UtilityFuncs.concat_to_np_array_dict(dct=network_output.posteriorsDict, key=leaf_node.index,
                                                          array=posterior_probs)
-                    final_feature_ref = network.get_variable_name(name="final_eval_feature", node=leaf_node)
+                    final_feature_ref = self.network.get_variable_name(name="final_eval_feature", node=leaf_node)
                     final_leaf_features = results[final_feature_ref]
                     UtilityFuncs.concat_to_np_array_dict(dct=network_output.featureVectorsDict, key=leaf_node.index,
                                                          array=final_leaf_features)
@@ -101,49 +103,49 @@ class SoftmaxCompresser:
                     one_hot_labels = results[one_hot_label_ref]
                     UtilityFuncs.concat_to_np_array_dict(dct=network_output.oneHotLabelsDict, key=leaf_node.index,
                                                          array=one_hot_labels)
-                    logits_ref = network.get_variable_name(name="logits", node=leaf_node)
+                    logits_ref = self.network.get_variable_name(name="logits", node=leaf_node)
                     logits = results[logits_ref]
                     UtilityFuncs.concat_to_np_array_dict(dct=network_output.logitsDict, key=leaf_node.index,
                                                          array=logits)
-                    softmax_weights_ref = network.get_variable_name(name="fc_softmax_weights", node=leaf_node)
+                    softmax_weights_ref = self.network.get_variable_name(name="fc_softmax_weights", node=leaf_node)
                     softmax_weights[leaf_node.index] = results[softmax_weights_ref]
-                    softmax_biases_ref = network.get_variable_name(name="fc_softmax_biases", node=leaf_node)
+                    softmax_biases_ref = self.network.get_variable_name(name="fc_softmax_biases", node=leaf_node)
                     softmax_biases[leaf_node.index] = results[softmax_biases_ref]
-                if dataset.isNewEpoch:
+                if self.dataset.isNewEpoch:
                     network_outputs[dataset_type] = network_output
                     break
 
         # Train all leaf classifiers by distillation
         compressed_layers_dict = {}
-        label_mappings = {}
-        for node in network.topologicalSortedNodes:
+        self.labelMappings = {}
+        for node in self.network.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
             leaf_node = node
-            modes_per_leaves = network.modeTracker.get_modes()
+            modes_per_leaves = self.network.modeTracker.get_modes()
             sorted_modes = sorted(modes_per_leaves[leaf_node.index])
-            label_mapping = SoftmaxCompresser.get_compressed_probability_mapping(modes=sorted_modes, dataset=dataset)
-            label_mappings[leaf_node.index] = label_mapping
+            label_mapping = SoftmaxCompresser.get_compressed_probability_mapping(modes=sorted_modes,
+                                                                                 dataset=self.dataset)
+            self.labelMappings[leaf_node.index] = label_mapping
             if GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_logistic_layer:
-                logistic_weights, logistic_bias = SoftmaxCompresser.train_logistic_layer(sess=sess,
-                                                                                         training_data=network_outputs[
-                                                                                             DatasetTypes.training],
-                                                                                         validation_data=
-                                                                                         network_outputs[
-                                                                                             DatasetTypes.test],
-                                                                                         test_data=network_outputs[
-                                                                                             DatasetTypes.test],
-                                                                                         network=network,
-                                                                                         leaf_node=leaf_node,
-                                                                                         cross_val_count=10)
+                logistic_weights, logistic_bias = self.train_logistic_layer(sess=sess,
+                                                                            training_data=network_outputs[
+                                                                                DatasetTypes.training],
+                                                                            validation_data=
+                                                                            network_outputs[
+                                                                                DatasetTypes.test],
+                                                                            test_data=network_outputs[
+                                                                                DatasetTypes.test],
+                                                                            network=self.network,
+                                                                            leaf_node=leaf_node,
+                                                                            cross_val_count=10)
                 compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
             elif GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.random_start:
-                logistic_weights, logistic_bias = SoftmaxCompresser.init_random_logistic_layer(sess=sess,
-                                                                                               network=network,
-                                                                                               training_data=
-                                                                                               network_outputs[
-                                                                                                   DatasetTypes.training],
-                                                                                               leaf_node=leaf_node)
+                logistic_weights, logistic_bias = self.init_random_logistic_layer(sess=sess,
+                                                                                  training_data=
+                                                                                  network_outputs[
+                                                                                      DatasetTypes.training],
+                                                                                  leaf_node=leaf_node)
                 compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
             else:
                 raise NotImplementedError()
@@ -181,8 +183,7 @@ class SoftmaxCompresser:
         assert is_equal1
         assert is_equal2
 
-    @staticmethod
-    def train_distillation_network(sess, network, leaf_node, training_data, test_data, run_id):
+    def train_distillation_network(self, sess, leaf_node, training_data, test_data):
         training_logits = training_data.logitsDict[leaf_node.index]
         training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
         training_features = training_data.featureVectorsDict[leaf_node.index]
@@ -198,16 +199,16 @@ class SoftmaxCompresser:
                                                                                 temperature=1.0)
         # Get the compressed probabilities
         training_compressed_posteriors, training_compressed_one_hot_entries = \
-            SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
-                                                             posteriors=training_tempered_posteriors,
-                                                             one_hot_labels=training_one_hot_labels)
+            self.build_compressed_probabilities(leaf_node=leaf_node,
+                                                posteriors=training_tempered_posteriors,
+                                                one_hot_labels=training_one_hot_labels)
         test_compressed_posteriors, test_compressed_one_hot_entries = \
-            SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
-                                                             posteriors=test_tempered_posteriors,
-                                                             one_hot_labels=test_one_hot_labels)
+            self.build_compressed_probabilities(leaf_node=leaf_node,
+                                                posteriors=test_tempered_posteriors,
+                                                one_hot_labels=test_one_hot_labels)
         logit_dim = training_logits.shape[1]
         features_dim = training_features.shape[1]
-        modes_per_leaves = network.modeTracker.get_modes()
+        modes_per_leaves = self.network.modeTracker.get_modes()
         compressed_class_count = len(modes_per_leaves[leaf_node.index]) + 1
         npz_file_name = "npz_node_{0}_final_features".format(leaf_node.index)
         UtilityFuncs.save_npz(npz_file_name,
@@ -234,10 +235,10 @@ class SoftmaxCompresser:
                                 stddev=0.1,
                                 seed=GlobalConstants.SEED,
                                 dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
+            name=self.network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
         softmax_biases = tf.Variable(
             tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+            name=self.network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
         # Compressed softmax probabilities
         compressed_logits = tf.matmul(features_tensor, softmax_weights) + softmax_biases
         # Prepare the loss function, according to Hinton's Distillation Recipe
@@ -324,11 +325,11 @@ class SoftmaxCompresser:
                 curr_lr = lr
             # Run the algorithm
             final_softmax_weights, final_softmax_biases, final_training_accuracy, final_test_accuracy = \
-                SoftmaxCompresser.train_for_params(network=network, leaf_node=leaf_node, run_id=run_id,
-                                                   lr=lr, temperature=temperature,
-                                                   soft_loss_weight=soft_loss_weight,
-                                                   hard_loss_weight=hard_loss_weight, l2_weight=l2_weight,
-                                                   tf_objects=tf_object, data_objects=data_object, kv_rows=kv_rows)
+                self.train_for_params(leaf_node=leaf_node,
+                                      lr=lr, temperature=temperature,
+                                      soft_loss_weight=soft_loss_weight,
+                                      hard_loss_weight=hard_loss_weight, l2_weight=l2_weight,
+                                      tf_objects=tf_object, data_objects=data_object, kv_rows=kv_rows)
             if GlobalConstants.USE_SOFTMAX_DISTILLATION_VERBOSE:
                 DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         # # Pick the best result
@@ -341,8 +342,7 @@ class SoftmaxCompresser:
         # # Get the best result among the best parameters
         print("X")
 
-    @staticmethod
-    def train_for_params(network, leaf_node, run_id,
+    def train_for_params(self, leaf_node,
                          lr, temperature, soft_loss_weight, hard_loss_weight, l2_weight,
                          tf_objects, data_objects, kv_rows):
         assert tf_objects.trainer is not None and tf_objects.learningRate is not None
@@ -359,13 +359,13 @@ class SoftmaxCompresser:
                                                                                 temperature=temperature)
         # Get the compressed probabilities
         training_compressed_posteriors, training_compressed_one_hot_entries = \
-            SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
-                                                             posteriors=training_tempered_posteriors,
-                                                             one_hot_labels=data_objects.trainingOneHotLabels)
+            self.build_compressed_probabilities(leaf_node=leaf_node,
+                                                posteriors=training_tempered_posteriors,
+                                                one_hot_labels=data_objects.trainingOneHotLabels)
         test_compressed_posteriors, test_compressed_one_hot_entries = \
-            SoftmaxCompresser.build_compressed_probabilities(network=network, leaf_node=leaf_node,
-                                                             posteriors=test_tempered_posteriors,
-                                                             one_hot_labels=data_objects.testOneHotLabels)
+            self.build_compressed_probabilities(leaf_node=leaf_node,
+                                                posteriors=test_tempered_posteriors,
+                                                one_hot_labels=data_objects.testOneHotLabels)
 
         # Training sets
         training_sample_count = data_objects.trainingFeatures.shape[0]
@@ -378,9 +378,9 @@ class SoftmaxCompresser:
         training_x = data_objects.trainingFeatures[training_indices]
         max_feature_entry = np.max(training_x)
         min_feature_entry = np.min(training_x)
-        kv_rows.append((run_id, -1,
+        kv_rows.append((self.runId, -1,
                         "Leaf:{0} max_feature_entry".format(leaf_node.index), max_feature_entry))
-        kv_rows.append((run_id, -1,
+        kv_rows.append((self.runId, -1,
                         "Leaf:{0} min_feature_entry".format(leaf_node.index), min_feature_entry))
         training_indices.extend(random_indices)
         training_p_wrapped = training_compressed_posteriors[training_indices]
@@ -398,9 +398,9 @@ class SoftmaxCompresser:
         # Calculate accuracy on the validation set
         test_accuracy_full = \
             SoftmaxCompresser.calculate_compressed_accuracy(posteriors=test_p, one_hot_labels=test_t)
-        kv_rows.append((run_id, -1,
+        kv_rows.append((self.runId, -1,
                         "Leaf:{0} Training Accuracy Full".format(leaf_node.index), training_accuracy_full))
-        kv_rows.append((run_id, -1,
+        kv_rows.append((self.runId, -1,
                         "Leaf:{0} Test Accuracy Full".format(leaf_node.index), test_accuracy_full))
         # Train
         batch_size = int(float(training_sample_count) * GlobalConstants.SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO)
@@ -477,9 +477,9 @@ class SoftmaxCompresser:
                                                                                               hard_loss_weight,
                                                                                               l2_weight, lr
                                                                                               )
-                        kv_rows.append((run_id, iteration, "Training Accuracy {0}".format(kv_table_key),
+                        kv_rows.append((self.runId, iteration, "Training Accuracy {0}".format(kv_table_key),
                                         training_accuracy))
-                        kv_rows.append((run_id, iteration, "Test Accuracy {0}".format(kv_table_key),
+                        kv_rows.append((self.runId, iteration, "Test Accuracy {0}".format(kv_table_key),
                                         test_accuracy))
                     if is_last_epoch:
                         final_softmax_weights = hyperplane_weights
@@ -489,12 +489,11 @@ class SoftmaxCompresser:
                         return final_softmax_weights, final_softmax_biases, final_training_accuracy, final_test_accuracy
                     break
 
-    @staticmethod
-    def build_compressed_probabilities(network, leaf_node, posteriors, one_hot_labels):
+    def build_compressed_probabilities(self, leaf_node, posteriors, one_hot_labels):
         # Order mode labels from small to large, assign the smallest label to "0", next one to "1" and so on.
         # If there are N modes, Outlier class will have N as the label.
         label_count = one_hot_labels.shape[1]
-        modes_per_leaves = network.modeTracker.get_modes()
+        modes_per_leaves = self.network.modeTracker.get_modes()
         sorted_modes = sorted(modes_per_leaves[leaf_node.index])
         non_mode_labels = [l for l in range(label_count) if l not in modes_per_leaves[leaf_node.index]]
         mode_posteriors = posteriors[:, sorted_modes]
@@ -510,7 +509,7 @@ class SoftmaxCompresser:
     def get_compressed_probability_mapping(modes, dataset):
         label_count = dataset.get_label_count()
         sorted_modes = sorted(modes)
-        label_mapping = np.zeros(shape=(label_count, ), dtype=np.int32)
+        label_mapping = np.zeros(shape=(label_count,), dtype=np.int32)
         for i in range(len(sorted_modes)):
             label_mapping[sorted_modes[i]] = i
         for l in range(label_count):
@@ -547,8 +546,8 @@ class SoftmaxCompresser:
         tempered_posteriors = exp_logits / logit_sums
         return tempered_posteriors
 
-    @staticmethod
-    def train_logistic_layer(sess, training_data, validation_data, test_data, network, leaf_node, cross_val_count):
+    def train_logistic_layer(self, sess, training_data, validation_data, test_data, network, leaf_node,
+                             cross_val_count):
         modes_per_leaves = network.modeTracker.get_modes()
         sorted_modes = sorted(modes_per_leaves[leaf_node.index])
         training_logits = training_data.logitsDict[leaf_node.index]
@@ -659,9 +658,8 @@ class SoftmaxCompresser:
         logistic_bias = selected_logistic_model.intercept_
         return softmax_weights, softmax_biases
 
-    @staticmethod
-    def init_random_logistic_layer(sess, network, training_data, leaf_node):
-        modes_per_leaves = network.modeTracker.get_modes()
+    def init_random_logistic_layer(self, sess, training_data, leaf_node):
+        modes_per_leaves = self.network.modeTracker.get_modes()
         sorted_modes = sorted(modes_per_leaves[leaf_node.index])
         training_logits = training_data.logitsDict[leaf_node.index]
         training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
@@ -680,9 +678,9 @@ class SoftmaxCompresser:
                                 stddev=0.1,
                                 seed=GlobalConstants.SEED,
                                 dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
+            name=self.network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
         softmax_biases = tf.Variable(
             tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+            name=self.network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
         sess.run([softmax_weights.initializer, softmax_biases.initializer])
         return softmax_weights, softmax_biases

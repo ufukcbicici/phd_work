@@ -3,6 +3,7 @@ import numpy as np
 
 from algorithms.accuracy_calculator import AccuracyCalculator
 from algorithms.mode_tracker import ModeTracker
+from algorithms.softmax_compresser import SoftmaxCompresser
 from algorithms.variable_manager import VariableManager
 from auxillary.constants import DatasetTypes
 from auxillary.dag_utilities import Dag
@@ -77,6 +78,7 @@ class TreeNetwork:
         self.modeTracker = ModeTracker(network=self)
         self.accuracyCalculator = AccuracyCalculator(network=self)
         self.variableManager = VariableManager(network=self)
+        self.softmaxCompresser = None
 
     # def get_parent_index(self, node_index):
     #     parent_index = int((node_index - 1) / self.treeDegree)
@@ -100,6 +102,10 @@ class TreeNetwork:
             return True
         else:
             return False
+
+    def reset_network(self, dataset, run_id):
+        self.modeTracker.reset()
+        self.softmaxCompresser = SoftmaxCompresser(network=self, dataset=dataset, run_id=run_id)
 
     def build_network(self):
         # Create itself
