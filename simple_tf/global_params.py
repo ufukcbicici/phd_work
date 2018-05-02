@@ -90,7 +90,7 @@ class GlobalConstants:
     SOFTMAX_DISTILLATION_VERBOSE = True
 
     SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT = 10
-    USE_SOFTMAX_DISTILLATION = True
+    USE_SOFTMAX_DISTILLATION = False
     # Softmax Compression Parameters
 
     ROUTE_CORRECTION_PERIOD = 5000
@@ -104,7 +104,7 @@ class GlobalConstants:
 
     DATA_TYPE = tf.float32
     SEED = None
-    USE_VERBOSE = True
+    USE_VERBOSE = False
     USE_SOFTMAX_DISTILLATION_VERBOSE = True
     USE_CPU = False
     USE_CPU_MASKING = False
