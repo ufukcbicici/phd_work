@@ -116,3 +116,16 @@ class UtilityFuncs:
                 modes.add(tpl[0])
                 cumulative_prob += tpl[1]
         return modes
+
+    @staticmethod
+    def distribute_evenly_to_threads(num_of_threads, list_to_distribute):
+        thread_dict = {}
+        curr_thread_id = 0
+        for item in list_to_distribute:
+            if curr_thread_id not in thread_dict:
+                thread_dict[curr_thread_id] = []
+            thread_dict[curr_thread_id].append(item)
+            curr_thread_id = (curr_thread_id + 1) % num_of_threads
+        return thread_dict
+
+

@@ -1,4 +1,5 @@
 import itertools
+import threading
 from random import shuffle
 
 import numpy as np
@@ -19,6 +20,40 @@ class NetworkOutputs:
         self.posteriorsDict = {}
         self.oneHotLabelsDict = {}
         self.labelMappings = {}
+
+
+class LogisticRegressionFitter(threading.Thread):
+    def __init__(self, thread_id, reg_weights_list,
+                 training_features, training_labels,
+                 test_features, test_labels,
+                 cross_val_count):
+        threading.Thread.__init__(self)
+        self.threadId = thread_id
+        self.regWeights = reg_weights_list
+        self.trainingFeatures = training_features
+        self.trainingLabels = training_labels
+        self.testFeatures = test_features
+        self.testLabels = test_labels
+        self.crossValidationCount = cross_val_count
+        self.results = []
+
+    def run(self):
+        for regularizer_weight in self.regWeights:
+            logistic_regression = LogisticRegression(solver="newton-cg", multi_class="multinomial",
+                                                     C=regularizer_weight, max_iter=1000)
+            cv_scores = cross_val_score(estimator=logistic_regression, X=self.trainingFeatures, y=self.trainingLabels,
+                                        cv=self.crossValidationCount)
+            logistic_regression.fit(X=self.trainingFeatures, y=self.trainingLabels)
+            score_training = logistic_regression.score(X=self.trainingFeatures, y=self.trainingLabels)
+            score_test = logistic_regression.score(X=self.testFeatures, y=self.testLabels)
+            mean_score = np.mean(cv_scores)
+            self.results.append((mean_score, logistic_regression, regularizer_weight, score_training, score_test))
+            # print("L2 Weight:{0} Mean CV Score:{1} Training Score:{2} Test Score:{3}".format(regularizer_weight,
+            #                                                                                  mean_score,
+            #                                                                                  score_training,
+            #                                                                                  score_test))
+
+
 
 
 # class RunData:
@@ -610,26 +645,28 @@ class SoftmaxCompresser:
         results_list = []
         best_test_result = 0.0
         best_test_l2_weight = -1.0
-        for regularizer_weight in regularizer_weights:
-            logistic_regression = LogisticRegression(solver="newton-cg", multi_class="multinomial",
-                                                     C=regularizer_weight, max_iter=1000)
-            cv_scores = cross_val_score(estimator=logistic_regression, X=training_features, y=training_labels,
-                                        cv=cross_val_count)
-            logistic_regression.fit(X=training_features, y=training_labels)
-            score_training = logistic_regression.score(X=training_features, y=training_labels)
-            score_test = logistic_regression.score(X=test_features, y=test_labels)
-            if score_test > best_test_result:
-                best_test_l2_weight = regularizer_weight
-                best_test_result = score_test
-            mean_score = np.mean(cv_scores)
-            results_list.append((mean_score, logistic_regression, regularizer_weight, score_training, score_test))
-            print("L2 Weight:{0} Mean CV Score:{1} Training Score:{2} Test Score:{3}".format(regularizer_weight,
-                                                                                             mean_score,
-                                                                                             score_training,
-                                                                                             score_test))
-        sorted_results = sorted(results_list, key=lambda tpl: tpl[0], reverse=True)
-        best_result = sorted_results[0]
-        selected_logistic_model = best_result[1]
+        regularizer_weights_dict = \
+            UtilityFuncs.distribute_evenly_to_threads(num_of_threads=GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT,
+                                                      list_to_distribute=regularizer_weights)
+        threads_dict = {}
+        for thread_id in range(GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT):
+            threads_dict[thread_id] = LogisticRegressionFitter(thread_id=thread_id,
+                                                               reg_weights_list=regularizer_weights_dict[thread_id],
+                                                               training_features=training_features,
+                                                               training_labels=training_labels,
+                                                               test_features=test_features, test_labels=test_labels,
+                                                               cross_val_count=cross_val_count)
+            threads_dict[thread_id].start()
+        all_results = []
+        for thread in threads_dict.values():
+            thread.join()
+        for thread in threads_dict.values():
+            all_results.extend(thread.results)
+        sorted_results_best_validation = sorted(all_results, key=lambda tpl: tpl[0], reverse=True)
+        sorted_results_best_test = sorted(all_results, key=lambda tpl: tpl[-1], reverse=True)
+        best_result_validation = sorted_results_best_validation[0]
+        best_test_result = sorted_results_best_test[0][-1]
+        selected_logistic_model = best_result_validation[1]
         features_dim = training_features.shape[1]
         compressed_class_count = training_one_hot_labels_compressed.shape[1]
         logistic_weight = np.transpose(selected_logistic_model.coef_)
@@ -642,7 +679,7 @@ class SoftmaxCompresser:
             name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
         sess.run([softmax_weights.initializer, softmax_biases.initializer])
         print("Best Test Result:{0} Best L2 Weight:{1}".format(best_test_result, best_test_l2_weight))
-        print("Selected L2 Weight:{0}".format(best_result[2]))
+        print("Selected L2 Weight:{0}".format(best_result_validation[2]))
         if GlobalConstants.SOFTMAX_DISTILLATION_VERBOSE:
             x_tensor = tf.placeholder(tf.float32)
             compressed_logits = tf.matmul(x_tensor, softmax_weights) + softmax_biases
