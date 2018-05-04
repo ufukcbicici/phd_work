@@ -89,7 +89,7 @@ class TreeNetwork:
         return tf.Variable(cnst, name=complete_name)
 
     def get_decision_parameters(self):
-        vars = self.variableManager.trainable_variables()
+        vars = self.variableManager.trainableVariables
         H_vars = [v for v in vars if "hyperplane" in v.name]
         for i in range(len(H_vars)):
             self.decisionParamsDict[H_vars[i]] = i
@@ -202,8 +202,15 @@ class TreeNetwork:
                     node.leafCountUnderThisNode += 1
         # Learning rate, counter
         self.globalCounter = tf.Variable(0, dtype=GlobalConstants.DATA_TYPE, trainable=False)
-        # Save all trainable variables
-        self.variableManager.save_trainable_variables()
+        # Record all variables into the variable manager (For backwards compatibility)
+        self.variableManager.get_all_node_variables()
+
+        # Unit Test
+        tf_trainable_vars = set(tf.trainable_variables())
+        custom_trainable_vars = set(self.variableManager.trainable_variables())
+        assert tf_trainable_vars == custom_trainable_vars
+        # Unit Test
+
         # Prepare the cost function
         # ******************** Main losses ********************
         primary_losses = []
@@ -252,25 +259,7 @@ class TreeNetwork:
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.gradFunc(network=self)
-        # Assign ops for variables
-        for var in vars:
-            is_residue_variable = "_residue_" in var.name
-            op_name = self.get_assign_op_name(variable=var)
-            new_value = tf.placeholder(name=op_name, dtype=GlobalConstants.DATA_TYPE)
-            assign_op = tf.assign(ref=var, value=new_value)
-            self.newValuesDict[op_name] = new_value
-            self.assignOpsDict[op_name] = assign_op
-            self.momentumStatesDict[var.name] = np.zeros(shape=var.shape)
-            for node in self.topologicalSortedNodes:
-                if var in node.variablesSet:
-                    if var.name in self.varToNodesDict:
-                        raise Exception("{0} is in the parameters already.".format(var.name))
-                    self.varToNodesDict[var.name] = node
-            if not is_residue_variable and var.name not in self.varToNodesDict:
-                raise Exception("{0} is not in the parameters!".format(var.name))
-                # Add tensorboard ops
-                # self.summaryFunc(network=self)
-                # self.summaryWriter = tf.summary.FileWriter(GlobalConstants.SUMMARY_DIR + "//train")
+
 
     def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
         if calculation_type == AccuracyCalcType.regular:
@@ -447,7 +436,8 @@ class TreeNetwork:
         # Main loss
         main_grads = {}
         for k, v in self.mainLossParamsDict.items():
-            node = self.varToNodesDict[k.name]
+            # print(k.name)
+            node = self.variableManager.varToNodesDict[k]
             is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
             if not is_node_open:
                 continue
@@ -487,7 +477,7 @@ class TreeNetwork:
             is_residue_var = "_residue_" in k.name
             # coeff = 1.0
             if not is_residue_var:
-                node = self.varToNodesDict[k.name]
+                node = self.variableManager.varToNodesDict[k]
                 is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
                 if not is_node_open:
                     continue
@@ -539,7 +529,7 @@ class TreeNetwork:
         #         self.summaryWriter.add_summary(summary, iteration)
         d_grads = {}
         for k, v in self.decisionParamsDict.items():
-            node = self.varToNodesDict[k.name]
+            node = self.variableManager.varToNodesDict[k]
             is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
             if not is_node_open:
                 continue

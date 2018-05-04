@@ -274,6 +274,8 @@ def residue_network_func(network):
                             dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_2")
     fc_residue_bias_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS],
                                                 dtype=GlobalConstants.DATA_TYPE), name="fc_residue_bias_2")
+    network.variableManager.add_variables_to_node(node=None, tf_variables=[fc_residue_weights_1, fc_residue_bias_1,
+                                                                           fc_residue_weights_2, fc_residue_bias_2])
     # Reside Network Operations
     residue_hidden_layer = tf.nn.relu(tf.matmul(input_x, fc_residue_weights_1) + fc_residue_bias_1)
     residue_drop = tf.nn.dropout(residue_hidden_layer, keep_prob=network.classificationDropoutKeepProb)
