@@ -54,8 +54,6 @@ class LogisticRegressionFitter(threading.Thread):
             #                                                                                  score_test))
 
 
-
-
 # class RunData:
 #     def __init__(self):
 
@@ -171,7 +169,6 @@ class SoftmaxCompresser:
                                                                                 DatasetTypes.test],
                                                                             test_data=network_outputs[
                                                                                 DatasetTypes.test],
-                                                                            network=self.network,
                                                                             leaf_node=leaf_node,
                                                                             cross_val_count=10)
                 compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
@@ -184,8 +181,48 @@ class SoftmaxCompresser:
                 compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
             else:
                 raise NotImplementedError()
+        # Change the loss layers for all leaf nodes
+        for node in self.network.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            leaf_node = node
 
         return compressed_layers_dict
+
+    # def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
+    #     final_feature_final = final_feature
+    #     if GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION:
+    #         final_feature_final = tf.nn.dropout(final_feature, self.classificationDropoutKeepProb)
+    #     if GlobalConstants.USE_DECISION_AUGMENTATION:
+    #         concat_list = [final_feature_final]
+    #         concat_list.extend(node.activationsDict.values())
+    #         final_feature_final = tf.concat(values=concat_list, axis=1)
+    #     node.residueOutputTensor = final_feature_final
+    #     node.finalFeatures = final_feature_final
+    #     node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature_final
+    #     node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature_final)
+    #     logits = tf.matmul(final_feature_final, softmax_weights) + softmax_biases
+    #     cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
+    #                                                                                logits=logits)
+    #     parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}
+    #     mixture_of_expert_updates = {GradientType.mixture_of_experts_biased, GradientType.mixture_of_experts_unbiased}
+    #     if GlobalConstants.GRADIENT_TYPE in parallel_dnn_updates:
+    #         pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
+    #         loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
+    #     elif GlobalConstants.GRADIENT_TYPE in mixture_of_expert_updates:
+    #         pre_loss = tf.reduce_sum(cross_entropy_loss_tensor)
+    #         loss = (1.0 / float(GlobalConstants.BATCH_SIZE)) * pre_loss
+    #     else:
+    #         raise NotImplementedError()
+    #     node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
+    #     node.lossList.append(loss)
+    #     return final_feature_final, logits
+
+    # def apply_compressed_loss(self, node, softmax_weights, softmax_biases):
+
+
+
+
 
     @staticmethod
     def assert_prob_correctness(softmax_weights, softmax_biases, features, logits, probs, leaf_node):
@@ -265,15 +302,21 @@ class SoftmaxCompresser:
         hard_labels_cost_weight = tf.placeholder(tf.float32)
         l2_loss_weight = tf.placeholder(tf.float32)
         # Get new class count: Mode labels + Outliers. Init the new classifier hyperplanes.
-        softmax_weights = tf.Variable(
-            tf.truncated_normal([features_dim, compressed_class_count],
-                                stddev=0.1,
-                                seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE),
-            name=self.network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
-        softmax_biases = tf.Variable(
-            tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
-            name=self.network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+        softmax_weights = self.network.variableManager.create_and_add_variable_to_node(
+            node=leaf_node,
+            name=self.network.get_variable_name(name="distilled_fc_softmax_weights_{0}".format(self.runId)),
+            initial_value=tf.truncated_normal([features_dim, compressed_class_count],
+                                              stddev=0.1,
+                                              seed=GlobalConstants.SEED,
+                                              dtype=GlobalConstants.DATA_TYPE),
+            is_trainable=True
+        )
+        softmax_biases = self.network.variableManager.create_and_add_variable_to_node(
+            node=leaf_node,
+            name=self.network.get_variable_name(name="distilled_fc_softmax_biases_{0}".format(self.runId)),
+            initial_value=tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
+            is_trainable=True
+        )
         # Compressed softmax probabilities
         compressed_logits = tf.matmul(features_tensor, softmax_weights) + softmax_biases
         # Prepare the loss function, according to Hinton's Distillation Recipe
@@ -294,7 +337,8 @@ class SoftmaxCompresser:
         # grad_hard_loss = tf.gradients(ys=hard_loss, xs=[softmax_weights, softmax_biases])
         # grad_sm_weights = tf.gradients(ys=weight_l2, xs=[softmax_weights])
         # Counter
-        global_step = tf.Variable(name="global_step", initial_value=0, trainable=False)
+        global_step = self.network.variableManager.create_and_add_variable_to_node(node=None, name="global_step", initial_value=0,
+                                                                                   is_trainable=False)
         # Train by cross-validation
         # temperature_list = [1.0]
         # soft_loss_weights = [0.0, 0.25, 0.5, 0.75, 1.0]
@@ -581,9 +625,9 @@ class SoftmaxCompresser:
         tempered_posteriors = exp_logits / logit_sums
         return tempered_posteriors
 
-    def train_logistic_layer(self, sess, training_data, validation_data, test_data, network, leaf_node,
+    def train_logistic_layer(self, sess, training_data, validation_data, test_data, leaf_node,
                              cross_val_count):
-        modes_per_leaves = network.modeTracker.get_modes()
+        modes_per_leaves = self.network.modeTracker.get_modes()
         sorted_modes = sorted(modes_per_leaves[leaf_node.index])
         training_logits = training_data.logitsDict[leaf_node.index]
         training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
@@ -671,12 +715,14 @@ class SoftmaxCompresser:
         compressed_class_count = training_one_hot_labels_compressed.shape[1]
         logistic_weight = np.transpose(selected_logistic_model.coef_)
         logistic_bias = selected_logistic_model.intercept_
-        softmax_weights = tf.Variable(
-            tf.constant(logistic_weight, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
-        softmax_biases = tf.Variable(
-            tf.constant(logistic_bias, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+        softmax_weights = self.network.variableManager.create_and_add_variable_to_node(
+            node=leaf_node,
+            initial_value=tf.constant(logistic_weight, dtype=GlobalConstants.DATA_TYPE),
+            name=self.network.get_variable_name(name="distilled_fc_softmax_weights_{0}".format(self.runId), node=leaf_node))
+        softmax_biases = self.network.variableManager.create_and_add_variable_to_node(
+            node=leaf_node,
+            initial_value=tf.constant(logistic_bias, dtype=GlobalConstants.DATA_TYPE),
+            name=self.network.get_variable_name(name="distilled_fc_softmax_biases_{0}".format(self.runId), node=leaf_node))
         sess.run([softmax_weights.initializer, softmax_biases.initializer])
         print("Best Test Result:{0} Best L2 Weight:{1}".format(best_test_result, best_test_l2_weight))
         print("Selected L2 Weight:{0}".format(best_result_validation[2]))
@@ -710,14 +756,16 @@ class SoftmaxCompresser:
 
         features_dim = training_features.shape[1]
         compressed_class_count = training_one_hot_labels_compressed.shape[1]
-        softmax_weights = tf.Variable(
-            tf.truncated_normal([features_dim, compressed_class_count],
+        softmax_weights = self.network.variableManager.create_and_add_variable_to_node(
+            node=leaf_node,
+            initial_value=tf.truncated_normal([features_dim, compressed_class_count],
                                 stddev=0.1,
                                 seed=GlobalConstants.SEED,
                                 dtype=GlobalConstants.DATA_TYPE),
-            name=self.network.get_variable_name(name="distilled_fc_softmax_weights", node=leaf_node))
-        softmax_biases = tf.Variable(
-            tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
-            name=self.network.get_variable_name(name="distilled_fc_softmax_biases", node=leaf_node))
+            name=self.network.get_variable_name(name="distilled_fc_softmax_weights_{0}".format(self.runId), node=leaf_node))
+        softmax_biases = self.network.variableManager.create_and_add_variable_to_node(
+            node=leaf_node,
+            initial_value=tf.constant(0.1, shape=[compressed_class_count], dtype=GlobalConstants.DATA_TYPE),
+            name=self.network.get_variable_name(name="distilled_fc_softmax_biases_{0}".format(self.runId), node=leaf_node))
         sess.run([softmax_weights.initializer, softmax_biases.initializer])
         return softmax_weights, softmax_biases

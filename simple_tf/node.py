@@ -4,7 +4,6 @@ class Node:
         self.depth = depth
         self.isRoot = is_root
         self.isLeaf = is_leaf
-        self.variablesSet = set()
         self.fOpsList = []
         self.hOpsList = []
         self.lossList = []
@@ -20,10 +19,12 @@ class Node:
         self.softmaxDecay = None
         self.probThresholdCalculator = None
         self.softmaxDecayCalculator = None
+        self.finalFeatures = None
         self.residueOutputTensor = None
         self.weightDecayModifier = 1.0
         self.infoGainBalanceCoefficient = None
         self.p_n_given_x = None
+        self.leafCountUnderThisNode = 0
         # Indexed by the nodes producing them
         self.activationsDict = {}
         self.proxyLossInputDicts = {}

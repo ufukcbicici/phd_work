@@ -62,7 +62,6 @@ class TreeNetwork:
         self.isTrain = None
         self.useMasking = None
         self.isDecisionPhase = None
-        self.varToNodesDict = {}
         self.mainLossParamsDict = {}
         self.residueParamsDict = {}
         self.regularizationParamsDict = {}
@@ -194,6 +193,13 @@ class TreeNetwork:
             # One Hot Label outputs
             if node.oneHotLabelTensor is not None:
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
+        # Get the leaf counts, which are descendants of each node
+        for node in self.topologicalSortedNodes:
+            descendants = self.dagObject.descendants(node=node)
+            descendants.append(node)
+            for descendant in descendants:
+                if descendant.isLeaf:
+                    node.leafCountUnderThisNode += 1
         # Learning rate, counter
         self.globalCounter = tf.Variable(0, dtype=GlobalConstants.DATA_TYPE, trainable=False)
         # Save all trainable variables
@@ -458,6 +464,9 @@ class TreeNetwork:
                     sample_count = sample_counts[sample_count_entry_name]
                 gradient_modifier = float(GlobalConstants.BATCH_SIZE) / float(sample_count)
                 modified_g = gradient_modifier * g
+                main_grads[k] = modified_g
+            elif GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_biased:
+                modified_g = (1.0 / node.leafCountUnderThisNode) * g
                 main_grads[k] = modified_g
         # Residue Loss
         res_grads = {}
@@ -728,6 +737,7 @@ class TreeNetwork:
             concat_list.extend(node.activationsDict.values())
             final_feature_final = tf.concat(values=concat_list, axis=1)
         node.residueOutputTensor = final_feature_final
+        node.finalFeatures = final_feature_final
         node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature_final
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature_final)
         logits = tf.matmul(final_feature_final, softmax_weights) + softmax_biases

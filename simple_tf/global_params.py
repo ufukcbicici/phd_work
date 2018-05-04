@@ -92,6 +92,7 @@ class GlobalConstants:
     SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT = 10
     USE_SOFTMAX_DISTILLATION = True
     SOFTMAX_DISTILLATION_CPU_COUNT = 8
+    SOFTMAX_DISTILLATION_GRADIENT_TYPE = GradientType.parallel_dnns_unbiased
     # Softmax Compression Parameters
 
     ROUTE_CORRECTION_PERIOD = 5000
