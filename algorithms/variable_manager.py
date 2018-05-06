@@ -42,6 +42,16 @@ class VariableManager:
             self.network.assignOpsDict[op_name] = assign_op
             self.network.momentumStatesDict[tf_variable.name] = np.zeros(shape=tf_variable.shape)
 
+    def remove_variables_with_name(self, name):
+        list_of_vars = [var for var in self.trainableVariables if name in var.name]
+        for var in list_of_vars:
+            self.remove_variable(variable=var)
+
+    def remove_variable(self, variable):
+        list_of_vars = [var for var in self.trainableVariables if var == variable]
+        assert len(list_of_vars) == 1
+        self.trainableVariables.remove(list_of_vars[0])
+
     # Backward compatibility method
     def get_all_node_variables(self):
         for node in self.network.topologicalSortedNodes:

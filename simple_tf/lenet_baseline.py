@@ -69,6 +69,10 @@ def grad_func(network):
         classification_vars_list.append(v)
         if not ("gamma" in v.name or "beta" in v.name):
             regularization_vars_list.append(v)
+    network.decisionParamsDict = {}
+    network.mainLossParamsDict = {}
+    network.residueParamsDict = {}
+    network.regularizationParamsDict = {}
     for i in range(len(decision_vars_list)):
         network.decisionParamsDict[decision_vars_list[i]] = i
     for i in range(len(classification_vars_list)):

@@ -10,7 +10,7 @@ from sklearn.model_selection import cross_val_score
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants, SoftmaxCompressionStrategy
+from simple_tf.global_params import GlobalConstants, SoftmaxCompressionStrategy, GradientType
 
 
 class NetworkOutputs:
@@ -160,6 +160,7 @@ class SoftmaxCompresser:
             label_mapping = SoftmaxCompresser.get_compressed_probability_mapping(modes=sorted_modes,
                                                                                  dataset=self.dataset)
             self.labelMappings[leaf_node.index] = label_mapping
+            self.network.variableManager.remove_variables_with_name(name="_softmax_")
             if GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_logistic_layer:
                 logistic_weights, logistic_bias = self.train_logistic_layer(sess=sess,
                                                                             training_data=network_outputs[
@@ -186,8 +187,36 @@ class SoftmaxCompresser:
             if not node.isLeaf:
                 continue
             leaf_node = node
+            self.change_leaf_loss(node=leaf_node, compressed_layers_dict=compressed_layers_dict)
+        # Redefine the main classification loss and the regularization loss; these are dependent on the new
+        # compressed hyperplanes.
+        self.network.build_main_loss()
+        self.network.build_regularization_loss()
+        # Re-calculate the gradients
+        self.network.gradFunc(network=self.network)
 
-        return compressed_layers_dict
+    def change_leaf_loss(self, node, compressed_layers_dict):
+        softmax_weights = compressed_layers_dict[node.index][0]
+        softmax_biases = compressed_layers_dict[node.index][1]
+        logits = tf.matmul(node.finalFeatures , softmax_weights) + softmax_biases
+        if node.labelMappingTensor is None:
+            node.labelMappingTensor = tf.placeholder(name="label_mapping_node_{0}".format(node.index), dtype=tf.int64)
+            node.compressedLabelsTensor = tf.nn.embedding_lookup(params=node.labelMappingTensor, ids=node.labelTensor)
+        cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.compressedLabelsTensor,
+                                                                                   logits=logits)
+        parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}
+        mixture_of_expert_updates = {GradientType.mixture_of_experts_biased, GradientType.mixture_of_experts_unbiased}
+        if GlobalConstants.SOFTMAX_DISTILLATION_GRADIENT_TYPE in parallel_dnn_updates:
+            pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
+            loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
+        elif GlobalConstants.SOFTMAX_DISTILLATION_GRADIENT_TYPE in mixture_of_expert_updates:
+            pre_loss = tf.reduce_sum(cross_entropy_loss_tensor)
+            loss = (1.0 / float(GlobalConstants.BATCH_SIZE)) * pre_loss
+        else:
+            raise NotImplementedError()
+        node.fOpsList[-1] = loss
+        assert len(node.lossList) == 1
+        node.lossList = [loss]
 
     # def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
     #     final_feature_final = final_feature

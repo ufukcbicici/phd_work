@@ -194,9 +194,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-                                   0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-                                   0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    classification_dropout_prob = [0.2]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -319,7 +317,7 @@ def main():
                                                             iteration=iteration_counter, epoch=epoch_id)
                 if do_compress:
                     print("**********************Compressing the network**********************")
-                    compressed_layers_dict = network.softmaxCompresser.compress_network_softmax(sess=sess)
+                    network.softmaxCompresser.compress_network_softmax(sess=sess)
                     print("**********************Compressing the network**********************")
 
         test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,

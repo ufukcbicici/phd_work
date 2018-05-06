@@ -1,3 +1,5 @@
+import tensorflow as tf
+
 class Node:
     def __init__(self, index, depth, is_root, is_leaf):
         self.index = index
@@ -9,6 +11,8 @@ class Node:
         self.lossList = []
         self.infoGainLoss = None
         self.labelTensor = None
+        self.labelMappingTensor = None
+        self.compressedLabelsTensor = None
         self.oneHotLabelTensor = None
         self.indicesTensor = None
         self.isOpenIndicatorTensor = None

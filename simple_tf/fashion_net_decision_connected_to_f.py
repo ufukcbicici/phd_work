@@ -267,6 +267,10 @@ def grad_func(network):
                 regularization_vars_list.append(v)
     else:
         raise NotImplementedError()
+    network.decisionParamsDict = {}
+    network.mainLossParamsDict = {}
+    network.residueParamsDict = {}
+    network.regularizationParamsDict = {}
     for i in range(len(decision_vars_list)):
         network.decisionParamsDict[decision_vars_list[i]] = i
     for i in range(len(classification_vars_list)):

@@ -49,8 +49,8 @@ class TreeNetwork:
         self.assignOpsDict = {}
         self.learningRate = None
         self.globalCounter = None
-        self.weightDecayCoeff = None
-        self.decisionWeightDecayCoeff = None
+        self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
+        self.decisionWeightDecayCoeff = tf.placeholder(name="decision_weight_decay_coefficient", dtype=tf.float32)
         self.useThresholding = None
         self.iterationHolder = None
         self.decisionDropoutKeepProb = None
@@ -97,7 +97,7 @@ class TreeNetwork:
 
     def is_decision_variable(self, variable):
         if "scale" in variable.name or "shift" in variable.name or "hyperplane" in variable.name or \
-                "gamma" in variable.name or "beta" in variable.name or "_decision_" in variable.name:
+                        "gamma" in variable.name or "beta" in variable.name or "_decision_" in variable.name:
             return True
         else:
             return False
@@ -156,15 +156,14 @@ class TreeNetwork:
         # Set up mechanism for probability thresholding
         if not self.isBaseline:
             self.thresholdFunc(network=self)
+        # Build all symbolic networks in each node
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
+        # Disable some properties if we are using a baseline
         if self.isBaseline:
             GlobalConstants.USE_INFO_GAIN_DECISION = False
             GlobalConstants.USE_CONCAT_TRICK = False
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
-            self.residueLoss = tf.constant(value=0.0)
-        else:
-            self.residueLoss = GlobalConstants.RESIDUE_LOSS_COEFFICIENT * self.residueFunc(network=self)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
@@ -202,6 +201,9 @@ class TreeNetwork:
                     node.leafCountUnderThisNode += 1
         # Learning rate, counter
         self.globalCounter = tf.Variable(0, dtype=GlobalConstants.DATA_TYPE, trainable=False)
+        # Prepare the cost function
+        # ******************** Residue loss ********************
+        self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
         self.variableManager.get_all_node_variables()
 
@@ -210,17 +212,36 @@ class TreeNetwork:
         custom_trainable_vars = set(self.variableManager.trainable_variables())
         assert tf_trainable_vars == custom_trainable_vars
         # Unit Test
+        # ******************** Residue loss ********************
 
-        # Prepare the cost function
         # ******************** Main losses ********************
+        self.build_main_loss()
+        # ******************** Main losses ********************
+
+        # ******************** Decision losses ********************
+        self.build_decision_loss()
+        # ******************** Decision losses ********************
+
+        # ******************** Regularization losses ********************
+        self.build_regularization_loss()
+        # ******************** Regularization losses ********************
+        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
+        self.evalDict["RegularizerLoss"] = self.regularizationLoss
+        self.evalDict["PrimaryLoss"] = self.mainLoss
+        self.evalDict["ResidueLoss"] = self.residueLoss
+        self.evalDict["DecisionLoss"] = self.decisionLoss
+        self.evalDict["NetworkLoss"] = self.finalLoss
+        self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
+        self.gradFunc(network=self)
+
+    def build_main_loss(self):
         primary_losses = []
         for node in self.topologicalSortedNodes:
             primary_losses.extend(node.lossList)
-        # ******************** Main losses ********************
+        self.mainLoss = tf.add_n(primary_losses)
 
-        # ******************** Regularization losses ********************
-        self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
-        self.decisionWeightDecayCoeff = tf.placeholder(name="decision_weight_decay_coefficient", dtype=tf.float32)
+    def build_regularization_loss(self):
         vars = self.variableManager.trainable_variables()
         l2_loss_list = []
         for v in vars:
@@ -235,31 +256,24 @@ class TreeNetwork:
                     l2_loss_list.append(self.decisionWeightDecayCoeff * loss_tensor)
                 else:
                     l2_loss_list.append(self.weightDecayCoeff * loss_tensor)
-        # ******************** Regularization losses ********************
+        self.regularizationLoss = tf.add_n(l2_loss_list)
 
-        # ******************** Decision losses ********************
+    def build_decision_loss(self):
         decision_losses = []
         for node in self.topologicalSortedNodes:
             if node.isLeaf:
                 continue
             decision_losses.append(node.infoGainLoss)
-        self.regularizationLoss = tf.add_n(l2_loss_list)
-        self.mainLoss = tf.add_n(primary_losses)
         if len(decision_losses) > 0 and not self.isBaseline:
             self.decisionLoss = GlobalConstants.DECISION_LOSS_COEFFICIENT * tf.add_n(decision_losses)
         else:
             self.decisionLoss = tf.constant(value=0.0)
-        # ******************** Decision losses ********************
-        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
-        self.evalDict["RegularizerLoss"] = self.regularizationLoss
-        self.evalDict["PrimaryLoss"] = self.mainLoss
-        self.evalDict["ResidueLoss"] = self.residueLoss
-        self.evalDict["DecisionLoss"] = self.decisionLoss
-        self.evalDict["NetworkLoss"] = self.finalLoss
-        self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
-        self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
-        self.gradFunc(network=self)
 
+    def build_residue_loss(self):
+        if self.isBaseline:
+            self.residueLoss = tf.constant(value=0.0)
+        else:
+            self.residueLoss = GlobalConstants.RESIDUE_LOSS_COEFFICIENT * self.residueFunc(network=self)
 
     def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
         if calculation_type == AccuracyCalcType.regular:
@@ -444,7 +458,7 @@ class TreeNetwork:
             g = classification_grads[v]
             # print("Param:{0} Classification Grad Norm:{1}".format(k.name, np.linalg.norm(g)))
             if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
-                    GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
+                        GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
                 main_grads[k] = g
             elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
                 sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
@@ -481,8 +495,8 @@ class TreeNetwork:
                 is_node_open = is_open_indicators[self.get_variable_name(name="is_open", node=node)]
                 if not is_node_open:
                     continue
-                # if GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY and not self.is_decision_variable(variable=k):
-                #     coeff = node.weightDecayModifier
+                    # if GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY and not self.is_decision_variable(variable=k):
+                    #     coeff = node.weightDecayModifier
             r = regularization_grads[v]
             reg_grads[k] = r
         return main_grads, res_grads, reg_grads, vars_current_values, sample_counts, is_open_indicators
