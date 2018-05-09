@@ -108,6 +108,7 @@ class SoftmaxCompresser:
         self.network = network
         self.dataset = dataset
         self.runId = run_id
+        self.labelMappings = {}
         pass
 
     def compress_network_softmax(self, sess):
@@ -151,6 +152,7 @@ class SoftmaxCompresser:
         # Train all leaf classifiers by distillation
         compressed_layers_dict = {}
         self.labelMappings = {}
+        self.network.variableManager.remove_variables_with_name(name="_softmax_")
         for node in self.network.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
@@ -160,7 +162,6 @@ class SoftmaxCompresser:
             label_mapping = SoftmaxCompresser.get_compressed_probability_mapping(modes=sorted_modes,
                                                                                  dataset=self.dataset)
             self.labelMappings[leaf_node.index] = label_mapping
-            self.network.variableManager.remove_variables_with_name(name="_softmax_")
             if GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_logistic_layer:
                 logistic_weights, logistic_bias = self.train_logistic_layer(sess=sess,
                                                                             training_data=network_outputs[
@@ -193,12 +194,14 @@ class SoftmaxCompresser:
         self.network.build_main_loss()
         self.network.build_regularization_loss()
         # Re-calculate the gradients
+        GlobalConstants.GRADIENT_TYPE = GlobalConstants.SOFTMAX_DISTILLATION_GRADIENT_TYPE
         self.network.gradFunc(network=self.network)
 
     def change_leaf_loss(self, node, compressed_layers_dict):
         softmax_weights = compressed_layers_dict[node.index][0]
         softmax_biases = compressed_layers_dict[node.index][1]
         logits = tf.matmul(node.finalFeatures , softmax_weights) + softmax_biases
+        self.network.evalDict[self.network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
         if node.labelMappingTensor is None:
             node.labelMappingTensor = tf.placeholder(name="label_mapping_node_{0}".format(node.index), dtype=tf.int64)
             node.compressedLabelsTensor = tf.nn.embedding_lookup(params=node.labelMappingTensor, ids=node.labelTensor)

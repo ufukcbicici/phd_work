@@ -360,6 +360,12 @@ class TreeNetwork:
         else:
             feed_dict[self.decisionDropoutKeepProb] = 1.0
 
+    def get_label_mappings(self, feed_dict):
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            feed_dict[node.labelMappingTensor] = self.softmaxCompresser.labelMappings[node.index]
+
     def get_effective_sample_counts(self, sample_counts):
         effective_sample_counts = {}
         for node in self.topologicalSortedNodes:
@@ -403,6 +409,8 @@ class TreeNetwork:
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration,
                                            update=True)
             self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=True)
+            if self.modeTracker.isCompressed:
+                self.get_label_mappings(feed_dict=feed_dict)
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.residueGradients,

@@ -51,6 +51,9 @@ class VariableManager:
         list_of_vars = [var for var in self.trainableVariables if var == variable]
         assert len(list_of_vars) == 1
         self.trainableVariables.remove(list_of_vars[0])
+        container_node = self.varToNodesDict[variable]
+        self.nodesToVarsDict[container_node.index].remove(variable)
+        del self.varToNodesDict[variable]
 
     # Backward compatibility method
     def get_all_node_variables(self):
