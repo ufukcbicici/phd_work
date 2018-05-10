@@ -129,6 +129,108 @@ class AccuracyCalculator:
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return overall_correct / overall_count, confusion_matrix_db_rows
 
+    def calculate_accuracy_after_compression(self, sess, dataset, dataset_type):
+        branch_probs = {}
+        posterior_probs = {}
+        leaf_true_labels_dict = {}
+        final_features_dict = {}
+        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        while True:
+            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            for node in self.network.topologicalSortedNodes:
+                if not node.isLeaf:
+                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
+                                                         array=branch_prob)
+                else:
+                    posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                    true_labels = results["Node{0}_label_tensor".format(node.index)]
+                    final_features = results[self.network.get_variable_name(name="final_feature_final", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                                                         array=posterior_prob)
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                         array=true_labels)
+                    UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
+                                                         array=final_features)
+            if dataset.isNewEpoch:
+                break
+        # Integrity check
+        true_labels_list = list(leaf_true_labels_dict.values())
+        for label_arr in true_labels_list:
+            assert np.array_equal(label_arr, true_labels_list[0])
+        # Method 1: Find the most confident leaf. If this leaf is indecisive, then find the most confident leaf.
+        # If all confidents are indecisive, then pick the most confident leaf's prediction as a heuristic.
+        root_node = self.network.nodes[0]
+        sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
+        total_correct = 0
+        total_mode_prediction_count = 0
+        total_correct_of_mode_predictions = 0
+        samples_with_non_mode_predictions = set()
+        wrong_samples_with_non_mode_predictions = set()
+        true_labels_dict = {}
+        modes_per_leaves = self.network.modeTracker.get_modes()
+        # Predict all samples which correspond to modes
+        for sample_index in range(sample_count):
+            curr_node = root_node
+            probabilities_on_path = []
+            while True:
+                if not curr_node.isLeaf:
+                    p_n_given_sample = branch_probs[curr_node.index][sample_index, :]
+                    child_nodes = self.network.dagObject.children(node=curr_node)
+                    child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
+                    arg_max_index = np.asscalar(np.argmax(p_n_given_sample))
+                    probabilities_on_path.append(p_n_given_sample[arg_max_index])
+                    curr_node = child_nodes_sorted[arg_max_index]
+                else:
+                    sample_posterior = posterior_probs[curr_node.index][sample_index, :]
+                    predicted_compressed_label = np.asscalar(np.argmax(sample_posterior))
+                    true_label = leaf_true_labels_dict[curr_node.index][sample_index]
+                    true_labels_dict[sample_index] = true_label
+                    inverse_label_mapping = self.network.softmaxCompresser.inverseLabelMappings[curr_node.index]
+                    predicted_label = inverse_label_mapping[predicted_compressed_label]
+                    if predicted_label == -1:
+                        samples_with_non_mode_predictions.add(sample_index)
+                    else:
+                        total_mode_prediction_count += 1
+                        if predicted_label == true_label:
+                            total_correct += 1
+                            total_correct_of_mode_predictions += 1
+        # Handle all samples with non mode predictions
+        # Try to correct non mode estimations with a simple heuristics:
+        # 1) Check all leaves. Among the leaves which predicts the sample having a label within its modes, choose the
+        # prediction with the highest confidence.
+        # 2) If all leaves predict the sample as a non mode, pick the estimate with the highest confidence.
+        total_correct_non_mode_predictions = 0
+        for sample_index in samples_with_non_mode_predictions:
+            curr_predicted_label = None
+            curr_prediction_confidence = 0.0
+            for node in self.network.topologicalSortedNodes:
+                if not node.isLeaf:
+                    continue
+                sample_posterior = posterior_probs[node.index][sample_index, :]
+                compressed_labels_sorted = np.argsort(sample_posterior)[::-1]
+                inverse_label_mapping = self.network.softmaxCompresser.inverseLabelMappings[node.index]
+                predicted_compressed_label0 = compressed_labels_sorted[0]
+                predicted_label0 = inverse_label_mapping[predicted_compressed_label0]
+                label0_probability = sample_posterior[predicted_compressed_label0]
+                predicted_compressed_label1 = compressed_labels_sorted[1]
+                predicted_label1 = inverse_label_mapping[predicted_compressed_label1]
+                label1_probability = sample_posterior[predicted_compressed_label1]
+                assert predicted_label0 != -1 or predicted_label1 != -1
+                if predicted_label0 != -1:
+                    if label0_probability + 1.0 > curr_prediction_confidence:
+                        curr_prediction_confidence = label0_probability + 1.0
+                        curr_predicted_label = predicted_label0
+                else:
+                    if label1_probability > curr_prediction_confidence:
+                        curr_prediction_confidence = label1_probability
+                        curr_predicted_label = predicted_label1
+            if curr_predicted_label == true_labels_dict[sample_index]:
+                total_correct += 1
+                total_correct_non_mode_predictions += 1
+        accuracy = total_correct / sample_count
+        return accuracy
+
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_predicted_labels_dict = {}

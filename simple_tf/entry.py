@@ -273,38 +273,44 @@ def main():
                 if dataset.isNewEpoch:
                     if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
                         print("Epoch Time={0}".format(total_time))
-                        training_accuracy, training_confusion = \
-                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
-                                                       run_id=experiment_id, iteration=iteration_counter,
-                                                       calculation_type=AccuracyCalcType.regular)
-                        validation_accuracy, validation_confusion = \
-                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
-                                                       run_id=experiment_id, iteration=iteration_counter,
-                                                       calculation_type=AccuracyCalcType.regular)
-                        if not network.isBaseline:
-                            validation_accuracy_corrected, validation_marginal_corrected = \
+                        if not network.modeTracker.isCompressed:
+                            training_accuracy, training_confusion = \
                                 network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.test,
-                                                           run_id=experiment_id,
-                                                           iteration=iteration_counter,
-                                                           calculation_type=
-                                                           AccuracyCalcType.route_correction)
+                                                           dataset_type=DatasetTypes.training,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy, validation_confusion = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            if not network.isBaseline:
+                                validation_accuracy_corrected, validation_marginal_corrected = \
+                                    network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                               dataset_type=DatasetTypes.test,
+                                                               run_id=experiment_id,
+                                                               iteration=iteration_counter,
+                                                               calculation_type=
+                                                               AccuracyCalcType.route_correction)
+                            else:
+                                validation_accuracy_corrected = 0.0
+                                validation_marginal_corrected = 0.0
                         else:
-                            validation_accuracy_corrected = 0.0
-                            validation_marginal_corrected = 0.0
-                            # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                            #                                                 dataset_type=DatasetTypes.test)
-                        # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                        #                                                 dataset_type=DatasetTypes.validation)
-                        # DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
-                        #                                  "Corrected Validation Accuracy",
-                        #                                  validation_accuracy_corrected)],
-                        #                           table=DbLogger.runKvStore, col_count=4)
+                            training_accuracy, training_confusion = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                           dataset_type=DatasetTypes.training,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy, validation_confusion = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy_corrected = validation_accuracy
                         DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
                                                          validation_accuracy, validation_accuracy_corrected,
-                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
+                                                         0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
                         DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
-                        if GlobalConstants.SAVE_CONFUSION_MATRICES:
+                        if GlobalConstants.SAVE_CONFUSION_MATRICES and training_confusion is not None and \
+                                        validation_confusion is not None:
                             DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
                                                       col_count=7)
                             DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
@@ -320,29 +326,29 @@ def main():
                     network.softmaxCompresser.compress_network_softmax(sess=sess)
                     print("**********************Compressing the network**********************")
 
-        test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                                   dataset_type=DatasetTypes.test,
-                                                                   run_id=experiment_id, iteration=iteration_counter,
-                                                                   calculation_type=AccuracyCalcType.regular)
-        result_rows = [(experiment_id, explanation, test_accuracy, "Regular")]
-        if not network.isBaseline:
-            test_accuracy_corrected, test_marginal_corrected = \
-                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                           dataset_type=DatasetTypes.test,
-                                           run_id=experiment_id,
-                                           iteration=iteration_counter,
-                                           calculation_type=
-                                           AccuracyCalcType.route_correction)
-            # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
-            DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
-                                             "Corrected Test Accuracy",
-                                             test_accuracy_corrected)],
-                                      table=DbLogger.runKvStore, col_count=4)
-            result_rows.append((experiment_id, explanation, test_accuracy_corrected, "Corrected"))
-            result_rows.append((experiment_id, explanation, test_marginal_corrected, "Marginal"))
-        DbLogger.write_into_table(result_rows, table=DbLogger.runResultsTable, col_count=4)
-        if GlobalConstants.SAVE_CONFUSION_MATRICES:
-            DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)
+        # test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
+        #                                                            dataset_type=DatasetTypes.test,
+        #                                                            run_id=experiment_id, iteration=iteration_counter,
+        #                                                            calculation_type=AccuracyCalcType.regular)
+        # result_rows = [(experiment_id, explanation, test_accuracy, "Regular")]
+        # if not network.isBaseline:
+        #     test_accuracy_corrected, test_marginal_corrected = \
+        #         network.calculate_accuracy(sess=sess, dataset=dataset,
+        #                                    dataset_type=DatasetTypes.test,
+        #                                    run_id=experiment_id,
+        #                                    iteration=iteration_counter,
+        #                                    calculation_type=
+        #                                    AccuracyCalcType.route_correction)
+        #     # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
+        #     DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
+        #                                      "Corrected Test Accuracy",
+        #                                      test_accuracy_corrected)],
+        #                               table=DbLogger.runKvStore, col_count=4)
+        #     result_rows.append((experiment_id, explanation, test_accuracy_corrected, "Corrected"))
+        #     result_rows.append((experiment_id, explanation, test_marginal_corrected, "Marginal"))
+        # DbLogger.write_into_table(result_rows, table=DbLogger.runResultsTable, col_count=4)
+        # if GlobalConstants.SAVE_CONFUSION_MATRICES and test_confusion is not None:
+        #     DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)
         print("X")
         run_id += 1
 

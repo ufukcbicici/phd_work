@@ -276,23 +276,28 @@ class TreeNetwork:
             self.residueLoss = GlobalConstants.RESIDUE_LOSS_COEFFICIENT * self.residueFunc(network=self)
 
     def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
-        if calculation_type == AccuracyCalcType.regular:
-            accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
-                                                                             dataset_type=dataset_type,
-                                                                             run_id=run_id,
-                                                                             iteration=iteration)
-            return accuracy, confusion
-        elif calculation_type == AccuracyCalcType.route_correction:
-            accuracy_corrected, marginal_corrected = \
-                self.accuracyCalculator.calculate_accuracy_with_route_correction(
-                    sess=sess, dataset=dataset,
-                    dataset_type=dataset_type)
-            return accuracy_corrected, marginal_corrected
-        elif calculation_type == AccuracyCalcType.with_residue_network:
-            self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                            dataset_type=dataset_type)
+        if not self.modeTracker.isCompressed:
+            if calculation_type == AccuracyCalcType.regular:
+                accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
+                                                                                 dataset_type=dataset_type,
+                                                                                 run_id=run_id,
+                                                                                 iteration=iteration)
+                return accuracy, confusion
+            elif calculation_type == AccuracyCalcType.route_correction:
+                accuracy_corrected, marginal_corrected = \
+                    self.accuracyCalculator.calculate_accuracy_with_route_correction(
+                        sess=sess, dataset=dataset,
+                        dataset_type=dataset_type)
+                return accuracy_corrected, marginal_corrected
+            elif calculation_type == AccuracyCalcType.with_residue_network:
+                self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+                                                                                dataset_type=dataset_type)
+            else:
+                raise NotImplementedError()
         else:
-            raise NotImplementedError()
+            accuracy = self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
+                                                                                    dataset_type=dataset_type)
+            return accuracy, None
 
     def check_for_compression(self, run_id, epoch, iteration, dataset):
         do_compress = self.modeTracker.check_for_compression_start(dataset=dataset, epoch=epoch)
@@ -795,6 +800,8 @@ class TreeNetwork:
             self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
             self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
+            # if self.modeTracker.isCompressed:
+            #     self.get_label_mappings(feed_dict=feed_dict)
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
         for k, v in results.items():
