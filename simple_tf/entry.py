@@ -214,8 +214,11 @@ def main():
         #                                                              decay_period=GlobalConstants.DECAY_STEP)
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(15000, 0.005), (30000, 0.0025),
-                                                                               (40000, 0.00025)])
+                                                                     schedule=[(15000, 0.005),
+                                                                               (30000, 0.0025),
+                                                                               (40000, 0.00025),
+                                                                               (60000, 0.000125),
+                                                                               (80000, 0.0000125)])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
         #                                                                value=GlobalConstants.INITIAL_LR,
