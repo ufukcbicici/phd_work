@@ -195,6 +195,7 @@ class AccuracyCalculator:
                         if predicted_label == true_label:
                             total_correct += 1
                             total_correct_of_mode_predictions += 1
+                    break
         # Handle all samples with non mode predictions
         # Try to correct non mode estimations with a simple heuristics:
         # 1) Check all leaves. Among the leaves which predicts the sample having a label within its modes, choose the
