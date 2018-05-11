@@ -24,7 +24,7 @@ class SoftmaxCompressionStrategy(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 200
+    TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
