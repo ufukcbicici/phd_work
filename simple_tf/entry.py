@@ -195,7 +195,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.15]
+    classification_dropout_prob = [0.2]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -296,27 +296,31 @@ def main():
                             else:
                                 validation_accuracy_corrected = 0.0
                                 validation_marginal_corrected = 0.0
+                            DbLogger.write_into_table(
+                                rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
+                                       validation_accuracy, validation_accuracy_corrected,
+                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                            # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
+                            if GlobalConstants.SAVE_CONFUSION_MATRICES:
+                                DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
+                                                          col_count=7)
+                                DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
+                                                          col_count=7)
                         else:
-                            training_accuracy, training_confusion = \
+                            training_accuracy_best_leaf, training_confusion_residue = \
                                 network.calculate_accuracy(sess=sess, dataset=dataset,
                                                            dataset_type=DatasetTypes.training,
                                                            run_id=experiment_id, iteration=iteration_counter,
                                                            calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy, validation_confusion = \
+                            validation_accuracy_best_leaf, validation_confusion_residue = \
                                 network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
                                                            run_id=experiment_id, iteration=iteration_counter,
                                                            calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy_corrected = validation_accuracy
-                        DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy, validation_accuracy_corrected,
-                                                         0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
-                        DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
-                        if GlobalConstants.SAVE_CONFUSION_MATRICES and training_confusion is not None and \
-                                        validation_confusion is not None:
-                            DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
-                                                      col_count=7)
-                            DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
-                                                      col_count=7)
+                            DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id,
+                                                             training_accuracy_best_leaf,
+                                                             validation_accuracy_best_leaf,
+                                                             validation_confusion_residue,
+                                                             0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
                         leaf_info_rows = []
                     break
             # Compress softmax classifiers

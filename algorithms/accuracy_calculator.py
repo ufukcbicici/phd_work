@@ -158,7 +158,7 @@ class AccuracyCalculator:
                                                              self.network.classificationDropoutKeepProb:
                                                                  GlobalConstants.CLASSIFICATION_DROPOUT_PROB})
                     UtilityFuncs.concat_to_np_array_dict(dct=residue_posteriors_dict, key=node.index,
-                                                         array=residue_posteriors)
+                                                         array=residue_posteriors[0])
 
             if dataset.isNewEpoch:
                 break
@@ -170,12 +170,12 @@ class AccuracyCalculator:
         # If all confidents are indecisive, then pick the most confident leaf's prediction as a heuristic.
         root_node = self.network.nodes[0]
         sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
-        total_correct = 0
         total_mode_prediction_count = 0
         total_correct_of_mode_predictions = 0
         samples_with_non_mode_predictions = set()
         wrong_samples_with_non_mode_predictions = set()
         true_labels_dict = {}
+        leaf_nodes_dict = {}
         modes_per_leaves = self.network.modeTracker.get_modes()
         # Predict all samples which correspond to modes
         for sample_index in range(sample_count):
@@ -194,6 +194,7 @@ class AccuracyCalculator:
                     predicted_compressed_label = np.asscalar(np.argmax(sample_posterior))
                     true_label = leaf_true_labels_dict[curr_node.index][sample_index]
                     true_labels_dict[sample_index] = true_label
+                    leaf_nodes_dict[sample_index] = curr_node.index
                     inverse_label_mapping = self.network.softmaxCompresser.inverseLabelMappings[curr_node.index]
                     predicted_label = inverse_label_mapping[predicted_compressed_label]
                     if predicted_label == -1:
@@ -201,7 +202,6 @@ class AccuracyCalculator:
                     else:
                         total_mode_prediction_count += 1
                         if predicted_label == true_label:
-                            total_correct += 1
                             total_correct_of_mode_predictions += 1
                     break
         # Handle all samples with non mode predictions Method 1
@@ -209,7 +209,10 @@ class AccuracyCalculator:
         # 1) Check all leaves. Among the leaves which predicts the sample having a label within its modes, choose the
         # prediction with the highest confidence.
         # 2) If all leaves predict the sample as a non mode, pick the estimate with the highest confidence.
-        total_correct_non_mode_predictions = 0
+        method1_total_correct_non_mode_predictions = 0
+        set_of_indecisive_samples = set()
+        method1_total_correct_decisive_predictions = 0
+        method1_total_correct_indecisive_predictions = 0
         for sample_index in samples_with_non_mode_predictions:
             curr_predicted_label = None
             curr_prediction_confidence = 0.0
@@ -234,14 +237,31 @@ class AccuracyCalculator:
                     if label1_probability > curr_prediction_confidence:
                         curr_prediction_confidence = label1_probability
                         curr_predicted_label = predicted_label1
+            if curr_prediction_confidence < 1.0:
+                set_of_indecisive_samples.add(sample_index)
             if curr_predicted_label == true_labels_dict[sample_index]:
-                total_correct += 1
-                total_correct_non_mode_predictions += 1
-        best_leaf_accuracy = total_correct / sample_count
+                method1_total_correct_non_mode_predictions += 1
+                if curr_prediction_confidence < 1.0:
+                    method1_total_correct_indecisive_predictions += 1
+                else:
+                    method1_total_correct_decisive_predictions += 1
+        best_leaf_accuracy = (method1_total_correct_non_mode_predictions + total_correct_of_mode_predictions) / \
+                             sample_count
+
         # Handle all samples with non mode predictions Method 2
         # Try to correct non mode estimations with the residue network:
         # If a sample is non-mode, then accept the residue network's inference about it as the final result.
-        return accuracy
+        method2_total_correct_indecisive_predictions = 0
+        for sample_index in set_of_indecisive_samples:
+            residue_posterior = residue_posteriors_dict[leaf_nodes_dict[sample_index]][sample_index, :]
+            residue_predicted_label = np.asscalar(np.argmax(residue_posterior))
+            if residue_predicted_label == true_labels_dict[sample_index]:
+                method2_total_correct_indecisive_predictions += 1
+        residue_correction_accuracy = (method2_total_correct_indecisive_predictions +
+                                       method1_total_correct_decisive_predictions +
+                                       total_correct_of_mode_predictions) / \
+                                      sample_count
+        return best_leaf_accuracy, residue_correction_accuracy
 
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)

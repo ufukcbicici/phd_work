@@ -296,9 +296,10 @@ class TreeNetwork:
             else:
                 raise NotImplementedError()
         else:
-            accuracy = self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
-                                                                                    dataset_type=dataset_type)
-            return accuracy, None
+            best_leaf_accuracy, residue_corrected_accuracy = \
+                self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
+                                                                             dataset_type=dataset_type)
+            return best_leaf_accuracy, residue_corrected_accuracy
 
     def check_for_compression(self, run_id, epoch, iteration, dataset):
         do_compress = self.modeTracker.check_for_compression_start(dataset=dataset, epoch=epoch)
