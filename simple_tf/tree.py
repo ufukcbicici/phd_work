@@ -51,6 +51,7 @@ class TreeNetwork:
         self.globalCounter = None
         self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
         self.decisionWeightDecayCoeff = tf.placeholder(name="decision_weight_decay_coefficient", dtype=tf.float32)
+        self.residueInputTensor = None
         self.useThresholding = None
         self.iterationHolder = None
         self.decisionDropoutKeepProb = None

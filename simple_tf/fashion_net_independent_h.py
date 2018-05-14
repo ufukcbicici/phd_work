@@ -260,8 +260,8 @@ def leaf_func(node, network, variables=None):
 
 def residue_network_func(network):
     all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
-    input_x = all_residue_features  # tf.stop_gradient(all_residue_features)
-    input_dim = input_x.get_shape().as_list()[-1]
+    network.residueInputTensor = all_residue_features  # tf.stop_gradient(all_residue_features)
+    input_dim = network.residueInputTensor.get_shape().as_list()[-1]
     # Residue Network Parameters
     fc_residue_weights_1 = tf.Variable(
         tf.truncated_normal([input_dim, GlobalConstants.FASHION_F_RESIDUE], stddev=0.1, seed=GlobalConstants.SEED,
@@ -277,7 +277,7 @@ def residue_network_func(network):
     network.variableManager.add_variables_to_node(node=None, tf_variables=[fc_residue_weights_1, fc_residue_bias_1,
                                                                            fc_residue_weights_2, fc_residue_bias_2])
     # Reside Network Operations
-    residue_hidden_layer = tf.nn.relu(tf.matmul(input_x, fc_residue_weights_1) + fc_residue_bias_1)
+    residue_hidden_layer = tf.nn.relu(tf.matmul(network.residueInputTensor, fc_residue_weights_1) + fc_residue_bias_1)
     residue_drop = tf.nn.dropout(residue_hidden_layer, keep_prob=network.classificationDropoutKeepProb)
     residue_logits = tf.matmul(residue_drop, fc_residue_weights_2) + fc_residue_bias_2
     cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=input_labels,
@@ -286,7 +286,7 @@ def residue_network_func(network):
     network.evalDict["residue_probabilities"] = tf.nn.softmax(residue_logits)
     network.evalDict["residue_labels"] = input_labels
     network.evalDict["residue_indices"] = input_indices
-    network.evalDict["residue_features"] = input_x
+    network.evalDict["residue_features"] = network.residueInputTensor
     return loss
     # return tf.constant(value=0.0)
 

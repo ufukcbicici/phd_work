@@ -134,6 +134,7 @@ class AccuracyCalculator:
         posterior_probs = {}
         leaf_true_labels_dict = {}
         final_features_dict = {}
+        residue_posteriors_dict = {}
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         while True:
             results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
@@ -152,6 +153,13 @@ class AccuracyCalculator:
                                                          array=true_labels)
                     UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
                                                          array=final_features)
+                    residue_posteriors = sess.run([self.network.evalDict["residue_probabilities"]],
+                                                  feed_dict={self.network.residueInputTensor: final_features,
+                                                             self.network.classificationDropoutKeepProb:
+                                                                 GlobalConstants.CLASSIFICATION_DROPOUT_PROB})
+                    UtilityFuncs.concat_to_np_array_dict(dct=residue_posteriors_dict, key=node.index,
+                                                         array=residue_posteriors)
+
             if dataset.isNewEpoch:
                 break
         # Integrity check
@@ -196,7 +204,7 @@ class AccuracyCalculator:
                             total_correct += 1
                             total_correct_of_mode_predictions += 1
                     break
-        # Handle all samples with non mode predictions
+        # Handle all samples with non mode predictions Method 1
         # Try to correct non mode estimations with a simple heuristics:
         # 1) Check all leaves. Among the leaves which predicts the sample having a label within its modes, choose the
         # prediction with the highest confidence.
@@ -229,7 +237,10 @@ class AccuracyCalculator:
             if curr_predicted_label == true_labels_dict[sample_index]:
                 total_correct += 1
                 total_correct_non_mode_predictions += 1
-        accuracy = total_correct / sample_count
+        best_leaf_accuracy = total_correct / sample_count
+        # Handle all samples with non mode predictions Method 2
+        # Try to correct non mode estimations with the residue network:
+        # If a sample is non-mode, then accept the residue network's inference about it as the final result.
         return accuracy
 
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
