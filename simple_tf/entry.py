@@ -92,7 +92,8 @@ def get_explanation_string(network):
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
             explanation += node.probThresholdCalculator.get_explanation()
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-    explanation += "Use Softmax Compression:{0}".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
+    explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
+    explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
     explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_F_NUM_FILTERS_1)
     explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
@@ -102,6 +103,8 @@ def get_explanation_string(network):
     explanation += "F FC1:{0} Units\n".format(GlobalConstants.FASHION_F_FC_1)
     explanation += "F FC2:{0} Units\n".format(GlobalConstants.FASHION_F_FC_2)
     explanation += "F Residue FC:{0} Units\n".format(GlobalConstants.FASHION_F_RESIDUE)
+    explanation += "Residue Hidden Layer Count:{0}\n".format(GlobalConstants.FASHION_F_RESIDUE_LAYER_COUNT)
+    explanation += "Residue Use Dropout:{0}\n".format(GlobalConstants.FASHION_F_RESIDUE_USE_DROPOUT)
     explanation += "H Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_H_NUM_FILTERS_1)
     explanation += "H Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,

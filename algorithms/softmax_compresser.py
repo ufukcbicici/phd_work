@@ -747,6 +747,13 @@ class SoftmaxCompresser:
         sorted_results_best_validation = sorted(all_results, key=lambda tpl: tpl[0], reverse=True)
         sorted_results_best_test = sorted(all_results, key=lambda tpl: tpl[-1], reverse=True)
         best_result_validation = sorted_results_best_validation[0]
+        best_result_test = sorted_results_best_test[0]
+        kv_rows = []
+        kv_rows.append((self.runId, -1,
+                        "Leaf:{0} Best Validation L2".format(leaf_node.index), best_result_validation[2]))
+        kv_rows.append((self.runId, -1,
+                        "Leaf:{0} Best Test L2".format(leaf_node.index), best_result_test[2]))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         best_test_result = sorted_results_best_test[0][-1]
         selected_logistic_model = best_result_validation[1]
         features_dim = training_features.shape[1]
