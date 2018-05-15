@@ -685,6 +685,17 @@ class SoftmaxCompresser:
         print("validation_accuracy_full={0}".format(validation_accuracy_full))
         print("test_accuracy_full={0}".format(test_accuracy_full))
 
+        npz_file_name = "npz_node_{0}_all_data".format(leaf_node.index)
+        UtilityFuncs.save_npz(npz_file_name,
+                              arr_dict={"training_features": training_features,
+                                        "training_labels": training_labels,
+                                        "test_features": test_features,
+                                        "test_labels": test_labels,
+                                        "training_posteriors_compressed": training_posteriors_compressed,
+                                        "training_one_hot_labels_compressed": training_one_hot_labels_compressed,
+                                        "test_posteriors_compressed": test_posteriors_compressed,
+                                        "test_one_hot_labels_compressed": test_one_hot_labels_compressed})
+
         all_training_data = \
             SoftmaxCompresser.TrainingData(training_features=training_features,
                                            training_labels=training_labels,
@@ -739,18 +750,23 @@ class SoftmaxCompresser:
         sorted_results_best_test = sorted(all_results, key=lambda tpl: tpl[-1], reverse=True)
         best_result_validation = sorted_results_best_validation[0]
         best_result_test = sorted_results_best_test[0]
-        kv_rows = []
-        kv_rows.append((self.runId, -1,
-                        "Leaf:{0} Best Validation L2".format(leaf_node.index), best_result_validation[2]))
-        kv_rows.append((self.runId, -1,
-                        "Leaf:{0} Best Test L2".format(leaf_node.index), best_result_test[2]))
-        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         best_test_result = sorted_results_best_test[0][-1]
         selected_logistic_model = best_result_validation[1]
         features_dim = all_training_data.training_features.shape[1]
         compressed_class_count = all_training_data.reduced_dimension
         logistic_weight = np.transpose(selected_logistic_model.coef_)
         logistic_bias = selected_logistic_model.intercept_
+        kv_rows = []
+        kv_rows.append((self.runId, -1,
+                        "Leaf:{0} Best Validation L2".format(leaf_node.index), best_result_validation[2]))
+        kv_rows.append((self.runId, -1,
+                        "Leaf:{0} Best Test L2".format(leaf_node.index), best_result_test[2]))
+        assert logistic_weight.shape[1] > logistic_weight.shape[0]
+        for col in range(logistic_weight.shape[1]):
+            magnitude = np.linalg.norm(logistic_weight[:, col])
+            kv_rows.append((self.runId, -1,
+                            "Leaf:{0} Hyperplane {1} Magnitude".format(leaf_node.index, col), magnitude))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         softmax_weights = self.network.variableManager.create_and_add_variable_to_node(
             node=leaf_node,
             initial_value=tf.constant(logistic_weight, dtype=GlobalConstants.DATA_TYPE),
