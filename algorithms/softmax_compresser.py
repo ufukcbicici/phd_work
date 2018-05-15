@@ -761,7 +761,7 @@ class SoftmaxCompresser:
                         "Leaf:{0} Best Validation L2".format(leaf_node.index), best_result_validation[2]))
         kv_rows.append((self.runId, -1,
                         "Leaf:{0} Best Test L2".format(leaf_node.index), best_result_test[2]))
-        assert logistic_weight.shape[1] > logistic_weight.shape[0]
+        assert logistic_weight.shape[0] > logistic_weight.shape[1]
         for col in range(logistic_weight.shape[1]):
             magnitude = np.linalg.norm(logistic_weight[:, col])
             kv_rows.append((self.runId, -1,
