@@ -11,6 +11,7 @@ from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, SoftmaxCompressionStrategy, GradientType
+from collections import namedtuple
 
 
 class NetworkOutputs:
@@ -103,6 +104,13 @@ class DataObjects:
 
 
 class SoftmaxCompresser:
+    TrainingData = namedtuple("TrainingData",
+                              ["training_features",
+                               "training_labels",
+                               "test_features",
+                               "test_labels",
+                               "reduced_dimension"])
+
     def __init__(self, network, dataset, run_id):
         self.network = network
         self.dataset = dataset
@@ -221,41 +229,6 @@ class SoftmaxCompresser:
         node.fOpsList[-1] = loss
         assert len(node.lossList) == 1
         node.lossList = [loss]
-
-    # def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
-    #     final_feature_final = final_feature
-    #     if GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION:
-    #         final_feature_final = tf.nn.dropout(final_feature, self.classificationDropoutKeepProb)
-    #     if GlobalConstants.USE_DECISION_AUGMENTATION:
-    #         concat_list = [final_feature_final]
-    #         concat_list.extend(node.activationsDict.values())
-    #         final_feature_final = tf.concat(values=concat_list, axis=1)
-    #     node.residueOutputTensor = final_feature_final
-    #     node.finalFeatures = final_feature_final
-    #     node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature_final
-    #     node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature_final)
-    #     logits = tf.matmul(final_feature_final, softmax_weights) + softmax_biases
-    #     cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
-    #                                                                                logits=logits)
-    #     parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}
-    #     mixture_of_expert_updates = {GradientType.mixture_of_experts_biased, GradientType.mixture_of_experts_unbiased}
-    #     if GlobalConstants.GRADIENT_TYPE in parallel_dnn_updates:
-    #         pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
-    #         loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
-    #     elif GlobalConstants.GRADIENT_TYPE in mixture_of_expert_updates:
-    #         pre_loss = tf.reduce_sum(cross_entropy_loss_tensor)
-    #         loss = (1.0 / float(GlobalConstants.BATCH_SIZE)) * pre_loss
-    #     else:
-    #         raise NotImplementedError()
-    #     node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
-    #     node.lossList.append(loss)
-    #     return final_feature_final, logits
-
-    # def apply_compressed_loss(self, node, softmax_weights, softmax_biases):
-
-
-
-
 
     @staticmethod
     def assert_prob_correctness(softmax_weights, softmax_biases, features, logits, probs, leaf_node):
@@ -662,14 +635,14 @@ class SoftmaxCompresser:
         tempered_posteriors = exp_logits / logit_sums
         return tempered_posteriors
 
-    def train_logistic_layer(self, sess, training_data, validation_data, test_data, leaf_node,
-                             cross_val_count):
+    def prepare_training_data(self, training_data, validation_data, test_data, leaf_node, temperature=1.0):
         modes_per_leaves = self.network.modeTracker.get_modes()
         sorted_modes = sorted(modes_per_leaves[leaf_node.index])
         training_logits = training_data.logitsDict[leaf_node.index]
         training_one_hot_labels = training_data.oneHotLabelsDict[leaf_node.index]
         training_features = training_data.featureVectorsDict[leaf_node.index]
-        training_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=training_logits, temperature=1.0)
+        training_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=training_logits,
+                                                                           temperature=temperature)
         training_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
                                                                                 probability=training_posteriors)
         training_one_hot_labels_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
@@ -679,7 +652,8 @@ class SoftmaxCompresser:
         validation_logits = validation_data.logitsDict[leaf_node.index]
         validation_one_hot_labels = validation_data.oneHotLabelsDict[leaf_node.index]
         validation_features = validation_data.featureVectorsDict[leaf_node.index]
-        validation_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=validation_logits, temperature=1.0)
+        validation_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=validation_logits,
+                                                                             temperature=temperature)
         validation_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
                                                                                   probability=validation_posteriors)
         validation_one_hot_labels_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
@@ -689,13 +663,12 @@ class SoftmaxCompresser:
         test_logits = test_data.logitsDict[leaf_node.index]
         test_one_hot_labels = test_data.oneHotLabelsDict[leaf_node.index]
         test_features = test_data.featureVectorsDict[leaf_node.index]
-        test_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=test_logits, temperature=1.0)
+        test_posteriors = SoftmaxCompresser.get_tempered_probabilities(logits=test_logits, temperature=temperature)
         test_posteriors_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
                                                                             probability=test_posteriors)
         test_one_hot_labels_compressed = SoftmaxCompresser.compress_probability(modes=sorted_modes,
                                                                                 probability=test_one_hot_labels)
         test_labels = np.argmax(test_one_hot_labels_compressed, axis=1)
-
         # Calculate accuracy on the training set
         training_accuracy_full = \
             SoftmaxCompresser.calculate_compressed_accuracy(posteriors=training_posteriors_compressed,
@@ -712,6 +685,24 @@ class SoftmaxCompresser:
         print("validation_accuracy_full={0}".format(validation_accuracy_full))
         print("test_accuracy_full={0}".format(test_accuracy_full))
 
+        all_training_data = \
+            SoftmaxCompresser.TrainingData(training_features=training_features,
+                                           training_labels=training_labels,
+                                           test_features=test_features,
+                                           test_labels=test_labels,
+                                           reduced_dimension=training_one_hot_labels_compressed.shape[1])
+        return all_training_data
+
+    def train_svm_layer(self, sess, training_data, validation_data, test_data, leaf_node,
+                        cross_val_count):
+        all_training_data = self.prepare_training_data(training_data=training_data, validation_data=validation_data,
+                                                       test_data=test_data, leaf_node=leaf_node)
+
+
+    def train_logistic_layer(self, sess, training_data, validation_data, test_data, leaf_node,
+                             cross_val_count):
+        all_training_data = self.prepare_training_data(training_data=training_data, validation_data=validation_data,
+                                                       test_data=test_data, leaf_node=leaf_node)
         regularizer_weights = [0.00001, 0.000025, 0.00005,
                                0.0001, 0.00025, 0.0005,
                                0.001, 0.0025, 0.005,
@@ -723,7 +714,6 @@ class SoftmaxCompresser:
                                100.0, 250.0, 500.0,
                                1000.0, 2500.0, 5000.0, 10000.0]
         # regularizer_weights = [0.01]
-
         results_list = []
         best_test_result = 0.0
         best_test_l2_weight = -1.0
@@ -734,9 +724,10 @@ class SoftmaxCompresser:
         for thread_id in range(GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT):
             threads_dict[thread_id] = LogisticRegressionFitter(thread_id=thread_id,
                                                                reg_weights_list=regularizer_weights_dict[thread_id],
-                                                               training_features=training_features,
-                                                               training_labels=training_labels,
-                                                               test_features=test_features, test_labels=test_labels,
+                                                               training_features=all_training_data.training_features,
+                                                               training_labels=all_training_data.training_labels,
+                                                               test_features=all_training_data.test_features,
+                                                               test_labels=all_training_data.test_labels,
                                                                cross_val_count=cross_val_count)
             threads_dict[thread_id].start()
         all_results = []
@@ -756,8 +747,8 @@ class SoftmaxCompresser:
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         best_test_result = sorted_results_best_test[0][-1]
         selected_logistic_model = best_result_validation[1]
-        features_dim = training_features.shape[1]
-        compressed_class_count = training_one_hot_labels_compressed.shape[1]
+        features_dim = all_training_data.training_features.shape[1]
+        compressed_class_count = all_training_data.reduced_dimension
         logistic_weight = np.transpose(selected_logistic_model.coef_)
         logistic_bias = selected_logistic_model.intercept_
         softmax_weights = self.network.variableManager.create_and_add_variable_to_node(
@@ -776,9 +767,9 @@ class SoftmaxCompresser:
         if GlobalConstants.SOFTMAX_DISTILLATION_VERBOSE:
             x_tensor = tf.placeholder(tf.float32)
             compressed_logits = tf.matmul(x_tensor, softmax_weights) + softmax_biases
-            result = sess.run([compressed_logits], feed_dict={x_tensor: training_features})
+            result = sess.run([compressed_logits], feed_dict={x_tensor: all_training_data.training_features})
             tensorflow_response = result[0]
-            scilearn_response = selected_logistic_model.decision_function(training_features)
+            scilearn_response = selected_logistic_model.decision_function(all_training_data.training_features)
             # assert np.allclose(tensorflow_response, scilearn_response)
             diff_matrix = np.abs(tensorflow_response - scilearn_response)
             ind = np.unravel_index(np.argmax(diff_matrix, axis=None), diff_matrix.shape)
