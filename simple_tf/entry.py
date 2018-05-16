@@ -94,6 +94,8 @@ def get_explanation_string(network):
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
     explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
     explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
+    explanation += "Softmax Distillation Cross Validation Count:{0}\n".\
+        format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
     explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_F_NUM_FILTERS_1)
     explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
