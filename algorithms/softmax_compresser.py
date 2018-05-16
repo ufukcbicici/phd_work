@@ -181,7 +181,8 @@ class SoftmaxCompresser:
                                                                             test_data=network_outputs[
                                                                                 DatasetTypes.test],
                                                                             leaf_node=leaf_node,
-                                                                            cross_val_count=10)
+                                                                            cross_val_count=
+                                                                            GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
                 compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
             elif GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.random_start:
                 logistic_weights, logistic_bias = self.init_random_logistic_layer(sess=sess,
@@ -763,7 +764,7 @@ class SoftmaxCompresser:
                         "Leaf:{0} Best Test L2".format(leaf_node.index), best_result_test[2]))
         assert logistic_weight.shape[0] > logistic_weight.shape[1]
         for col in range(logistic_weight.shape[1]):
-            magnitude = np.linalg.norm(logistic_weight[:, col])
+            magnitude = np.asscalar(np.linalg.norm(logistic_weight[:, col]))
             kv_rows.append((self.runId, -1,
                             "Leaf:{0} Hyperplane {1} Magnitude".format(leaf_node.index, col), magnitude))
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
