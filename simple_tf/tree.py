@@ -28,6 +28,14 @@ class TreeNetwork:
         self.residueFunc = residue_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
+        GlobalConstants.TRAIN_DATA_TENSOR = tf.placeholder(GlobalConstants.DATA_TYPE,
+                                                           shape=(None, GlobalConstants.IMAGE_SIZE,
+                                                                  GlobalConstants.IMAGE_SIZE,
+                                                                  GlobalConstants.NUM_CHANNELS))
+        GlobalConstants.TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,))
+        GlobalConstants.TRAIN_INDEX_TENSOR = tf.placeholder(tf.int64, shape=(None,))
+        GlobalConstants.TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
+                                                              shape=(None, GlobalConstants.NUM_LABELS))
         self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
         self.labelTensor = GlobalConstants.TRAIN_LABEL_TENSOR
         self.oneHotLabelTensor = GlobalConstants.TRAIN_ONE_HOT_LABELS
