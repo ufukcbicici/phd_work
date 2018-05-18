@@ -94,6 +94,7 @@ def get_explanation_string(network):
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
     explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
     explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
+    explanation += "Mode Percentile:{0}\n".format(GlobalConstants.PERCENTILE_THRESHOLD)
     explanation += "Softmax Distillation Cross Validation Count:{0}\n".\
         format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
     explanation += "Softmax Distillation Strategy:{0}\n".\
@@ -152,7 +153,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.1, 0.1]
+    classification_dropout_prob = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
