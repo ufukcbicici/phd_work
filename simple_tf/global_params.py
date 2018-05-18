@@ -21,6 +21,7 @@ class AccuracyCalcType(Enum):
 class SoftmaxCompressionStrategy(Enum):
     random_start = 0
     fit_logistic_layer = 1
+    fit_svm_layer = 2
 
 
 class GlobalConstants:
@@ -70,7 +71,7 @@ class GlobalConstants:
     # Softmax Compression Parameters
     PERCENTILE_THRESHOLD = 0.85
     COMPRESSION_EPOCH = 10
-    MODE_WAIT_EPOCHS = 5
+    MODE_WAIT_EPOCHS = 25
     SOFTMAX_DISTILLATION_INITIAL_LR = 0.01
     SOFTMAX_DISTILLATION_DECAY = 0.5
     SOFTMAX_DISTILLATION_BATCH_SIZE = 1000
@@ -83,7 +84,7 @@ class GlobalConstants:
     # SOFTMAX_DISTILLATION_STEP_COUNT = 6000
     # SOFTMAX_DISTILLATION_EPOCH_COUNT = 200
 
-    SOFTMAX_COMPRESSION_STRATEGY = SoftmaxCompressionStrategy.fit_logistic_layer
+    SOFTMAX_COMPRESSION_STRATEGY = SoftmaxCompressionStrategy.fit_svm_layer
     SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO = 0.05
     SOFTMAX_DISTILLATION_STEP_COUNT = 75 * int(1.0 / SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO)
     SOFTMAX_DISTILLATION_EPOCH_COUNT = 300

@@ -129,7 +129,8 @@ class AccuracyCalculator:
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return overall_correct / overall_count, confusion_matrix_db_rows
 
-    def calculate_accuracy_after_compression(self, sess, dataset, dataset_type):
+    def calculate_accuracy_after_compression(self, sess, run_id, iteration, dataset, dataset_type):
+        kv_rows = []
         branch_probs = {}
         posterior_probs = {}
         leaf_true_labels_dict = {}
@@ -204,6 +205,14 @@ class AccuracyCalculator:
                         if predicted_label == true_label:
                             total_correct_of_mode_predictions += 1
                     break
+        kv_rows.append((run_id, iteration, "{0} Mode Predictions".format(dataset_type), total_mode_prediction_count))
+        kv_rows.append((run_id, iteration, "{0} Non Mode Predictions".format(dataset_type),
+                        len(samples_with_non_mode_predictions)))
+        kv_rows.append((run_id, iteration, "{0} Mode Correct Predictions".format(dataset_type),
+                        total_correct_of_mode_predictions))
+        kv_rows.append((run_id, iteration, "{0} Mode Accuracy".format(dataset_type),
+                        float(total_correct_of_mode_predictions) /
+                        float(total_mode_prediction_count)))
         # Handle all samples with non mode predictions Method 1
         # Try to correct non mode estimations with a simple heuristics:
         # 1) Check all leaves. Among the leaves which predicts the sample having a label within its modes, choose the
@@ -257,10 +266,23 @@ class AccuracyCalculator:
             residue_predicted_label = np.asscalar(np.argmax(residue_posterior))
             if residue_predicted_label == true_labels_dict[sample_index]:
                 method2_total_correct_indecisive_predictions += 1
-        residue_correction_accuracy = (method2_total_correct_indecisive_predictions +
-                                       method1_total_correct_decisive_predictions +
+        method2_total_correct_non_mode_predictions = method2_total_correct_indecisive_predictions + \
+                                                     method1_total_correct_decisive_predictions
+        residue_correction_accuracy = (method2_total_correct_non_mode_predictions +
                                        total_correct_of_mode_predictions) / \
-                                      sample_count
+                                        sample_count
+
+        kv_rows.append((run_id, iteration, "{0} Method 1 Correct Non Mode Predictions".format(dataset_type),
+                        method1_total_correct_non_mode_predictions))
+        kv_rows.append((run_id, iteration, "{0} Method 1 Non Mode Prediction Accuracy".format(dataset_type),
+                        float(method1_total_correct_non_mode_predictions) /
+                        float(len(samples_with_non_mode_predictions))))
+        kv_rows.append((run_id, iteration, "{0} Method 2 Correct Non Mode Predictions".format(dataset_type),
+                        method2_total_correct_non_mode_predictions))
+        kv_rows.append((run_id, iteration, "{0} Method 2 Non Mode Prediction Accuracy".format(dataset_type),
+                        float(method2_total_correct_non_mode_predictions) /
+                        float(total_mode_prediction_count)))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return best_leaf_accuracy, residue_correction_accuracy
 
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):

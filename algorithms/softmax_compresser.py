@@ -3,6 +3,7 @@ import threading
 from random import shuffle
 
 import numpy as np
+import scipy
 import tensorflow as tf
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_score
@@ -12,6 +13,9 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, SoftmaxCompressionStrategy, GradientType
 from collections import namedtuple
+from scipy.stats import expon
+from sklearn.svm import LinearSVC
+from sklearn.model_selection import GridSearchCV
 
 
 class NetworkOutputs:
@@ -109,7 +113,8 @@ class SoftmaxCompresser:
                                "training_labels",
                                "test_features",
                                "test_labels",
-                               "reduced_dimension"])
+                               "reduced_dimension",
+                               "test_accuracy_full"])
 
     def __init__(self, network, dataset, run_id):
         self.network = network
@@ -190,6 +195,19 @@ class SoftmaxCompresser:
                                                                                   network_outputs[
                                                                                       DatasetTypes.training],
                                                                                   leaf_node=leaf_node)
+                compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
+            elif GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY == SoftmaxCompressionStrategy.fit_svm_layer:
+                logistic_weights, logistic_bias = self.train_svm_layer(sess=sess,
+                                                                       training_data=network_outputs[
+                                                                           DatasetTypes.training],
+                                                                       validation_data=
+                                                                       network_outputs[
+                                                                           DatasetTypes.test],
+                                                                       test_data=network_outputs[
+                                                                           DatasetTypes.test],
+                                                                       leaf_node=leaf_node,
+                                                                       cross_val_count=
+                                                                       GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
                 compressed_layers_dict[leaf_node.index] = (logistic_weights, logistic_bias)
             else:
                 raise NotImplementedError()
@@ -702,14 +720,69 @@ class SoftmaxCompresser:
                                            training_labels=training_labels,
                                            test_features=test_features,
                                            test_labels=test_labels,
-                                           reduced_dimension=training_one_hot_labels_compressed.shape[1])
+                                           reduced_dimension=training_one_hot_labels_compressed.shape[1],
+                                           test_accuracy_full=test_accuracy_full)
         return all_training_data
 
     def train_svm_layer(self, sess, training_data, validation_data, test_data, leaf_node,
                         cross_val_count):
         all_training_data = self.prepare_training_data(training_data=training_data, validation_data=validation_data,
                                                        test_data=test_data, leaf_node=leaf_node)
-
+        exponential_distribution = scipy.stats.expon(scale=100)
+        all_regularizer_values = exponential_distribution.rvs(100).tolist()
+        lesser_than_one = np.linspace(0.00001, 1.0, 11)
+        all_regularizer_values.extend(lesser_than_one)
+        all_regularizer_values.extend([10, 100, 1000, 10000])
+        regularizer_dict = {"C": all_regularizer_values}
+        svm = LinearSVC(C=1.0, class_weight=None, dual=False, fit_intercept=True,
+                        intercept_scaling=1, loss='squared_hinge', max_iter=1000,
+                        multi_class='ovr', penalty='l2', random_state=None, tol=0.0001,
+                        verbose=0)
+        grid_search = GridSearchCV(estimator=svm, param_grid=regularizer_dict, cv=cross_val_count,
+                                   n_jobs=1, scoring=None, refit=True)
+        grid_search.fit(X=all_training_data.training_features, y=all_training_data.training_labels)
+        best_svm = grid_search.best_estimator_
+        hyperplanes = np.transpose(best_svm.coef_)
+        normalized_hyperplanes = np.copy(hyperplanes)
+        biases = best_svm.intercept_
+        for col in range(hyperplanes.shape[1]):
+            magnitude = np.asscalar(np.linalg.norm(hyperplanes[:, col]))
+            normalized_hyperplanes[:, col] = hyperplanes[:, col] / magnitude
+        confidences = best_svm.decision_function(X=all_training_data.test_features)
+        confidences_manual = np.dot(all_training_data.test_features, hyperplanes) + biases
+        confidences_manual_normalized = np.dot(all_training_data.test_features, normalized_hyperplanes) + biases
+        best_svm_score = best_svm.score(X=all_training_data.test_features, y=all_training_data.test_labels)
+        assert np.allclose(confidences, confidences_manual)
+        kv_rows = []
+        kv_rows.append((self.runId, -1,
+                        "Leaf:{0} Original Test Accuracy".format(leaf_node.index),
+                        all_training_data.test_accuracy_full))
+        kv_rows.append((self.runId, -1,
+                        "Leaf:{0} Best Svm Accuracy".format(leaf_node.index), best_svm_score))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+        softmax_weights = self.network.variableManager.create_and_add_variable_to_node(
+            node=leaf_node,
+            initial_value=tf.constant(normalized_hyperplanes, dtype=GlobalConstants.DATA_TYPE),
+            name=self.network.get_variable_name(name="distilled_fc_softmax_weights_{0}".format(self.runId),
+                                                node=leaf_node))
+        softmax_biases = self.network.variableManager.create_and_add_variable_to_node(
+            node=leaf_node,
+            initial_value=tf.constant(biases, dtype=GlobalConstants.DATA_TYPE),
+            name=self.network.get_variable_name(name="distilled_fc_softmax_biases_{0}".format(self.runId),
+                                                node=leaf_node))
+        sess.run([softmax_weights.initializer, softmax_biases.initializer])
+        if GlobalConstants.SOFTMAX_DISTILLATION_VERBOSE:
+            x_tensor = tf.placeholder(tf.float32)
+            compressed_logits = tf.matmul(x_tensor, softmax_weights) + softmax_biases
+            result = sess.run([compressed_logits], feed_dict={x_tensor: all_training_data.training_features})
+            tensorflow_response = result[0]
+            scilearn_response = confidences_manual_normalized
+            # assert np.allclose(tensorflow_response, scilearn_response)
+            diff_matrix = np.abs(tensorflow_response - scilearn_response)
+            ind = np.unravel_index(np.argmax(diff_matrix, axis=None), diff_matrix.shape)
+            print("Most different tensorflow entry:{0}".format(tensorflow_response[ind]))
+            print("Most different scilearn entry:{0}".format(scilearn_response[ind]))
+        return softmax_weights, softmax_biases
 
     def train_logistic_layer(self, sess, training_data, validation_data, test_data, leaf_node,
                              cross_val_count):

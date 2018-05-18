@@ -36,7 +36,7 @@ for leaf_index in {3, 4, 5, 6}:
                                                         one_hot_labels=test_one_hot_labels_compressed)
 
     exponential_distribution = scipy.stats.expon(scale=100)
-    all_regularizer_values = exponential_distribution.rvs(20).tolist()
+    all_regularizer_values = exponential_distribution.rvs(100).tolist()
     lesser_than_one = np.linspace(0.00001, 1.0, 11)
     all_regularizer_values.extend(lesser_than_one)
     all_regularizer_values.extend([10, 100, 1000, 10000])
