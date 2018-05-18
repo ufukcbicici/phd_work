@@ -32,7 +32,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist - Independent H - Tests - Parallel Dnns, Softmax Distillation - v3\n"
+    explanation = "SVM - Fashion Mnist - Independent H - Tests - Parallel Dnns, Softmax Distillation\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -153,7 +153,18 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    classification_dropout_prob = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+                                   0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+                                   0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+                                   0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                                   0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                                   0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                                   0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                                   0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                                   0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                                   0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+                                   0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+                                   0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -234,6 +245,8 @@ def main():
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
+        series_id = int(run_id % 6)
+        explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
