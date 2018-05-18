@@ -136,14 +136,9 @@ def get_explanation_string(network):
 
 
 def main():
+    dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
     # Do the training
-    if GlobalConstants.USE_CPU:
-        config = tf.ConfigProto(device_count={'GPU': 0})
-        sess = tf.Session(config=config)
-    else:
-        sess = tf.Session()
-        dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
-        # dataset = MnistDataSet(validation_sample_count=0, load_validation_from=None)
+    # dataset = MnistDataSet(validation_sample_count=0, load_validation_from=None)
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # # wd_list = [x for x in itertools.repeat(0.0, 5)]
@@ -157,7 +152,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.2]
+    classification_dropout_prob = [0.1, 0.1]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
@@ -165,6 +160,11 @@ def main():
     # wd_list = [0.02]
     run_id = 0
     for tpl in cartesian_product:
+        if GlobalConstants.USE_CPU:
+            config = tf.ConfigProto(device_count={'GPU': 0})
+            sess = tf.Session(config=config)
+        else:
+            sess = tf.Session()
         # Build the network
         # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
         #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
