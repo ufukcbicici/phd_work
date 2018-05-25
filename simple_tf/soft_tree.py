@@ -1,12 +1,10 @@
-import tensorflow as tf
-import numpy as np
-from auxillary.dag_utilities import Dag
-from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants, GradientType
-from simple_tf.info_gain import InfoGainLoss
-from simple_tf.node import Node
 from collections import deque
 
+import tensorflow as tf
+
+from algorithms.info_gain import InfoGainLoss
+from simple_tf.global_params import GlobalConstants
+from simple_tf.node import Node
 from simple_tf.tree import TreeNetwork
 
 

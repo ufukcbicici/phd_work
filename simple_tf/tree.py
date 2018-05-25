@@ -1,19 +1,19 @@
-import tensorflow as tf
-import numpy as np
+from collections import deque
 
+import numpy as np
+import tensorflow as tf
+
+from algorithms import batch_norm
 from algorithms.accuracy_calculator import AccuracyCalculator
+from algorithms.info_gain import InfoGainLoss
 from algorithms.mode_tracker import ModeTracker
 from algorithms.softmax_compresser import SoftmaxCompresser
 from algorithms.variable_manager import VariableManager
-from auxillary.constants import DatasetTypes
 from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants, GradientType, AccuracyCalcType
-from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
-from collections import deque
-from simple_tf import batch_norm
 
 
 class TreeNetwork:
@@ -588,7 +588,7 @@ class TreeNetwork:
         if GlobalConstants.USE_INFO_GAIN_DECISION:
             decision_grads, info_gain_results, decision_sample_counts \
                 = self.get_decision_grads(sess=sess, samples=samples, labels=labels,
-                                          indices=indices_list,
+                                           indices=indices_list,
                                           one_hot_labels=one_hot_labels,
                                           iteration=iteration)
         # Classification network
