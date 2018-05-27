@@ -9,7 +9,7 @@ class ToyDataset(DataSet):
     def __init__(self,
                  validation_sample_count,
                  # path=os.path.join(os.getcwd(), "data\\toy_data\\spiral.txt")
-                 path="C:\\Users\\ufuk.bicici\\PycharmProjects\\DeepVision\\data\\toy_data\\spiral.txt"
+                 path="C:\\Users\\ufuk.bicici\\Desktop\\tf\\phd_work\\data\\toy_data\\spiral.txt"
                  ):
         super().__init__()
         # os_name = platform.system()
