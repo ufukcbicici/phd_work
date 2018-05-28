@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
 from simple_tf.global_params import GlobalConstants
 
@@ -262,22 +263,18 @@ def residue_network_func(network):
     all_residue_features, input_labels, input_indices = network.prepare_residue_input_tensors()
     network.residueInputTensor = all_residue_features  # tf.stop_gradient(all_residue_features)
     # Residue Network Parameters
-    variable_list = []
-    curr_layer = network.residueInputTensor
-    for layer_index in range(GlobalConstants.FASHION_F_RESIDUE_LAYER_COUNT):
-        if GlobalConstants.FASHION_F_RESIDUE_USE_DROPOUT:
-            curr_layer = tf.nn.dropout(curr_layer, keep_prob=network.classificationDropoutKeepProb)
-        input_dim = curr_layer.get_shape().as_list()[-1]
-        fc_residue_weights = tf.Variable(
-            tf.truncated_normal([input_dim, GlobalConstants.FASHION_F_RESIDUE], stddev=0.1, seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE), name="fc_residue_weights_{0}".format(layer_index))
-        fc_residue_bias = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.FASHION_F_RESIDUE],
-                                                  dtype=GlobalConstants.DATA_TYPE),
-                                      name="fc_residue_bias_{0}".format(layer_index))
-        variable_list.extend([fc_residue_weights, fc_residue_bias])
-        curr_layer = tf.nn.relu(tf.matmul(curr_layer, fc_residue_weights) + fc_residue_bias)
+    # variable_list = []
+    layer_dims = [GlobalConstants.FASHION_F_RESIDUE for i in range(GlobalConstants.FASHION_F_RESIDUE_LAYER_COUNT)]
+    use_dropout_list = [GlobalConstants.FASHION_F_RESIDUE_USE_DROPOUT
+                        for i in range(GlobalConstants.FASHION_F_RESIDUE_LAYER_COUNT)]
+    residue_network_output, variable_list = UtilityFuncs.create_mlp_layers(
+        input=network.residueInputTensor,
+        layer_dims=layer_dims,
+        use_dropout_list=use_dropout_list,
+        dropout_prob_tensor=network.classificationDropoutKeepProb,
+        variable_name_prefix="fc_residue")
     # Loss layer
-    input_dim = curr_layer.get_shape().as_list()[-1]
+    input_dim = residue_network_output.get_shape().as_list()[-1]
     fc_residue_softmax_weights = tf.Variable(
         tf.truncated_normal([input_dim, GlobalConstants.NUM_LABELS], stddev=0.1, seed=GlobalConstants.SEED,
                             dtype=GlobalConstants.DATA_TYPE), name="fc_residue_final_weights")
@@ -286,7 +283,7 @@ def residue_network_func(network):
                                           name="fc_residue_final_bias")
     variable_list.extend([fc_residue_softmax_weights, fc_residue_softmax_bias])
     network.variableManager.add_variables_to_node(node=None, tf_variables=variable_list)
-    curr_layer = tf.nn.dropout(curr_layer, keep_prob=network.classificationDropoutKeepProb)
+    curr_layer = tf.nn.dropout(residue_network_output, keep_prob=network.classificationDropoutKeepProb)
     residue_logits = tf.matmul(curr_layer, fc_residue_softmax_weights) + fc_residue_softmax_bias
     cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=input_labels,
                                                                                logits=residue_logits)
