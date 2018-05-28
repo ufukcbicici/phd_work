@@ -131,26 +131,41 @@ class UtilityFuncs:
         return thread_dict
 
     @staticmethod
-    def create_mlp_layers(input, layer_dims, use_dropout_list, dropout_prob_tensor, variable_name_prefix):
+    def create_mlp_layers(input, layer_dims, use_dropout_list, dropout_prob_tensor, variable_name_prefix,
+                          weight_bias_list=None):
         curr_layer = input
-        assert len(layer_dims) == len(use_dropout_list)
-        layer_count = len(layer_dims)
         variable_list = []
-        for layer_index in range(layer_count):
-            layer_dim = layer_dims[layer_index]
-            use_dropout = use_dropout_list[layer_index]
-            if use_dropout:
-                curr_layer = tf.nn.dropout(curr_layer, keep_prob=dropout_prob_tensor)
-            input_dim = curr_layer.get_shape().as_list()[-1]
-            weights = tf.Variable(
-                tf.truncated_normal([input_dim, layer_dim], stddev=0.1,
-                                    seed=GlobalConstants.SEED,
-                                    dtype=GlobalConstants.DATA_TYPE),
-                name="{0}_{1}".format(variable_name_prefix, layer_index))
-            bias = tf.Variable(tf.constant(0.1, shape=[layer_dim],
-                                           dtype=GlobalConstants.DATA_TYPE),
-                               name="{0}_{1}".format(variable_name_prefix, layer_index))
-            variable_list.extend([weights, bias])
-            curr_layer = tf.nn.relu(tf.matmul(curr_layer, weights) + bias)
-        output = curr_layer
-        return output, variable_list
+        if weight_bias_list is None:
+            assert len(layer_dims) == len(use_dropout_list)
+            layer_count = len(layer_dims)
+            for layer_index in range(layer_count):
+                layer_dim = layer_dims[layer_index]
+                use_dropout = use_dropout_list[layer_index]
+                if use_dropout:
+                    curr_layer = tf.nn.dropout(curr_layer, keep_prob=dropout_prob_tensor)
+                input_dim = curr_layer.get_shape().as_list()[-1]
+                weights = tf.Variable(
+                    tf.truncated_normal([input_dim, layer_dim], stddev=0.1,
+                                        seed=GlobalConstants.SEED,
+                                        dtype=GlobalConstants.DATA_TYPE),
+                    name="{0}_{1}".format(variable_name_prefix, layer_index))
+                bias = tf.Variable(tf.constant(0.1, shape=[layer_dim],
+                                               dtype=GlobalConstants.DATA_TYPE),
+                                   name="{0}_{1}".format(variable_name_prefix, layer_index))
+                variable_list.extend([weights, bias])
+                curr_layer = tf.nn.relu(tf.matmul(curr_layer, weights) + bias)
+            output = curr_layer
+            return output, variable_list
+        else:
+            assert len(weight_bias_list) == len(use_dropout_list)
+            layer_count = len(weight_bias_list)
+            for layer_index in range(layer_count):
+                weights = weight_bias_list[layer_index]["weights"]
+                bias = weight_bias_list[layer_index]["bias"]
+                use_dropout = use_dropout_list[layer_index]
+                if use_dropout:
+                    curr_layer = tf.nn.dropout(curr_layer, keep_prob=dropout_prob_tensor)
+                variable_list.extend([weights, bias])
+                curr_layer = tf.nn.relu(tf.matmul(curr_layer, weights) + bias)
+            output = curr_layer
+            return output, variable_list

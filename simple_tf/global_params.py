@@ -19,7 +19,7 @@ class AccuracyCalcType(Enum):
 
 
 class SoftmaxCompressionStrategy(Enum):
-    random_start = 0
+    start_with_random_mlp_layer = 0
     fit_logistic_layer = 1
     fit_svm_layer = 2
 
@@ -94,6 +94,10 @@ class GlobalConstants:
     USE_SOFTMAX_DISTILLATION = True
     SOFTMAX_DISTILLATION_CPU_COUNT = 8
     SOFTMAX_DISTILLATION_GRADIENT_TYPE = GradientType.parallel_dnns_unbiased
+
+    SOFTMAX_DISTILLATION_MLP_LAYER_COUNT = 3
+    SOFTMAX_DISTILLATION_MLP_LAYER_SIZES = [1024, 1024, 1024]
+    SOFTMAX_DISTILLATION_MLP_LAYER_DROPOUTS = [True, True, True]
     # Softmax Compression Parameters
 
     ROUTE_CORRECTION_PERIOD = 5000
