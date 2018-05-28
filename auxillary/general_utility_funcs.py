@@ -1,10 +1,12 @@
 import os
+import tensorflow as tf
 import numpy as np
 from os import listdir
 from os.path import isfile, join
 import itertools
 
 from auxillary.parameters import DecayingParameter, FixedParameter
+from simple_tf.global_params import GlobalConstants
 
 
 class UtilityFuncs:
@@ -26,7 +28,7 @@ class UtilityFuncs:
     @staticmethod
     def get_absolute_path(script_file, relative_path):
         script_dir = os.path.dirname(script_file)
-        absolute_path = script_dir + "/" + relative_path # os.path.join(script_dir, relative_path)
+        absolute_path = script_dir + "/" + relative_path  # os.path.join(script_dir, relative_path)
         absolute_path = absolute_path.replace("\\", "/")
         return absolute_path
 
@@ -70,8 +72,8 @@ class UtilityFuncs:
                 label_dict[label] = 0
             label_dict[label] += 1
         entropy = 0.0
-        for label,quantity in label_dict.items():
-            probability = float(quantity)/float(sample_count)
+        for label, quantity in label_dict.items():
+            probability = float(quantity) / float(sample_count)
             entropy -= probability * np.log2(probability)
         return entropy
 
@@ -128,4 +130,27 @@ class UtilityFuncs:
             curr_thread_id = (curr_thread_id + 1) % num_of_threads
         return thread_dict
 
-
+    @staticmethod
+    def create_mlp_layers(input, layer_dims, use_dropout_list, dropout_prob_tensor, variable_name_prefix):
+        curr_layer = input
+        assert len(layer_dims) == len(use_dropout_list)
+        layer_count = len(layer_dims)
+        variable_list = []
+        for layer_index in range(layer_count):
+            layer_dim = layer_dims[layer_index]
+            use_dropout = use_dropout_list[layer_index]
+            if use_dropout:
+                curr_layer = tf.nn.dropout(curr_layer, keep_prob=dropout_prob_tensor)
+            input_dim = curr_layer.get_shape().as_list()[-1]
+            weights = tf.Variable(
+                tf.truncated_normal([input_dim, layer_dim], stddev=0.1,
+                                    seed=GlobalConstants.SEED,
+                                    dtype=GlobalConstants.DATA_TYPE),
+                name="{0}_{1}".format(variable_name_prefix, layer_index))
+            bias = tf.Variable(tf.constant(0.1, shape=[layer_dim],
+                                           dtype=GlobalConstants.DATA_TYPE),
+                               name="{0}_{1}".format(variable_name_prefix, layer_index))
+            variable_list.extend([weights, bias])
+            curr_layer = tf.nn.relu(tf.matmul(curr_layer, weights) + bias)
+        output = curr_layer
+        return output, variable_list
