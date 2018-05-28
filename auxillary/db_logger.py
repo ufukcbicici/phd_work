@@ -15,7 +15,7 @@ class DbLogger:
     compressionTestsTable = "compression_tests_table"
 
     # Lab
-    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
+    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger2.db"
 
     # Home
     # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
