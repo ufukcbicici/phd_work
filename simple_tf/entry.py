@@ -32,7 +32,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation\n"
+    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation v2\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -95,9 +95,9 @@ def get_explanation_string(network):
     explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
     explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
     explanation += "Mode Percentile:{0}\n".format(GlobalConstants.PERCENTILE_THRESHOLD)
-    explanation += "Softmax Distillation Cross Validation Count:{0}\n".\
+    explanation += "Softmax Distillation Cross Validation Count:{0}\n". \
         format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
-    explanation += "Softmax Distillation Strategy:{0}\n".\
+    explanation += "Softmax Distillation Strategy:{0}\n". \
         format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
     explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_F_NUM_FILTERS_1)
@@ -153,25 +153,40 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-                                   0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-                                   0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-                                   0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-                                   0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-                                   0.3, 0.3, 0.3, 0.3, 0.3, 0.3
-                                   # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-                                   # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-                                   # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-                                   # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-                                   # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-                                   # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-                                   # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-                                   # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-                                   # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-                                   # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-                                   # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-                                   # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
-                                   ]
+    classification_dropout_prob = [
+        0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+        0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+        0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+        0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+        0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+        0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+        0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+        0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+        0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+        0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+        0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+        0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+        0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+        0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+        0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+        0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+        0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+        0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+        0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+        0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+        0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+        0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+        0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+        0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+        0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+        0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+        0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+    ]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_prob])
