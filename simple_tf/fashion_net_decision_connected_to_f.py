@@ -259,7 +259,7 @@ def grad_func(network):
                 regularization_vars_list.append(v)
             else:
                 classification_vars_list.append(v)
-                if "_softmax_" not in v.name:
+                if "_softmax_" or "distilled" not in v.name:
                     residue_vars_list.append(v)
                 if "conv" in v.name:
                     decision_vars_list.append(v)

@@ -123,7 +123,7 @@ class SoftmaxCompresser:
         self.labelMappings = {}
         self.inverseLabelMappings = {}
 
-    def compress_network_softmax(self, sess):
+    def compress_network_softmax(self, sess, run_id, iteration):
         # Get all final feature vectors for all leaves, for the complete training set.
         softmax_weights = {}
         softmax_biases = {}
@@ -132,7 +132,8 @@ class SoftmaxCompresser:
             network_output = NetworkOutputs()
             self.dataset.set_current_data_set_type(dataset_type=dataset_type)
             while True:
-                results = self.network.eval_network(sess=sess, dataset=self.dataset, use_masking=True)
+                results = self.network.eval_network(sess=sess, dataset=self.dataset, use_masking=True,
+                                                    run_id=run_id, iteration=iteration)
                 for node in self.network.topologicalSortedNodes:
                     if not node.isLeaf:
                         continue
@@ -216,7 +217,7 @@ class SoftmaxCompresser:
             if not node.isLeaf:
                 continue
             leaf_node = node
-            self.change_leaf_loss(node=leaf_node, compressed_layers_dict=compressed_layers_dict)
+            self.change_leaf_loss(network=self.network, node=leaf_node, compressed_layers_dict=compressed_layers_dict)
         # Redefine the main classification loss and the regularization loss; these are dependent on the new
         # compressed hyperplanes.
         self.network.build_main_loss()
@@ -243,7 +244,7 @@ class SoftmaxCompresser:
                 weight_bias_list=mlp_params)
             curr_layer = output
         # Build Loss layer
-        logits = tf.matmul(node.finalFeatures, softmax_params["softmax_weights"]) + softmax_params["softmax_biases"]
+        logits = tf.matmul(curr_layer, softmax_params["softmax_weights"]) + softmax_params["softmax_biases"]
         self.network.evalDict[self.network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
         if node.labelMappingTensor is None:
             node.labelMappingTensor = tf.placeholder(name="label_mapping_node_{0}".format(node.index), dtype=tf.int64)

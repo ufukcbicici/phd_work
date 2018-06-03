@@ -319,7 +319,7 @@ def grad_func(network):
             else:
                 classification_vars_list.append(v)
                 if GlobalConstants.RESIDE_AFFECTS_WHOLE_NETWORK:
-                    if "_softmax_" not in v.name:
+                    if "_softmax_" not in v.name and "distilled" not in v.name:
                         residue_vars_list.append(v)
                 regularization_vars_list.append(v)
                 # if not ("gamma" in v.name or "beta" in v.name):

@@ -17,7 +17,7 @@ from simple_tf import batch_norm
 
 
 class TreeNetwork:
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list):
+    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, run_id=-1):
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
         self.depth = len(self.nodeBuildFuncs)
@@ -28,6 +28,7 @@ class TreeNetwork:
         self.residueFunc = residue_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
+        self.runId = run_id
         GlobalConstants.TRAIN_DATA_TENSOR = tf.placeholder(GlobalConstants.DATA_TYPE,
                                                            shape=(None, GlobalConstants.IMAGE_SIZE,
                                                                   GlobalConstants.IMAGE_SIZE,
@@ -296,11 +297,12 @@ class TreeNetwork:
                 accuracy_corrected, marginal_corrected = \
                     self.accuracyCalculator.calculate_accuracy_with_route_correction(
                         sess=sess, dataset=dataset,
-                        dataset_type=dataset_type)
+                        dataset_type=dataset_type, run_id=run_id, iteration=iteration)
                 return accuracy_corrected, marginal_corrected
             elif calculation_type == AccuracyCalcType.with_residue_network:
                 self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                                dataset_type=dataset_type)
+                                                                                dataset_type=dataset_type,
+                                                                                run_id=run_id, iteration=iteration)
             else:
                 raise NotImplementedError()
         else:
@@ -600,7 +602,12 @@ class TreeNetwork:
         assign_dict = {}
         self.learningRateCalculator.update(iteration=iteration + 1.0)
         lr = self.learningRateCalculator.value
+        if self.modeTracker.isCompressed:
+            lr = 0.1 * lr
+        kv_rows = []
         for v, curr_value in zip(vars, vars_current_values):
+            kv_rows.append((self.runId, iteration, "ParamNorm {0}".format(v.name),
+                            np.asscalar(np.linalg.norm(curr_value))))
             is_residue_var = "_residue_" in v.name
             if not is_residue_var and epoch >= GlobalConstants.EPOCH_COUNT:
                 continue
@@ -614,6 +621,12 @@ class TreeNetwork:
                 total_grad += reg_grads[v]
             if GlobalConstants.USE_INFO_GAIN_DECISION and v in decision_grads:
                 total_grad += decision_grads[v]
+            # old_norm = np.linalg.norm(self.momentumStatesDict[v.name])
+            # new_norm = np.linalg.norm(total_grad)
+            # if new_norm > 5.0 * old_norm and self.modeTracker.isCompressed:
+            #     print("SOMETHING IS WRONG! variable:{0} old_norm:{1} new_norm:{2}".format(v.name, old_norm, new_norm))
+                # import time
+                # time.sleep(1000.0)
             self.momentumStatesDict[v.name][:] *= GlobalConstants.MOMENTUM_DECAY
             self.momentumStatesDict[v.name][:] += -lr * total_grad
             new_value = curr_value + self.momentumStatesDict[v.name]
@@ -624,6 +637,7 @@ class TreeNetwork:
             op_name = self.get_assign_op_name(variable=v)
             update_dict[self.newValuesDict[op_name]] = new_value
             assign_dict[op_name] = self.assignOpsDict[op_name]
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         sess.run(assign_dict, feed_dict=update_dict)
         return sample_counts, decision_sample_counts, lr, is_open_indicators
 
@@ -785,7 +799,7 @@ class TreeNetwork:
         node.lossList.append(loss)
         return final_feature_final, logits
 
-    def eval_network(self, sess, dataset, use_masking):
+    def eval_network(self, sess, dataset, use_masking, run_id, iteration):
         # if is_train:
         samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(
             batch_size=GlobalConstants.EVAL_BATCH_SIZE)
@@ -815,9 +829,12 @@ class TreeNetwork:
             #     self.get_label_mappings(feed_dict=feed_dict)
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)
         results = sess.run(self.evalDict, feed_dict)
+        kv_rows = []
         for k, v in results.items():
-            if "final_feature_mag" in k:
+            if "final_feature_mag" in k or "l2_loss" in k:
+                kv_rows = [(run_id, iteration, k, np.asscalar(v))]
                 print("{0}={1}".format(k, v))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return results
 
     def get_transformed_data(self, sess, dataset, dataset_type):

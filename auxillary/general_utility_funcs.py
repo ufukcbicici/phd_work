@@ -148,10 +148,10 @@ class UtilityFuncs:
                     tf.truncated_normal([input_dim, layer_dim], stddev=0.1,
                                         seed=GlobalConstants.SEED,
                                         dtype=GlobalConstants.DATA_TYPE),
-                    name="{0}_{1}".format(variable_name_prefix, layer_index))
+                    name="{0}_weights_{1}".format(variable_name_prefix, layer_index))
                 bias = tf.Variable(tf.constant(0.1, shape=[layer_dim],
                                                dtype=GlobalConstants.DATA_TYPE),
-                                   name="{0}_{1}".format(variable_name_prefix, layer_index))
+                                   name="{0}_biases_{1}".format(variable_name_prefix, layer_index))
                 variable_list.extend([weights, bias])
                 curr_layer = tf.nn.relu(tf.matmul(curr_layer, weights) + bias)
             output = curr_layer

@@ -19,7 +19,8 @@ class AccuracyCalculator:
         info_gain_dict = {}
         branch_probs = {}
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
+            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True, run_id=run_id,
+                                                iteration=iteration)
             batch_sample_count = 0.0
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
@@ -138,7 +139,8 @@ class AccuracyCalculator:
         residue_posteriors_dict = {}
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False, run_id=run_id,
+                                                iteration=iteration)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
@@ -285,7 +287,7 @@ class AccuracyCalculator:
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return best_leaf_accuracy, residue_correction_accuracy
 
-    def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
+    def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
@@ -294,7 +296,8 @@ class AccuracyCalculator:
         one_hot_branch_probs = {}
         posterior_probs = {}
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False, run_id=run_id,
+                                                iteration=iteration)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
@@ -419,7 +422,7 @@ class AccuracyCalculator:
         print("Marginalized prediction accuracy={0}".format(marginalized_corrected_accuracy))
         return corrected_accuracy, marginalized_corrected_accuracy
 
-    def calculate_accuracy_with_residue_network(self, sess, dataset, dataset_type):
+    def calculate_accuracy_with_residue_network(self, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_true_labels_dict = {}
         leaf_sample_indices_dict = {}
@@ -429,7 +432,8 @@ class AccuracyCalculator:
         residue_posterior_probs_dict = {}
         modes_per_leaves = self.network.modeTracker.get_modes()
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False, run_id=run_id,
+                                                iteration=iteration)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]

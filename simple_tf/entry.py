@@ -153,13 +153,7 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-                                   0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-                                   0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-                                   0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-                                   0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-                                   0.05, 0.05, 0.05, 0.05, 0.05, 0.05
-                                   ]
+    classification_dropout_prob = [0.15]
     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
@@ -240,7 +234,9 @@ def main():
                                                                      value=GlobalConstants.INITIAL_LR,
                                                                      schedule=[(15000, 0.005),
                                                                                (30000, 0.0025),
-                                                                               (40000, 0.00025)])
+                                                                               (40000, 0.00025,
+                                                                                60000, 0.000125,
+                                                                                80000, 0.00005)])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
         #                                                                value=GlobalConstants.INITIAL_LR,
@@ -248,6 +244,7 @@ def main():
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
+        network.runId = experiment_id
         explanation = get_explanation_string(network=network)
         series_id = int(run_id / 6)
         explanation += "\n Series:{0}".format(series_id)
@@ -354,7 +351,8 @@ def main():
                                                             iteration=iteration_counter, epoch=epoch_id)
                 if do_compress:
                     print("**********************Compressing the network**********************")
-                    network.softmaxCompresser.compress_network_softmax(sess=sess)
+                    network.softmaxCompresser.compress_network_softmax(sess=sess, run_id=experiment_id,
+                                                                       iteration=iteration_counter)
                     print("**********************Compressing the network**********************")
 
         # test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
