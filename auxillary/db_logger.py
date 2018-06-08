@@ -14,10 +14,10 @@ class DbLogger:
     confusionTable = "confusion_matrices"
 
     # Lab
-    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
+    # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Home
-    # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
+    log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Idea
     # log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
