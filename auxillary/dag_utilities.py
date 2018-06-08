@@ -36,7 +36,7 @@ class Dag:
         self.dag_object.add_edge(parent, child)
 
     def get_topological_sort(self):
-        return nx.topological_sort(self.dag_object)
+        return list(nx.topological_sort(self.dag_object))
 
     def get_shortest_path(self, source, dest):
         return nx.shortest_path(self.dag_object, source, dest)

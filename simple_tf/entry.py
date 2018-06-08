@@ -162,24 +162,24 @@ def main():
     #     residue_func=fashion_net_baseline.residue_network_func,
     #     summary_func=fashion_net_baseline.tensorboard_func,
     #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
-    network = TreeNetwork(
-        node_build_funcs=[fashion_net_independent_h.root_func,
-                          fashion_net_independent_h.l1_func,
-                          fashion_net_independent_h.leaf_func],
-        grad_func=fashion_net_independent_h.grad_func,
-        threshold_func=fashion_net_independent_h.threshold_calculator_func,
-        residue_func=fashion_net_independent_h.residue_network_func,
-        summary_func=fashion_net_independent_h.tensorboard_func,
-        degree_list=GlobalConstants.TREE_DEGREE_LIST)
     # network = TreeNetwork(
-    #     node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
-    #                       fashion_net_decision_connected_to_f.l1_func,
-    #                       fashion_net_decision_connected_to_f.leaf_func],
-    #     grad_func=fashion_net_decision_connected_to_f.grad_func,
-    #     threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
-    #     residue_func=fashion_net_decision_connected_to_f.residue_network_func,
-    #     summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
+    #     node_build_funcs=[fashion_net_independent_h.root_func,
+    #                       fashion_net_independent_h.l1_func,
+    #                       fashion_net_independent_h.leaf_func],
+    #     grad_func=fashion_net_independent_h.grad_func,
+    #     threshold_func=fashion_net_independent_h.threshold_calculator_func,
+    #     residue_func=fashion_net_independent_h.residue_network_func,
+    #     summary_func=fashion_net_independent_h.tensorboard_func,
     #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    network = TreeNetwork(
+        node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
+                          fashion_net_decision_connected_to_f.l1_func,
+                          fashion_net_decision_connected_to_f.leaf_func],
+        grad_func=fashion_net_decision_connected_to_f.grad_func,
+        threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
+        residue_func=fashion_net_decision_connected_to_f.residue_network_func,
+        summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
+        degree_list=GlobalConstants.TREE_DEGREE_LIST)
     network.build_network()
     # dataset.reset()
     # Init
