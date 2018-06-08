@@ -32,7 +32,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation v3\n"
+    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -166,7 +166,8 @@ def main():
         # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
         # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
         # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-        # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+        # 0.2, 0.2, 0.2, 0.2,
+        # 0.2, 0.2,
         # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
         # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
         # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
