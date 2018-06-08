@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from auxillary.parameters import DiscreteParameter, DecayingParameter
+from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
 from simple_tf.global_params import GlobalConstants
 
 
@@ -95,7 +95,11 @@ def root_func(node, network, variables=None):
         tf.constant(0.1, shape=[GlobalConstants.FASHION_H_FC_1], dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="fc_decision_bias", node=node))
     raw_ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
-    ig_feature = tf.nn.relu(raw_ig_feature)
+    # ***************** Dropout *****************
+    relu_ig_feature = tf.nn.relu(raw_ig_feature)
+    dropped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = dropped_ig_feature
+    # ***************** Dropout *****************
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     # OK
     hyperplane_weights = tf.Variable(
@@ -175,7 +179,11 @@ def l1_func(node, network, variables=None):
         tf.constant(0.1, shape=[GlobalConstants.FASHION_H_FC_2], dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="fc_decision_bias_2", node=node))
     raw_ig_feature = tf.matmul(flat_data, fc_h_weights) + fc_h_bias
-    ig_feature = tf.nn.relu(raw_ig_feature)
+    # ***************** Dropout *****************
+    relu_ig_feature = tf.nn.relu(raw_ig_feature)
+    dropped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = dropped_ig_feature
+    # ***************** Dropout *****************
     ig_feature_size = ig_feature.get_shape().as_list()[-1]
     # OK
     hyperplane_weights = tf.Variable(
@@ -335,15 +343,8 @@ def tensorboard_func(network):
 
 
 def threshold_calculator_func(network):
-    # Information Gain Balance Coefficients
-    # network.nodes[0].infoGainBalanceCoefficient = 1.0
-    # network.nodes[1].infoGainBalanceCoefficient = 1.0
-    # network.nodes[2].infoGainBalanceCoefficient = 1.0
-
     # Decision Dropout Schedule
-    network.decisionDropoutKeepProbCalculator = DiscreteParameter(name="decision_dropout_calculator",
-                                                                  schedule=GlobalConstants.DROPOUT_SCHEDULE,
-                                                                  value=GlobalConstants.DROPOUT_INITIAL_PROB)
+    network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - 0.35)
     # Noise Coefficient
     network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=1.0,
                                                            decay=0.9999,
