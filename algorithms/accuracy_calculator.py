@@ -276,14 +276,16 @@ class AccuracyCalculator:
 
         kv_rows.append((run_id, iteration, "{0} Method 1 Correct Non Mode Predictions".format(dataset_type),
                         method1_total_correct_non_mode_predictions))
-        kv_rows.append((run_id, iteration, "{0} Method 1 Non Mode Prediction Accuracy".format(dataset_type),
-                        float(method1_total_correct_non_mode_predictions) /
-                        float(len(samples_with_non_mode_predictions))))
+        if len(samples_with_non_mode_predictions) > 0:
+            kv_rows.append((run_id, iteration, "{0} Method 1 Non Mode Prediction Accuracy".format(dataset_type),
+                            float(method1_total_correct_non_mode_predictions) /
+                            float(len(samples_with_non_mode_predictions))))
         kv_rows.append((run_id, iteration, "{0} Method 2 Correct Non Mode Predictions".format(dataset_type),
                         method2_total_correct_non_mode_predictions))
-        kv_rows.append((run_id, iteration, "{0} Method 2 Non Mode Prediction Accuracy".format(dataset_type),
-                        float(method2_total_correct_non_mode_predictions) /
-                        float(total_mode_prediction_count)))
+        if len(samples_with_non_mode_predictions) > 0:
+            kv_rows.append((run_id, iteration, "{0} Method 2 Non Mode Prediction Accuracy".format(dataset_type),
+                            float(method2_total_correct_non_mode_predictions) /
+                            float(len(samples_with_non_mode_predictions))))
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return best_leaf_accuracy, residue_correction_accuracy
 

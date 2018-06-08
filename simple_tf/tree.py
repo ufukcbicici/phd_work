@@ -603,7 +603,7 @@ class TreeNetwork:
         self.learningRateCalculator.update(iteration=iteration + 1.0)
         lr = self.learningRateCalculator.value
         if self.modeTracker.isCompressed:
-            lr = 0.1 * lr
+            lr = GlobalConstants.SOFTMAX_DISTILLATION_LR_DECAY * lr
         kv_rows = []
         for v, curr_value in zip(vars, vars_current_values):
             kv_rows.append((self.runId, iteration, "ParamNorm {0}".format(v.name),
@@ -637,7 +637,7 @@ class TreeNetwork:
             op_name = self.get_assign_op_name(variable=v)
             update_dict[self.newValuesDict[op_name]] = new_value
             assign_dict[op_name] = self.assignOpsDict[op_name]
-        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+        # DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         sess.run(assign_dict, feed_dict=update_dict)
         return sample_counts, decision_sample_counts, lr, is_open_indicators
 

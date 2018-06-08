@@ -16,7 +16,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, DecayingParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
-from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline
+from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline, fashion_net_decision_connected_to_f
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
 
@@ -99,6 +99,7 @@ def get_explanation_string(network):
         format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
     explanation += "Softmax Distillation Strategy:{0}\n". \
         format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
+    explanation += "Softmax Distillation Lr Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DISTILLATION_LR_DECAY)
     explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_F_NUM_FILTERS_1)
     explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
@@ -154,6 +155,17 @@ def main():
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     classification_dropout_prob = [0.15]
+    softmax_compression_lr_decay = [
+                                    1.0/6.0, 1.0/6.0, 1.0/6.0,
+                                    1.0/7.0, 1.0/7.0, 1.0/7.0,
+                                    1.0/8.0, 1.0/8.0, 1.0/8.0,
+                                    1.0/9.0, 1.0/9.0, 1.0/9.0,
+                                    1.0/10.0,1.0/10.0,1.0/10.0,
+                                    1.0 / 11.0, 1.0 / 11.0, 1.0 / 11.0,
+                                    1.0 / 12.0, 1.0 / 12.0, 1.0 / 12.0,
+                                    1.0 / 13.0, 1.0 / 13.0, 1.0 / 13.0,
+                                    1.0 / 14.0, 1.0 / 14.0, 1.0 / 14.0,
+                                    1.0 / 15.0, 1.0 / 15.0, 1.0 / 15.0]
     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
@@ -163,9 +175,11 @@ def main():
     # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
     # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
     # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
+                                                                          decision_wd,
                                                                           info_gain_balance_coeffs,
-                                                                          classification_dropout_prob])
+                                                                          classification_dropout_prob,
+                                                                          softmax_compression_lr_decay])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
@@ -194,26 +208,26 @@ def main():
         #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
 
         # Fashion Mnist H connected to F
-        # network = TreeNetwork(
-        #     node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
-        #                       fashion_net_decision_connected_to_f.l1_func,
-        #                       fashion_net_decision_connected_to_f.leaf_func],
-        #     grad_func=fashion_net_decision_connected_to_f.grad_func,
-        #     threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
-        #     residue_func=fashion_net_decision_connected_to_f.residue_network_func,
-        #     summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
-        #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
+        network = TreeNetwork(
+            node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
+                              fashion_net_decision_connected_to_f.l1_func,
+                              fashion_net_decision_connected_to_f.leaf_func],
+            grad_func=fashion_net_decision_connected_to_f.grad_func,
+            threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
+            residue_func=fashion_net_decision_connected_to_f.residue_network_func,
+            summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
+            degree_list=GlobalConstants.TREE_DEGREE_LIST)
 
         # Fashion Mnist H independent
-        network = TreeNetwork(
-            node_build_funcs=[fashion_net_independent_h.root_func,
-                              fashion_net_independent_h.l1_func,
-                              fashion_net_independent_h.leaf_func],
-            grad_func=fashion_net_independent_h.grad_func,
-            threshold_func=fashion_net_independent_h.threshold_calculator_func,
-            residue_func=fashion_net_independent_h.residue_network_func,
-            summary_func=fashion_net_independent_h.tensorboard_func,
-            degree_list=GlobalConstants.TREE_DEGREE_LIST)
+        # network = TreeNetwork(
+        #     node_build_funcs=[fashion_net_independent_h.root_func,
+        #                       fashion_net_independent_h.l1_func,
+        #                       fashion_net_independent_h.leaf_func],
+        #     grad_func=fashion_net_independent_h.grad_func,
+        #     threshold_func=fashion_net_independent_h.threshold_calculator_func,
+        #     residue_func=fashion_net_independent_h.residue_network_func,
+        #     summary_func=fashion_net_independent_h.tensorboard_func,
+        #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
 
         network.build_network()
 
@@ -226,6 +240,7 @@ def main():
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        GlobalConstants.SOFTMAX_DISTILLATION_LR_DECAY = tpl[4]
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
         #                                                              value=GlobalConstants.INITIAL_LR,
         #                                                              decay=GlobalConstants.DECAY_RATE,
