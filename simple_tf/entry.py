@@ -2,35 +2,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from algorithms.softmax_compresser import SoftmaxCompresser
 from auxillary.constants import DatasetTypes
-from auxillary.dag_utilities import Dag
 
-import argparse
-import gzip
-import os
-import sys
 import time
-import networkx as nx
 
-import numpy
-from six.moves import urllib
-from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 import numpy as np
-import itertools
 
 # MNIST
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DecayingParameterV2, DecayingParameter, DiscreteParameter
+from auxillary.parameters import DiscreteParameter, DecayingParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
-from simple_tf import lenet_decision_connected_to_f, fashion_net_baseline, fashion_net_independent_h, \
-    fashion_net_decision_connected_to_f
-from simple_tf.global_params import GlobalConstants
+from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline, fashion_net_decision_connected_to_f
+from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
-import simple_tf.lenet3 as lenet3
-import simple_tf.baseline as baseline
 
 
 # tf.set_random_seed(1234)
@@ -40,14 +28,11 @@ import simple_tf.baseline as baseline
 
 def get_explanation_string(network):
     total_param_count = 0
-    for v in tf.trainable_variables():
-        print("Name:{0} Size:{1}".format(v.name, np.prod(v.get_shape().as_list())))
+    for v in network.variableManager.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Fashion Mnist Tree, H is connected to F. Dropout in IG Features." \
-                  "Double Dropout Conv Filters:5x5 - 5x5 - 1x1." \
-                  "(Lr=0.01, - Decay 0.5 at each 15000. iteration)\n"
+    explanation = "SVM - Fashion Mnist - Independent H - Tests - Parallel Dnns, Softmax Distillation\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -63,6 +48,7 @@ def get_explanation_string(network):
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
     explanation += "Residue Loss Coefficient:{0}\n".format(GlobalConstants.RESIDUE_LOSS_COEFFICIENT)
+    explanation += "Residue Affects All Network:{0}\n".format(GlobalConstants.RESIDE_AFFECTS_WHOLE_NETWORK)
     explanation += "Using Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
     explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
@@ -106,6 +92,14 @@ def get_explanation_string(network):
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
             explanation += node.probThresholdCalculator.get_explanation()
             explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
+    explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
+    explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
+    explanation += "Mode Percentile:{0}\n".format(GlobalConstants.PERCENTILE_THRESHOLD)
+    explanation += "Softmax Distillation Cross Validation Count:{0}\n". \
+        format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
+    explanation += "Softmax Distillation Strategy:{0}\n". \
+        format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
+    explanation += "Softmax Distillation Lr Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DISTILLATION_LR_DECAY)
     explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_F_NUM_FILTERS_1)
     explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
@@ -115,6 +109,8 @@ def get_explanation_string(network):
     explanation += "F FC1:{0} Units\n".format(GlobalConstants.FASHION_F_FC_1)
     explanation += "F FC2:{0} Units\n".format(GlobalConstants.FASHION_F_FC_2)
     explanation += "F Residue FC:{0} Units\n".format(GlobalConstants.FASHION_F_RESIDUE)
+    explanation += "Residue Hidden Layer Count:{0}\n".format(GlobalConstants.FASHION_F_RESIDUE_LAYER_COUNT)
+    explanation += "Residue Use Dropout:{0}\n".format(GlobalConstants.FASHION_F_RESIDUE_USE_DROPOUT)
     explanation += "H Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
                                                            GlobalConstants.FASHION_H_NUM_FILTERS_1)
     explanation += "H Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
@@ -142,41 +138,9 @@ def get_explanation_string(network):
 
 
 def main():
+    dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
     # Do the training
-    if GlobalConstants.USE_CPU:
-        config = tf.ConfigProto(device_count={'GPU': 0})
-        sess = tf.Session(config=config)
-    else:
-        sess = tf.Session()
-        dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
-    # Build the network
-    # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
-    #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
-    #                       grad_func=lenet3.grad_func,
-    #                       create_new_variables=True)
-    # network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
-    #     # node_build_funcs=[baseline.baseline],
-    #     # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
-    #     #                   lenet_decision_connected_to_f.leaf_func],
-    #     node_build_funcs=[fashion_net_baseline.baseline],
-    #     grad_func=fashion_net_baseline.grad_func,
-    #     threshold_func=fashion_net_baseline.threshold_calculator_func,
-    #     residue_func=fashion_net_baseline.residue_network_func,
-    #     summary_func=fashion_net_baseline.tensorboard_func,
-    #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
-    network = TreeNetwork(
-        node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
-                          fashion_net_decision_connected_to_f.l1_func,
-                          fashion_net_decision_connected_to_f.leaf_func],
-        grad_func=fashion_net_decision_connected_to_f.grad_func,
-        threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
-        residue_func=fashion_net_decision_connected_to_f.residue_network_func,
-        summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
-        degree_list=GlobalConstants.TREE_DEGREE_LIST)
-    network.build_network()
-    # dataset.reset()
-    # Init
-    init = tf.global_variables_initializer()
+    # dataset = MnistDataSet(validation_sample_count=0, load_validation_from=None)
     # Grid search
     # wd_list = [0.0001 * x for n in range(0, 31) for x in itertools.repeat(n, 5)] # list(itertools.product(*list_of_lists))
     # # wd_list = [x for x in itertools.repeat(0.0, 5)]
@@ -190,28 +154,104 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
+    classification_dropout_prob = [0.15]
+    softmax_compression_lr_decay = [
+                                    1.0/6.0, 1.0/6.0, 1.0/6.0,
+                                    1.0/7.0, 1.0/7.0, 1.0/7.0,
+                                    1.0/8.0, 1.0/8.0, 1.0/8.0,
+                                    1.0/9.0, 1.0/9.0, 1.0/9.0,
+                                    1.0/10.0,1.0/10.0,1.0/10.0,
+                                    1.0 / 11.0, 1.0 / 11.0, 1.0 / 11.0,
+                                    1.0 / 12.0, 1.0 / 12.0, 1.0 / 12.0,
+                                    1.0 / 13.0, 1.0 / 13.0, 1.0 / 13.0,
+                                    1.0 / 14.0, 1.0 / 14.0, 1.0 / 14.0,
+                                    1.0 / 15.0, 1.0 / 15.0, 1.0 / 15.0]
+    # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+    # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+    # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+    # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+    # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+    # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+    # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
+                                                                          decision_wd,
                                                                           info_gain_balance_coeffs,
-                                                                          classification_dropout_prob])
+                                                                          classification_dropout_prob,
+                                                                          softmax_compression_lr_decay])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
     run_id = 0
     for tpl in cartesian_product:
+        if GlobalConstants.USE_CPU:
+            config = tf.ConfigProto(device_count={'GPU': 0})
+            sess = tf.Session(config=config)
+        else:
+            sess = tf.Session()
+        # Build the network
+        # network = TreeNetwork(tree_degree=GlobalConstants.TREE_DEGREE,
+        #                       node_build_funcs=[lenet3.root_func, lenet3.l1_func, lenet3.leaf_func],
+        #                       grad_func=lenet3.grad_func,
+        #                       create_new_variables=True)
+
+        # Mnist Baseline
+        # network = TreeNetwork(  # tree_degree=GlobalConstants.TREE_DEGREE,
+        #     node_build_funcs=[lenet_baseline.baseline],
+        #     # node_build_funcs=[lenet_decision_connected_to_f.root_func, lenet_decision_connected_to_f.l1_func,
+        #     #                   lenet_decision_connected_to_f.leaf_func],
+        #     # node_build_funcs=[fashion_net_baseline.baseline],
+        #     grad_func=lenet_baseline.grad_func,
+        #     threshold_func=lenet_baseline.threshold_calculator_func,
+        #     residue_func=lenet_baseline.residue_network_func,
+        #     summary_func=lenet_baseline.tensorboard_func,
+        #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
+
+        # Fashion Mnist H connected to F
+        network = TreeNetwork(
+            node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
+                              fashion_net_decision_connected_to_f.l1_func,
+                              fashion_net_decision_connected_to_f.leaf_func],
+            grad_func=fashion_net_decision_connected_to_f.grad_func,
+            threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
+            residue_func=fashion_net_decision_connected_to_f.residue_network_func,
+            summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
+            degree_list=GlobalConstants.TREE_DEGREE_LIST)
+
+        # Fashion Mnist H independent
+        # network = TreeNetwork(
+        #     node_build_funcs=[fashion_net_independent_h.root_func,
+        #                       fashion_net_independent_h.l1_func,
+        #                       fashion_net_independent_h.leaf_func],
+        #     grad_func=fashion_net_independent_h.grad_func,
+        #     threshold_func=fashion_net_independent_h.threshold_calculator_func,
+        #     residue_func=fashion_net_independent_h.residue_network_func,
+        #     summary_func=fashion_net_independent_h.tensorboard_func,
+        #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
+
+        network.build_network()
+
+        # dataset.reset()
+        # Init
+        init = tf.global_variables_initializer()
         print("********************NEW RUN:{0}********************".format(run_id))
         # Restart the network; including all annealed parameters.
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        GlobalConstants.SOFTMAX_DISTILLATION_LR_DECAY = tpl[4]
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
         #                                                              value=GlobalConstants.INITIAL_LR,
         #                                                              decay=GlobalConstants.DECAY_RATE,
         #                                                              decay_period=GlobalConstants.DECAY_STEP)
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(15000, 0.005), (30000, 0.0025),
-                                                                               (40000, 0.00025)])
+                                                                     schedule=[(15000, 0.005),
+                                                                               (30000, 0.0025),
+                                                                               (40000, 0.00025,
+                                                                                60000, 0.000125,
+                                                                                80000, 0.00005)])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
         #                                                                value=GlobalConstants.INITIAL_LR,
@@ -219,10 +259,14 @@ def main():
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
+        network.runId = experiment_id
         explanation = get_explanation_string(network=network)
+        series_id = int(run_id / 6)
+        explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
         sess.run(init)
+        network.reset_network(dataset=dataset, run_id=experiment_id)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -260,70 +304,98 @@ def main():
                     indicator_str += "[{0}={1}]".format(k, v)
                 print(indicator_str)
                 iteration_counter += 1
-                if iteration_counter % 50 == 0:
-                    kv_rows = []
-                    for k, v in sample_counts.items():
-                        kv_rows.append((experiment_id, iteration_counter, k, np.asscalar(v)))
-                    DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+                # if iteration_counter % 50 == 0:
+                #     kv_rows = []
+                #     for k, v in sample_counts.items():
+                #         kv_rows.append((experiment_id, iteration_counter, k, np.asscalar(v)))
+                #     DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
                 if dataset.isNewEpoch:
                     if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
                         print("Epoch Time={0}".format(total_time))
-                        training_accuracy, training_confusion = \
-                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
-                                                       run_id=experiment_id, iteration=iteration_counter)
-                        validation_accuracy, validation_confusion = \
-                            network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
-                                                       run_id=experiment_id, iteration=iteration_counter)
-                        if not network.isBaseline:
-                            validation_accuracy_corrected, validation_marginal_corrected = \
-                                network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
-                                                                                 dataset_type=DatasetTypes.test,
-                                                                                 run_id=experiment_id,
-                                                                                 iteration=iteration_counter)
+                        if not network.modeTracker.isCompressed:
+                            training_accuracy, training_confusion = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                           dataset_type=DatasetTypes.training,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy, validation_confusion = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            if not network.isBaseline:
+                                validation_accuracy_corrected, validation_marginal_corrected = \
+                                    network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                               dataset_type=DatasetTypes.test,
+                                                               run_id=experiment_id,
+                                                               iteration=iteration_counter,
+                                                               calculation_type=
+                                                               AccuracyCalcType.route_correction)
+                            else:
+                                validation_accuracy_corrected = 0.0
+                                validation_marginal_corrected = 0.0
+                            DbLogger.write_into_table(
+                                rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
+                                       validation_accuracy, validation_accuracy_corrected,
+                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                            # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
+                            if GlobalConstants.SAVE_CONFUSION_MATRICES:
+                                DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
+                                                          col_count=7)
+                                DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
+                                                          col_count=7)
                         else:
-                            validation_accuracy_corrected = 0.0
-                            validation_marginal_corrected = 0.0
-                            # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                            #                                                 dataset_type=DatasetTypes.test)
-                        # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                        #                                                 dataset_type=DatasetTypes.validation)
-                        # DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
-                        #                                  "Corrected Validation Accuracy",
-                        #                                  validation_accuracy_corrected)],
-                        #                           table=DbLogger.runKvStore, col_count=4)
-                        DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                                         validation_accuracy, validation_accuracy_corrected,
-                                                         0.0, 0.0, "LeNet3")], table=DbLogger.logsTable, col_count=9)
-                        DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
-                        if GlobalConstants.SAVE_CONFUSION_MATRICES:
-                            DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
-                                                      col_count=7)
-                            DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
-                                                      col_count=7)
+                            training_accuracy_best_leaf, training_confusion_residue = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                           dataset_type=DatasetTypes.training,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy_best_leaf, validation_confusion_residue = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id,
+                                                             training_accuracy_best_leaf,
+                                                             validation_accuracy_best_leaf,
+                                                             validation_confusion_residue,
+                                                             0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
                         leaf_info_rows = []
                     break
-        test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                                   dataset_type=DatasetTypes.test,
-                                                                   run_id=experiment_id, iteration=iteration_counter)
-        result_rows = [(experiment_id, explanation, test_accuracy, "Regular")]
-        if not network.isBaseline:
-            test_accuracy_corrected, test_marginal_corrected = \
-                network.calculate_accuracy_with_route_correction(sess=sess, dataset=dataset,
-                                                                 dataset_type=DatasetTypes.test,
-                                                                 run_id=experiment_id,
-                                                                 iteration=iteration_counter)
-            # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
-            DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
-                                             "Corrected Test Accuracy",
-                                             test_accuracy_corrected)],
-                                      table=DbLogger.runKvStore, col_count=4)
-            result_rows.append((experiment_id, explanation, test_accuracy_corrected, "Corrected"))
-            result_rows.append((experiment_id, explanation, test_marginal_corrected, "Marginal"))
-        DbLogger.write_into_table(result_rows, table=DbLogger.runResultsTable, col_count=4)
-        if GlobalConstants.SAVE_CONFUSION_MATRICES:
-            DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)
+            # Compress softmax classifiers
+            if GlobalConstants.USE_SOFTMAX_DISTILLATION:
+                do_compress = network.check_for_compression(dataset=dataset, run_id=experiment_id,
+                                                            iteration=iteration_counter, epoch=epoch_id)
+                if do_compress:
+                    print("**********************Compressing the network**********************")
+                    network.softmaxCompresser.compress_network_softmax(sess=sess, run_id=experiment_id,
+                                                                       iteration=iteration_counter)
+                    print("**********************Compressing the network**********************")
+
+        # test_accuracy, test_confusion = network.calculate_accuracy(sess=sess, dataset=dataset,
+        #                                                            dataset_type=DatasetTypes.test,
+        #                                                            run_id=experiment_id, iteration=iteration_counter,
+        #                                                            calculation_type=AccuracyCalcType.regular)
+        # result_rows = [(experiment_id, explanation, test_accuracy, "Regular")]
+        # if not network.isBaseline:
+        #     test_accuracy_corrected, test_marginal_corrected = \
+        #         network.calculate_accuracy(sess=sess, dataset=dataset,
+        #                                    dataset_type=DatasetTypes.test,
+        #                                    run_id=experiment_id,
+        #                                    iteration=iteration_counter,
+        #                                    calculation_type=
+        #                                    AccuracyCalcType.route_correction)
+        #     # network.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test)
+        #     DbLogger.write_into_table(rows=[(experiment_id, iteration_counter,
+        #                                      "Corrected Test Accuracy",
+        #                                      test_accuracy_corrected)],
+        #                               table=DbLogger.runKvStore, col_count=4)
+        #     result_rows.append((experiment_id, explanation, test_accuracy_corrected, "Corrected"))
+        #     result_rows.append((experiment_id, explanation, test_marginal_corrected, "Marginal"))
+        # DbLogger.write_into_table(result_rows, table=DbLogger.runResultsTable, col_count=4)
+        # if GlobalConstants.SAVE_CONFUSION_MATRICES and test_confusion is not None:
+        #     DbLogger.write_into_table(rows=test_confusion, table=DbLogger.confusionTable, col_count=7)
         print("X")
         run_id += 1
+        tf.reset_default_graph()
 
 
 main()
