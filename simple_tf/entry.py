@@ -153,43 +153,44 @@ def main():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_prob = [
-        # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-        # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-        # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-        0.1
-        # 0.1, 0.1, 0.1, 0.1, 0.1,
-        # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-        # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1
-        # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-        # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-        # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15
-        # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-        # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-        # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-        # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-        # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-        # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-        # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-        # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-        # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3
-        # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-        # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-        # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-        # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-        # 0.4, 0.4, 0.4, 0.4, 0.4,
-        # 0.4,
-        # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-        # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-        # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-        # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-        # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-        # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-        # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
-    ]
+    # classification_dropout_prob = [
+    #     # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    #     # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    #     # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    #     0.1
+    #     # 0.1, 0.1, 0.1, 0.1, 0.1,
+    #     # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+    #     # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1
+    #     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+    #     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+    #     # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15
+    #     # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+    #     # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+    #     # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+    #     # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+    #     # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+    #     # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+    #     # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+    #     # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+    #     # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3
+    #     # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+    #     # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+    #     # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+    #     # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+    #     # 0.4, 0.4, 0.4, 0.4, 0.4,
+    #     # 0.4,
+    #     # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+    #     # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+    #     # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+    #     # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+    #     # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    #     # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    #     # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+    # ]
+    classification_dropout_probs = [0.1]
     decision_dropout_probs = [
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -202,11 +203,11 @@ def main():
         0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
-                                                                          classification_dropout_prob,
+                                                                          classification_dropout_probs,
                                                                           decision_dropout_probs])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
-    run_id = 11
+    run_id = 0
     for tpl in cartesian_product:
         if GlobalConstants.USE_CPU:
             config = tf.ConfigProto(device_count={'GPU': 0})
@@ -264,8 +265,6 @@ def main():
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
-        network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
-                                                                   value=1.0 - tpl[4])
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
         #                                                              value=GlobalConstants.INITIAL_LR,
         #                                                              decay=GlobalConstants.DECAY_RATE,
@@ -281,6 +280,8 @@ def main():
         #                                                                decay=GlobalConstants.DECAY_RATE)
         # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
         network.thresholdFunc(network=network)
+        network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                                   value=1.0 - tpl[4])
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
         series_id = int(run_id / 6)
