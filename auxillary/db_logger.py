@@ -15,13 +15,13 @@ class DbLogger:
     compressionTestsTable = "compression_tests_table"
 
     # Lab
-    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger2.db"
+    # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger2.db"
 
     # Home
     # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Idea GPU
-    # log_db_path = "D://deep//phd_work//simple_tf//bnnlogger.db"
+    log_db_path = "D://deep//phd_work//simple_tf//bnnlogger.db"
 
     # Idea
     # log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"

@@ -13,7 +13,7 @@ import numpy as np
 # MNIST
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DiscreteParameter, DecayingParameter
+from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
 from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline, fashion_net_decision_connected_to_f
@@ -32,7 +32,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation v2\n"
+    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H v2\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -84,7 +84,7 @@ def get_explanation_string(network):
         explanation += "********Decision Dropout Schedule********\n"
     explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
     explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
-    explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_PROB)
+    explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
             if node.isLeaf:
@@ -154,45 +154,59 @@ def main():
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     classification_dropout_prob = [
-        0.0,
+        # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+        # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+        # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+        0.1
+        # 0.1, 0.1, 0.1, 0.1, 0.1,
+        # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+        # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1
+        # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+        # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+        # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15
+        # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+        # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+        # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+        # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+        # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+        # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+        # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+        # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+        # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3
+        # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+        # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+        # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+        # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+        # 0.4, 0.4, 0.4, 0.4, 0.4,
+        # 0.4,
+        # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+        # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+        # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+        # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+        # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+        # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+        # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+    ]
+    decision_dropout_probs = [
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
         0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
         0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
         0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
         0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
         0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-        0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-        0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-        0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-        0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-        0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-        0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-        0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-        0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-        0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-        0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-        0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-        0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-        0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-        0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-        0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-        0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-        0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-        0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-        0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-        0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-        0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-        0.5, 0.5, 0.5, 0.5, 0.5, 0.5
-    ]
+        0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
                                                                           info_gain_balance_coeffs,
-                                                                          classification_dropout_prob])
+                                                                          classification_dropout_prob,
+                                                                          decision_dropout_probs])
     # del cartesian_product[0:10]
     # wd_list = [0.02]
-    run_id = 0
+    run_id = 11
     for tpl in cartesian_product:
         if GlobalConstants.USE_CPU:
             config = tf.ConfigProto(device_count={'GPU': 0})
@@ -250,6 +264,8 @@ def main():
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                                   value=1.0 - tpl[4])
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
         #                                                              value=GlobalConstants.INITIAL_LR,
         #                                                              decay=GlobalConstants.DECAY_RATE,
