@@ -191,17 +191,19 @@ def main():
     #     # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
     # ]
     classification_dropout_probs = [0.1]
-    decision_dropout_probs = [
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-        0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-        0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-        0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-        0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-        0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd, decision_wd,
+    decision_dropout_probs = [0.05]
+    # decision_dropout_probs = [
+    #     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    #     0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    #     0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    #     0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+    #     0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+    #     0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
+                                                                          decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_probs,
                                                                           decision_dropout_probs])
@@ -274,6 +276,12 @@ def main():
                                                                      schedule=[(15000, 0.005),
                                                                                (30000, 0.0025),
                                                                                (40000, 0.00025)])
+        # GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+        #                                                              value=GlobalConstants.INITIAL_LR,
+        #                                                              schedule=[(15000, 0.01),
+        #                                                                        (30000, 0.005),
+        #                                                                        (40000, 0.0005),
+        #                                                                        (64000, 0.00025)])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
         #                                                                value=GlobalConstants.INITIAL_LR,

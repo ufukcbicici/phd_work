@@ -51,7 +51,10 @@ class GlobalConstants:
     # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
     #                                              decay_period=DECAY_STEP)
     LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator", value=INITIAL_LR,
-                                                 schedule=[(15000, 0.005), (30000, 0.0025), (40000, 0.00025)])
+                                                 schedule=[(15000, 0.01),
+                                                           (30000, 0.005),
+                                                           (40000, 0.0005),
+                                                           (64000, 0.00025)])
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9

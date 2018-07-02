@@ -11,13 +11,53 @@ class AccuracyCalculator:
         self.network = network
         self.modesHistory = []
 
+    @staticmethod
+    def measure_branch_probs(branch_probs, run_id, iteration, kv_rows):
+        # Measure Branching Probabilities
+        for k, v in branch_probs.items():
+            p_n = np.mean(v, axis=0)
+            for branch in range(p_n.shape[0]):
+                print("p_{0}({1})={2}".format(k, branch, p_n[branch]))
+                kv_rows.append((run_id, iteration, "p_{0}({1})".format(k, branch), np.asscalar(p_n[branch])))
+
+    def prepare_confusion_matrix_analysis(self, leaf_predicted_labels_dict, leaf_true_labels_dict, dataset):
+        for node in self.network.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            if node.index not in leaf_predicted_labels_dict:
+                continue
+            predicted = leaf_predicted_labels_dict[node.index]
+            true_labels = leaf_true_labels_dict[node.index]
+            if predicted.shape != true_labels.shape:
+                raise Exception("Predicted and true labels counts do not hold.")
+
+
+
+            # confusion_matrix =
+
+
+            # correct_count = np.sum(predicted == true_labels)
+            # # Get the incorrect predictions by preparing a confusion matrix for each leaf
+            # sparse_confusion_matrix = {}
+            # for i in range(true_labels.shape[0]):
+            #     true_label = true_labels[i]
+            #     predicted_label = predicted[i]
+            #     label_pair = (np.asscalar(true_label), np.asscalar(predicted_label))
+            #     if label_pair not in sparse_confusion_matrix:
+            #         sparse_confusion_matrix[label_pair] = 0
+            #     sparse_confusion_matrix[label_pair] += 1
+            # for k, v in sparse_confusion_matrix.items():
+            #     confusion_matrix_db_rows.append((run_id, dataset_type.value, node.index, iteration, k[0], k[1], v))
+
+
+
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
         final_features_dict = {}
         info_gain_dict = {}
-        branch_probs = {}
+        branch_probs_dict = {}
         while True:
             results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
             batch_sample_count = 0.0
@@ -25,7 +65,7 @@ class AccuracyCalculator:
                 if not node.isLeaf:
                     info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index, array=branch_prob)
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index, array=branch_prob)
                     if node.index not in info_gain_dict:
                         info_gain_dict[node.index] = []
                     info_gain_dict[node.index].append(np.asscalar(info_gain))
@@ -59,18 +99,18 @@ class AccuracyCalculator:
             max_feature_magnitude = np.max(feature_magnitudes)
             min_feature_magnitude = np.min(feature_magnitudes)
             std_feature_magnitude = np.std(feature_magnitudes)
-            kv_rows.append((run_id, iteration, "Leaf {0} {1} max_feature_entry".format(k, dataset_type),
-                            np.asscalar(max_feature_entry)))
-            kv_rows.append((run_id, iteration, "Leaf {0} {1} min_feature_entry".format(k, dataset_type),
-                            np.asscalar(min_feature_entry)))
-            kv_rows.append((run_id, iteration, "Leaf {0} {1} mean_feature_magnitude".format(k, dataset_type),
-                            np.asscalar(mean_feature_magnitude)))
-            kv_rows.append((run_id, iteration, "Leaf {0} {1} max_feature_magnitude".format(k, dataset_type),
-                            np.asscalar(max_feature_magnitude)))
-            kv_rows.append((run_id, iteration, "Leaf {0} {1} min_feature_magnitude".format(k, dataset_type),
-                            np.asscalar(min_feature_magnitude)))
-            kv_rows.append((run_id, iteration, "Leaf {0} {1} std_feature_magnitude".format(k, dataset_type),
-                            np.asscalar(std_feature_magnitude)))
+            # kv_rows.append((run_id, iteration, "Leaf {0} {1} max_feature_entry".format(k, dataset_type),
+            #                 np.asscalar(max_feature_entry)))
+            # kv_rows.append((run_id, iteration, "Leaf {0} {1} min_feature_entry".format(k, dataset_type),
+            #                 np.asscalar(min_feature_entry)))
+            # kv_rows.append((run_id, iteration, "Leaf {0} {1} mean_feature_magnitude".format(k, dataset_type),
+            #                 np.asscalar(mean_feature_magnitude)))
+            # kv_rows.append((run_id, iteration, "Leaf {0} {1} max_feature_magnitude".format(k, dataset_type),
+            #                 np.asscalar(max_feature_magnitude)))
+            # kv_rows.append((run_id, iteration, "Leaf {0} {1} min_feature_magnitude".format(k, dataset_type),
+            #                 np.asscalar(min_feature_magnitude)))
+            # kv_rows.append((run_id, iteration, "Leaf {0} {1} std_feature_magnitude".format(k, dataset_type),
+            #                 np.asscalar(std_feature_magnitude)))
         # Measure Information Gain
         total_info_gain = 0.0
         for k, v in info_gain_dict.items():
@@ -80,11 +120,10 @@ class AccuracyCalculator:
             kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
         kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
         # Measure Branching Probabilities
-        for k, v in branch_probs.items():
-            p_n = np.mean(v, axis=0)
-            print("p_{0}(n)={1}".format(k, p_n))
+        AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration,
+                                                branch_probs=branch_probs_dict, kv_rows=kv_rows)
         # Measure The Histogram of Branching Probabilities
-        self.network.calculate_branch_probability_histograms(branch_probs=branch_probs)
+        self.network.calculate_branch_probability_histograms(branch_probs=branch_probs_dict)
         # Measure Accuracy
         overall_count = 0.0
         overall_correct = 0.0
@@ -131,7 +170,8 @@ class AccuracyCalculator:
 
     def calculate_accuracy_after_compression(self, sess, run_id, iteration, dataset, dataset_type):
         kv_rows = []
-        branch_probs = {}
+        branch_probs_dict = {}
+        info_gain_dict = {}
         posterior_probs = {}
         leaf_true_labels_dict = {}
         final_features_dict = {}
@@ -141,9 +181,14 @@ class AccuracyCalculator:
             results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
+                    info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index,
                                                          array=branch_prob)
+                    if node.index not in info_gain_dict:
+                        info_gain_dict[node.index] = []
+                    info_gain_dict[node.index].append(np.asscalar(info_gain))
+                    continue
                 else:
                     posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
                     true_labels = results["Node{0}_label_tensor".format(node.index)]
@@ -167,6 +212,17 @@ class AccuracyCalculator:
         true_labels_list = list(leaf_true_labels_dict.values())
         for label_arr in true_labels_list:
             assert np.array_equal(label_arr, true_labels_list[0])
+        # Measure Information Gain
+        total_info_gain = 0.0
+        for k, v in info_gain_dict.items():
+            avg_info_gain = sum(v) / float(len(v))
+            print("IG_{0}={1}".format(k, -avg_info_gain))
+            total_info_gain -= avg_info_gain
+            kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
+        kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
+        # Measure Branching Probabilities
+        AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration,
+                                                branch_probs=branch_probs_dict, kv_rows=kv_rows)
         # Method 1: Find the most confident leaf. If this leaf is indecisive, then find the most confident leaf.
         # If all confidents are indecisive, then pick the most confident leaf's prediction as a heuristic.
         root_node = self.network.nodes[0]
@@ -184,7 +240,7 @@ class AccuracyCalculator:
             probabilities_on_path = []
             while True:
                 if not curr_node.isLeaf:
-                    p_n_given_sample = branch_probs[curr_node.index][sample_index, :]
+                    p_n_given_sample = branch_probs_dict[curr_node.index][sample_index, :]
                     child_nodes = self.network.dagObject.children(node=curr_node)
                     child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
                     arg_max_index = np.asscalar(np.argmax(p_n_given_sample))

@@ -752,7 +752,7 @@ class SoftmaxCompresser:
         confidences_manual = np.dot(all_training_data.test_features, hyperplanes) + biases
         confidences_manual_normalized = np.dot(all_training_data.test_features, normalized_hyperplanes) + biases
         best_svm_score = best_svm.score(X=all_training_data.test_features, y=all_training_data.test_labels)
-        assert np.allclose(confidences, confidences_manual)
+        # assert np.allclose(confidences, confidences_manual)
         kv_rows = []
         kv_rows.append((self.runId, -1,
                         "Leaf:{0} Original Test Accuracy".format(leaf_node.index),
