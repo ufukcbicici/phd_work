@@ -20,36 +20,25 @@ class AccuracyCalculator:
                 print("p_{0}({1})={2}".format(k, branch, p_n[branch]))
                 kv_rows.append((run_id, iteration, "p_{0}({1})".format(k, branch), np.asscalar(p_n[branch])))
 
-    def prepare_confusion_matrix_analysis(self, leaf_predicted_labels_dict, leaf_true_labels_dict, dataset):
+    def label_distribution_analysis(self,
+                                    run_id,
+                                    iteration,
+                                    kv_rows,
+                                    leaf_true_labels_dict,
+                                    dataset,
+                                    dataset_type):
+        label_count = dataset.get_label_count()
+        label_distribution = np.zeros(shape=(label_count,))
         for node in self.network.topologicalSortedNodes:
             if not node.isLeaf:
                 continue
-            if node.index not in leaf_predicted_labels_dict:
+            if node.index not in leaf_true_labels_dict:
                 continue
-            predicted = leaf_predicted_labels_dict[node.index]
             true_labels = leaf_true_labels_dict[node.index]
-            if predicted.shape != true_labels.shape:
-                raise Exception("Predicted and true labels counts do not hold.")
-
-
-
-            # confusion_matrix =
-
-
-            # correct_count = np.sum(predicted == true_labels)
-            # # Get the incorrect predictions by preparing a confusion matrix for each leaf
-            # sparse_confusion_matrix = {}
-            # for i in range(true_labels.shape[0]):
-            #     true_label = true_labels[i]
-            #     predicted_label = predicted[i]
-            #     label_pair = (np.asscalar(true_label), np.asscalar(predicted_label))
-            #     if label_pair not in sparse_confusion_matrix:
-            #         sparse_confusion_matrix[label_pair] = 0
-            #     sparse_confusion_matrix[label_pair] += 1
-            # for k, v in sparse_confusion_matrix.items():
-            #     confusion_matrix_db_rows.append((run_id, dataset_type.value, node.index, iteration, k[0], k[1], v))
-
-
+            for l in range(label_count):
+                label_distribution[l] = np.sum(true_labels == l)
+                kv_rows.append((run_id, iteration, "{0} Leaf:{1} True Label:{2}".
+                                format(dataset_type, node.index, l), np.asscalar(label_distribution[l])))
 
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
@@ -124,6 +113,10 @@ class AccuracyCalculator:
                                                 branch_probs=branch_probs_dict, kv_rows=kv_rows)
         # Measure The Histogram of Branching Probabilities
         self.network.calculate_branch_probability_histograms(branch_probs=branch_probs_dict)
+        # Measure Label Distribution
+        self.label_distribution_analysis(run_id=run_id, iteration=iteration, kv_rows=kv_rows,
+                                         leaf_true_labels_dict=leaf_true_labels_dict,
+                                         dataset=dataset, dataset_type=dataset_type)
         # Measure Accuracy
         overall_count = 0.0
         overall_correct = 0.0
@@ -173,6 +166,7 @@ class AccuracyCalculator:
         branch_probs_dict = {}
         info_gain_dict = {}
         posterior_probs = {}
+        leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
         final_features_dict = {}
         residue_posteriors_dict = {}
@@ -191,10 +185,13 @@ class AccuracyCalculator:
                     continue
                 else:
                     posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                    predicted_labels = np.argmax(posterior_prob, axis=1)
                     true_labels = results["Node{0}_label_tensor".format(node.index)]
                     final_features = results[self.network.get_variable_name(name="final_feature_final", node=node)]
                     UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
                                                          array=posterior_prob)
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                                                         array=predicted_labels)
                     UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
                                                          array=true_labels)
                     UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
@@ -223,6 +220,10 @@ class AccuracyCalculator:
         # Measure Branching Probabilities
         AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration,
                                                 branch_probs=branch_probs_dict, kv_rows=kv_rows)
+        # Measure Label Distribution
+        self.label_distribution_analysis(run_id=run_id, iteration=iteration, kv_rows=kv_rows,
+                                         leaf_true_labels_dict=leaf_true_labels_dict,
+                                         dataset=dataset, dataset_type=dataset_type)
         # Method 1: Find the most confident leaf. If this leaf is indecisive, then find the most confident leaf.
         # If all confidents are indecisive, then pick the most confident leaf's prediction as a heuristic.
         root_node = self.network.nodes[0]
@@ -326,7 +327,7 @@ class AccuracyCalculator:
                                                      method1_total_correct_decisive_predictions
         residue_correction_accuracy = (method2_total_correct_non_mode_predictions +
                                        total_correct_of_mode_predictions) / \
-                                        sample_count
+                                      sample_count
 
         kv_rows.append((run_id, iteration, "{0} Method 1 Correct Non Mode Predictions".format(dataset_type),
                         method1_total_correct_non_mode_predictions))
