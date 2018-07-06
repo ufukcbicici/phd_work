@@ -12,13 +12,14 @@ class AccuracyCalculator:
         self.modesHistory = []
 
     @staticmethod
-    def measure_branch_probs(branch_probs, run_id, iteration, kv_rows):
+    def measure_branch_probs(branch_probs, run_id, iteration, dataset_type, kv_rows):
         # Measure Branching Probabilities
         for k, v in branch_probs.items():
             p_n = np.mean(v, axis=0)
             for branch in range(p_n.shape[0]):
-                print("p_{0}({1})={2}".format(k, branch, p_n[branch]))
-                kv_rows.append((run_id, iteration, "p_{0}({1})".format(k, branch), np.asscalar(p_n[branch])))
+                print("{0} p_{1}({2})={3}".format(dataset_type, k, branch, p_n[branch]))
+                kv_rows.append((run_id, iteration, "{0} p_{1}({2})".format(dataset_type, k, branch),
+                                np.asscalar(p_n[branch])))
 
     def label_distribution_analysis(self,
                                     run_id,
@@ -109,7 +110,7 @@ class AccuracyCalculator:
             kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
         kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
         # Measure Branching Probabilities
-        AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration,
+        AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration, dataset_type=dataset_type,
                                                 branch_probs=branch_probs_dict, kv_rows=kv_rows)
         # Measure The Histogram of Branching Probabilities
         self.network.calculate_branch_probability_histograms(branch_probs=branch_probs_dict)
@@ -163,35 +164,35 @@ class AccuracyCalculator:
 
     def calculate_accuracy_after_compression(self, sess, run_id, iteration, dataset, dataset_type):
         kv_rows = []
-        branch_probs_dict = {}
-        info_gain_dict = {}
         posterior_probs = {}
+        branch_probs_dict = {}
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
         final_features_dict = {}
         residue_posteriors_dict = {}
+        # Run with mask off
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         while True:
             results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
-                    info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
-                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index,
-                                                         array=branch_prob)
-                    if node.index not in info_gain_dict:
-                        info_gain_dict[node.index] = []
-                    info_gain_dict[node.index].append(np.asscalar(info_gain))
+                    # info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
+                    # branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                    # UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index,
+                    #                                      array=branch_prob)
+                    # if node.index not in info_gain_dict:
+                    #     info_gain_dict[node.index] = []
+                    # info_gain_dict[node.index].append(np.asscalar(info_gain))
                     continue
                 else:
                     posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
-                    predicted_labels = np.argmax(posterior_prob, axis=1)
+                    # predicted_labels = np.argmax(posterior_prob, axis=1)
                     true_labels = results["Node{0}_label_tensor".format(node.index)]
                     final_features = results[self.network.get_variable_name(name="final_feature_final", node=node)]
                     UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
                                                          array=posterior_prob)
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
-                                                         array=predicted_labels)
+                    # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                    #                                      array=predicted_labels)
                     UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
                                                          array=true_labels)
                     UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
@@ -209,21 +210,9 @@ class AccuracyCalculator:
         true_labels_list = list(leaf_true_labels_dict.values())
         for label_arr in true_labels_list:
             assert np.array_equal(label_arr, true_labels_list[0])
-        # Measure Information Gain
-        total_info_gain = 0.0
-        for k, v in info_gain_dict.items():
-            avg_info_gain = sum(v) / float(len(v))
-            print("IG_{0}={1}".format(k, -avg_info_gain))
-            total_info_gain -= avg_info_gain
-            kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
-        kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
-        # Measure Branching Probabilities
-        AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration,
-                                                branch_probs=branch_probs_dict, kv_rows=kv_rows)
-        # Measure Label Distribution
-        self.label_distribution_analysis(run_id=run_id, iteration=iteration, kv_rows=kv_rows,
-                                         leaf_true_labels_dict=leaf_true_labels_dict,
-                                         dataset=dataset, dataset_type=dataset_type)
+        # Collect branching statistics
+        self.measure_branching_properties(sess=sess, run_id=run_id, iteration=iteration,
+                                          dataset=dataset, dataset_type=dataset_type, kv_rows=kv_rows)
         # Method 1: Find the most confident leaf. If this leaf is indecisive, then find the most confident leaf.
         # If all confidents are indecisive, then pick the most confident leaf's prediction as a heuristic.
         root_node = self.network.nodes[0]
@@ -341,6 +330,50 @@ class AccuracyCalculator:
                         float(total_mode_prediction_count)))
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return best_leaf_accuracy, residue_correction_accuracy
+
+    def measure_branching_properties(self, sess, run_id, iteration, dataset, dataset_type, kv_rows):
+        branch_probs_dict_mask_on = {}
+        info_gain_dict = {}
+        leaf_true_labels_dict = {}
+        leaf_predicted_labels_dict = {}
+        # Run with mask on
+        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        while True:
+            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
+            for node in self.network.topologicalSortedNodes:
+                if not node.isLeaf:
+                    info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
+                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict_mask_on, key=node.index,
+                                                         array=branch_prob)
+                    if node.index not in info_gain_dict:
+                        info_gain_dict[node.index] = []
+                    info_gain_dict[node.index].append(np.asscalar(info_gain))
+                else:
+                    posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                    predicted_labels = np.argmax(posterior_prob, axis=1)
+                    true_labels = results["Node{0}_label_tensor".format(node.index)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                                                         array=predicted_labels)
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                         array=true_labels)
+            if dataset.isNewEpoch:
+                break
+        # Measure Information Gain
+        total_info_gain = 0.0
+        for k, v in info_gain_dict.items():
+            avg_info_gain = sum(v) / float(len(v))
+            print("IG_{0}={1}".format(k, -avg_info_gain))
+            total_info_gain -= avg_info_gain
+            kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
+        kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
+        # Measure Branching Probabilities
+        AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration, dataset_type=dataset_type,
+                                                branch_probs=branch_probs_dict_mask_on, kv_rows=kv_rows)
+        # Measure Label Distribution
+        self.label_distribution_analysis(run_id=run_id, iteration=iteration, kv_rows=kv_rows,
+                                         leaf_true_labels_dict=leaf_true_labels_dict,
+                                         dataset=dataset, dataset_type=dataset_type)
 
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
