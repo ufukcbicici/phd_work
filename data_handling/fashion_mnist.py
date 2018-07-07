@@ -8,10 +8,14 @@ class FashionMnistDataSet(MnistDataSet):
                  validation_sample_count,
                  save_validation_as=None,
                  load_validation_from=None,
-                 test_images_path=os.path.join(os.getcwd(), "..\\data\\fashion_mnist\\t10k-images-idx3-ubyte"),
-                 test_labels_path=os.path.join(os.getcwd(), "..\\data\\fashion_mnist\\t10k-labels-idx1-ubyte"),
-                 training_images_path=os.path.join(os.getcwd(), "..\\data\\fashion_mnist\\train-images-idx3-ubyte"),
-                 training_labels_path=os.path.join(os.getcwd(), "..\\data\\fashion_mnist\\train-labels-idx1-ubyte")):
+                 test_images_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
+                                  os.sep + "data" + os.sep + "fashion_mnist" + os.sep + "t10k-images-idx3-ubyte",
+                 test_labels_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
+                                  os.sep + "data" + os.sep + "fashion_mnist" + os.sep + "t10k-labels-idx1-ubyte",
+                 training_images_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
+                                      os.sep + "data" + os.sep + "fashion_mnist" + os.sep + "train-images-idx3-ubyte",
+                 training_labels_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
+                                      os.sep + "data" + os.sep + "fashion_mnist" + os.sep + "train-labels-idx1-ubyte"):
         super().__init__(validation_sample_count=validation_sample_count, save_validation_as=save_validation_as,
                          load_validation_from=load_validation_from, test_images_path=test_images_path,
                          test_labels_path=test_labels_path, training_images_path=training_images_path,

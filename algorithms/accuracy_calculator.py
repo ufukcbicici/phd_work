@@ -177,9 +177,9 @@ class AccuracyCalculator:
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     # info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
-                    # branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    # UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index,
-                    #                                      array=branch_prob)
+                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index,
+                                                         array=branch_prob)
                     # if node.index not in info_gain_dict:
                     #     info_gain_dict[node.index] = []
                     # info_gain_dict[node.index].append(np.asscalar(info_gain))

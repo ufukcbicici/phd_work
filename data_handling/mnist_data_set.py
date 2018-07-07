@@ -16,12 +16,17 @@ class MnistDataSet(DataSet):
                  validation_sample_count,
                  save_validation_as=None,
                  load_validation_from=None,
-                 test_images_path = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-images-idx3-ubyte"),
-                 test_labels_path = os.path.join(os.getcwd(), "..\\data\\mnist\\t10k-labels-idx1-ubyte"),
-                 training_images_path = os.path.join(os.getcwd(), "..\\data\\mnist\\train-images-idx3-ubyte"),
-                 training_labels_path = os.path.join(os.getcwd(), "..\\data\\mnist\\train-labels-idx1-ubyte")
+                 test_images_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
+                                  os.sep + "data" + os.sep + "mnist" + os.sep + "t10k-images-idx3-ubyte",
+                 test_labels_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
+                                  os.sep + "data" + os.sep + "mnist" + os.sep + "t10k-labels-idx1-ubyte",
+                 training_images_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
+                                      os.sep + "data" + os.sep + "mnist" + os.sep + "train-images-idx3-ubyte",
+                 training_labels_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
+                                      os.sep + "data" + os.sep + "mnist" + os.sep + "train-labels-idx1-ubyte"
                  ):
         super().__init__()
+        path = os.path.abspath(__file__)
         # os_name = platform.system()
         self.testImagesPath = test_images_path
         self.testLabelsPath = test_labels_path

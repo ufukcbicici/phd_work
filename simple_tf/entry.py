@@ -2,7 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from algorithms.softmax_compresser import SoftmaxCompresser
+import os
+
+#from algorithms.softmax_compresser import SoftmaxCompresser
 from auxillary.constants import DatasetTypes
 
 import time
@@ -191,7 +193,7 @@ def main():
     #     # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
     # ]
     classification_dropout_probs = [0.1]
-    decision_dropout_probs = [0.05]
+    decision_dropout_probs = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
     # decision_dropout_probs = [
     #     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
     #     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -212,6 +214,7 @@ def main():
     run_id = 0
     for tpl in cartesian_product:
         if GlobalConstants.USE_CPU:
+            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
             config = tf.ConfigProto(device_count={'GPU': 0})
             sess = tf.Session(config=config)
         else:
