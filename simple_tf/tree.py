@@ -733,7 +733,6 @@ class TreeNetwork:
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
-        self.p_n_given_x = p_n_given_x
         arg_max_indices = tf.argmax(p_n_given_x, axis=1)
         child_nodes = self.dagObject.children(node=node)
         child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
