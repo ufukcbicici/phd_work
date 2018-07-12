@@ -20,6 +20,8 @@ from simple_tf.tree import TreeNetwork
 class FastTreeNetwork(TreeNetwork):
     def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list)
+        self.global_step = None
+        self.learningRate = None
         self.optimizer = None
 
     def build_network(self):
@@ -81,6 +83,8 @@ class FastTreeNetwork(TreeNetwork):
         # Final Loss
         self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
         # Build optimizer
+        self.global_step = tf.Variable(0, trainable=False)
+        self.learningRate = tf.train.piecewise_constant(self.global_step, boundaries, values)
         self.optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(self.loss, global_step=global_step)
 
     def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
