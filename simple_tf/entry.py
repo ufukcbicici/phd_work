@@ -431,4 +431,80 @@ def main():
         tf.reset_default_graph()
 
 
-main()
+def main_fast_tree():
+    dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
+    classification_wd = [0.0]
+    decision_wd = [0.0]
+    info_gain_balance_coeffs = [5.0]
+    classification_dropout_probs = [0.1]
+    decision_dropout_probs = [0.0]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
+                                                                          decision_wd,
+                                                                          info_gain_balance_coeffs,
+                                                                          classification_dropout_probs,
+                                                                          decision_dropout_probs])
+    run_id = 0
+    for tpl in cartesian_product:
+        # Session initialization
+        if GlobalConstants.USE_CPU:
+            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+            config = tf.ConfigProto(device_count={'GPU': 0})
+            sess = tf.Session(config=config)
+        else:
+            sess = tf.Session()
+        # Create network
+        network = TreeNetwork(
+            node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
+                              fashion_net_decision_connected_to_f.l1_func,
+                              fashion_net_decision_connected_to_f.leaf_func],
+            grad_func=fashion_net_decision_connected_to_f.grad_func,
+            threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
+            residue_func=fashion_net_decision_connected_to_f.residue_network_func,
+            summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
+            degree_list=GlobalConstants.TREE_DEGREE_LIST)
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.INITIAL_LR,
+                                                                     schedule=[(15000, 0.005),
+                                                                               (30000, 0.0025),
+                                                                               (40000, 0.00025)])
+        network.build_network()
+        # Init
+        init = tf.global_variables_initializer()
+        print("********************NEW RUN:{0}********************".format(run_id))
+        # Restart the network; including all annealed parameters.
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
+        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
+        network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
+        network.thresholdFunc(network=network)
+        experiment_id = DbLogger.get_run_id()
+        explanation = get_explanation_string(network=network)
+        series_id = int(run_id / 6)
+        explanation += "\n Series:{0}".format(series_id)
+        DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
+                                  col_count=2)
+        sess.run(init)
+        network.reset_network(dataset=dataset, run_id=experiment_id)
+        iteration_counter = 0
+        for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
+            # An epoch is a complete pass on the whole dataset.
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            print("*************Epoch {0}*************".format(epoch_id))
+            total_time = 0.0
+            leaf_info_rows = []
+            while True:
+                start_time = time.time()
+                # sample_counts, decision_sample_counts, lr, is_open_indicators = \
+                #     network.update_params_with_momentum(sess=sess, dataset=dataset,
+                #                                         epoch=epoch_id,
+                #                                         iteration=iteration_counter)
+                elapsed_time = time.time() - start_time
+                total_time += elapsed_time
+                print("Iteration:{0}".format(iteration_counter))
+                print("Lr:{0}".format(lr))
+
+
+# main()
+main_fast_tree()

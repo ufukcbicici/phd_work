@@ -84,8 +84,11 @@ class FastTreeNetwork(TreeNetwork):
         self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
         # Build optimizer
         self.global_step = tf.Variable(0, trainable=False)
+        boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
+        values = [tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
         self.learningRate = tf.train.piecewise_constant(self.global_step, boundaries, values)
-        self.optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(self.loss, global_step=global_step)
+        self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+                                                                                     global_step=self.global_step)
 
     def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
@@ -159,3 +162,23 @@ class FastTreeNetwork(TreeNetwork):
         node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
         node.lossList.append(loss)
         return final_feature, logits
+
+    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        minibatch.samples = np.expand_dims(minibatch.samples, axis=3)
+
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_decision_phase, is_train, use_masking):
+        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: minibatch.samples,
+                     GlobalConstants.TRAIN_LABEL_TENSOR: minibatch.labels,
+                     GlobalConstants.TRAIN_INDEX_TENSOR: minibatch.indices,
+                     GlobalConstants.TRAIN_ONE_HOT_LABELS: minibatch.one_hot_labels,
+                     self.globalCounter: iteration,
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                     self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
+                     self.useThresholding: int(use_threshold),
+                     self.isDecisionPhase: int(is_decision_phase),
+                     self.isTrain: int(is_train),
+                     self.useMasking: int(use_masking),
+                     self.classificationDropoutKeepProb: GlobalConstants.CLASSIFICATION_DROPOUT_PROB,
+                     self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
+                     self.iterationHolder: iteration}

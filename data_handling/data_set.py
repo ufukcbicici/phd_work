@@ -1,7 +1,10 @@
 from auxillary.constants import DatasetTypes
+from collections import namedtuple
 
 
 class DataSet:
+    MiniBatch = namedtuple('MiniBatch', ['samples', 'labels', 'indices', 'one_hot_labels'])
+
     def __init__(self):
         self.dataShape = None
         self.targetShape = None

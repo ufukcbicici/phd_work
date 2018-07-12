@@ -304,14 +304,6 @@ def tensorboard_func(network):
 
 
 def threshold_calculator_func(network):
-    # Information Gain Balance Coefficients
-    # network.nodes[0].infoGainBalanceCoefficient = 1.0
-    # network.nodes[1].infoGainBalanceCoefficient = 1.0
-    # network.nodes[2].infoGainBalanceCoefficient = 1.0
-
-    # Decision Dropout Schedule
-    network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
-                                                               value=1.0 - GlobalConstants.DECISION_DROPOUT_PROB)
     # Noise Coefficient
     network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
                                                            decay=0.0,

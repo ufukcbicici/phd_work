@@ -580,7 +580,11 @@ class TreeNetwork:
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         vars = self.variableManager.trainable_variables()
-        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples = minibatch.samples
+        labels = minibatch.labels
+        indices_list = minibatch.indices
+        one_hot_labels = minibatch.one_hot_labels
         samples = np.expand_dims(samples, axis=3)
         # Decision network
         decision_grads = {}
@@ -786,8 +790,11 @@ class TreeNetwork:
 
     def eval_network(self, sess, dataset, use_masking):
         # if is_train:
-        samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(
-            batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        samples = minibatch.samples
+        labels = minibatch.labels
+        indices_list = minibatch.indices
+        one_hot_labels = minibatch.one_hot_labels
         samples = np.expand_dims(samples, axis=3)
         feed_dict = {
             GlobalConstants.TRAIN_DATA_TENSOR: samples,
