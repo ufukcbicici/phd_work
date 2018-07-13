@@ -23,6 +23,8 @@ class FastTreeNetwork(TreeNetwork):
         self.global_step = None
         self.learningRate = None
         self.optimizer = None
+        self.info_gain_dicts = None
+        self.extra_update_ops = None
 
     def build_network(self):
         # Create itself
@@ -87,8 +89,41 @@ class FastTreeNetwork(TreeNetwork):
         boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
         values = [tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
         self.learningRate = tf.train.piecewise_constant(self.global_step, boundaries, values)
-        self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-                                                                                     global_step=self.global_step)
+        self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(self.extra_update_ops):
+            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+                                                                                         global_step=self.global_step)
+        # Prepare tensors to evaluate
+        for node in self.topologicalSortedNodes:
+            # if node.isLeaf:
+            #     continue
+            # F
+            f_output = node.fOpsList[-1]
+            self.evalDict["Node{0}_F".format(node.index)] = f_output
+            # H
+            if len(node.hOpsList) > 0:
+                h_output = node.hOpsList[-1]
+                self.evalDict["Node{0}_H".format(node.index)] = h_output
+            # Activations
+            for k, v in node.activationsDict.items():
+                self.evalDict["Node{0}_activation_from_{1}".format(node.index, k)] = v
+            # Decision masks
+            for k, v in node.maskTensors.items():
+                self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
+            # Evaluation outputs
+            for k, v in node.evalDict.items():
+                self.evalDict[k] = v
+            # Label outputs
+            if node.labelTensor is not None:
+                self.evalDict["Node{0}_label_tensor".format(node.index)] = node.labelTensor
+                # Sample indices
+                self.evalDict["Node{0}_indices_tensor".format(node.index)] = node.indicesTensor
+            # One Hot Label outputs
+            if node.oneHotLabelTensor is not None:
+                self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
+        self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
+        self.info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
     def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
@@ -166,8 +201,20 @@ class FastTreeNetwork(TreeNetwork):
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         minibatch.samples = np.expand_dims(minibatch.samples, axis=3)
+        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
+                                           is_train=True, use_masking=True)
+        # Prepare result tensors to collect
+        run_ops = [self.optimizer, self.learningRate, self.sample_count_tensors, self.isOpenTensors,
+                   self.info_gain_dicts]
+        if GlobalConstants.USE_VERBOSE:
+            run_ops.append(self.evalDict)
+        results = sess.run(run_ops, feed_dict=feed_dict)
 
-    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_decision_phase, is_train, use_masking):
+
+
+
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: minibatch.samples,
                      GlobalConstants.TRAIN_LABEL_TENSOR: minibatch.labels,
                      GlobalConstants.TRAIN_INDEX_TENSOR: minibatch.indices,
@@ -176,9 +223,18 @@ class FastTreeNetwork(TreeNetwork):
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
                      self.useThresholding: int(use_threshold),
-                     self.isDecisionPhase: int(is_decision_phase),
+                     # self.isDecisionPhase: int(is_decision_phase),
                      self.isTrain: int(is_train),
                      self.useMasking: int(use_masking),
                      self.classificationDropoutKeepProb: GlobalConstants.CLASSIFICATION_DROPOUT_PROB,
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
+        if is_train:
+            self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
+            self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
+            self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
+        else:
+            self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
+            self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
+            self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
+        return feed_dict
