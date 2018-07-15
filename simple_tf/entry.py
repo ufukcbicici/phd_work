@@ -19,6 +19,7 @@ from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedPara
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
 from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline, fashion_net_decision_connected_to_f
+from simple_tf.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
 
@@ -453,7 +454,7 @@ def main_fast_tree():
         else:
             sess = tf.Session()
         # Create network
-        network = TreeNetwork(
+        network = FastTreeNetwork(
             node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
                               fashion_net_decision_connected_to_f.l1_func,
                               fashion_net_decision_connected_to_f.leaf_func],
@@ -496,14 +497,85 @@ def main_fast_tree():
             leaf_info_rows = []
             while True:
                 start_time = time.time()
-                # sample_counts, decision_sample_counts, lr, is_open_indicators = \
-                #     network.update_params_with_momentum(sess=sess, dataset=dataset,
-                #                                         epoch=epoch_id,
-                #                                         iteration=iteration_counter)
+                lr, sample_counts, is_open_indicators = network.update_params_with_momentum(sess=sess, dataset=dataset,
+                                                                                            epoch=epoch_id,
+                                                                                            iteration=iteration_counter)
                 elapsed_time = time.time() - start_time
                 total_time += elapsed_time
                 print("Iteration:{0}".format(iteration_counter))
                 print("Lr:{0}".format(lr))
+                # Print sample counts (classification)
+                sample_count_str = "Classification:   "
+                for k, v in sample_counts.items():
+                    sample_count_str += "[{0}={1}]".format(k, v)
+                    node_index = network.get_node_from_variable_name(name=k).index
+                    leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
+                print(sample_count_str)
+                # Print node open indicators
+                indicator_str = ""
+                for k, v in is_open_indicators.items():
+                    indicator_str += "[{0}={1}]".format(k, v)
+                print(indicator_str)
+                iteration_counter += 1
+                if dataset.isNewEpoch:
+                    if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
+                        print("Epoch Time={0}".format(total_time))
+                        if not network.modeTracker.isCompressed:
+                            training_accuracy, training_confusion = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                           dataset_type=DatasetTypes.training,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy, validation_confusion = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            if not network.isBaseline:
+                                validation_accuracy_corrected, validation_marginal_corrected = \
+                                    network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                               dataset_type=DatasetTypes.test,
+                                                               run_id=experiment_id,
+                                                               iteration=iteration_counter,
+                                                               calculation_type=
+                                                               AccuracyCalcType.route_correction)
+                            else:
+                                validation_accuracy_corrected = 0.0
+                                validation_marginal_corrected = 0.0
+                            DbLogger.write_into_table(
+                                rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
+                                       validation_accuracy, validation_accuracy_corrected,
+                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                            # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
+                            if GlobalConstants.SAVE_CONFUSION_MATRICES:
+                                DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
+                                                          col_count=7)
+                                DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
+                                                          col_count=7)
+                        else:
+                            training_accuracy_best_leaf, training_confusion_residue = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                           dataset_type=DatasetTypes.training,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy_best_leaf, validation_confusion_residue = \
+                                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                                           run_id=experiment_id, iteration=iteration_counter,
+                                                           calculation_type=AccuracyCalcType.regular)
+                            DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id,
+                                                             training_accuracy_best_leaf,
+                                                             validation_accuracy_best_leaf,
+                                                             validation_confusion_residue,
+                                                             0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                        leaf_info_rows = []
+                    break
+            # Compress softmax classifiers
+            if GlobalConstants.USE_SOFTMAX_DISTILLATION:
+                do_compress = network.check_for_compression(dataset=dataset, run_id=experiment_id,
+                                                            iteration=iteration_counter, epoch=epoch_id)
+                if do_compress:
+                    print("**********************Compressing the network**********************")
+                    network.softmaxCompresser.compress_network_softmax(sess=sess)
+                    print("**********************Compressing the network**********************")
 
 
 # main()

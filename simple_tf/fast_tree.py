@@ -210,9 +210,21 @@ class FastTreeNetwork(TreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
+        lr = results[1]
+        sample_counts = results[2]
+        is_open_indicators = results[3]
+        return lr, sample_counts, is_open_indicators
 
-
-
+    def eval_network(self, sess, dataset, use_masking):
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        minibatch.samples = np.expand_dims(minibatch.samples, axis=3)
+        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
+                                           is_train=False, use_masking=use_masking)
+        results = sess.run(self.evalDict, feed_dict)
+        # for k, v in results.items():
+        #     if "final_feature_mag" in k:
+        #         print("{0}={1}".format(k, v))
+        return results
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: minibatch.samples,
@@ -226,7 +238,7 @@ class FastTreeNetwork(TreeNetwork):
                      # self.isDecisionPhase: int(is_decision_phase),
                      self.isTrain: int(is_train),
                      self.useMasking: int(use_masking),
-                     self.classificationDropoutKeepProb: GlobalConstants.CLASSIFICATION_DROPOUT_PROB,
+                     self.classificationDropoutKeepProb: 1.0,
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
         if is_train:
