@@ -32,6 +32,7 @@ class GlobalConstants:
     EVAL_BATCH_SIZE = 10000
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
+    USE_FAST_TREE_MODE = True
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
@@ -94,7 +95,7 @@ class GlobalConstants:
     SOFTMAX_DISTILLATION_VERBOSE = False
 
     SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT = 3
-    USE_SOFTMAX_DISTILLATION = True
+    USE_SOFTMAX_DISTILLATION = False
     SOFTMAX_DISTILLATION_CPU_COUNT = 8
     SOFTMAX_DISTILLATION_GRADIENT_TYPE = GradientType.parallel_dnns_unbiased
     # Softmax Compression Parameters

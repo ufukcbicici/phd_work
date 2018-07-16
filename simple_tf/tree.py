@@ -790,7 +790,7 @@ class TreeNetwork:
 
     def eval_network(self, sess, dataset, use_masking):
         # if is_train:
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         samples = minibatch.samples
         labels = minibatch.labels
         indices_list = minibatch.indices

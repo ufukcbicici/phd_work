@@ -1,26 +1,18 @@
-import tensorflow as tf
-import numpy as np
+from collections import deque
 
-from algorithms.accuracy_calculator import AccuracyCalculator
-from algorithms.mode_tracker import ModeTracker
-from algorithms.softmax_compresser import SoftmaxCompresser
-from algorithms.variable_manager import VariableManager
-from auxillary.constants import DatasetTypes
-from auxillary.dag_utilities import Dag
-from auxillary.db_logger import DbLogger
-from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants, GradientType, AccuracyCalcType
+import numpy as np
+import tensorflow as tf
+
+from simple_tf.global_params import GlobalConstants
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
-from collections import deque
-from simple_tf import batch_norm
 from simple_tf.tree import TreeNetwork
+from data_handling.data_set import DataSet
 
 
 class FastTreeNetwork(TreeNetwork):
     def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list)
-        self.global_step = None
         self.learningRate = None
         self.optimizer = None
         self.info_gain_dicts = None
@@ -85,14 +77,15 @@ class FastTreeNetwork(TreeNetwork):
         # Final Loss
         self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
         # Build optimizer
-        self.global_step = tf.Variable(0, trainable=False)
+        self.globalCounter = tf.Variable(0, trainable=False)
         boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
-        values = [tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
-        self.learningRate = tf.train.piecewise_constant(self.global_step, boundaries, values)
+        values = [GlobalConstants.INITIAL_LR]
+        values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
+        self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
         self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(self.extra_update_ops):
             self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-                                                                                         global_step=self.global_step)
+                                                                                         global_step=self.globalCounter)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
@@ -127,7 +120,8 @@ class FastTreeNetwork(TreeNetwork):
 
     def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-            branching_feature = tf.layers.batch_normalization(branching_feature, training=self.isTrain)
+            branching_feature = tf.layers.batch_normalization(branching_feature, training=tf.cast(self.isTrain,
+                                                                                                  tf.bool))
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
@@ -187,7 +181,7 @@ class FastTreeNetwork(TreeNetwork):
     def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
         node.residueOutputTensor = final_feature
         node.finalFeatures = final_feature
-        node.evalDict[self.get_variable_name(name="final_feature", node=node)] = final_feature
+        node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature)
         logits = tf.matmul(final_feature, softmax_weights) + softmax_biases
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
@@ -200,7 +194,8 @@ class FastTreeNetwork(TreeNetwork):
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
-        minibatch.samples = np.expand_dims(minibatch.samples, axis=3)
+        minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
+                                      minibatch.indices, minibatch.one_hot_labels)
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
                                            is_train=True, use_masking=True)
@@ -216,8 +211,9 @@ class FastTreeNetwork(TreeNetwork):
         return lr, sample_counts, is_open_indicators
 
     def eval_network(self, sess, dataset, use_masking):
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
-        minibatch.samples = np.expand_dims(minibatch.samples, axis=3)
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
+                                      minibatch.indices, minibatch.one_hot_labels)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
                                            is_train=False, use_masking=use_masking)
         results = sess.run(self.evalDict, feed_dict)
@@ -231,22 +227,23 @@ class FastTreeNetwork(TreeNetwork):
                      GlobalConstants.TRAIN_LABEL_TENSOR: minibatch.labels,
                      GlobalConstants.TRAIN_INDEX_TENSOR: minibatch.indices,
                      GlobalConstants.TRAIN_ONE_HOT_LABELS: minibatch.one_hot_labels,
-                     self.globalCounter: iteration,
+                     # self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
                      self.useThresholding: int(use_threshold),
                      # self.isDecisionPhase: int(is_decision_phase),
                      self.isTrain: int(is_train),
                      self.useMasking: int(use_masking),
-                     self.classificationDropoutKeepProb: 1.0,
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
         if is_train:
             self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
             self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
+            feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
         else:
             self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
             self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
-            self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
+            feed_dict[self.classificationDropoutKeepProb] = 1.0
+            feed_dict[self.decisionDropoutKeepProb] = 1.0
         return feed_dict

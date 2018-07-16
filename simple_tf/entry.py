@@ -22,7 +22,7 @@ from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline, fashion
 from simple_tf.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
-
+from tensorflow.python.framework import ops
 
 # tf.set_random_seed(1234)
 # np_seed = 88
@@ -488,6 +488,8 @@ def main_fast_tree():
                                   col_count=2)
         sess.run(init)
         network.reset_network(dataset=dataset, run_id=experiment_id)
+        moving_stat_vars = [var for var in ops.get_collection(ops.GraphKeys.GLOBAL_VARIABLES) if "moving" in var.name]
+        moving_results_0 = sess.run(moving_stat_vars)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -518,6 +520,7 @@ def main_fast_tree():
                 print(indicator_str)
                 iteration_counter += 1
                 if dataset.isNewEpoch:
+                    moving_results_1 = sess.run(moving_stat_vars)
                     if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
                         print("Epoch Time={0}".format(total_time))
                         if not network.modeTracker.isCompressed:

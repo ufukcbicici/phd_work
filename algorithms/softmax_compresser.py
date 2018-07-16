@@ -223,7 +223,16 @@ class SoftmaxCompresser:
         self.network.build_regularization_loss()
         # Re-calculate the gradients
         GlobalConstants.GRADIENT_TYPE = GlobalConstants.SOFTMAX_DISTILLATION_GRADIENT_TYPE
-        self.network.gradFunc(network=self.network)
+        if not GlobalConstants.USE_FAST_TREE_MODE:
+            self.network.gradFunc(network=self.network)
+        else:
+            # Create a new minimizer, using the modified losses.
+            # Final Loss
+            self.network.finalLoss = self.network.mainLoss + self.network.regularizationLoss + self.network.decisionLoss
+            with tf.control_dependencies(self.network.extra_update_ops):
+                self.network.optimizer = tf.train.MomentumOptimizer(self.network.learningRate, 0.9).minimize(
+                    self.network.finalLoss,
+                    global_step=self.network.globalCounter)
 
     def change_leaf_loss(self, node, compressed_layers_dict):
         softmax_weights = compressed_layers_dict[node.index][0]
