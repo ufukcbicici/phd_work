@@ -85,11 +85,12 @@ class ModeTracker:
                 self.unchangedEpochCount += 1
         if self.unchangedEpochCount != GlobalConstants.MODE_WAIT_EPOCHS:
             return False
-        curr_modes = self.modesHistory[-1]
-        for v in curr_modes.values():
-            total_mode_count += len(v)
-        if total_mode_count != label_count:
-            return False
+        if GlobalConstants.CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT:
+            curr_modes = self.modesHistory[-1]
+            for v in curr_modes.values():
+                total_mode_count += len(v)
+            if total_mode_count != label_count:
+                return False
         if self.isCompressed:
             return False
         self.isCompressed = True

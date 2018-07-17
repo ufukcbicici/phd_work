@@ -34,7 +34,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H New Round\n"
+    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H DGX-v1\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -97,6 +97,8 @@ def get_explanation_string(network):
     explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
     explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
     explanation += "Mode Percentile:{0}\n".format(GlobalConstants.PERCENTILE_THRESHOLD)
+    explanation += "Constrain Softmax Compression With Label Count:{0}\n".format(GlobalConstants.
+                                                                                 CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT)
     explanation += "Softmax Distillation Cross Validation Count:{0}\n". \
         format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
     explanation += "Softmax Distillation Strategy:{0}\n". \
@@ -193,17 +195,12 @@ def main():
     #     # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
     # ]
     classification_dropout_probs = [0.1]
-    decision_dropout_probs = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    # decision_dropout_probs = [
-    #     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-    #     0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-    #     0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-    #     0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-    #     0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-    #     0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    # decision_dropout_probs = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    decision_dropout_probs = [
+        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+        0.35, 0.35, 0.35, 0.35, 0.35, 0.35
+    ]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
@@ -431,4 +428,4 @@ def main():
         tf.reset_default_graph()
 
 
-main()
+# main()
