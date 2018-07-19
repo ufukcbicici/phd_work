@@ -230,10 +230,14 @@ class SoftmaxCompresser:
             # Final Loss
             self.network.finalLoss = self.network.mainLoss + self.network.regularizationLoss + \
                                      self.network.decisionLoss + self.network.residueLoss
+            # Get all momentum variables
+            all_variables = tf.ops.get_collection(tf.ops.GraphKeys.GLOBAL_VARIABLES)
             with tf.control_dependencies(self.network.extra_update_ops):
                 self.network.optimizer = tf.train.MomentumOptimizer(self.network.learningRate, 0.9).minimize(
                     self.network.finalLoss,
                     global_step=self.network.globalCounter)
+            uninitialized_vars = set(sess.run(tf.report_uninitialized_variables()))
+            print("X")
 
     def change_leaf_loss(self, node, compressed_layers_dict):
         softmax_weights = compressed_layers_dict[node.index][0]
