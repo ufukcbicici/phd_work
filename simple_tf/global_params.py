@@ -24,6 +24,11 @@ class SoftmaxCompressionStrategy(Enum):
     fit_svm_layer = 2
 
 
+class ModeTrackingStrategy(Enum):
+    wait_for_convergence = 0
+    wait_for_fixed_epochs = 1
+
+
 class GlobalConstants:
     TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
@@ -73,9 +78,11 @@ class GlobalConstants:
     # INFO_GAIN_BALANCE_COEFFICIENT = 1.0
 
     # Softmax Compression Parameters
-    PERCENTILE_THRESHOLD = 0.85
+    PERCENTILE_THRESHOLD = 0.925
+    MODE_TRACKING_STRATEGY = ModeTrackingStrategy.wait_for_fixed_epochs
+    CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT = False
     COMPRESSION_EPOCH = 10
-    MODE_WAIT_EPOCHS = 25
+    MODE_WAIT_EPOCHS = 50
     SOFTMAX_DISTILLATION_INITIAL_LR = 0.01
     SOFTMAX_DISTILLATION_DECAY = 0.5
     SOFTMAX_DISTILLATION_BATCH_SIZE = 1000
@@ -120,7 +127,7 @@ class GlobalConstants:
     USE_PROBABILITY_THRESHOLD = True
     USE_ADAPTIVE_WEIGHT_DECAY = False
     ADAPTIVE_WEIGHT_DECAY_MIXING_RATE = 0.9
-    USE_DROPOUT_FOR_DECISION = True
+    USE_DROPOUT_FOR_DECISION = False
     USE_EFFECTIVE_SAMPLE_COUNTS = True
     USE_REPARAMETRIZATION_TRICK = False
     USE_DROPOUT_FOR_CLASSIFICATION = False

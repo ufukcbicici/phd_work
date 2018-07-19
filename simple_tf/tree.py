@@ -721,8 +721,8 @@ class TreeNetwork:
             branching_feature = tf.where(self.isTrain > 0, noisy_feature, branching_feature)
             self.evalDict[self.get_variable_name(name="final_branching_feature", node=node)] = branching_feature
             # branching_feature = noisy_feature
-        if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-            branching_feature = tf.nn.dropout(branching_feature, self.decisionDropoutKeepProb)
+        # if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+        #     branching_feature = tf.nn.dropout(branching_feature, self.decisionDropoutKeepProb)
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
