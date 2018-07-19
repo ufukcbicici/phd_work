@@ -66,6 +66,8 @@ class FastTreeNetwork(TreeNetwork):
         # Build all symbolic networks in each node
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
+        # Build the residue loss
+        self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
         self.variableManager.get_all_node_variables()
         # Build main classification loss
@@ -75,7 +77,7 @@ class FastTreeNetwork(TreeNetwork):
         # Build regularization loss
         self.build_regularization_loss()
         # Final Loss
-        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
+        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss + self.residueLoss
         # Build optimizer
         self.globalCounter = tf.Variable(0, trainable=False)
         boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]

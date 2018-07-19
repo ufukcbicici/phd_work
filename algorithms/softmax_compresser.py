@@ -228,7 +228,8 @@ class SoftmaxCompresser:
         else:
             # Create a new minimizer, using the modified losses.
             # Final Loss
-            self.network.finalLoss = self.network.mainLoss + self.network.regularizationLoss + self.network.decisionLoss
+            self.network.finalLoss = self.network.mainLoss + self.network.regularizationLoss + \
+                                     self.network.decisionLoss + self.network.residueLoss
             with tf.control_dependencies(self.network.extra_update_ops):
                 self.network.optimizer = tf.train.MomentumOptimizer(self.network.learningRate, 0.9).minimize(
                     self.network.finalLoss,

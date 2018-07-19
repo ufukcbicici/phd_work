@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import os
 
-#from algorithms.softmax_compresser import SoftmaxCompresser
+# from algorithms.softmax_compresser import SoftmaxCompresser
 from auxillary.constants import DatasetTypes
 
 import time
@@ -24,6 +24,7 @@ from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
 from tensorflow.python.framework import ops
 
+
 # tf.set_random_seed(1234)
 # np_seed = 88
 # np.random.seed(np_seed)
@@ -35,7 +36,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H New Round\n"
+    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H v2\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -439,7 +440,15 @@ def main_fast_tree():
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     classification_dropout_probs = [0.1]
-    decision_dropout_probs = [0.0]
+    decision_dropout_probs = [0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
+    # # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    # #  0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    # #  0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    #  [0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    #  0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+    #  0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
@@ -489,8 +498,8 @@ def main_fast_tree():
                                   col_count=2)
         sess.run(init)
         network.reset_network(dataset=dataset, run_id=experiment_id)
-        moving_stat_vars = [var for var in ops.get_collection(ops.GraphKeys.GLOBAL_VARIABLES) if "moving" in var.name]
-        moving_results_0 = sess.run(moving_stat_vars)
+        # moving_stat_vars = [var for var in ops.get_collection(ops.GraphKeys.GLOBAL_VARIABLES) if "moving" in var.name]
+        # moving_results_0 = sess.run(moving_stat_vars)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -521,7 +530,7 @@ def main_fast_tree():
                 print(indicator_str)
                 iteration_counter += 1
                 if dataset.isNewEpoch:
-                    moving_results_1 = sess.run(moving_stat_vars)
+                    # moving_results_1 = sess.run(moving_stat_vars)
                     if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
                         print("Epoch Time={0}".format(total_time))
                         if not network.modeTracker.isCompressed:
@@ -580,6 +589,9 @@ def main_fast_tree():
                     print("**********************Compressing the network**********************")
                     network.softmaxCompresser.compress_network_softmax(sess=sess)
                     print("**********************Compressing the network**********************")
+        # Reset the computation graph
+        tf.reset_default_graph()
+        run_id += 1
 
 
 # main()

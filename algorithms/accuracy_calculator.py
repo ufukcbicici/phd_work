@@ -199,8 +199,7 @@ class AccuracyCalculator:
                                                          array=final_features)
                     residue_posteriors = sess.run([self.network.evalDict["residue_probabilities"]],
                                                   feed_dict={self.network.residueInputTensor: final_features,
-                                                             self.network.classificationDropoutKeepProb:
-                                                                 GlobalConstants.CLASSIFICATION_DROPOUT_PROB})
+                                                             self.network.classificationDropoutKeepProb: 1.0})
                     UtilityFuncs.concat_to_np_array_dict(dct=residue_posteriors_dict, key=node.index,
                                                          array=residue_posteriors[0])
 
