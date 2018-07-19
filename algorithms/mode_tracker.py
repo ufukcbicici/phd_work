@@ -1,7 +1,7 @@
 import numpy as np
 
 from auxillary.constants import DatasetTypes
-from simple_tf.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants, ModeTrackingStrategy
 
 
 class ModeTracker:
@@ -68,37 +68,42 @@ class ModeTracker:
             self.modesHistory.append(modes_per_leaves)
 
     def check_for_compression_start(self, dataset, epoch):
-        label_count = dataset.get_label_count()
-        total_mode_count = 0
-        # for modes in last_modes.values():
-        #     total_mode_count += len(modes)
-        if len(self.modesHistory) == 0:
-            raise Exception("Mode history can't be zero.")
-        elif len(self.modesHistory) == 1:
-            self.unchangedEpochCount = 1
-        else:
-            prev_modes = self.modesHistory[-2]
-            curr_modes = self.modesHistory[-1]
-            if self.modes_changed(prev_modes=prev_modes, curr_modes=curr_modes):
+        if GlobalConstants.MODE_TRACKING_STRATEGY == ModeTrackingStrategy.wait_for_convergence:
+            label_count = dataset.get_label_count()
+            total_mode_count = 0
+            # for modes in last_modes.values():
+            #     total_mode_count += len(modes)
+            if len(self.modesHistory) == 0:
+                raise Exception("Mode history can't be zero.")
+            elif len(self.modesHistory) == 1:
                 self.unchangedEpochCount = 1
             else:
-                self.unchangedEpochCount += 1
-        if self.unchangedEpochCount != GlobalConstants.MODE_WAIT_EPOCHS:
-            return False
-        if GlobalConstants.CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT:
-            curr_modes = self.modesHistory[-1]
-            for v in curr_modes.values():
-                total_mode_count += len(v)
-            if total_mode_count != label_count:
+                prev_modes = self.modesHistory[-2]
+                curr_modes = self.modesHistory[-1]
+                if self.modes_changed(prev_modes=prev_modes, curr_modes=curr_modes):
+                    self.unchangedEpochCount = 1
+                else:
+                    self.unchangedEpochCount += 1
+            if self.unchangedEpochCount != GlobalConstants.MODE_WAIT_EPOCHS:
                 return False
-        if self.isCompressed:
-            return False
-        self.isCompressed = True
-        return True
-        # if epoch == GlobalConstants.EPOCH_COUNT - 1:
-        #     return True
-        # else:
-        #     return False
+            if GlobalConstants.CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT:
+                curr_modes = self.modesHistory[-1]
+                for v in curr_modes.values():
+                    total_mode_count += len(v)
+                if total_mode_count != label_count:
+                    return False
+            if self.isCompressed:
+                return False
+            self.isCompressed = True
+            return True
+        elif GlobalConstants.MODE_TRACKING_STRATEGY == ModeTrackingStrategy.wait_for_fixed_epochs:
+            if epoch == GlobalConstants.MODE_WAIT_EPOCHS:
+                self.isCompressed = True
+                return True
+            else:
+                return False
+
+
 
 
 

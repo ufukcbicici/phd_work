@@ -97,6 +97,7 @@ def get_explanation_string(network):
     explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
     explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
     explanation += "Mode Percentile:{0}\n".format(GlobalConstants.PERCENTILE_THRESHOLD)
+    explanation += "Mode Tracking Strategy:{0}\n".format(GlobalConstants.MODE_TRACKING_STRATEGY)
     explanation += "Constrain Softmax Compression With Label Count:{0}\n".format(GlobalConstants.
                                                                                  CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT)
     explanation += "Softmax Distillation Cross Validation Count:{0}\n". \
@@ -195,6 +196,7 @@ def main():
     #     # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
     # ]
     classification_dropout_probs = [0.1]
+    # decision_dropout_probs = [0.35]
     # decision_dropout_probs = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     decision_dropout_probs = [
         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
@@ -427,5 +429,5 @@ def main():
         run_id += 1
         tf.reset_default_graph()
 
-
+main()
 # main()
