@@ -83,13 +83,13 @@ class GlobalConstants:
     # INFO_GAIN_BALANCE_COEFFICIENT = 1.0
 
     # Softmax Compression Parameters
-    PERCENTILE_THRESHOLD = 0.95
+    PERCENTILE_THRESHOLD = 0.85
     MAX_MODE_CLASSES = 5
-    MODE_COMPUTATION_STRATEGY = ModeComputationStrategy.max_num_of_classes
-    MODE_TRACKING_STRATEGY = ModeTrackingStrategy.wait_for_fixed_epochs
+    MODE_COMPUTATION_STRATEGY = ModeComputationStrategy.percentile
+    MODE_TRACKING_STRATEGY = ModeTrackingStrategy.wait_for_convergence
     CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT = False
     COMPRESSION_EPOCH = 10
-    MODE_WAIT_EPOCHS = 50
+    MODE_WAIT_EPOCHS = 25
     SOFTMAX_DISTILLATION_INITIAL_LR = 0.01
     SOFTMAX_DISTILLATION_DECAY = 0.5
     SOFTMAX_DISTILLATION_BATCH_SIZE = 1000

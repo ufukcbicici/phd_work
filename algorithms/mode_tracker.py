@@ -46,7 +46,7 @@ class ModeTracker:
                 frequencies[label] = np.sum(true_labels == label)
                 label_distribution[label] = frequencies[label] / float(total_sample_count)
                 distribution_str += "{0}:{1:.3f} ".format(label, label_distribution[label])
-                print("Node{0} Label Distribution: {1}".format(node.index, distribution_str))
+            print("Node{0} Label Distribution: {1}".format(node.index, distribution_str))
             leaf_label_distributions[node.index] = label_distribution
         if GlobalConstants.MODE_COMPUTATION_STRATEGY == ModeComputationStrategy.percentile:
             if dataset_type == DatasetTypes.training:
@@ -66,8 +66,8 @@ class ModeTracker:
                     mode_txt = mode_txt[0:len(mode_txt) - 1]
                     total_mode_count += len(modes_per_leaves[node.index])
                     kv_rows.append((run_id, iteration, "Leaf {0} Modes".format(node.index), mode_txt))
-                    kv_rows.append((run_id, iteration, "Total Mode Count", total_mode_count))
-                    self.modesHistory.append(modes_per_leaves)
+                kv_rows.append((run_id, iteration, "Total Mode Count", total_mode_count))
+                self.modesHistory.append(modes_per_leaves)
         elif GlobalConstants.MODE_COMPUTATION_STRATEGY == ModeComputationStrategy.max_num_of_classes:
             if dataset_type == DatasetTypes.training:
                 for node in self.network.topologicalSortedNodes:
@@ -84,8 +84,8 @@ class ModeTracker:
                     mode_txt = mode_txt[0:len(mode_txt) - 1]
                     total_mode_count += len(modes_per_leaves[node.index])
                     kv_rows.append((run_id, iteration, "Leaf {0} Modes".format(node.index), mode_txt))
-                    kv_rows.append((run_id, iteration, "Total Mode Count", total_mode_count))
-                    self.modesHistory.append(modes_per_leaves)
+                kv_rows.append((run_id, iteration, "Total Mode Count", total_mode_count))
+                self.modesHistory.append(modes_per_leaves)
 
     def check_for_compression_start(self, dataset, epoch):
         if GlobalConstants.MODE_TRACKING_STRATEGY == ModeTrackingStrategy.wait_for_convergence:

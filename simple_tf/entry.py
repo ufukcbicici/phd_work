@@ -596,5 +596,5 @@ def main_fast_tree():
         run_id += 1
 
 
-main()
-# main_fast_tree()
+# main()
+main_fast_tree()
