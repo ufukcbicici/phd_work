@@ -49,6 +49,7 @@ def get_explanation_string(network):
     explanation += "********Lr Settings********\n"
     explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
     explanation += "********Lr Settings********\n"
+    explanation += network.decisionLossCoefficientCalculator.get_explanation()
     explanation += "Param Count:{0}\n".format(total_param_count)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)

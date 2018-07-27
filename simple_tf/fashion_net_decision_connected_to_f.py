@@ -309,6 +309,11 @@ def threshold_calculator_func(network):
                                                            decay=0.0,
                                                            decay_period=1,
                                                            min_limit=0.0)
+    # Decision Loss Coefficient
+    network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
+                                                                  value=0.0,
+                                                                  schedule=[(12000, 1.0)])
+
     for node in network.topologicalSortedNodes:
         if node.isLeaf:
             continue

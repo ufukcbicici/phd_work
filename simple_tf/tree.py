@@ -62,6 +62,7 @@ class TreeNetwork:
         self.residueInputTensor = None
         self.useThresholding = None
         self.iterationHolder = None
+        self.decisionLossCoefficient = tf.placeholder(name="decision_loss_coefficient", dtype=tf.float32)
         self.decisionDropoutKeepProb = None
         self.decisionDropoutKeepProbCalculator = None
         self.classificationDropoutKeepProb = None
@@ -81,6 +82,7 @@ class TreeNetwork:
         self.summaryWriter = None
         self.branchingBatchNormAssignOps = []
         self.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
+        self.decisionLossCoefficientCalculator = None
         self.isBaseline = None
         # Algorithms
         self.modeTracker = ModeTracker(network=self)
@@ -274,7 +276,7 @@ class TreeNetwork:
                 continue
             decision_losses.append(node.infoGainLoss)
         if len(decision_losses) > 0 and not self.isBaseline:
-            self.decisionLoss = GlobalConstants.DECISION_LOSS_COEFFICIENT * tf.add_n(decision_losses)
+            self.decisionLoss = self.decisionLossCoefficient * tf.add_n(decision_losses)
         else:
             self.decisionLoss = tf.constant(value=0.0)
 
@@ -347,6 +349,13 @@ class TreeNetwork:
                 node.probThresholdCalculator.update(iteration=iteration + 1)
             else:
                 feed_dict[node.probabilityThreshold] = 0.0
+
+    def get_decision_weight(self, feed_dict, iteration, update):
+        weight = self.decisionLossCoefficientCalculator.value
+        feed_dict[self.decisionLossCoefficient] = weight
+        print("self.decisionLossCoefficient={0}".format(weight))
+        if update:
+            self.decisionLossCoefficientCalculator.update(iteration=iteration+1)
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:

@@ -243,11 +243,13 @@ class FastTreeNetwork(TreeNetwork):
             self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
+            self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
             if self.modeTracker.isCompressed:
                 self.get_label_mappings(feed_dict=feed_dict)
         else:
             self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
             self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
+            self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
             feed_dict[self.classificationDropoutKeepProb] = 1.0
             feed_dict[self.decisionDropoutKeepProb] = 1.0
         return feed_dict
