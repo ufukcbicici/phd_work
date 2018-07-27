@@ -239,7 +239,7 @@ class SoftmaxCompresser:
             uninitialized_var_names = set(sess.run(tf.report_uninitialized_variables()))
             uninitialized_vars = []
             for uninitialized_var_name in uninitialized_var_names:
-                candidates = [v for v in all_variables if str(uninitialized_var_name) in v.name]
+                candidates = [v for v in all_variables if str(uninitialized_var_name)[2:-1] in v.name]
                 assert len(candidates) == 1
                 uninitialized_vars.append(candidates[0])
             init_ops = [v.initializer for v in uninitialized_vars]

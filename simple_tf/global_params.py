@@ -42,7 +42,7 @@ class GlobalConstants:
     EVAL_BATCH_SIZE = 10000
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
-    USE_FAST_TREE_MODE = False
+    USE_FAST_TREE_MODE = True
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
