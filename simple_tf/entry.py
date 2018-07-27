@@ -442,7 +442,9 @@ def main_fast_tree():
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     classification_dropout_probs = [0.1]
-    decision_dropout_probs = [0.35]
+    decision_dropout_probs = [0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
     # # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
     # #  0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
     # #  0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
