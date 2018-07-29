@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import os
 
-#from algorithms.softmax_compresser import SoftmaxCompresser
+# from algorithms.softmax_compresser import SoftmaxCompresser
 from auxillary.constants import DatasetTypes
 
 import time
@@ -205,11 +205,11 @@ def main():
     # decision_dropout_probs = [0.35]
     # decision_dropout_probs = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     decision_dropout_probs = \
-    [
-        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-        0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-        0.35, 0.35, 0.35, 0.35, 0.35, 0.35
-    ]
+        [
+            0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+            0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+            0.35, 0.35, 0.35, 0.35, 0.35, 0.35
+        ]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
@@ -442,10 +442,21 @@ def main_fast_tree():
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
-    classification_dropout_probs = [0.1]
-    decision_dropout_probs = [0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-                              0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-                              0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
+    classification_dropout_probs = \
+        [0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+         0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+         0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+         0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+         0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+         0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+         0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+         0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+         0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+         0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+         0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+         0.3, 0.3, 0.3, 0.3, 0.3, 0.3
+         ]
+    decision_dropout_probs = [0.35]
     # # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
     # #  0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
     # #  0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
