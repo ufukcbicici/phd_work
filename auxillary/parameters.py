@@ -175,3 +175,7 @@ class FixedParameter(Parameter):
 
     def update(self, iteration):
         pass
+
+    def get_explanation(self):
+        explanation = "Fixed Value:{0}\n".format(self.value)
+        return explanation
