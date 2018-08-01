@@ -36,7 +36,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H ARG-DOM Distillation Runs v1\n"
+    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H Fast Tree DGX v5\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -607,7 +607,8 @@ def main_fast_tree():
                         print("**********************Compressing the network**********************")
                         network.softmaxCompresser.compress_network_softmax(sess=sess)
                         print("**********************Compressing the network**********************")
-        except:
+        except Exception as e:
+            print(e)
             print("ERROR!!!!")
         # Reset the computation graph
         tf.reset_default_graph()
