@@ -4,18 +4,19 @@ import tensorflow as tf
 
 
 def fast_tree_batch_norm(x, masked_x, network, node, decay, iteration, is_training_phase):
-    gamma_name = network.get_variable_name(node=node, name="gamma")
-    beta_name = network.get_variable_name(node=node, name="beta")
-    pop_mean_name = network.get_variable_name(node=node, name="pop_mean")
-    pop_var_name = network.get_variable_name(node=node, name="pop_var")
+    gamma_name = network.get_variable_name(node=node, name="gamma") if network is not None else "gamma"
+    beta_name = network.get_variable_name(node=node, name="beta") if network is not None else "beta"
+    pop_mean_name = network.get_variable_name(node=node, name="pop_mean") if network is not None else "pop_mean"
+    pop_var_name = network.get_variable_name(node=node, name="pop_var") if network is not None else "pop_var"
     pop_mean = tf.Variable(name=pop_mean_name, initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]),
                            trainable=False)
     pop_var = tf.Variable(name=pop_var_name, initial_value=tf.constant(0.0, shape=[x.get_shape()[-1]]), trainable=False)
     if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
         gamma = tf.Variable(name=gamma_name, initial_value=tf.ones([x.get_shape()[-1]]))
         beta = tf.Variable(name=beta_name, initial_value=tf.zeros([x.get_shape()[-1]]))
-        node.variablesSet.add(gamma)
-        node.variablesSet.add(beta)
+        if node is not None:
+            node.variablesSet.add(gamma)
+            node.variablesSet.add(beta)
     else:
         gamma = None
         beta = None
