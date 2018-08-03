@@ -34,7 +34,7 @@ def fast_tree_batch_norm(x, masked_x, network, node, decay, iteration, is_traini
                                                 variance_epsilon=1e-5)
     normed_x = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
                                          variance_epsilon=1e-5)
-    return normed_x, normed_masked_x
+    return normed_x, normed_masked_x, mu, sigma
 
 # Nasıl çalışıyor?
 # 1) is_training_phase = 1 ise:
