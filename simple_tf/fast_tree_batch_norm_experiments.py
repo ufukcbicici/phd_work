@@ -58,6 +58,9 @@ for iteration in range(10000):
     assert np.allclose(ma_mean, population_stats[0], rtol=1.e-3, atol=1.e-6)
     print("ma_var == pop_var:{0}".format(np.allclose(ma_var, population_stats[1], rtol=1.e-3, atol=1.e-6)))
     assert np.allclose(ma_var, population_stats[1], rtol=1.e-3, atol=1.e-6)
+    print("results[0][non_zero_indices] == results[1]:{0}".
+          format(np.allclose(results[0][non_zero_indices], results[1])))
+    assert np.allclose(results[0][non_zero_indices], results[1])
     print("Iteration:{0}".format(iteration))
 
 # Testing

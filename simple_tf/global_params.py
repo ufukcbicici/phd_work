@@ -69,7 +69,7 @@ class GlobalConstants:
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
-    BATCH_NORM_DECAY = 0.9
+    BATCH_NORM_DECAY = 0.99
     # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
     #                                           decay_period=1, min_limit=0.0)
     SOFTMAX_DECAY_INITIAL = 25.0
@@ -125,7 +125,7 @@ class GlobalConstants:
 
     DATA_TYPE = tf.float32
     SEED = None
-    USE_VERBOSE = False
+    USE_VERBOSE = True
     USE_SOFTMAX_DISTILLATION_VERBOSE = True
     USE_CPU = False
     USE_CPU_MASKING = False
@@ -143,6 +143,7 @@ class GlobalConstants:
     USE_DECISION_AUGMENTATION = False
     USE_CONCAT_TRICK = False
     USE_BATCH_NORM_BEFORE_BRANCHING = True
+    USE_UNIFIED_BATCH_NORM = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
     USE_DECISION_REGULARIZER = True
     DECISION_LOSS_COEFFICIENT = 1.0

@@ -52,6 +52,8 @@ def get_explanation_string(network):
     explanation += "********Decision Loss Weight Settings********\n"
     explanation += network.decisionLossCoefficientCalculator.get_explanation()
     explanation += "********Decision Loss Weight Settings********\n"
+    explanation += "Use Unified Batch Norm:{0}\n".format(GlobalConstants.USE_UNIFIED_BATCH_NORM)
+    explanation += "Batch Norm Decay:{0}\n".format(GlobalConstants.BATCH_NORM_DECAY)
     explanation += "Param Count:{0}\n".format(total_param_count)
     explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
     explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)

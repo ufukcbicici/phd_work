@@ -79,8 +79,14 @@ def root_func(node, network, variables=None):
     node.variablesSet.add(hyperplane_weights)
     node.variablesSet.add(hyperplane_biases)
     # Decisions
-    network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
-                           hyperplane_biases=hyperplane_biases)
+
+    if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+        network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature,
+                                                       hyperplane_weights=hyperplane_weights,
+                                                       hyperplane_biases=hyperplane_biases)
+    else:
+        network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
+                               hyperplane_biases=hyperplane_biases)
     # ***************** H: Connected to F *****************
 
 
@@ -142,8 +148,13 @@ def l1_func(node, network, variables=None):
     node.variablesSet.add(hyperplane_weights)
     node.variablesSet.add(hyperplane_biases)
     # Decisions
-    network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
-                           hyperplane_biases=hyperplane_biases)
+    if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+        network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature,
+                                                       hyperplane_weights=hyperplane_weights,
+                                                       hyperplane_biases=hyperplane_biases)
+    else:
+        network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
+                               hyperplane_biases=hyperplane_biases)
     # ***************** H: Connected to F *****************
 
 

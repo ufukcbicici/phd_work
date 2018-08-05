@@ -29,12 +29,13 @@ def fast_tree_batch_norm(x, masked_x, network, node, decay, iteration, is_traini
     tf.add_to_collection(name=tf.GraphKeys.UPDATE_OPS, value=pop_var_assign_op)
     final_mean = tf.where(is_training_phase > 0, mu, pop_mean)
     final_var = tf.where(is_training_phase > 0, sigma, pop_var)
-    normed_masked_x = tf.nn.batch_normalization(x=masked_x, mean=final_mean, variance=final_var, offset=beta,
-                                                scale=gamma,
-                                                variance_epsilon=1e-5)
+    # normed_masked_x = tf.nn.batch_normalization(x=masked_x, mean=final_mean, variance=final_var, offset=beta,
+    #                                             scale=gamma,
+    #                                             variance_epsilon=1e-5)
     normed_x = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
                                          variance_epsilon=1e-5)
-    return normed_x, normed_masked_x, mu, sigma, final_mean, final_var, pop_mean, pop_var
+    # return normed_x, normed_masked_x, mu, sigma, final_mean, final_var, pop_mean, pop_var
+    return normed_x
 
 # Nasıl çalışıyor?
 # 1) is_training_phase = 1 ise:
