@@ -40,6 +40,7 @@ class GlobalConstants:
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 10000
+    CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
     USE_FAST_TREE_MODE = True
@@ -125,7 +126,7 @@ class GlobalConstants:
 
     DATA_TYPE = tf.float32
     SEED = None
-    USE_VERBOSE = True
+    USE_VERBOSE = False
     USE_SOFTMAX_DISTILLATION_VERBOSE = True
     USE_CPU = False
     USE_CPU_MASKING = False
@@ -184,6 +185,9 @@ class GlobalConstants:
     FASHION_F_RESIDUE = 128
     FASHION_F_RESIDUE_LAYER_COUNT = 1
     FASHION_F_RESIDUE_USE_DROPOUT = False
+
+    # MultiPath Evaluation Schedules
+    MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.0]
 
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"

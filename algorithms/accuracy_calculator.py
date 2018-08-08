@@ -4,6 +4,7 @@ from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
+from collections import deque
 
 
 class AccuracyCalculator:
@@ -373,6 +374,68 @@ class AccuracyCalculator:
         self.label_distribution_analysis(run_id=run_id, iteration=iteration, kv_rows=kv_rows,
                                          leaf_true_labels_dict=leaf_true_labels_dict,
                                          dataset=dataset, dataset_type=dataset_type)
+
+    def calculate_accuracy_multipath(self, sess, dataset, dataset_type):
+        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        leaf_predicted_labels_dict = {}
+        leaf_true_labels_dict = {}
+        info_gain_dict = {}
+        branch_probs = {}
+        one_hot_branch_probs = {}
+        posterior_probs = {}
+        while True:
+            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            for node in self.network.topologicalSortedNodes:
+                if not node.isLeaf:
+                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
+                                                         array=branch_prob)
+                else:
+                    posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                    true_labels = results["Node{0}_label_tensor".format(node.index)]
+                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                                                         array=posterior_prob)
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                         array=true_labels)
+            if dataset.isNewEpoch:
+                break
+        label_dict = list(leaf_true_labels_dict.values())[0]
+        for v in leaf_true_labels_dict.values():
+            assert np.allclose(v, label_dict)
+        root_node = self.network.nodes[0]
+        sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
+        total_correct = 0
+        total_mode_prediction_count = 0
+        total_correct_of_mode_predictions = 0
+        samples_with_non_mode_predictions = set()
+        wrong_samples_with_non_mode_predictions = set()
+        true_labels_dict = {}
+        modes_per_leaves = self.network.modeTracker.get_modes()
+        for path_threshold in GlobalConstants.MULTIPATH_SCHEDULES:
+            for sample_index in range(sample_count):
+                queue = deque([(root_node, 1.0)])
+                leaf_path_probs = {}
+                leaf_posteriors = {}
+                while len(queue) > 0:
+                    pair = queue.popleft()
+                    curr_node = pair[0]
+                    path_probability = pair[1]
+                    if not curr_node.isLeaf:
+                        p_n_given_sample = branch_probs[curr_node.index][sample_index, :]
+                        child_nodes = self.network.dagObject.children(node=curr_node)
+                        child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
+                        for index in range(len(child_nodes_sorted)):
+                            if p_n_given_sample[index] >= path_threshold:
+                                queue.append((child_nodes_sorted[index], path_probability*p_n_given_sample[index]))
+                    else:
+                        sample_posterior = posterior_probs[curr_node.index][sample_index, :]
+                        assert curr_node.index not in leaf_path_probs and curr_node.index not in leaf_posteriors
+                        leaf_path_probs[curr_node.index] = path_probability
+                        leaf_posteriors[curr_node.index] = sample_posterior
+
+
+
+
 
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)

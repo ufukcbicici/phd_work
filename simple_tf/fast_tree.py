@@ -213,7 +213,8 @@ class FastTreeNetwork(TreeNetwork):
             node.labelTensor = self.labelTensor
             node.indicesTensor = self.indicesTensor
             node.oneHotLabelTensor = self.oneHotLabelTensor
-            node.filteredMask = tf.constant(value=True, dtype=tf.bool, shape=(GlobalConstants.BATCH_SIZE, ))
+            # node.filteredMask = tf.constant(value=True, dtype=tf.bool, shape=(GlobalConstants.BATCH_SIZE, ))
+            node.filteredMask = self.filteredMask
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
@@ -254,6 +255,7 @@ class FastTreeNetwork(TreeNetwork):
         return final_feature, logits
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
                                       minibatch.indices, minibatch.one_hot_labels)
@@ -270,11 +272,15 @@ class FastTreeNetwork(TreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             if GlobalConstants.USE_UNIFIED_BATCH_NORM:
                 for level in range(self.depth):
+                    if level == 0:
+                        continue
                     level_nodes = [node for node in self.topologicalSortedNodes if node.depth == level]
                     sum_of_samples = 0
                     for node in level_nodes:
                         filtered_mask = results[-1]["Node{0}_filteredMask".format(node.index)]
                         sum_of_samples += np.sum(filtered_mask)
+                    if sum_of_samples != GlobalConstants.BATCH_SIZE:
+                        print("ERR")
                     assert sum_of_samples == GlobalConstants.BATCH_SIZE
         # Unit Test for Unified Batch Normalization
         lr = results[1]
@@ -283,6 +289,7 @@ class FastTreeNetwork(TreeNetwork):
         return lr, sample_counts, is_open_indicators
 
     def eval_network(self, sess, dataset, use_masking):
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
                                       minibatch.indices, minibatch.one_hot_labels)
@@ -307,7 +314,8 @@ class FastTreeNetwork(TreeNetwork):
                      self.isTrain: int(is_train),
                      self.useMasking: int(use_masking),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
-                     self.iterationHolder: iteration}
+                     self.iterationHolder: iteration,
+                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE, ), dtype=bool)}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:

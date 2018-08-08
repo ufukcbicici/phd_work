@@ -40,6 +40,7 @@ class TreeNetwork:
         self.labelTensor = GlobalConstants.TRAIN_LABEL_TENSOR
         self.oneHotLabelTensor = GlobalConstants.TRAIN_ONE_HOT_LABELS
         self.indicesTensor = GlobalConstants.TRAIN_INDEX_TENSOR
+        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None, ))
         self.evalDict = {}
         self.mainLoss = None
         self.residueLoss = None
