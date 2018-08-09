@@ -304,6 +304,9 @@ class TreeNetwork:
             elif calculation_type == AccuracyCalcType.with_residue_network:
                 self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                                                                                 dataset_type=dataset_type)
+            elif calculation_type == AccuracyCalcType.multi_path:
+                    self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
+                                                                         dataset_type=dataset_type)
             else:
                 raise NotImplementedError()
         else:
@@ -435,6 +438,7 @@ class TreeNetwork:
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration,
                                            update=True)
             self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=True)
+            self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
             if self.modeTracker.isCompressed:
                 self.get_label_mappings(feed_dict=feed_dict)
         run_ops = [self.classificationGradients,
@@ -558,6 +562,7 @@ class TreeNetwork:
             self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=False)
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
             self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=False)
+            self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
@@ -827,6 +832,7 @@ class TreeNetwork:
             self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
             self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
+            self.get_decision_weight(feed_dict=feed_dict, iteration=1000000, update=False)
             # if self.modeTracker.isCompressed:
             #     self.get_label_mappings(feed_dict=feed_dict)
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)

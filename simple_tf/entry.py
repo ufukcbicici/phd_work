@@ -575,6 +575,12 @@ def main_fast_tree():
                                                                iteration=iteration_counter,
                                                                calculation_type=
                                                                AccuracyCalcType.route_correction)
+                                network.calculate_accuracy(sess=sess, dataset=dataset,
+                                                           dataset_type=DatasetTypes.test,
+                                                           run_id=experiment_id,
+                                                           iteration=iteration_counter,
+                                                           calculation_type=
+                                                           AccuracyCalcType.multi_path)
                             else:
                                 validation_accuracy_corrected = 0.0
                                 validation_marginal_corrected = 0.0

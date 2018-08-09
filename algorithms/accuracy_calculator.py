@@ -412,7 +412,10 @@ class AccuracyCalculator:
         true_labels_dict = {}
         modes_per_leaves = self.network.modeTracker.get_modes()
         for path_threshold in GlobalConstants.MULTIPATH_SCHEDULES:
+            total_correct_simple_avg = 0
+            total_correct_weighted_avg = 0
             for sample_index in range(sample_count):
+                true_label = label_dict[sample_index]
                 queue = deque([(root_node, 1.0)])
                 leaf_path_probs = {}
                 leaf_posteriors = {}
@@ -426,16 +429,36 @@ class AccuracyCalculator:
                         child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
                         for index in range(len(child_nodes_sorted)):
                             if p_n_given_sample[index] >= path_threshold:
-                                queue.append((child_nodes_sorted[index], path_probability*p_n_given_sample[index]))
+                                queue.append((child_nodes_sorted[index], path_probability * p_n_given_sample[index]))
                     else:
                         sample_posterior = posterior_probs[curr_node.index][sample_index, :]
                         assert curr_node.index not in leaf_path_probs and curr_node.index not in leaf_posteriors
                         leaf_path_probs[curr_node.index] = path_probability
                         leaf_posteriors[curr_node.index] = sample_posterior
-
-
-
-
+                assert len(leaf_path_probs) > 1 and \
+                       len(leaf_posteriors) > 1 and \
+                       len(leaf_path_probs) == len(leaf_posteriors)
+                # Method 1: Simply take the average of all posteriors
+                posterior_matrix = np.concatenate(list(leaf_posteriors.values()), axis=0)
+                final_posterior = np.mean(posterior_matrix, axis=0)
+                prediction_simple_avg = np.argmax(final_posterior)
+                # Method 2: Weighted average of all posteriors
+                final_posterior_weighted = np.copy(final_posterior)
+                final_posterior_weighted[:] = 0.0
+                normalizing_constant = 0
+                for k,v in leaf_posteriors.items():
+                    normalizing_constant += k
+                    final_posterior_weighted += k*v
+                final_posterior_weighted = (1.0 / normalizing_constant) * final_posterior_weighted
+                prediction_weighted_avg = np.argmax(final_posterior_weighted)
+                if prediction_simple_avg == true_label:
+                    total_correct_simple_avg += 1
+                if prediction_weighted_avg == true_label:
+                    total_correct_weighted_avg += 1
+            accuracy_simple_avg = float(total_correct_simple_avg) / float(sample_count)
+            accuracy_weighted_avg = float(total_correct_weighted_avg) / float(sample_count)
+            print("******* Multipath Threshold:{0} Simple Accuracy:{1} Weighted Accuracy:{2} *******"
+                  .format(path_threshold, accuracy_simple_avg, accuracy_weighted_avg))
 
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)

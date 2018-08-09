@@ -16,6 +16,7 @@ class AccuracyCalcType(Enum):
     regular = 0
     route_correction = 1
     with_residue_network = 2
+    multi_path = 3
 
 
 class SoftmaxCompressionStrategy(Enum):
