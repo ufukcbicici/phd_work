@@ -435,20 +435,28 @@ class AccuracyCalculator:
                         assert curr_node.index not in leaf_path_probs and curr_node.index not in leaf_posteriors
                         leaf_path_probs[curr_node.index] = path_probability
                         leaf_posteriors[curr_node.index] = sample_posterior
-                assert len(leaf_path_probs) > 1 and \
-                       len(leaf_posteriors) > 1 and \
+                assert len(leaf_path_probs) > 0 and \
+                       len(leaf_posteriors) > 0 and \
                        len(leaf_path_probs) == len(leaf_posteriors)
                 # Method 1: Simply take the average of all posteriors
-                posterior_matrix = np.concatenate(list(leaf_posteriors.values()), axis=0)
-                final_posterior = np.mean(posterior_matrix, axis=0)
+                final_posterior = None
+                # posterior_matrix = np.concatenate(list(leaf_posteriors.values()), axis=0)
+                # final_posterior = np.mean(posterior_matrix, axis=0)
+                # prediction_simple_avg = np.argmax(final_posterior)
+                for posterior in leaf_posteriors.values():
+                    if final_posterior is None:
+                        final_posterior = np.copy(posterior)
+                    else:
+                        final_posterior += posterior
+                final_posterior = (1.0 / len(leaf_posteriors)) * final_posterior
                 prediction_simple_avg = np.argmax(final_posterior)
                 # Method 2: Weighted average of all posteriors
                 final_posterior_weighted = np.copy(final_posterior)
-                final_posterior_weighted[:] = 0.0
+                final_posterior_weighted.fill(0.0)
                 normalizing_constant = 0
                 for k,v in leaf_posteriors.items():
-                    normalizing_constant += k
-                    final_posterior_weighted += k*v
+                    normalizing_constant += leaf_path_probs[k]
+                    final_posterior_weighted += leaf_path_probs[k]*v
                 final_posterior_weighted = (1.0 / normalizing_constant) * final_posterior_weighted
                 prediction_weighted_avg = np.argmax(final_posterior_weighted)
                 if prediction_simple_avg == true_label:
