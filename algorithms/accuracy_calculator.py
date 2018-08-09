@@ -414,6 +414,7 @@ class AccuracyCalculator:
         for path_threshold in GlobalConstants.MULTIPATH_SCHEDULES:
             total_correct_simple_avg = 0
             total_correct_weighted_avg = 0
+            total_leaves_evaluated = 0
             for sample_index in range(sample_count):
                 true_label = label_dict[sample_index]
                 queue = deque([(root_node, 1.0)])
@@ -438,6 +439,7 @@ class AccuracyCalculator:
                 assert len(leaf_path_probs) > 0 and \
                        len(leaf_posteriors) > 0 and \
                        len(leaf_path_probs) == len(leaf_posteriors)
+                total_leaves_evaluated += len(leaf_posteriors)
                 # Method 1: Simply take the average of all posteriors
                 final_posterior = None
                 # posterior_matrix = np.concatenate(list(leaf_posteriors.values()), axis=0)
@@ -465,8 +467,10 @@ class AccuracyCalculator:
                     total_correct_weighted_avg += 1
             accuracy_simple_avg = float(total_correct_simple_avg) / float(sample_count)
             accuracy_weighted_avg = float(total_correct_weighted_avg) / float(sample_count)
-            print("******* Multipath Threshold:{0} Simple Accuracy:{1} Weighted Accuracy:{2} *******"
-                  .format(path_threshold, accuracy_simple_avg, accuracy_weighted_avg))
+            print(
+                "******* Multipath Threshold:{0} Simple Accuracy:{1} "
+                "Weighted Accuracy:{2} Total Leaves Evaluated:{3}*******"
+                .format(path_threshold, accuracy_simple_avg, accuracy_weighted_avg, total_leaves_evaluated))
 
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type)
