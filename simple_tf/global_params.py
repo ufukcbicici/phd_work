@@ -71,7 +71,7 @@ class GlobalConstants:
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
-    BATCH_NORM_DECAY = 0.99
+    BATCH_NORM_DECAY = 0.9
     # PROBABILITY_THRESHOLD = DecayingParameter(name="ProbThreshold", value=1.0 / float(TREE_DEGREE), decay=0.999,
     #                                           decay_period=1, min_limit=0.0)
     SOFTMAX_DECAY_INITIAL = 25.0
@@ -188,8 +188,14 @@ class GlobalConstants:
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
     # MultiPath Evaluation Schedules
-    MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.0]
-
+    # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]
+    # MULTIPATH_SCHEDULES.extend([i*0.001 for i in range(50)])
+    MULTIPATH_SCHEDULES = [0.5, 0.1,
+                           0.05, 0.025, 0.01,
+                           0.005, 0.0025, 0.001,
+                           0.0005, 0.00025, 0.0001,
+                           0.00005, 0.000025, 0.00001,
+                           0.0]
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"
     # Home

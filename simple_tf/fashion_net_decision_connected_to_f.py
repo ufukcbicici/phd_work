@@ -217,8 +217,6 @@ def residue_network_func(network):
     variable_list = []
     curr_layer = network.residueInputTensor
     for layer_index in range(GlobalConstants.FASHION_F_RESIDUE_LAYER_COUNT):
-        if GlobalConstants.FASHION_F_RESIDUE_USE_DROPOUT:
-            curr_layer = tf.nn.dropout(curr_layer, keep_prob=network.classificationDropoutKeepProb)
         input_dim = curr_layer.get_shape().as_list()[-1]
         fc_residue_weights = tf.Variable(
             tf.truncated_normal([input_dim, GlobalConstants.FASHION_F_RESIDUE], stddev=0.1, seed=GlobalConstants.SEED,
@@ -228,6 +226,8 @@ def residue_network_func(network):
                                       name="fc_residue_bias_{0}".format(layer_index))
         variable_list.extend([fc_residue_weights, fc_residue_bias])
         curr_layer = tf.nn.relu(tf.matmul(curr_layer, fc_residue_weights) + fc_residue_bias)
+        if GlobalConstants.FASHION_F_RESIDUE_USE_DROPOUT:
+            curr_layer = tf.nn.dropout(curr_layer, keep_prob=network.classificationDropoutKeepProb)
     # Loss layer
     input_dim = curr_layer.get_shape().as_list()[-1]
     fc_residue_softmax_weights = tf.Variable(

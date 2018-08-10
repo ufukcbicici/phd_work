@@ -306,7 +306,8 @@ class TreeNetwork:
                                                                                 dataset_type=dataset_type)
             elif calculation_type == AccuracyCalcType.multi_path:
                     self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
-                                                                         dataset_type=dataset_type)
+                                                                         dataset_type=dataset_type, run_id=run_id,
+                                                                                 iteration=iteration)
             else:
                 raise NotImplementedError()
         else:
