@@ -11,7 +11,7 @@ from collections import deque
 
 class MultipathCalculator(threading.Thread):
     def __init__(self, thread_id, run_id, iteration, threshold_list,
-                 network, sample_count, label_dict, branch_probs, posterior_probs):
+                 network, sample_count, label_list, branch_probs, posterior_probs):
         threading.Thread.__init__(self)
         self.threadId = thread_id
         self.runId = run_id
@@ -19,7 +19,7 @@ class MultipathCalculator(threading.Thread):
         self.thresholdList = threshold_list
         self.network = network
         self.sampleCount = sample_count
-        self.labelDict = label_dict
+        self.labelList = label_list
         self.branchProbs = branch_probs
         self.posteriorProbs = posterior_probs
         self.kvRows = []
@@ -31,7 +31,7 @@ class MultipathCalculator(threading.Thread):
             total_correct_weighted_avg = 0
             total_leaves_evaluated = 0
             for sample_index in range(self.sampleCount):
-                true_label = self.labelDict[sample_index]
+                true_label = self.labelList[sample_index]
                 queue = deque([(root_node, 1.0)])
                 leaf_path_probs = {}
                 leaf_posteriors = {}
@@ -107,6 +107,40 @@ class AccuracyCalculator:
                 kv_rows.append((run_id, iteration, "{0} p_{1}({2})".format(dataset_type, k, branch),
                                 np.asscalar(p_n[branch])))
 
+    def prepare_sample_wise_statistics(self, run_id, iteration, hash_list, sample_count, branch_probs,
+                                       posterior_probs, true_labels):
+        kv_rows = []
+        for sample_index in range(sample_count):
+            sample_label = true_labels[sample_index]
+            hash_code = "{0}".format(hash_list[sample_index])
+            kv_rows.append((run_id,
+                            iteration,
+                            hash_code,
+                            "Label",
+                            sample_label))
+            for node in self.network.topologicalSortedNodes:
+                if not node.isLeaf:
+                    branch_prob = branch_probs[node.index][sample_index, :]
+                    for i in range(branch_prob.shape[0]):
+                        kv_rows.append(
+                            (run_id,
+                             iteration,
+                             hash_code,
+                             "branch_p_{0}_({1})".format(node.index, i),
+                             branch_prob[i]
+                             ))
+                else:
+                    posterior = posterior_probs[node.index][sample_index, :]
+                    for i in range(posterior.shape[0]):
+                        kv_rows.append(
+                            (run_id,
+                             iteration,
+                             hash_code,
+                             "posterior_p_{0}_({1})".format(node.index, i),
+                             posterior[i]
+                             ))
+        return kv_rows
+
     def label_distribution_analysis(self,
                                     run_id,
                                     iteration,
@@ -135,7 +169,7 @@ class AccuracyCalculator:
         info_gain_dict = {}
         branch_probs_dict = {}
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
+            results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
             batch_sample_count = 0.0
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
@@ -259,7 +293,7 @@ class AccuracyCalculator:
         # Run with mask off
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     # info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
@@ -424,7 +458,7 @@ class AccuracyCalculator:
         # Run with mask on
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
+            results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
@@ -468,8 +502,9 @@ class AccuracyCalculator:
         branch_probs = {}
         one_hot_branch_probs = {}
         posterior_probs = {}
+        hash_codes = {}
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            results, minibatch = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
@@ -482,28 +517,42 @@ class AccuracyCalculator:
                                                          array=posterior_prob)
                     UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
                                                          array=true_labels)
+                    if GlobalConstants.USE_SAMPLE_HASHING:
+                        UtilityFuncs.concat_to_np_array_dict(dct=hash_codes, key=node.index,
+                                                             array=minibatch.hash_codes)
+
             if dataset.isNewEpoch:
                 break
-        label_dict = list(leaf_true_labels_dict.values())[0]
-        for v in leaf_true_labels_dict.values():
-            assert np.allclose(v, label_dict)
-        root_node = self.network.nodes[0]
         sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
-        total_correct = 0
-        total_mode_prediction_count = 0
-        total_correct_of_mode_predictions = 0
-        samples_with_non_mode_predictions = set()
-        wrong_samples_with_non_mode_predictions = set()
-        true_labels_dict = {}
-        modes_per_leaves = self.network.modeTracker.get_modes()
+        label_list = list(leaf_true_labels_dict.values())[0]
+        hash_list = list(hash_codes.values())[0]
+        for v in leaf_true_labels_dict.values():
+            assert np.allclose(v, label_list)
+        for v in hash_codes.values():
+            assert np.array_equal(v, hash_list)
+        if GlobalConstants.USE_SAMPLE_HASHING and iteration >= 43201:
+            statistic_rows = self.prepare_sample_wise_statistics(run_id=run_id, iteration=iteration,
+                                                                 hash_list=hash_list, sample_count=sample_count,
+                                                                 branch_probs=branch_probs,
+                                                                 posterior_probs=posterior_probs,
+                                                                 true_labels=label_list)
+            DbLogger.write_into_table(rows=statistic_rows, table=DbLogger.sample_wise_table, col_count=5)
+        # total_correct = 0
+        # total_mode_prediction_count = 0
+        # total_correct_of_mode_predictions = 0
+        # samples_with_non_mode_predictions = set()
+        # wrong_samples_with_non_mode_predictions = set()
+        # true_labels_dict = {}
+        # modes_per_leaves = self.network.modeTracker.get_modes()
         threshold_dict = UtilityFuncs.distribute_evenly_to_threads(
             num_of_threads=GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT,
             list_to_distribute=GlobalConstants.MULTIPATH_SCHEDULES)
         threads_dict = {}
         for thread_id in range(GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT):
             threads_dict[thread_id] = MultipathCalculator(thread_id=thread_id, run_id=run_id, iteration=iteration,
-                                                          threshold_list=threshold_dict[thread_id], network=self.network,
-                                                          sample_count=sample_count, label_dict=label_dict,
+                                                          threshold_list=threshold_dict[thread_id],
+                                                          network=self.network,
+                                                          sample_count=sample_count, label_list=label_list,
                                                           branch_probs=branch_probs, posterior_probs=posterior_probs)
             threads_dict[thread_id].start()
         all_results = []
@@ -522,7 +571,7 @@ class AccuracyCalculator:
         one_hot_branch_probs = {}
         posterior_probs = {}
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
@@ -657,7 +706,7 @@ class AccuracyCalculator:
         residue_posterior_probs_dict = {}
         modes_per_leaves = self.network.modeTracker.get_modes()
         while True:
-            results = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]

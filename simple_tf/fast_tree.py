@@ -258,7 +258,7 @@ class FastTreeNetwork(TreeNetwork):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
-                                      minibatch.indices, minibatch.one_hot_labels)
+                                      minibatch.indices, minibatch.one_hot_labels, minibatch.hash_codes)
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
                                            is_train=True, use_masking=True)
@@ -292,14 +292,14 @@ class FastTreeNetwork(TreeNetwork):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
-                                      minibatch.indices, minibatch.one_hot_labels)
+                                      minibatch.indices, minibatch.one_hot_labels, minibatch.hash_codes)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
                                            is_train=False, use_masking=use_masking)
         results = sess.run(self.evalDict, feed_dict)
         # for k, v in results.items():
         #     if "final_feature_mag" in k:
         #         print("{0}={1}".format(k, v))
-        return results
+        return results, minibatch
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: minibatch.samples,
