@@ -25,13 +25,13 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # Lab
-    # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger2.db"
+    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger2.db"
 
     # Home
     # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Idea GPU
-    log_db_path = "D://deep//phd_work//simple_tf//bnnlogger.db"
+    # log_db_path = "D://deep//phd_work//simple_tf//bnnlogger.db"
 
     # Idea
     # log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
@@ -113,6 +113,31 @@ class DbLogger:
                 accuracy = float(row[0])
         DbLogger.lock.release()
         return accuracy
+
+    @staticmethod
+    def read_tuples_from_table(table_name, condition=None):
+        DbLogger.lock.acquire()
+        con = lite.connect(DbLogger.log_db_path)
+        with con:
+            cur = con.cursor()
+            sql_command = "SELECT * FROM {0}".format(table_name)
+            if condition is not None:
+                sql_command = "{0} WHERE {1}".format(sql_command, condition)
+            cur.execute(sql_command)
+            rows = cur.fetchall()
+        DbLogger.lock.release()
+        return rows
+
+    @staticmethod
+    def read_query(query):
+        DbLogger.lock.acquire()
+        con = lite.connect(DbLogger.log_db_path)
+        with con:
+            cur = con.cursor()
+            cur.execute(query)
+            rows = cur.fetchall()
+        DbLogger.lock.release()
+        return rows
 
     @staticmethod
     def log_bnn_explanation(runId, explanation_string):
