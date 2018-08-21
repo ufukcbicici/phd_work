@@ -127,7 +127,7 @@ class AccuracyCalculator:
                              iteration,
                              hash_code,
                              "branch_p_{0}_({1})".format(node.index, i),
-                             branch_prob[i]
+                             np.asscalar(branch_prob[i])
                              ))
                 else:
                     posterior = posterior_probs[node.index][sample_index, :]
@@ -137,7 +137,7 @@ class AccuracyCalculator:
                              iteration,
                              hash_code,
                              "posterior_p_{0}_({1})".format(node.index, i),
-                             posterior[i]
+                             np.asscalar(posterior[i])
                              ))
         return kv_rows
 
