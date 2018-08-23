@@ -3,7 +3,7 @@ import sys
 from auxillary.db_logger import DbLogger
 
 
-def get_query(min_run_id, max_run_id, condition, add_union=True):
+def get_query(min_run_id, max_run_id, condition, iteration_lower_limit, add_union=True):
     qry = "SELECT RunId, Avg(Accuracy) AS Accuracy, AVG(LeafEvaluated) AS LeafEvaluated, COUNT(1) AS CNT\n"
     qry += "FROM\n"
     qry += "(\n"
@@ -23,29 +23,32 @@ def get_query(min_run_id, max_run_id, condition, add_union=True):
 
 print('Number of arguments:', len(sys.argv), 'arguments.')
 
+
 # min_id = sys.argv[1]
 # max_id = sys.argv[2]
-min_id = 1829
-max_id = 1858
-step1 = 250
-step2 = 500
-low_limit = 10000
-mid_limit = 15000
-max_limit = 20000
-intervals = [(i, i + step1) for i in range(low_limit, mid_limit, step1)]
-intervals.extend([(i, i + step2) for i in range(mid_limit, max_limit, step2)])
-iteration_lower_limit = 43201
-query = get_query(min_run_id=min_id, max_run_id=max_id, condition="WHERE LeafEvaluated = {0}".format(low_limit))
-for interval in intervals:
-    query += get_query(min_run_id=min_id, max_run_id=max_id,
-                       condition="WHERE {0} < LeafEvaluated AND LeafEvaluated <= {1}".format(interval[0], interval[1]))
-query += get_query(min_run_id=min_id, max_run_id=max_id, condition="WHERE {0} < LeafEvaluated".format(max_limit),
-                   add_union=False)
-# print(query)
+def execute_path_query():
+    min_id = 2009
+    max_id = 2038
+    step1 = 250
+    step2 = 500
+    low_limit = 10000
+    mid_limit = 15000
+    max_limit = 20000
+    intervals = [(i, i + step1) for i in range(low_limit, mid_limit, step1)]
+    intervals.extend([(i, i + step2) for i in range(mid_limit, max_limit, step2)])
+    iteration_lower_limit = 43201
+    query = get_query(min_run_id=min_id, max_run_id=max_id, condition="WHERE LeafEvaluated = {0}".format(low_limit))
+    for interval in intervals:
+        query += get_query(min_run_id=min_id, max_run_id=max_id,
+                           condition="WHERE {0} < LeafEvaluated AND LeafEvaluated <= {1}".format(interval[0],
+                                                                                                 interval[1]))
+    query += get_query(min_run_id=min_id, max_run_id=max_id, condition="WHERE {0} < LeafEvaluated".format(max_limit),
+                       iteration_lower_limit=iteration_lower_limit, add_union=False)
+    # print(query)
 
-rows = DbLogger.read_query(query=query)
-for row in rows:
-    print(row)
+    rows = DbLogger.read_query(query=query)
+    for row in rows:
+        print(row)
 
 # SELECT RunId, Avg(Accuracy) AS Accuracy, AVG(LeafEvaluated) AS LeafEvaluated, COUNT(1) AS CNT
 # FROM
