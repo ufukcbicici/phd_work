@@ -37,11 +37,13 @@ def execute_path_query():
     intervals = [(i, i + step1) for i in range(low_limit, mid_limit, step1)]
     intervals.extend([(i, i + step2) for i in range(mid_limit, max_limit, step2)])
     iteration_lower_limit = 43201
-    query = get_query(min_run_id=min_id, max_run_id=max_id, condition="WHERE LeafEvaluated = {0}".format(low_limit))
+    query = get_query(min_run_id=min_id, max_run_id=max_id, condition="WHERE LeafEvaluated = {0}".format(low_limit),
+                      iteration_lower_limit=iteration_lower_limit)
     for interval in intervals:
         query += get_query(min_run_id=min_id, max_run_id=max_id,
                            condition="WHERE {0} < LeafEvaluated AND LeafEvaluated <= {1}".format(interval[0],
-                                                                                                 interval[1]))
+                                                                                                 interval[1]),
+                           iteration_lower_limit=iteration_lower_limit)
     query += get_query(min_run_id=min_id, max_run_id=max_id, condition="WHERE {0} < LeafEvaluated".format(max_limit),
                        iteration_lower_limit=iteration_lower_limit, add_union=False)
     # print(query)
