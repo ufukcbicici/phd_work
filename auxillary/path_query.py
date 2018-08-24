@@ -24,15 +24,15 @@ def get_query(min_run_id, max_run_id, condition, iteration_lower_limit, add_unio
 print('Number of arguments:', len(sys.argv), 'arguments.')
 
 
-# min_id = sys.argv[1]
-# max_id = sys.argv[2]
+min_id = sys.argv[1]
+max_id = sys.argv[2]
+
+
 def execute_path_query():
-    min_id = 2009
-    max_id = 2038
     step1 = 250
     step2 = 500
     low_limit = 10000
-    mid_limit = 15000
+    mid_limit = 11000
     max_limit = 20000
     intervals = [(i, i + step1) for i in range(low_limit, mid_limit, step1)]
     intervals.extend([(i, i + step2) for i in range(mid_limit, max_limit, step2)])
