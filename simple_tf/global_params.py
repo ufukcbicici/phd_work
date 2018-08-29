@@ -129,7 +129,7 @@ class GlobalConstants:
     DATA_TYPE = tf.float32
     SEED = None
     USE_VERBOSE = False
-    USE_SAMPLE_HASHING = True
+    USE_SAMPLE_HASHING = False
     USE_SOFTMAX_DISTILLATION_VERBOSE = True
     USE_CPU = False
     USE_CPU_MASKING = False

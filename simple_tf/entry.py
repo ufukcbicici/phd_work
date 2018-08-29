@@ -37,7 +37,7 @@ def get_explanation_string(network):
 
     # Tree
     explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H " \
-                  "MultiPath v2\n"
+                  "MultiPath Tempered\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -460,11 +460,17 @@ def main_fast_tree():
             # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
             # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
             # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-            0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+            0.1, 0.1, 0.1, 0.1, 0.1,
+            0.1, 0.1, 0.1, 0.1, 0.1,
+            0.1, 0.1, 0.1, 0.1, 0.1,
+            0.1, 0.1, 0.1, 0.1, 0.1,
+            0.1, 0.1, 0.1, 0.1, 0.1,
+            0.1, 0.1, 0.1, 0.1, 0.1
+            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
             # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
             # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
             # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
@@ -557,7 +563,7 @@ def main_fast_tree():
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
-        series_id = int(run_id / 30)
+        series_id = int(run_id / 15)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)

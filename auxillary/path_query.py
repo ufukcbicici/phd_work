@@ -4,7 +4,7 @@ from auxillary.db_logger import DbLogger
 
 
 def get_query(min_run_id, max_run_id, condition, iteration_lower_limit, add_union=True):
-    qry = "SELECT RunId, IsWeighted, Avg(Accuracy) AS Accuracy, AVG(LeafEvaluated) AS LeafEvaluated, COUNT(1) AS CNT\n"
+    qry = "SELECT RunId, Threshold, IsWeighted, Avg(Accuracy) AS Accuracy, AVG(LeafEvaluated) AS LeafEvaluated, COUNT(1) AS CNT\n"
     qry += "FROM\n"
     qry += "(\n"
     qry += "SELECT RunId,Max(RunId),Min(RunId),Threshold, IsWeighted, Avg(Accuracy) AS Accuracy, " \

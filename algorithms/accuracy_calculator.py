@@ -541,12 +541,12 @@ class AccuracyCalculator:
                 break
         sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
         label_list = list(leaf_true_labels_dict.values())[0]
-        hash_list = list(hash_codes.values())[0]
         for v in leaf_true_labels_dict.values():
             assert np.allclose(v, label_list)
-        for v in hash_codes.values():
-            assert np.array_equal(v, hash_list)
         if GlobalConstants.USE_SAMPLE_HASHING and iteration >= 43201:
+            hash_list = list(hash_codes.values())[0]
+            for v in hash_codes.values():
+                assert np.array_equal(v, hash_list)
             statistic_rows = self.prepare_sample_wise_statistics(run_id=run_id, iteration=iteration,
                                                                  hash_list=hash_list, sample_count=sample_count,
                                                                  branch_activations=branch_activations,
