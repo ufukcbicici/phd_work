@@ -16,7 +16,7 @@ class MultipathCalculator(threading.Thread):
         self.threadId = thread_id
         self.runId = run_id
         self.iteration = iteration
-        self.thresholdList = threshold_list
+        self.thresholdList = sorted(threshold_list, reverse=True)
         self.network = network
         self.sampleCount = sample_count
         self.labelList = label_list
@@ -26,6 +26,8 @@ class MultipathCalculator(threading.Thread):
 
     def run(self):
         root_node = self.network.nodes[0]
+        leaf_count = len([node for node in self.network.topologicalSortedNodes if node.isLeaf])
+        max_num_of_samples = leaf_count * self.sampleCount
         for path_threshold in self.thresholdList:
             total_correct_simple_avg = 0
             total_correct_weighted_avg = 0
@@ -90,6 +92,8 @@ class MultipathCalculator(threading.Thread):
                                 total_leaves_evaluated))
             self.kvRows.append((self.runId, self.iteration, 1, path_threshold, accuracy_weighted_avg,
                                 total_leaves_evaluated))
+            if total_leaves_evaluated == max_num_of_samples:
+                break
 
 
 class AccuracyCalculator:
@@ -108,7 +112,7 @@ class AccuracyCalculator:
                                 np.asscalar(p_n[branch])))
 
     def prepare_sample_wise_statistics(self, run_id, iteration, hash_list, sample_count, branch_probs,
-                                       posterior_probs, true_labels):
+                                       branch_activations, posterior_probs, true_labels):
         kv_rows = []
         for sample_index in range(sample_count):
             sample_label = true_labels[sample_index]
@@ -117,10 +121,11 @@ class AccuracyCalculator:
                             iteration,
                             hash_code,
                             "Label",
-                            sample_label))
+                            np.asscalar(sample_label)))
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     branch_prob = branch_probs[node.index][sample_index, :]
+                    branch_activation = branch_activations[node.index][sample_index, :]
                     for i in range(branch_prob.shape[0]):
                         kv_rows.append(
                             (run_id,
@@ -128,6 +133,13 @@ class AccuracyCalculator:
                              hash_code,
                              "branch_p_{0}_({1})".format(node.index, i),
                              np.asscalar(branch_prob[i])
+                             ))
+                        kv_rows.append(
+                            (run_id,
+                             iteration,
+                             hash_code,
+                             "branch_a_{0}_({1})".format(node.index, i),
+                             np.asscalar(branch_activation[i])
                              ))
                 else:
                     posterior = posterior_probs[node.index][sample_index, :]
@@ -499,6 +511,7 @@ class AccuracyCalculator:
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
         info_gain_dict = {}
+        branch_activations = {}
         branch_probs = {}
         one_hot_branch_probs = {}
         posterior_probs = {}
@@ -508,8 +521,11 @@ class AccuracyCalculator:
             for node in self.network.topologicalSortedNodes:
                 if not node.isLeaf:
                     branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                    activations = results[self.network.get_variable_name(name="activations", node=node)]
                     UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
                                                          array=branch_prob)
+                    UtilityFuncs.concat_to_np_array_dict(dct=branch_activations, key=node.index,
+                                                         array=activations)
                 else:
                     posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
                     true_labels = results["Node{0}_label_tensor".format(node.index)]
@@ -533,6 +549,7 @@ class AccuracyCalculator:
         if GlobalConstants.USE_SAMPLE_HASHING and iteration >= 43201:
             statistic_rows = self.prepare_sample_wise_statistics(run_id=run_id, iteration=iteration,
                                                                  hash_list=hash_list, sample_count=sample_count,
+                                                                 branch_activations=branch_activations,
                                                                  branch_probs=branch_probs,
                                                                  posterior_probs=posterior_probs,
                                                                  true_labels=label_list)

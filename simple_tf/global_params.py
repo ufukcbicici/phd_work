@@ -78,7 +78,7 @@ class GlobalConstants:
     SOFTMAX_DECAY_COEFFICIENT = 0.9999
     SOFTMAX_DECAY_PERIOD = 2
     SOFTMAX_DECAY_MIN_LIMIT = 1.0
-    SOFTMAX_TEST_TEMPERATURE = 5.0
+    SOFTMAX_TEST_TEMPERATURE = 50.0
     DROPOUT_INITIAL_PROB = 0.75
     DROPOUT_SCHEDULE = [(15000, 0.5), (30000, 0.25), (45000, 0.125)]
     CLASSIFICATION_DROPOUT_PROB = 0.5
@@ -192,9 +192,9 @@ class GlobalConstants:
     # MultiPath Evaluation Schedules
     # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]
     # MULTIPATH_SCHEDULES.extend([i*0.001 for i in range(50)])
-    MULTIPATH_SCHEDULES = [0.5, 0.1,
-                           0.05, 0.025, 0.01,
-                           0.005, 0.0025, 0.001,
+    MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15,
+                           0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.025, 0.02, 0.01,
+                           0.009, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.0025, 0.002, 0.001,
                            0.0005, 0.00025, 0.0001,
                            0.00005, 0.000025, 0.00001,
                            0.000005, 0.0000025, 0.000001,

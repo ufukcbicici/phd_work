@@ -37,7 +37,7 @@ def get_explanation_string(network):
 
     # Tree
     explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H " \
-                  "MultiPath\n"
+                  "MultiPath v2\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -71,6 +71,7 @@ def get_explanation_string(network):
     explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
     explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
     explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+    explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.SOFTMAX_TEST_TEMPERATURE)
     explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
     # for node in network.topologicalSortedNodes:
     #     if node.isLeaf:

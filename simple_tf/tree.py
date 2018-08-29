@@ -368,11 +368,13 @@ class TreeNetwork:
                 continue
             # Decay for Softmax
             decay = node.softmaxDecayCalculator.value
-            feed_dict[node.softmaxDecay] = decay
             if update:
+                feed_dict[node.softmaxDecay] = decay
                 print("{0} value={1}".format(node.softmaxDecayCalculator.name, decay))
                 # Update the Softmax Decay
                 node.softmaxDecayCalculator.update(iteration=iteration + 1)
+            else:
+                feed_dict[node.softmaxDecay] = GlobalConstants.SOFTMAX_TEST_TEMPERATURE
 
     def get_noise_coefficient(self, feed_dict, iteration, update):
         noise_coeff = self.noiseCoefficientCalculator.value
