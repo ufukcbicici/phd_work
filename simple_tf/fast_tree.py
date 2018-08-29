@@ -222,7 +222,8 @@ class FastTreeNetwork(TreeNetwork):
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
             mask_tensor = parent_node.maskTensors[node.index]
-            mask_without_threshold = parent_node.masksWithoutThreshold[node.index]
+            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                mask_without_threshold = parent_node.masksWithoutThreshold[node.index]
             mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
                                    tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
@@ -237,7 +238,8 @@ class FastTreeNetwork(TreeNetwork):
             node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
             node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
             node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
-            node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
+            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
             return parent_F, parent_H
 
     def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
