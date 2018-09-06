@@ -304,10 +304,10 @@ class FastTreeNetwork(TreeNetwork):
         return results, minibatch
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
-        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: minibatch.samples,
-                     GlobalConstants.TRAIN_LABEL_TENSOR: minibatch.labels,
-                     GlobalConstants.TRAIN_INDEX_TENSOR: minibatch.indices,
-                     GlobalConstants.TRAIN_ONE_HOT_LABELS: minibatch.one_hot_labels,
+        feed_dict = {self.dataTensor: minibatch.samples,
+                     self.labelTensor: minibatch.labels,
+                     self.indicesTensor: minibatch.indices,
+                     self.oneHotLabelTensor: minibatch.one_hot_labels,
                      # self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,

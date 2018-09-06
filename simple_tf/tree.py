@@ -28,19 +28,15 @@ class TreeNetwork:
         self.residueFunc = residue_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
-        GlobalConstants.TRAIN_DATA_TENSOR = tf.placeholder(GlobalConstants.DATA_TYPE,
-                                                           shape=(None, GlobalConstants.IMAGE_SIZE,
-                                                                  GlobalConstants.IMAGE_SIZE,
-                                                                  GlobalConstants.NUM_CHANNELS))
-        GlobalConstants.TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,))
-        GlobalConstants.TRAIN_INDEX_TENSOR = tf.placeholder(tf.int64, shape=(None,))
-        GlobalConstants.TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
-                                                              shape=(None, GlobalConstants.NUM_LABELS))
-        self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
-        self.labelTensor = GlobalConstants.TRAIN_LABEL_TENSOR
-        self.oneHotLabelTensor = GlobalConstants.TRAIN_ONE_HOT_LABELS
-        self.indicesTensor = GlobalConstants.TRAIN_INDEX_TENSOR
-        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None, ))
+        self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
+                                         shape=(None, GlobalConstants.IMAGE_SIZE,
+                                                GlobalConstants.IMAGE_SIZE,
+                                                GlobalConstants.NUM_CHANNELS))
+        self.labelTensor = tf.placeholder(tf.int64, shape=(None,))
+        self.oneHotLabelTensor = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
+                                                shape=(None, GlobalConstants.NUM_LABELS))
+        self.indicesTensor = tf.placeholder(tf.int64, shape=(None,))
+        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None,))
         self.evalDict = {}
         self.mainLoss = None
         self.residueLoss = None
@@ -109,7 +105,7 @@ class TreeNetwork:
 
     def is_decision_variable(self, variable):
         if "scale" in variable.name or "shift" in variable.name or "hyperplane" in variable.name or \
-                        "gamma" in variable.name or "beta" in variable.name or "_decision_" in variable.name:
+                "gamma" in variable.name or "beta" in variable.name or "_decision_" in variable.name:
             return True
         else:
             return False
@@ -305,9 +301,9 @@ class TreeNetwork:
                 self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                                                                                 dataset_type=dataset_type)
             elif calculation_type == AccuracyCalcType.multi_path:
-                    self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
-                                                                         dataset_type=dataset_type, run_id=run_id,
-                                                                                 iteration=iteration)
+                self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
+                                                                     dataset_type=dataset_type, run_id=run_id,
+                                                                     iteration=iteration)
             else:
                 raise NotImplementedError()
         else:
@@ -360,7 +356,7 @@ class TreeNetwork:
         feed_dict[self.decisionLossCoefficient] = weight
         print("self.decisionLossCoefficient={0}".format(weight))
         if update:
-            self.decisionLossCoefficientCalculator.update(iteration=iteration+1)
+            self.decisionLossCoefficientCalculator.update(iteration=iteration + 1)
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:
@@ -499,7 +495,7 @@ class TreeNetwork:
             g = classification_grads[v]
             # print("Param:{0} Classification Grad Norm:{1}".format(k.name, np.linalg.norm(g)))
             if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
-                        GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
+                    GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
                 main_grads[k] = g
             elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
                 sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)

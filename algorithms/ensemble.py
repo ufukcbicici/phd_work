@@ -17,7 +17,7 @@ def get_explanation_string(networks):
             total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "FashionMnist Full Baseline\n"
+    explanation = "FashionMnist Ensemble of Thin Baselines \n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -159,7 +159,7 @@ class Ensemble:
             assert total_size == len(feed_dict)
         list_of_eval_dicts = [network.evalDict for network in self.networks]
         results = sess.run(list_of_eval_dicts, feed_dict)
-        return results, minibatch
+        return results
 
     def train(self, sess, run_id, weight_decay_coeff, decision_weight_decay_coeff, info_gain_balance_coeff,
               classification_dropout_prob, decision_dropout_prob):
@@ -178,8 +178,6 @@ class Ensemble:
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)
-        init = tf.global_variables_initializer()
-        sess.run(init)
         network_dataset_pairs = zip(self.networks, self.datasets)
         for network, dataset in network_dataset_pairs:
             network.reset_network(dataset=dataset, run_id=experiment_id)
@@ -197,6 +195,8 @@ class Ensemble:
         with tf.control_dependencies(self.extra_update_ops):
             self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(ensemble_loss,
                                                                                          global_step=self.globalCounter)
+        init = tf.global_variables_initializer()
+        sess.run(init)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -229,7 +229,7 @@ class Ensemble:
         while True:
             results = self.eval(sess=sess, dataset=self.datasets[0], use_masking=True)
             batch_sample_count = 0.0
-            for network, eval_dict in (self.networks, results):
+            for network, eval_dict in zip(self.networks, results):
                 for node in network.topologicalSortedNodes:
                     if node.isLeaf:
                         posterior_probs = eval_dict[network.get_variable_name(name="posterior_probs", node=node)]
@@ -238,8 +238,9 @@ class Ensemble:
                                                              array=posterior_probs)
                         UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=(network, node.index),
                                                              array=true_labels)
-            if batch_sample_count != GlobalConstants.EVAL_BATCH_SIZE:
-                raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
+            # batch_sample_count += list(leaf_true_labels_dict.values())[0].shape[0]
+            # if batch_sample_count != GlobalConstants.EVAL_BATCH_SIZE:
+            #     raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
             if self.datasets[0].isNewEpoch:
                 break
         ensemble_length = len(leaf_posteriors_dict)
@@ -249,13 +250,13 @@ class Ensemble:
         assert averaged_posterior.shape[0] == self.datasets[0].get_current_sample_count()
         assert averaged_posterior.shape[1] == self.datasets[0].get_label_count()
         true_labels_list = list(leaf_true_labels_dict.values())
-        for i in range(len(true_labels_list)):
+        for i in range(len(true_labels_list)-1):
             assert np.array_equal(true_labels_list[i], true_labels_list[i+1])
         true_label_arr = true_labels_list[0]
         total_correct = 0.0
         total_count = float(true_label_arr.shape[0])
         assert averaged_posterior.shape[0] == true_label_arr.shape[0]
-        for i in range(len(averaged_posterior.shape[0])):
+        for i in range(averaged_posterior.shape[0]):
             sample_posterior = averaged_posterior[i, :]
             predicted_label = np.argmax(sample_posterior)
             true_label = true_label_arr[i]
