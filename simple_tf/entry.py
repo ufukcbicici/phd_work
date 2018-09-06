@@ -18,7 +18,8 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from data_handling.mnist_data_set import MnistDataSet
-from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline, fashion_net_decision_connected_to_f
+from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline, fashion_net_decision_connected_to_f, \
+    fashion_net_baseline
 from simple_tf.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
@@ -36,8 +37,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "SVM - Fashion Mnist - Connected H - Tests - Parallel Dnns, Softmax Distillation 16 H " \
-                  "MultiPath Tempered\n"
+    explanation = "FashionMnist Full Baseline\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -50,9 +50,10 @@ def get_explanation_string(network):
     explanation += "********Lr Settings********\n"
     explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
     explanation += "********Lr Settings********\n"
-    explanation += "********Decision Loss Weight Settings********\n"
-    explanation += network.decisionLossCoefficientCalculator.get_explanation()
-    explanation += "********Decision Loss Weight Settings********\n"
+    if not network.isBaseline:
+        explanation += "********Decision Loss Weight Settings********\n"
+        explanation += network.decisionLossCoefficientCalculator.get_explanation()
+        explanation += "********Decision Loss Weight Settings********\n"
     explanation += "Use Unified Batch Norm:{0}\n".format(GlobalConstants.USE_UNIFIED_BATCH_NORM)
     explanation += "Batch Norm Decay:{0}\n".format(GlobalConstants.BATCH_NORM_DECAY)
     explanation += "Param Count:{0}\n".format(total_param_count)
@@ -449,76 +450,123 @@ def main_fast_tree():
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     classification_dropout_probs = \
-        [
-            # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-            # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-            # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-            # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-            # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-            0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1,
-            0.1, 0.1, 0.1, 0.1, 0.1
-            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-            # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-            # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-            # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-            # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-            # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-            # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-            # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-            # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-            # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-            # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-            # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-            # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-            # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-            # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-            # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-            # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-            # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-            # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-            # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-            # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-            # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-            # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-            # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-            # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-            # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-            # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-            # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-            # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-            # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-            # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-            # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-            # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-            # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-            # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-            # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-            # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-            # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-            # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-            # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
-        ]
-    decision_dropout_probs = [0.35]
-    # # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    # #  0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    # #  0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    #  [0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-    #  0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
-    #  0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+        [0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+         0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    decision_dropout_probs = [1.0
+                              # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+                              # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+                              # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+                              # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+                              # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+                              # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                              # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                              # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                              # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                              # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                              # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                              # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                              # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                              # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                              # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                              # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+                              # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+                              # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+                              # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+                              # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+                              # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                              # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                              # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                              # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                              # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                              # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+                              # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+                              # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+                              # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+                              # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                              # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+                              ]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
@@ -535,15 +583,22 @@ def main_fast_tree():
         else:
             sess = tf.Session()
         # Create network
+        # network = FastTreeNetwork(
+        #     node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
+        #                       fashion_net_decision_connected_to_f.l1_func,
+        #                       fashion_net_decision_connected_to_f.leaf_func],
+        #     grad_func=fashion_net_decision_connected_to_f.grad_func,
+        #     threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
+        #     residue_func=fashion_net_decision_connected_to_f.residue_network_func,
+        #     summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
+        #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
         network = FastTreeNetwork(
-            node_build_funcs=[fashion_net_decision_connected_to_f.root_func,
-                              fashion_net_decision_connected_to_f.l1_func,
-                              fashion_net_decision_connected_to_f.leaf_func],
-            grad_func=fashion_net_decision_connected_to_f.grad_func,
-            threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
-            residue_func=fashion_net_decision_connected_to_f.residue_network_func,
-            summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
-            degree_list=GlobalConstants.TREE_DEGREE_LIST)
+            node_build_funcs=[fashion_net_baseline.baseline],
+            grad_func=fashion_net_baseline.grad_func,
+            threshold_func=fashion_net_baseline.threshold_calculator_func,
+            residue_func=fashion_net_baseline.residue_network_func,
+            summary_func=fashion_net_baseline.tensorboard_func,
+            degree_list=[1])
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
                                                                      schedule=[(15000, 0.005),

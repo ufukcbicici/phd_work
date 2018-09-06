@@ -46,7 +46,7 @@ def execute_path_query():
                            iteration_lower_limit=iteration_lower_limit)
     query += get_query(min_run_id=min_id, max_run_id=max_id, condition="WHERE {0} < LeafEvaluated".format(max_limit),
                        iteration_lower_limit=iteration_lower_limit, add_union=False)
-    print(query)
+    # print(query)
 
     rows = DbLogger.read_query(query=query)
     for row in rows:
