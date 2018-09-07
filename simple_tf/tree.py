@@ -29,14 +29,14 @@ class TreeNetwork:
         self.summaryFunc = summary_func
         self.degreeList = degree_list
         self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
-                                         shape=(GlobalConstants.BATCH_SIZE, GlobalConstants.IMAGE_SIZE,
+                                         shape=(None, GlobalConstants.IMAGE_SIZE,
                                                 GlobalConstants.IMAGE_SIZE,
                                                 GlobalConstants.NUM_CHANNELS))
-        self.labelTensor = tf.placeholder(tf.int64, shape=(GlobalConstants.BATCH_SIZE,))
+        self.labelTensor = tf.placeholder(tf.int64, shape=(None,))
         self.oneHotLabelTensor = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
-                                                shape=(GlobalConstants.BATCH_SIZE, GlobalConstants.NUM_LABELS))
-        self.indicesTensor = tf.placeholder(tf.int64, shape=(GlobalConstants.BATCH_SIZE,))
-        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(GlobalConstants.BATCH_SIZE,))
+                                                shape=(None, GlobalConstants.NUM_LABELS))
+        self.indicesTensor = tf.placeholder(tf.int64, shape=(None,))
+        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None,))
         self.evalDict = {}
         self.mainLoss = None
         self.residueLoss = None

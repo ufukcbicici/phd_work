@@ -93,7 +93,6 @@ class FastTreeNetwork(TreeNetwork):
         self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
-        # self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(self.extra_update_ops):
             self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
                                                                                          global_step=self.globalCounter)
