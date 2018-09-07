@@ -36,11 +36,11 @@ class ModeTrackingStrategy(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 100
+    TOTAL_EPOCH_COUNT = 1
     EPOCH_COUNT = 100
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
-    EVAL_BATCH_SIZE = 10000
+    EVAL_BATCH_SIZE = 125
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
@@ -165,7 +165,7 @@ class GlobalConstants:
     FASHION_FILTERS_3_SIZE = 1
     FASHION_FC_1 = 128
     FASHION_FC_2 = 64
-    BASELINE_ENSEMBLE_COUNT = 4
+    BASELINE_ENSEMBLE_COUNT = 1
     # Conditional [2 2] Tree
     FASHION_F_NUM_FILTERS_1 = 32
     FASHION_F_NUM_FILTERS_2 = 64

@@ -23,6 +23,7 @@ def get_explanation_string(networks):
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
     explanation += "Concat Trick:{0}\n".format(GlobalConstants.USE_CONCAT_TRICK)
+    explanation += "Ensemble Count:{0}\n".format(GlobalConstants.BASELINE_ENSEMBLE_COUNT)
     explanation += "Info Gain:{0}\n".format(GlobalConstants.USE_INFO_GAIN_DECISION)
     explanation += "Using Effective Sample Counts:{0}\n".format(GlobalConstants.USE_EFFECTIVE_SAMPLE_COUNTS)
     explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
@@ -158,6 +159,13 @@ class Ensemble:
             feed_dict.update(feed_dict_temp)
             assert total_size == len(feed_dict)
         list_of_eval_dicts = [network.evalDict for network in self.networks]
+        # g = tf.get_default_graph()
+        # run_metadata = tf.RunMetadata()
+        # results = sess.run(list_of_eval_dicts, feed_dict,
+        #                    options=tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE),
+        #                    run_metadata=run_metadata)
+        # opts = tf.profiler.ProfileOptionBuilder.float_operation()
+        # flops = tf.profiler.profile(g, run_meta=run_metadata, cmd='op', options=opts)
         results = sess.run(list_of_eval_dicts, feed_dict)
         return results
 
@@ -216,6 +224,7 @@ class Ensemble:
                 if all([dataset.isNewEpoch for dataset in self.datasets]):
                     training_accuracy = self.calculate_accuracy(sess=sess, dataset_type=DatasetTypes.training)
                     test_accuracy = self.calculate_accuracy(sess=sess, dataset_type=DatasetTypes.test)
+                    print("Elapsed Time:{0}".format(total_time))
                     DbLogger.write_into_table(
                         rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
                                test_accuracy, 0.0,
