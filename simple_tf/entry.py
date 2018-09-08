@@ -16,15 +16,12 @@ import numpy as np
 # MNIST
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
+from auxillary.parameters import DiscreteParameter, FixedParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
-from data_handling.mnist_data_set import MnistDataSet
-from simple_tf import fashion_net_independent_h, lenet3, lenet_baseline, fashion_net_decision_connected_to_f, \
-    fashion_net_baseline
+from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline
 from simple_tf.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.tree import TreeNetwork
-from tensorflow.python.framework import ops
 
 
 # tf.set_random_seed(1234)
@@ -38,7 +35,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "FashionMnist Full Base 3x3 3.Conv\n"
+    explanation = "FashionMnist Thin Baseline\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
