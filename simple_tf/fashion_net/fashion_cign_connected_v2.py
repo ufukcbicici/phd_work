@@ -9,6 +9,7 @@ def apply_router_transformation(net, network, node, decision_feature_size, node_
     net_shape = h_net.get_shape().as_list()
     # Global Average Pooling
     h_net = tf.nn.avg_pool(h_net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
+    net_shape = h_net.get_shape().as_list()
     h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
     feature_size = h_net.get_shape().as_list()[-1]
     fc_h_weights = tf.Variable(tf.truncated_normal(
@@ -133,8 +134,8 @@ def leaf_func(node, network, variables=None):
     net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     # FC Layers
-    flattened = tf.contrib.layers.flatten(parent_F)
-    flattened_F_feature_size = flattened.get_shape().as_list()[-1]
+    net = tf.contrib.layers.flatten(net)
+    flattened_F_feature_size = net.get_shape().as_list()[-1]
     # Parameters
     # OK
     fc_weights_1 = tf.Variable(tf.truncated_normal(
@@ -167,7 +168,7 @@ def leaf_func(node, network, variables=None):
         name=network.get_variable_name(name="fc_softmax_biases", node=node))
     node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2, fc_softmax_weights, fc_softmax_biases}
     # OPS
-    hidden_layer_1 = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
+    hidden_layer_1 = tf.nn.relu(tf.matmul(net, fc_weights_1) + fc_biases_1)
     dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
     hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
     dropped_layer_2 = tf.nn.dropout(hidden_layer_2, network.classificationDropoutKeepProb)
@@ -305,9 +306,9 @@ def threshold_calculator_func(network):
         node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
         initial_value = 1.0 / float(node_degree)
         threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
-        node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
+        node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.2,
                                                          decay_period=12000,
-                                                         min_limit=0.4)
+                                                         min_limit=0.1)
         # Softmax Decay
         decay_name = network.get_variable_name(name="softmax_decay", node=node)
         node.softmaxDecayCalculator = DecayingParameter(name=decay_name, value=GlobalConstants.SOFTMAX_DECAY_INITIAL,
