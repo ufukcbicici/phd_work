@@ -17,7 +17,7 @@ from simple_tf import batch_norm
 
 
 class TreeNetwork:
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list):
+    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
         self.depth = len(self.nodeBuildFuncs)
@@ -81,6 +81,7 @@ class TreeNetwork:
         self.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         self.decisionLossCoefficientCalculator = None
         self.isBaseline = None
+        self.labelCount = dataset.get_label_count()
         # Algorithms
         self.modeTracker = ModeTracker(network=self)
         self.accuracyCalculator = AccuracyCalculator(network=self)
@@ -114,7 +115,7 @@ class TreeNetwork:
         self.modeTracker.reset()
         self.softmaxCompresser = SoftmaxCompresser(network=self, dataset=dataset, run_id=run_id)
 
-    def build_network(self):
+    def build_network(self, dataset):
         # Create itself
         curr_index = 0
         is_leaf = 0 == (self.depth - 1)

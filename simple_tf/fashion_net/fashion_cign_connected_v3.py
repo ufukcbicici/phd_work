@@ -101,59 +101,45 @@ def root_func(node, network, variables=None):
         tf.constant(0.1, shape=[GlobalConstants.FASHION_F_NUM_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="conv1_bias",
                                        node=node))
-
-    node.variablesSet = {conv1_weights, conv1_biases}
-    # ***************** F: Convolution Layers *****************
-    # First Conv Layer
-    network.mask_input_nodes(node=node)
-    net = tf.nn.conv2d(network.dataTensor, conv1_weights, strides=[1, 1, 1, 1], padding='SAME')
-    net = tf.nn.relu(tf.nn.bias_add(net, conv1_biases))
-    net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    node.fOpsList.extend([net])
-    # ***************** F: Convolution Layers *****************
-
-    # ***************** H: Connected to F *****************
-    apply_heavy_router_transform(net=net, network=network, node=node,
-                                decision_feature_size=GlobalConstants.FASHION_NO_H_FROM_F_UNITS_1,
-                                node_degree=node_degree)
-    # ***************** H: Connected to F *****************
-
-
-def l1_func(node, network, variables=None):
-    # Parameters
-    node_degree = network.degreeList[node.depth]
     # Convolution 2
     # OK
-    conv_weights = tf.Variable(
+    conv2_weights = tf.Variable(
         tf.truncated_normal([GlobalConstants.FASHION_FILTERS_2_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
                              GlobalConstants.FASHION_F_NUM_FILTERS_1, GlobalConstants.FASHION_F_NUM_FILTERS_2],
                             stddev=0.1,
                             seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="conv2_weight", node=node))
     # OK
-    conv_biases = tf.Variable(
+    conv2_biases = tf.Variable(
         tf.constant(0.1, shape=[GlobalConstants.FASHION_F_NUM_FILTERS_2], dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="conv2_bias",
                                        node=node))
-    node.variablesSet = {conv_weights, conv_biases}
-    # ***************** F: Convolution Layer *****************
-    parent_F, parent_H = network.mask_input_nodes(node=node)
-    net = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-    net = tf.nn.relu(tf.nn.bias_add(net, conv_biases))
-    net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    node.fOpsList.extend([net])
-    # ***************** F: Convolution Layer *****************
+    node.variablesSet = {conv1_weights, conv1_biases, conv2_weights, conv2_biases}
+    # ***************** F: Convolution Layers *****************
+    # First Conv Layer
+    # First Conv Layer
+    network.mask_input_nodes(node=node)
+    conv1 = tf.nn.conv2d(network.dataTensor, conv1_weights, strides=[1, 1, 1, 1], padding='SAME')
+    relu1 = tf.nn.relu(tf.nn.bias_add(conv1, conv1_biases))
+    pool1 = tf.nn.max_pool(relu1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    # Second Conv Layer
+    conv2 = tf.nn.conv2d(pool1, conv2_weights, strides=[1, 1, 1, 1], padding='SAME')
+    relu2 = tf.nn.relu(tf.nn.bias_add(conv2, conv2_biases))
+    pool2 = tf.nn.max_pool(relu2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    node.fOpsList.extend([conv1, relu1, pool1, conv2, relu2, pool2])
+    net = pool2
+    # ***************** F: Convolution Layers *****************
 
     # ***************** H: Connected to F *****************
     apply_router_transformation(net=net, network=network, node=node,
-                                decision_feature_size=GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2,
+                                decision_feature_size=GlobalConstants.FASHION_NO_H_FROM_F_UNITS_1,
                                 node_degree=node_degree)
     # ***************** H: Connected to F *****************
 
 
-def leaf_func(node, network, variables=None):
-    total_prev_degrees = sum(network.degreeList[0:node.depth])
-    softmax_input_dim = GlobalConstants.FASHION_F_FC_2
+def l1_func(node, network, variables=None):
+    node_degree = network.degreeList[node.depth]
+    # Parameters
     conv_weights = tf.Variable(
         tf.truncated_normal([GlobalConstants.FASHION_FILTERS_3_SIZE, GlobalConstants.FASHION_FILTERS_3_SIZE,
                              GlobalConstants.FASHION_F_NUM_FILTERS_2, GlobalConstants.FASHION_F_NUM_FILTERS_3],
@@ -167,15 +153,26 @@ def leaf_func(node, network, variables=None):
                                        node=node))
     node.variablesSet = {conv_weights, conv_biases}
     # ***************** F: Convolution Layer *****************
-    # Conv Layer
     parent_F, parent_H = network.mask_input_nodes(node=node)
-    net = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-    net = tf.nn.relu(tf.nn.bias_add(net, conv_biases))
-    net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    conv3 = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
+    relu3 = tf.nn.relu(tf.nn.bias_add(conv3, conv_biases))
+    pool3 = tf.nn.max_pool(relu3, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    node.fOpsList.extend([conv3, relu3, pool3])
+    net = pool3
+    # ***************** F: Convolution Layer *****************
 
-    # FC Layers
-    net = tf.contrib.layers.flatten(net)
-    flattened_F_feature_size = net.get_shape().as_list()[-1]
+    # ***************** H: Connected to F *****************
+    apply_router_transformation(net=net, network=network, node=node,
+                                decision_feature_size=GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2,
+                                node_degree=node_degree)
+    # ***************** H: Connected to F *****************
+
+
+def leaf_func(node, network, variables=None):
+    total_prev_degrees = sum(network.degreeList[0:node.depth])
+    parent_F, parent_H = network.mask_input_nodes(node=node)
+    flattened = tf.contrib.layers.flatten(parent_F)
+    flattened_F_feature_size = flattened.get_shape().as_list()[-1]
     # Parameters
     # OK
     fc_weights_1 = tf.Variable(tf.truncated_normal(
@@ -195,6 +192,7 @@ def leaf_func(node, network, variables=None):
     # OK
     fc_biases_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.FASHION_F_FC_2], dtype=GlobalConstants.DATA_TYPE),
                               name=network.get_variable_name(name="fc_biases_2", node=node))
+    softmax_input_dim = GlobalConstants.FASHION_F_FC_2
     # OK
     fc_softmax_weights = tf.Variable(
         tf.truncated_normal([softmax_input_dim, GlobalConstants.NUM_LABELS],
@@ -207,21 +205,19 @@ def leaf_func(node, network, variables=None):
         tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="fc_softmax_biases", node=node))
     node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2, fc_softmax_weights, fc_softmax_biases}
-    # OPS
-    hidden_layer_1 = tf.nn.relu(tf.matmul(net, fc_weights_1) + fc_biases_1)
+    # F Layer
+    hidden_layer_1 = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
     dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
     hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
     dropped_layer_2 = tf.nn.dropout(hidden_layer_2, network.classificationDropoutKeepProb)
     final_feature, logits = network.apply_loss(node=node, final_feature=dropped_layer_2,
                                                softmax_weights=fc_softmax_weights, softmax_biases=fc_softmax_biases)
-    node.fOpsList.extend([net])
     # Evaluation
     node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = final_feature
     node.evalDict[network.get_variable_name(name="logits", node=node)] = logits
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="fc_softmax_weights", node=node)] = fc_softmax_weights
     node.evalDict[network.get_variable_name(name="fc_softmax_biases", node=node)] = fc_softmax_biases
-    # ***************** F: Convolution Layer *****************
 
 
 def residue_network_func(network):
