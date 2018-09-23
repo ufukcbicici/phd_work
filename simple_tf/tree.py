@@ -115,7 +115,7 @@ class TreeNetwork:
         self.modeTracker.reset()
         self.softmaxCompresser = SoftmaxCompresser(network=self, dataset=dataset, run_id=run_id)
 
-    def build_network(self, dataset):
+    def build_network(self):
         # Create itself
         curr_index = 0
         is_leaf = 0 == (self.depth - 1)

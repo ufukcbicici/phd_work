@@ -20,6 +20,8 @@ class FastTreeNetwork(TreeNetwork):
         self.extra_update_ops = None
         self.classWeightsDict = {}
         self.leafLabelTensorsDict = {}
+        self.leafClassWeightTensorsDict = {}
+        self.leafSampleWeightTensorsDict = {}
 
     def build_network(self):
         # Create itself
@@ -63,6 +65,10 @@ class FastTreeNetwork(TreeNetwork):
         self.noiseCoefficient = tf.placeholder(name="noise_coefficient", dtype=tf.float32)
         self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient",
                                                                   dtype=tf.float32)
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                self.leafClassWeightTensorsDict[node.index] = \
+                    tf.placeholder(name="class_weight_tensor_node{0}".format(node.index), dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         self.isBaseline = len(self.topologicalSortedNodes) == 1
@@ -128,13 +134,24 @@ class FastTreeNetwork(TreeNetwork):
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
             if node.filteredMask is not None:
                 self.evalDict["Node{0}_filteredMask".format(node.index)] = node.filteredMask
+            # Class weighting tensors
+            if node.isLeaf:
+                assert node.index in self.leafClassWeightTensorsDict \
+                       and self.leafClassWeightTensorsDict[node.node.index] is not None
+                assert node.index in self.leafSampleWeightTensorsDict \
+                       and self.leafSampleWeightTensorsDict[node.node.index] is not None
+                self.evalDict["Node{0}_leafClassWeightTensor".format(node.index)] = \
+                    self.leafClassWeightTensorsDict[node.index]
+                self.evalDict["Node{0}_leafSampleWeightTensor".format(node.index)] = \
+                    self.leafSampleWeightTensorsDict[node.index]
+
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
         for node in self.topologicalSortedNodes:
             if node.isLeaf:
                 self.leafLabelTensorsDict[node.index] = node.labelTensor
-                self.classWeightsDict[node.index] = np.ones(shape=(self.labelCount, ), dtype=np.float32)
+                self.classWeightsDict[node.index] = np.ones(shape=(self.labelCount,), dtype=np.float32)
 
     def calculate_class_weights(self, sample_counts_dict, leaf_labels_dict):
         alpha = GlobalConstants.CLASS_WEIGHT_RUNNING_AVERAGE
@@ -269,6 +286,11 @@ class FastTreeNetwork(TreeNetwork):
         logits = tf.matmul(final_feature, softmax_weights) + softmax_biases
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
+        if GlobalConstants.USE_CLASS_WEIGHTING:
+            self.leafSampleWeightTensorsDict[node.index] = \
+                tf.nn.embedding_lookup(self.leafClassWeightTensorsDict[node.index], node.labelTensor)
+            cross_entropy_loss_tensor = tf.multiply(self.leafSampleWeightTensorsDict[node.index],
+                                                    cross_entropy_loss_tensor)
         pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
         loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
         node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
@@ -289,7 +311,11 @@ class FastTreeNetwork(TreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
-        self.calculate_class_weights()
+        lr = results[1]
+        sample_counts = results[2]
+        is_open_indicators = results[3]
+        leaf_label_tensors_dict = results[-1]
+        self.calculate_class_weights(sample_counts_dict=sample_counts, leaf_labels_dict=leaf_label_tensors_dict)
         # Unit Test for Unified Batch Normalization
         if GlobalConstants.USE_VERBOSE:
             if GlobalConstants.USE_UNIFIED_BATCH_NORM:
@@ -305,9 +331,6 @@ class FastTreeNetwork(TreeNetwork):
                         print("ERR")
                     assert sum_of_samples == GlobalConstants.BATCH_SIZE
         # Unit Test for Unified Batch Normalization
-        lr = results[1]
-        sample_counts = results[2]
-        is_open_indicators = results[3]
         return lr, sample_counts, is_open_indicators
 
     def eval_network(self, sess, dataset, use_masking):
@@ -337,7 +360,7 @@ class FastTreeNetwork(TreeNetwork):
                      self.useMasking: int(use_masking),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration,
-                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE, ), dtype=bool)}
+                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:
