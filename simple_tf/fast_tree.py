@@ -134,15 +134,16 @@ class FastTreeNetwork(TreeNetwork):
             if node.filteredMask is not None:
                 self.evalDict["Node{0}_filteredMask".format(node.index)] = node.filteredMask
             # Class weighting tensors
-            if node.isLeaf:
-                assert node.index in self.leafClassWeightTensorsDict \
-                       and self.leafClassWeightTensorsDict[node.index] is not None
-                assert node.index in self.leafSampleWeightTensorsDict \
-                       and self.leafSampleWeightTensorsDict[node.index] is not None
-                self.evalDict["Node{0}_leafClassWeightTensor".format(node.index)] = \
-                    self.leafClassWeightTensorsDict[node.index]
-                self.evalDict["Node{0}_leafSampleWeightTensor".format(node.index)] = \
-                    self.leafSampleWeightTensorsDict[node.index]
+            if GlobalConstants.USE_CLASS_WEIGHTING:
+                if node.isLeaf:
+                    assert node.index in self.leafClassWeightTensorsDict \
+                           and self.leafClassWeightTensorsDict[node.index] is not None
+                    assert node.index in self.leafSampleWeightTensorsDict \
+                           and self.leafSampleWeightTensorsDict[node.index] is not None
+                    self.evalDict["Node{0}_leafClassWeightTensor".format(node.index)] = \
+                        self.leafClassWeightTensorsDict[node.index]
+                    self.evalDict["Node{0}_leafSampleWeightTensor".format(node.index)] = \
+                        self.leafSampleWeightTensorsDict[node.index]
 
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
@@ -306,7 +307,10 @@ class FastTreeNetwork(TreeNetwork):
                                            is_train=True, use_masking=True)
         # Prepare result tensors to collect
         run_ops = [self.optimizer, self.learningRate, self.sample_count_tensors, self.isOpenTensors,
-                   self.info_gain_dicts, self.leafLabelTensorsDict]
+                   self.info_gain_dicts,
+                   self.leafClassWeightTensorsDict,
+                   self.leafSampleWeightTensorsDict,
+                   self.leafLabelTensorsDict]
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
@@ -362,10 +366,10 @@ class FastTreeNetwork(TreeNetwork):
                      self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
-            for node in self.topologicalSortedNodes:
-                if node.isLeaf:
-                    feed_dict[self.leafClassWeightTensorsDict[node.index]] = self.classWeightsDict[node.index]
             if not self.isBaseline:
+                for node in self.topologicalSortedNodes:
+                    if node.isLeaf:
+                        feed_dict[self.leafClassWeightTensorsDict[node.index]] = self.classWeightsDict[node.index]
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
@@ -375,6 +379,10 @@ class FastTreeNetwork(TreeNetwork):
         else:
             feed_dict[self.classificationDropoutKeepProb] = 1.0
             if not self.isBaseline:
+                for node in self.topologicalSortedNodes:
+                    if node.isLeaf:
+                        feed_dict[self.leafClassWeightTensorsDict[node.index]] = \
+                            np.ones(shape=(self.labelCount,), dtype=np.float32)
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
