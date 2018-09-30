@@ -3,6 +3,7 @@ from collections import deque
 import numpy as np
 import tensorflow as tf
 
+from simple_tf.batch_norm import fast_tree_batch_norm
 from simple_tf.global_params import GlobalConstants
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
@@ -11,12 +12,16 @@ from data_handling.data_set import DataSet
 
 
 class FastTreeNetwork(TreeNetwork):
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list):
-        super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list)
+    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
+        super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         self.learningRate = None
         self.optimizer = None
         self.info_gain_dicts = None
         self.extra_update_ops = None
+        self.classWeightsDict = {}
+        self.leafLabelTensorsDict = {}
+        self.leafClassWeightTensorsDict = {}
+        self.leafSampleWeightTensorsDict = {}
 
     def build_network(self):
         # Create itself
@@ -49,6 +54,9 @@ class FastTreeNetwork(TreeNetwork):
                     self.nodes[curr_index] = child_node
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
+            else:
+                self.leafClassWeightTensorsDict[curr_node.index] = \
+                    tf.placeholder(name="class_weight_tensor_node{0}".format(curr_node.index), dtype=tf.float32)
         # Flags and hyperparameters
         self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
         self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
@@ -92,7 +100,6 @@ class FastTreeNetwork(TreeNetwork):
         self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
-        # self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(self.extra_update_ops):
             self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
                                                                                          global_step=self.globalCounter)
@@ -124,14 +131,48 @@ class FastTreeNetwork(TreeNetwork):
             # One Hot Label outputs
             if node.oneHotLabelTensor is not None:
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
+            if node.filteredMask is not None:
+                self.evalDict["Node{0}_filteredMask".format(node.index)] = node.filteredMask
+            # Class weighting tensors
+            if GlobalConstants.USE_CLASS_WEIGHTING:
+                if node.isLeaf:
+                    assert node.index in self.leafClassWeightTensorsDict \
+                           and self.leafClassWeightTensorsDict[node.index] is not None
+                    assert node.index in self.leafSampleWeightTensorsDict \
+                           and self.leafSampleWeightTensorsDict[node.index] is not None
+                    self.evalDict["Node{0}_leafClassWeightTensor".format(node.index)] = \
+                        self.leafClassWeightTensorsDict[node.index]
+                    self.evalDict["Node{0}_leafSampleWeightTensor".format(node.index)] = \
+                        self.leafSampleWeightTensorsDict[node.index]
+
         self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                self.leafLabelTensorsDict[node.index] = node.labelTensor
+                self.classWeightsDict[node.index] = np.ones(shape=(self.labelCount,), dtype=np.float32)
+
+    def calculate_class_weights(self, sample_counts_dict, leaf_labels_dict):
+        alpha = GlobalConstants.CLASS_WEIGHT_RUNNING_AVERAGE
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                leaf_sample_count = sample_counts_dict[self.get_variable_name(name="sample_count", node=node)]
+                assert leaf_labels_dict[node.index].shape[0] == leaf_sample_count
+                for label in range(self.labelCount):
+                    label_count = np.sum(leaf_labels_dict[node.index] == label)
+                    if label_count == 0:
+                        label_count = GlobalConstants.LABEL_EPSILON
+                    curr_weight = self.classWeightsDict[node.index][label]
+                    new_weight = np.log(leaf_sample_count / float(label_count))
+                    self.classWeightsDict[node.index][label] =  alpha * curr_weight + (1.0 - alpha) * new_weight
 
     def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-            branching_feature = tf.layers.batch_normalization(branching_feature, training=tf.cast(self.isTrain,
-                                                                                                  tf.bool))
+            branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
+                                                              momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                              training=tf.cast(self.isTrain,
+                                                                               tf.bool))
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
@@ -160,11 +201,56 @@ class FastTreeNetwork(TreeNetwork):
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
+    def apply_decision_with_unified_batch_norm(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+        masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
+        normed_x = fast_tree_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
+                                        network=self, node=node,
+                                        decay=GlobalConstants.BATCH_NORM_DECAY,
+                                        iteration=self.iterationHolder,
+                                        is_training_phase=self.isTrain)
+        activations = tf.matmul(normed_x, hyperplane_weights) + hyperplane_biases
+        node.activationsDict[node.index] = activations
+        decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
+        p_n_given_x = tf.nn.softmax(decayed_activation)
+        p_n_given_x_masked = tf.boolean_mask(p_n_given_x, node.filteredMask)
+        p_c_given_x = node.oneHotLabelTensor
+        p_c_given_x_masked = tf.boolean_mask(p_c_given_x, node.filteredMask)
+        node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x_masked, p_c_given_x_2d=p_c_given_x_masked,
+                                                  balance_coefficient=self.informationGainBalancingCoefficient)
+        node.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
+        node.evalDict[self.get_variable_name(name="activations", node=node)] = activations
+        node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
+        node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
+        node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
+        node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
+        node.evalDict[self.get_variable_name(name="p(n|x)_masked", node=node)] = p_n_given_x_masked
+        node.evalDict[self.get_variable_name(name="p(c|x)", node=node)] = p_c_given_x
+        node.evalDict[self.get_variable_name(name="p(c|x)_masked", node=node)] = p_c_given_x_masked
+        arg_max_indices = tf.argmax(p_n_given_x, axis=1)
+        child_nodes = self.dagObject.children(node=node)
+        child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+        for index in range(len(child_nodes)):
+            child_node = child_nodes[index]
+            child_index = child_node.index
+            branch_prob = p_n_given_x[:, index]
+            mask_with_threshold = tf.reshape(tf.greater_equal(x=branch_prob, y=node.probabilityThreshold,
+                                                              name="Mask_with_threshold_{0}".format(child_index)), [-1])
+            mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
+                                                         name="Mask_without_threshold_{0}".format(child_index)), [-1])
+            mask_without_threshold = tf.logical_and(mask_without_threshold, node.filteredMask)
+            mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            node.maskTensors[child_index] = mask_tensor
+            node.masksWithoutThreshold[child_index] = mask_without_threshold
+            node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
+            node.evalDict[self.get_variable_name(name="masksWithoutThreshold", node=node)] = node.masksWithoutThreshold
+
     def mask_input_nodes(self, node):
         if node.isRoot:
             node.labelTensor = self.labelTensor
             node.indicesTensor = self.indicesTensor
             node.oneHotLabelTensor = self.oneHotLabelTensor
+            # node.filteredMask = tf.constant(value=True, dtype=tf.bool, shape=(GlobalConstants.BATCH_SIZE, ))
+            node.filteredMask = self.filteredMask
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
@@ -172,6 +258,8 @@ class FastTreeNetwork(TreeNetwork):
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
             mask_tensor = parent_node.maskTensors[node.index]
+            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                mask_without_threshold = parent_node.masksWithoutThreshold[node.index]
             mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
                                    tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
@@ -186,6 +274,8 @@ class FastTreeNetwork(TreeNetwork):
             node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
             node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
             node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
+            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
             return parent_F, parent_H
 
     def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
@@ -196,6 +286,11 @@ class FastTreeNetwork(TreeNetwork):
         logits = tf.matmul(final_feature, softmax_weights) + softmax_biases
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
+        if GlobalConstants.USE_CLASS_WEIGHTING:
+            self.leafSampleWeightTensorsDict[node.index] = \
+                tf.nn.embedding_lookup(self.leafClassWeightTensorsDict[node.index], node.labelTensor)
+            cross_entropy_loss_tensor = tf.multiply(self.leafSampleWeightTensorsDict[node.index],
+                                                    cross_entropy_loss_tensor)
         pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
         loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
         node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
@@ -203,40 +298,62 @@ class FastTreeNetwork(TreeNetwork):
         return final_feature, logits
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
-                                      minibatch.indices, minibatch.one_hot_labels)
+                                      minibatch.indices, minibatch.one_hot_labels, minibatch.hash_codes)
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
                                            is_train=True, use_masking=True)
         # Prepare result tensors to collect
         run_ops = [self.optimizer, self.learningRate, self.sample_count_tensors, self.isOpenTensors,
-                   self.info_gain_dicts]
+                   self.info_gain_dicts,
+                   self.leafClassWeightTensorsDict,
+                   self.leafSampleWeightTensorsDict,
+                   self.leafLabelTensorsDict]
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]
+        leaf_label_tensors_dict = results[-1]
+        self.calculate_class_weights(sample_counts_dict=sample_counts, leaf_labels_dict=leaf_label_tensors_dict)
+        # Unit Test for Unified Batch Normalization
+        if GlobalConstants.USE_VERBOSE:
+            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                for level in range(self.depth):
+                    if level == 0:
+                        continue
+                    level_nodes = [node for node in self.topologicalSortedNodes if node.depth == level]
+                    sum_of_samples = 0
+                    for node in level_nodes:
+                        filtered_mask = results[-1]["Node{0}_filteredMask".format(node.index)]
+                        sum_of_samples += np.sum(filtered_mask)
+                    if sum_of_samples != GlobalConstants.BATCH_SIZE:
+                        print("ERR")
+                    assert sum_of_samples == GlobalConstants.BATCH_SIZE
+        # Unit Test for Unified Batch Normalization
         return lr, sample_counts, is_open_indicators
 
     def eval_network(self, sess, dataset, use_masking):
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
-                                      minibatch.indices, minibatch.one_hot_labels)
+                                      minibatch.indices, minibatch.one_hot_labels, minibatch.hash_codes)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
                                            is_train=False, use_masking=use_masking)
         results = sess.run(self.evalDict, feed_dict)
         # for k, v in results.items():
         #     if "final_feature_mag" in k:
         #         print("{0}={1}".format(k, v))
-        return results
+        return results, minibatch
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
-        feed_dict = {GlobalConstants.TRAIN_DATA_TENSOR: minibatch.samples,
-                     GlobalConstants.TRAIN_LABEL_TENSOR: minibatch.labels,
-                     GlobalConstants.TRAIN_INDEX_TENSOR: minibatch.indices,
-                     GlobalConstants.TRAIN_ONE_HOT_LABELS: minibatch.one_hot_labels,
+        feed_dict = {self.dataTensor: minibatch.samples,
+                     self.labelTensor: minibatch.labels,
+                     self.indicesTensor: minibatch.indices,
+                     self.oneHotLabelTensor: minibatch.one_hot_labels,
                      # self.globalCounter: iteration,
                      self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
                      self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
@@ -245,10 +362,14 @@ class FastTreeNetwork(TreeNetwork):
                      self.isTrain: int(is_train),
                      self.useMasking: int(use_masking),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
-                     self.iterationHolder: iteration}
+                     self.iterationHolder: iteration,
+                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:
+                for node in self.topologicalSortedNodes:
+                    if node.isLeaf:
+                        feed_dict[self.leafClassWeightTensorsDict[node.index]] = self.classWeightsDict[node.index]
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
@@ -258,6 +379,10 @@ class FastTreeNetwork(TreeNetwork):
         else:
             feed_dict[self.classificationDropoutKeepProb] = 1.0
             if not self.isBaseline:
+                for node in self.topologicalSortedNodes:
+                    if node.isLeaf:
+                        feed_dict[self.leafClassWeightTensorsDict[node.index]] = \
+                            np.ones(shape=(self.labelCount,), dtype=np.float32)
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)

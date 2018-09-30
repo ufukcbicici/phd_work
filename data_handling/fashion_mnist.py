@@ -1,6 +1,7 @@
 import os
 
 from data_handling.mnist_data_set import MnistDataSet
+import numpy as np
 
 
 class FashionMnistDataSet(MnistDataSet):

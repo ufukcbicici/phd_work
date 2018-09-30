@@ -17,7 +17,7 @@ from simple_tf import batch_norm
 
 
 class TreeNetwork:
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list):
+    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
         self.depth = len(self.nodeBuildFuncs)
@@ -28,18 +28,15 @@ class TreeNetwork:
         self.residueFunc = residue_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
-        GlobalConstants.TRAIN_DATA_TENSOR = tf.placeholder(GlobalConstants.DATA_TYPE,
-                                                           shape=(None, GlobalConstants.IMAGE_SIZE,
-                                                                  GlobalConstants.IMAGE_SIZE,
-                                                                  GlobalConstants.NUM_CHANNELS))
-        GlobalConstants.TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,))
-        GlobalConstants.TRAIN_INDEX_TENSOR = tf.placeholder(tf.int64, shape=(None,))
-        GlobalConstants.TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
-                                                              shape=(None, GlobalConstants.NUM_LABELS))
-        self.dataTensor = GlobalConstants.TRAIN_DATA_TENSOR
-        self.labelTensor = GlobalConstants.TRAIN_LABEL_TENSOR
-        self.oneHotLabelTensor = GlobalConstants.TRAIN_ONE_HOT_LABELS
-        self.indicesTensor = GlobalConstants.TRAIN_INDEX_TENSOR
+        self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
+                                         shape=(None, GlobalConstants.IMAGE_SIZE,
+                                                GlobalConstants.IMAGE_SIZE,
+                                                GlobalConstants.NUM_CHANNELS))
+        self.labelTensor = tf.placeholder(tf.int64, shape=(None,))
+        self.oneHotLabelTensor = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
+                                                shape=(None, GlobalConstants.NUM_LABELS))
+        self.indicesTensor = tf.placeholder(tf.int64, shape=(None,))
+        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None,))
         self.evalDict = {}
         self.mainLoss = None
         self.residueLoss = None
@@ -84,6 +81,7 @@ class TreeNetwork:
         self.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         self.decisionLossCoefficientCalculator = None
         self.isBaseline = None
+        self.labelCount = dataset.get_label_count()
         # Algorithms
         self.modeTracker = ModeTracker(network=self)
         self.accuracyCalculator = AccuracyCalculator(network=self)
@@ -108,7 +106,7 @@ class TreeNetwork:
 
     def is_decision_variable(self, variable):
         if "scale" in variable.name or "shift" in variable.name or "hyperplane" in variable.name or \
-                        "gamma" in variable.name or "beta" in variable.name or "_decision_" in variable.name:
+                "gamma" in variable.name or "beta" in variable.name or "_decision_" in variable.name:
             return True
         else:
             return False
@@ -303,6 +301,10 @@ class TreeNetwork:
             elif calculation_type == AccuracyCalcType.with_residue_network:
                 self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                                                                                 dataset_type=dataset_type)
+            elif calculation_type == AccuracyCalcType.multi_path:
+                self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
+                                                                     dataset_type=dataset_type, run_id=run_id,
+                                                                     iteration=iteration)
             else:
                 raise NotImplementedError()
         else:
@@ -355,7 +357,7 @@ class TreeNetwork:
         feed_dict[self.decisionLossCoefficient] = weight
         print("self.decisionLossCoefficient={0}".format(weight))
         if update:
-            self.decisionLossCoefficientCalculator.update(iteration=iteration+1)
+            self.decisionLossCoefficientCalculator.update(iteration=iteration + 1)
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:
@@ -363,11 +365,13 @@ class TreeNetwork:
                 continue
             # Decay for Softmax
             decay = node.softmaxDecayCalculator.value
-            feed_dict[node.softmaxDecay] = decay
             if update:
+                feed_dict[node.softmaxDecay] = decay
                 print("{0} value={1}".format(node.softmaxDecayCalculator.name, decay))
                 # Update the Softmax Decay
                 node.softmaxDecayCalculator.update(iteration=iteration + 1)
+            else:
+                feed_dict[node.softmaxDecay] = GlobalConstants.SOFTMAX_TEST_TEMPERATURE
 
     def get_noise_coefficient(self, feed_dict, iteration, update):
         noise_coeff = self.noiseCoefficientCalculator.value
@@ -434,6 +438,7 @@ class TreeNetwork:
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration,
                                            update=True)
             self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=True)
+            self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
             if self.modeTracker.isCompressed:
                 self.get_label_mappings(feed_dict=feed_dict)
         run_ops = [self.classificationGradients,
@@ -491,7 +496,7 @@ class TreeNetwork:
             g = classification_grads[v]
             # print("Param:{0} Classification Grad Norm:{1}".format(k.name, np.linalg.norm(g)))
             if (GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_unbiased) or (
-                        GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
+                    GlobalConstants.GRADIENT_TYPE == GradientType.parallel_dnns_unbiased):
                 main_grads[k] = g
             elif GlobalConstants.GRADIENT_TYPE == GradientType.mixture_of_experts_biased:
                 sample_count_entry_name = self.get_variable_name(name="sample_count", node=node)
@@ -557,6 +562,7 @@ class TreeNetwork:
             self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=False)
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
             self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=False)
+            self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
         run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
@@ -826,6 +832,7 @@ class TreeNetwork:
             self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
             self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
+            self.get_decision_weight(feed_dict=feed_dict, iteration=1000000, update=False)
             # if self.modeTracker.isCompressed:
             #     self.get_label_mappings(feed_dict=feed_dict)
         # self.get_probability_hyperparams(feed_dict=feed_dict, iteration=1000000, update_thresholds=False)

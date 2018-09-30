@@ -16,6 +16,7 @@ class AccuracyCalcType(Enum):
     regular = 0
     route_correction = 1
     with_residue_network = 2
+    multi_path = 3
 
 
 class SoftmaxCompressionStrategy(Enum):
@@ -40,6 +41,7 @@ class GlobalConstants:
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 10000
+    CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
     USE_FAST_TREE_MODE = True
@@ -76,6 +78,7 @@ class GlobalConstants:
     SOFTMAX_DECAY_COEFFICIENT = 0.9999
     SOFTMAX_DECAY_PERIOD = 2
     SOFTMAX_DECAY_MIN_LIMIT = 1.0
+    SOFTMAX_TEST_TEMPERATURE = 50.0
     DROPOUT_INITIAL_PROB = 0.75
     DROPOUT_SCHEDULE = [(15000, 0.5), (30000, 0.25), (45000, 0.125)]
     CLASSIFICATION_DROPOUT_PROB = 0.5
@@ -126,6 +129,7 @@ class GlobalConstants:
     DATA_TYPE = tf.float32
     SEED = None
     USE_VERBOSE = False
+    USE_SAMPLE_HASHING = False
     USE_SOFTMAX_DISTILLATION_VERBOSE = True
     USE_CPU = False
     USE_CPU_MASKING = False
@@ -143,6 +147,7 @@ class GlobalConstants:
     USE_DECISION_AUGMENTATION = False
     USE_CONCAT_TRICK = False
     USE_BATCH_NORM_BEFORE_BRANCHING = True
+    USE_UNIFIED_BATCH_NORM = True
     USE_TRAINABLE_PARAMS_WITH_BATCH_NORM = True
     USE_DECISION_REGULARIZER = True
     DECISION_LOSS_COEFFICIENT = 1.0
@@ -150,20 +155,25 @@ class GlobalConstants:
     GRADIENT_TYPE = GradientType.parallel_dnns_unbiased
     INFO_GAIN_LOG_EPSILON = 1e-30
     SUMMARY_PERIOD = 100000000000
+    # CLASS WEIGHTING
+    USE_CLASS_WEIGHTING = False
+    CLASS_WEIGHT_RUNNING_AVERAGE = 0.9
+    LABEL_EPSILON = 0.1
     # Fashion Mnist
     # Baseline
     FASHION_NUM_FILTERS_1 = 32
     FASHION_NUM_FILTERS_2 = 64
-    FASHION_NUM_FILTERS_3 = 128
+    FASHION_NUM_FILTERS_3 = 64
     FASHION_FILTERS_1_SIZE = 5
     FASHION_FILTERS_2_SIZE = 5
     FASHION_FILTERS_3_SIZE = 1
-    FASHION_FC_1 = 1024
-    FASHION_FC_2 = 512
+    FASHION_FC_1 = 128
+    FASHION_FC_2 = 64
+    BASELINE_ENSEMBLE_COUNT = 1
     # Conditional [2 2] Tree
     FASHION_F_NUM_FILTERS_1 = 32
-    FASHION_F_NUM_FILTERS_2 = 64
-    FASHION_F_NUM_FILTERS_3 = 64
+    FASHION_F_NUM_FILTERS_2 = 32
+    FASHION_F_NUM_FILTERS_3 = 32
     FASHION_H_NUM_FILTERS_1 = 10
     FASHION_H_NUM_FILTERS_2 = 20
     FASHION_H_NUM_FILTERS_3 = 40
@@ -174,16 +184,40 @@ class GlobalConstants:
     FASHION_H_FC_2 = 32
     FASHION_F_FC_1 = 128
     FASHION_F_FC_2 = 64
-    FASHION_NO_H_FROM_F_UNITS_1 = 16
-    FASHION_NO_H_FROM_F_UNITS_2 = 16
+    FASHION_NO_H_FROM_F_UNITS_1 = 128
+    FASHION_NO_H_FROM_F_UNITS_2 = 128
 
     # Residue Network
-    RESIDUE_LOSS_COEFFICIENT = 1.0
+    RESIDUE_LOSS_COEFFICIENT = 0.0
     RESIDE_AFFECTS_WHOLE_NETWORK = True
     FASHION_F_RESIDUE = 128
     FASHION_F_RESIDUE_LAYER_COUNT = 1
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
+    # MultiPath Evaluation Schedules
+    # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]
+    # MULTIPATH_SCHEDULES.extend([i*0.001 for i in range(50)])
+    MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15,
+                           0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.025, 0.02, 0.01,
+                           0.009, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.0025, 0.002, 0.001,
+                           0.0005, 0.00025, 0.0001,
+                           0.00005, 0.000025, 0.00001,
+                           0.000005, 0.0000025, 0.000001,
+                           0.0000005, 0.00000025, 0.0000001,
+                           0.00000005, 0.000000025, 0.00000001,
+                           0.000000005, 0.0000000025, 0.000000001,
+                           0.0000000005, 0.00000000025, 0.0000000001,
+                           0.00000000005, 0.000000000025, 0.00000000001,
+                           0.000000000005, 0.0000000000025, 0.000000000001,
+                           0.0000000000005, 0.00000000000025, 0.0000000000001,
+                           0.00000000000005, 0.000000000000025, 0.00000000000001,
+                           0.000000000000005, 0.0000000000000025, 0.000000000000001,
+                           0.0000000000000005, 0.00000000000000025, 0.0000000000000001,
+                           0.00000000000000005, 0.000000000000000025, 0.00000000000000001,
+                           0.000000000000000005, 0.0000000000000000025, 0.000000000000000001,
+                           0.0000000000000000005, 0.00000000000000000025, 0.0000000000000000001,
+                           0.00000000000000000005, 0.000000000000000000025, 0.00000000000000000001,
+                           0.0]
     # Idea
     # SUMMARY_DIR = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf"
     # Home

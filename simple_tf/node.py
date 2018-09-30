@@ -17,6 +17,8 @@ class Node:
         self.indicesTensor = None
         self.isOpenIndicatorTensor = None
         self.maskTensors = {}
+        self.masksWithoutThreshold = {}
+        self.filteredMask = None
         self.evalDict = {}
         self.parentNonThresholdMaskVector = None
         self.probabilityThreshold = None
