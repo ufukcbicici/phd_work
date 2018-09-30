@@ -36,7 +36,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "FashionMnist Thin Tree H Connected to F\n"
+    explanation = "FashionMnist Thin Tree v3\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -451,8 +451,11 @@ def main_fast_tree():
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     # classification_dropout_probs = [0.15]
-    classification_dropout_probs = \
+    classification_dropout_probs = [0.15]
+    decision_dropout_probs = \
         [
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -460,6 +463,8 @@ def main_fast_tree():
             0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
             0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
             0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+            0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+            0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
             # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
             # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
             # 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
@@ -467,60 +472,54 @@ def main_fast_tree():
             0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
             0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
             0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-            # 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+            0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+            0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
 
             0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
             0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
             0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-            # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-            # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
-            # 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+            0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+            0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
 
             0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
             0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
             0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-            # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-            # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
-            # 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
 
 
             0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
             0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
             0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-            # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-            # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-            # 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+            0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+            0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
 
             0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
             0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
             0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-            # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-            # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
-            # 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+            0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+            0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
 
             0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
             0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
             0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-            # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-            # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
-            # 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+            0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+            0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
 
             0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
             0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
             0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-            # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-            # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
-            # 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+            0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+            0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
 
             0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
             0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
             0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-            # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-            # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
-            # 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+            0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+            0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
 
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
             0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
             0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
             0.5, 0.5, 0.5, 0.5, 0.5, 0.5
@@ -528,7 +527,7 @@ def main_fast_tree():
             # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
             # 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
         ]
-    decision_dropout_probs = [0.15]
+
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
@@ -555,25 +554,25 @@ def main_fast_tree():
         #     summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
         #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
 
-        network = FastTreeNetwork(
-            node_build_funcs=[fashion_cign_connected_v3.root_func,
-                              fashion_cign_connected_v3.l1_func,
-                              fashion_cign_connected_v3.leaf_func],
-            grad_func=fashion_cign_connected_v3.grad_func,
-            threshold_func=fashion_cign_connected_v3.threshold_calculator_func,
-            residue_func=fashion_cign_connected_v3.residue_network_func,
-            summary_func=fashion_cign_connected_v3.tensorboard_func,
-            degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
-
         # network = FastTreeNetwork(
-        #     node_build_funcs=[fashion_cign_connected_v2.root_func,
-        #                       fashion_cign_connected_v2.l1_func,
-        #                       fashion_cign_connected_v2.leaf_func],
-        #     grad_func=fashion_cign_connected_v2.grad_func,
-        #     threshold_func=fashion_cign_connected_v2.threshold_calculator_func,
-        #     residue_func=fashion_cign_connected_v2.residue_network_func,
-        #     summary_func=fashion_cign_connected_v2.tensorboard_func,
-        #     degree_list=GlobalConstants.TREE_DEGREE_LIST)
+        #     node_build_funcs=[fashion_cign_connected_v3.root_func,
+        #                       fashion_cign_connected_v3.l1_func,
+        #                       fashion_cign_connected_v3.leaf_func],
+        #     grad_func=fashion_cign_connected_v3.grad_func,
+        #     threshold_func=fashion_cign_connected_v3.threshold_calculator_func,
+        #     residue_func=fashion_cign_connected_v3.residue_network_func,
+        #     summary_func=fashion_cign_connected_v3.tensorboard_func,
+        #     degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
+
+        network = FastTreeNetwork(
+            node_build_funcs=[fashion_cign_connected_v2.root_func,
+                              fashion_cign_connected_v2.l1_func,
+                              fashion_cign_connected_v2.leaf_func],
+            grad_func=fashion_cign_connected_v2.grad_func,
+            threshold_func=fashion_cign_connected_v2.threshold_calculator_func,
+            residue_func=fashion_cign_connected_v2.residue_network_func,
+            summary_func=fashion_cign_connected_v2.tensorboard_func,
+            degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
 
         # network = FastTreeNetwork(
         #     node_build_funcs=[fashion_net_baseline.baseline],
@@ -602,7 +601,7 @@ def main_fast_tree():
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
-        series_id = int(run_id / 6)
+        series_id = int(run_id / 15)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData,
                                   col_count=2)

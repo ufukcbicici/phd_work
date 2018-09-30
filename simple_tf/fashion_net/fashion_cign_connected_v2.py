@@ -113,7 +113,7 @@ def root_func(node, network, variables=None):
     # ***************** F: Convolution Layers *****************
 
     # ***************** H: Connected to F *****************
-    apply_heavy_router_transform(net=net, network=network, node=node,
+    apply_router_transformation(net=net, network=network, node=node,
                                 decision_feature_size=GlobalConstants.FASHION_NO_H_FROM_F_UNITS_1,
                                 node_degree=node_degree)
     # ***************** H: Connected to F *****************
