@@ -40,6 +40,13 @@ class InfoGainLoss:
         return information_gain
         # return information_gain, unnormalized_joint_xcn, entropy_p_cn, entropy_p_n, entropy_p_c, \
         #        marginal_p_cn, marginal_p_n, marginal_p_c, log_prob_p_cn, log_prob_p_n, log_prob_p_c
+
+    @staticmethod
+    def get_layerwise_loss(layer, balance_coefficient):
+        pass
+
+
+
 #
 # sess = tf.Session()
 # prob = np.array([6.0, 0.0, 48.0, 2.0, 63.0, 7.0, 89.0, 10.0, 1.0, 39.0])
