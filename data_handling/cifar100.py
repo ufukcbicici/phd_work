@@ -32,7 +32,12 @@ class Cifar100DataSet(MnistDataSet):
                                                       Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE, 3)).astype(
             float)
         # Pack coarse and fine labels into a Nx2 array. Each i.th row corresponds to (coarse,fine) labels.
-        self.trainingLabels = np.concatenate([training_data[b"coarse_labels"], training_data[b"fine_labels"]], axis=1)
+        training_coarse_labels = np.array(training_data[b"coarse_labels"])
+        training_fine_labels = np.array(training_data[b"fine_labels"])
+        test_coarse_labels = np.array(test_data[b"coarse_labels"])
+        test_fine_labels = np.array(test_data[b"fine_labels"])
+        self.trainingLabels = np.concatenate([training_coarse_labels,  training_fine_labels], axis=1)
+        self.testLabels = np.concatenate([test_coarse_labels, test_fine_labels], axis=1)
         self.testLabels = np.concatenate([test_data[b"coarse_labels"], test_data[b"fine_labels"]], axis=1)
         if self.validationLoadFile is None:
             # random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount, replace=False)

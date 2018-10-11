@@ -951,4 +951,5 @@ def ensemble_training():
 
 dataset = Cifar100DataSet(validation_sample_count=0, load_validation_from=None)
 dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+dataset.visualize_sample(sample_index=150)
 print("X")
