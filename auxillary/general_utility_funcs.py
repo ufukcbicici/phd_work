@@ -107,6 +107,13 @@ class UtilityFuncs:
             dct[key] = np.concatenate((dct[key], array))
 
     @staticmethod
+    def unpickle(file):
+        import pickle
+        with open(file, 'rb') as fo:
+            dict = pickle.load(fo, encoding='bytes')
+        return dict
+
+    @staticmethod
     def get_modes_from_distribution(distribution, percentile_threshold):
         cumulative_prob = 0.0
         sorted_distribution = sorted(distribution.items(), key=lambda kv: kv[1], reverse=True)

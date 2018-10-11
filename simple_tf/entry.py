@@ -17,6 +17,7 @@ import numpy as np
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, FixedParameter
+from data_handling.cifar100 import Cifar100DataSet
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline, fashion_cign_connected_v2, \
     fashion_cign_connected_v3
@@ -945,5 +946,8 @@ def ensemble_training():
 
 
 # main()
-main_fast_tree()
+# main_fast_tree()
 # ensemble_training()
+
+dataset = Cifar100DataSet(validation_sample_count=0, load_validation_from=None)
+print("X")
