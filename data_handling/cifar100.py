@@ -1,7 +1,9 @@
+from auxillary.constants import DatasetTypes
 from data_handling.mnist_data_set import MnistDataSet
 import os
 from auxillary.general_utility_funcs import UtilityFuncs
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Cifar100DataSet(MnistDataSet):
@@ -25,20 +27,25 @@ class Cifar100DataSet(MnistDataSet):
     def load_dataset(self):
         training_data = UtilityFuncs.unpickle(file=self.trainImagesPath)
         test_data = UtilityFuncs.unpickle(file=self.testImagesPath)
-        self.trainingSamples = training_data[b"data"].reshape((training_data[b"data"].shape[0],
-                                                              Cifar100DataSet.CIFAR_SIZE,
-                                                              Cifar100DataSet.CIFAR_SIZE, 3)).astype(float)
-        self.testSamples = test_data[b"data"].reshape((test_data[b"data"].shape[0],
-                                                      Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE, 3)).astype(
-            float)
+        # self.trainingSamples = training_data[b"data"].reshape((training_data[b"data"].shape[0],
+        #                                                       Cifar100DataSet.CIFAR_SIZE,
+        #                                                       Cifar100DataSet.CIFAR_SIZE, 3)).astype(float)
+        # self.testSamples = test_data[b"data"].reshape((test_data[b"data"].shape[0],
+        #                                               Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE, 3)).astype(
+        #     float)
+        self.trainingSamples = training_data[b"data"]
+        self.testSamples = test_data[b"data"]
+        self.trainingSamples = self.trainingSamples.reshape((self.trainingSamples.shape[0],
+                                                             Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE, 3))
+        self.testSamples = self.testSamples.reshape((self.testSamples.shape[0],
+                                                     Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE, 3))
         # Pack coarse and fine labels into a Nx2 array. Each i.th row corresponds to (coarse,fine) labels.
-        training_coarse_labels = np.array(training_data[b"coarse_labels"])
-        training_fine_labels = np.array(training_data[b"fine_labels"])
-        test_coarse_labels = np.array(test_data[b"coarse_labels"])
-        test_fine_labels = np.array(test_data[b"fine_labels"])
+        training_coarse_labels = np.array(training_data[b"coarse_labels"]).reshape((len(training_data[b"coarse_labels"]), 1))
+        training_fine_labels = np.array(training_data[b"fine_labels"]).reshape((len(training_data[b"fine_labels"]), 1))
+        test_coarse_labels =   np.array(test_data[b"coarse_labels"]).reshape((len(test_data[b"coarse_labels"]), 1))
+        test_fine_labels = np.array(test_data[b"fine_labels"]).reshape((len(test_data[b"fine_labels"]), 1))
         self.trainingLabels = np.concatenate([training_coarse_labels,  training_fine_labels], axis=1)
         self.testLabels = np.concatenate([test_coarse_labels, test_fine_labels], axis=1)
-        self.testLabels = np.concatenate([test_data[b"coarse_labels"], test_data[b"fine_labels"]], axis=1)
         if self.validationLoadFile is None:
             # random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount, replace=False)
             indices = np.arange(0, self.validationSampleCount)
@@ -50,4 +57,16 @@ class Cifar100DataSet(MnistDataSet):
         self.validationLabels = self.trainingLabels[indices]
         self.trainingSamples = np.delete(self.trainingSamples, indices, 0)
         self.trainingLabels = np.delete(self.trainingLabels, indices, 0)
+        self.set_current_data_set_type(dataset_type=DatasetTypes.training)
+        self.visualize_sample(sample_index=1613)
         print("X")
+
+    def visualize_sample(self, sample_index):
+        sample_reshaped0 = self.currentSamples[sample_index]
+        sample_reshaped1 = self.currentSamples[sample_index].reshape(3, 32, 32).transpose([1, 2, 0])
+        plt.title('Label is {label}'.format(label=self.currentLabels[sample_index]))
+        # import matplotlib.image as mpimg
+        # mpimg.imshow(self.currentSamples[sample_index])
+        plt.imshow(sample_reshaped0)
+        plt.imshow(sample_reshaped1)
+        plt.show()

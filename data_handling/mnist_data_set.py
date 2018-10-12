@@ -130,6 +130,8 @@ class MnistDataSet(DataSet):
 
     def visualize_sample(self, sample_index):
         plt.title('Label is {label}'.format(label=self.currentLabels[sample_index]))
+        # import matplotlib.image as mpimg
+        # mpimg.imshow(self.currentSamples[sample_index])
         plt.imshow(self.currentSamples[sample_index])
         plt.show()
 
