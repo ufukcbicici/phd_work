@@ -35,10 +35,12 @@ class Cifar100DataSet(MnistDataSet):
         #     float)
         self.trainingSamples = training_data[b"data"]
         self.testSamples = test_data[b"data"]
-        self.trainingSamples = self.trainingSamples.reshape((self.trainingSamples.shape[0],
-                                                             Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE, 3))
-        self.testSamples = self.testSamples.reshape((self.testSamples.shape[0],
-                                                     Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE, 3))
+        self.trainingSamples = self.trainingSamples.reshape((self.trainingSamples.shape[0], 3,
+                                                             Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE))\
+            .transpose([0, 2, 3, 1])
+        self.testSamples = self.testSamples.reshape((self.testSamples.shape[0], 3,
+                                                     Cifar100DataSet.CIFAR_SIZE, Cifar100DataSet.CIFAR_SIZE))\
+            .transpose([0, 2, 3, 1])
         # Pack coarse and fine labels into a Nx2 array. Each i.th row corresponds to (coarse,fine) labels.
         training_coarse_labels = np.array(training_data[b"coarse_labels"]).reshape((len(training_data[b"coarse_labels"]), 1))
         training_fine_labels = np.array(training_data[b"fine_labels"]).reshape((len(training_data[b"fine_labels"]), 1))
@@ -62,11 +64,9 @@ class Cifar100DataSet(MnistDataSet):
         print("X")
 
     def visualize_sample(self, sample_index):
-        sample_reshaped0 = self.currentSamples[sample_index]
-        sample_reshaped1 = self.currentSamples[sample_index].reshape(3, 32, 32).transpose([1, 2, 0])
+        # sample_reshaped0 = self.currentSamples[sample_index]
+        # sample_reshaped1 = self.currentSamples[sample_index].transpose([1, 2, 0])
+        # sample_reshaped2 = self.currentSamples[sample_index].reshape(3, 32, 32).transpose([1, 2, 0])
         plt.title('Label is {label}'.format(label=self.currentLabels[sample_index]))
-        # import matplotlib.image as mpimg
-        # mpimg.imshow(self.currentSamples[sample_index])
-        plt.imshow(sample_reshaped0)
-        plt.imshow(sample_reshaped1)
+        plt.imshow(self.currentSamples[sample_index])
         plt.show()
