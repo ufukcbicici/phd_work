@@ -49,7 +49,6 @@ class Cifar100DataSet(MnistDataSet):
         self.trainingLabels = np.concatenate([training_coarse_labels,  training_fine_labels], axis=1)
         self.testLabels = np.concatenate([test_coarse_labels, test_fine_labels], axis=1)
         if self.validationLoadFile is None:
-            # random_indices = np.random.choice(self.trainingSamples.shape[0], size=self.validationSampleCount, replace=False)
             indices = np.arange(0, self.validationSampleCount)
             if self.validationSaveFile is not None:
                 UtilityFuncs.save_npz(file_name=self.validationSaveFile, arr_dict={"random_indices": indices})
