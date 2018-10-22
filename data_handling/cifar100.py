@@ -4,6 +4,9 @@ import os
 from auxillary.general_utility_funcs import UtilityFuncs
 import numpy as np
 import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow import keras
+from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 
 
 class Cifar100DataSet(MnistDataSet):
@@ -59,6 +62,21 @@ class Cifar100DataSet(MnistDataSet):
         self.trainingSamples = np.delete(self.trainingSamples, indices, 0)
         self.trainingLabels = np.delete(self.trainingLabels, indices, 0)
         self.set_current_data_set_type(dataset_type=DatasetTypes.training)
+        # Preprocessing and augmentation
+        datagen = ImageDataGenerator(
+            rotation_range=40,
+            width_shift_range=0.2,
+            height_shift_range=0.2,
+            shear_range=0.2,
+            zoom_range=0.2,
+            horizontal_flip=True,
+            zca_whitening=True,
+            fill_mode='nearest')
+
+
+
+
+
         self.visualize_sample(sample_index=1613)
         print("X")
 
