@@ -21,6 +21,11 @@ class CifarDataSet(MnistDataSet):
         image = tf.image.per_image_standardization(image)
         return image, labels
 
+    @staticmethod
+    def augment_test_image_fn(image, labels):
+        image = tf.image.per_image_standardization(image)
+        return image, labels
+
     def __init__(self,
                  validation_sample_count,
                  save_validation_as=None,
@@ -90,7 +95,8 @@ class CifarDataSet(MnistDataSet):
         self.trainDataset = self.trainDataset.repeat(self.augmentationMultiplier)
         self.trainDataset = self.trainDataset.batch(batch_size=self.batchSize)
         self.trainDataset = self.trainDataset.prefetch(buffer_size=self.batchSize)
-        self.trainIter = tf.data.Iterator.from_structure(self.trainDataset.output_types, self.trainDataset.output_shapes)
+        self.trainIter = tf.data.Iterator.from_structure(self.trainDataset.output_types,
+                                                         self.trainDataset.output_shapes)
 
         features, labels = self.trainIter.get_next()
         self.trainInitOp = self.trainIter.make_initializer(self.trainDataset)
