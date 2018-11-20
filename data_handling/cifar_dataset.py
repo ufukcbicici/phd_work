@@ -26,7 +26,7 @@ class CifarDataSet(MnistDataSet):
                  save_validation_as=None,
                  load_validation_from=None,
                  is_cifar100=True,
-                 augmentation_multiplier=10,
+                 augmentation_multiplier=1,
                  test_images_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
                                   os.sep + "data" + os.sep + "cifar100" + os.sep + "test",
                  training_images_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
@@ -36,6 +36,12 @@ class CifarDataSet(MnistDataSet):
         self.trainDataset = None
         self.validationDataset = None
         self.testDataset = None
+        self.trainIter = None
+        self.validationIter = None
+        self.testIter = None
+        self.trainInitOp = None
+        self.validationInitOp = None
+        self.testInitOp = None
         self.augmentationMultiplier = augmentation_multiplier
         self.batchSize = tf.placeholder(tf.int64)
         super().__init__(validation_sample_count=validation_sample_count, save_validation_as=save_validation_as,
@@ -84,24 +90,30 @@ class CifarDataSet(MnistDataSet):
         self.trainDataset = self.trainDataset.repeat(self.augmentationMultiplier)
         self.trainDataset = self.trainDataset.batch(batch_size=self.batchSize)
         self.trainDataset = self.trainDataset.prefetch(buffer_size=self.batchSize)
-        iter = tf.data.Iterator.from_structure(self.trainDataset.output_types, self.trainDataset.output_shapes)
+        self.trainIter = tf.data.Iterator.from_structure(self.trainDataset.output_types, self.trainDataset.output_shapes)
 
-        features, labels = iter.get_next()
-        train_init_op = iter.make_initializer(self.trainDataset)
+        features, labels = self.trainIter.get_next()
+        self.trainInitOp = self.trainIter.make_initializer(self.trainDataset)
         sess = tf.Session()
-        sess.run(train_init_op, feed_dict={self.batchSize: 250})
+        # sess.run(train_init_op, feed_dict={self.batchSize: 250})
 
-        f, l = sess.run([features, labels])
-        self.visualize_cifar_sample(image=f[5], labels=l[5])
+        # f, l = sess.run([features, labels])
+        # self.visualize_cifar_sample(image=f[5], labels=l[5])
 
-        # counter = 0
-        # while True:
-        #     try:
-        #         f, l = sess.run([features, labels])
-        #         counter += f.shape[0]
-        #     except tf.errors.OutOfRangeError:
-        #         break
-        # print(counter)
+        epoch = 0
+        while epoch < 10:
+            counter = 0
+            sess.run(self.trainInitOp, feed_dict={self.batchSize: 250})
+            while True:
+                try:
+                    f, l = sess.run([features, labels])
+                    if counter == 0:
+                        self.visualize_cifar_sample(image=f[5], labels=l[5])
+                    counter += f.shape[0]
+                except tf.errors.OutOfRangeError:
+                    break
+            print(counter)
+            epoch += 1
 
         print("X")
 
