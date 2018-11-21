@@ -47,6 +47,9 @@ class CifarDataSet(MnistDataSet):
         self.trainInitOp = None
         self.validationInitOp = None
         self.testInitOp = None
+        self.trainFeatureLabelPair = {}
+        self.validationFeatureLabelPair = {}
+        self.testFeatureLabelPair = {}
         self.augmentationMultiplier = augmentation_multiplier
         self.batchSize = tf.placeholder(tf.int64)
         super().__init__(validation_sample_count=validation_sample_count, save_validation_as=save_validation_as,
@@ -89,6 +92,7 @@ class CifarDataSet(MnistDataSet):
         self.trainDataset = tf.data.Dataset.from_tensor_slices((self.trainingSamples, self.trainingLabels))
         self.validationDataset = tf.data.Dataset.from_tensor_slices((self.validationSamples, self.validationLabels))
         self.testDataset = tf.data.Dataset.from_tensor_slices((self.testSamples, self.testLabels))
+
         # Create augmented training set
         # self.trainDataset = self.trainDataset.shuffle(buffer_size=self.trainingSamples.shape[0])
         self.trainDataset = self.trainDataset.map(CifarDataSet.augment_training_image_fn)
@@ -97,9 +101,24 @@ class CifarDataSet(MnistDataSet):
         self.trainDataset = self.trainDataset.prefetch(buffer_size=self.batchSize)
         self.trainIter = tf.data.Iterator.from_structure(self.trainDataset.output_types,
                                                          self.trainDataset.output_shapes)
-
         features, labels = self.trainIter.get_next()
+        self.trainFeatureLabelPair["training"] = (features, labels)
         self.trainInitOp = self.trainIter.make_initializer(self.trainDataset)
+
+        # Create validation set
+        self.validationDataset = self.validationDataset.map(CifarDataSet.augment_test_image_fn)
+        self.validationDataset = self.validationDataset.batch(batch_size=self.batchSize)
+        self.validationDataset = self.validationDataset.prefetch(buffer_size=self.batchSize)
+        self.validationIter = tf.data.Iterator.from_structure(self.validationDataset.output_types,
+                                                              self.validationDataset.output_shapes)
+
+        # Create test set
+        self.testDataset = self.testDataset.map(CifarDataSet.augment_test_image_fn)
+        self.testDataset = self.testDataset.batch(batch_size=self.batchSize)
+        self.testDataset = self.testDataset.prefetch(buffer_size=self.batchSize)
+        self.testIter = tf.data.Iterator.from_structure(self.testDataset.output_types,
+                                                        self.testDataset.output_shapes)
+
         sess = tf.Session()
         # sess.run(train_init_op, feed_dict={self.batchSize: 250})
 
