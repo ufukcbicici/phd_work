@@ -50,7 +50,7 @@ class TreeNetwork:
         self.residueGradients = None
         self.regularizationGradients = None
         self.decisionGradients = None
-        self.sample_count_tensors = None
+        self.sampleCountTensors = None
         self.isOpenTensors = None
         self.momentumStatesDict = {}
         self.newValuesDict = {}
@@ -244,7 +244,7 @@ class TreeNetwork:
         self.evalDict["ResidueLoss"] = self.residueLoss
         self.evalDict["DecisionLoss"] = self.decisionLoss
         self.evalDict["NetworkLoss"] = self.finalLoss
-        self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.gradFunc(network=self)
 
@@ -448,7 +448,7 @@ class TreeNetwork:
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.residueGradients,
-                   self.sample_count_tensors,
+                   self.sampleCountTensors,
                    vars,
                    self.isOpenTensors]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
@@ -567,7 +567,7 @@ class TreeNetwork:
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
             self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=False)
             self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
-        run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
+        run_ops = [self.decisionGradients, self.sampleCountTensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:

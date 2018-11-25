@@ -3,16 +3,15 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import time
+
+import numpy as np
+import tensorflow as tf
+from simple_tf.tree import TreeNetwork
 
 # from algorithms.softmax_compresser import SoftmaxCompresser
 from algorithms.ensemble import Ensemble
 from auxillary.constants import DatasetTypes
-
-import time
-
-import tensorflow as tf
-import numpy as np
-
 # MNIST
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -20,11 +19,9 @@ from auxillary.parameters import DiscreteParameter, FixedParameter
 from data_handling.cifar_dataset import CifarDataSet
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cifar_nets import fashion_net_for_cifar100
-from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline, fashion_cign_connected_v2, \
-    fashion_cign_connected_v3
-from simple_tf.fast_tree import FastTreeNetwork
+from simple_tf.cign.fast_tree import FastTreeNetwork
+from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline, fashion_cign_connected_v2
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
-from simple_tf.tree import TreeNetwork
 
 
 # tf.set_random_seed(1234)

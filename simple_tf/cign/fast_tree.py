@@ -3,12 +3,12 @@ from collections import deque
 import numpy as np
 import tensorflow as tf
 
+from data_handling.data_set import DataSet
 from simple_tf.batch_norm import fast_tree_batch_norm
+from simple_tf.cign.tree import TreeNetwork
 from simple_tf.global_params import GlobalConstants
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
-from simple_tf.tree import TreeNetwork
-from data_handling.data_set import DataSet
 
 
 class FastTreeNetwork(TreeNetwork):
@@ -16,12 +16,8 @@ class FastTreeNetwork(TreeNetwork):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         self.learningRate = None
         self.optimizer = None
-        self.info_gain_dicts = None
+        self.infoGainDicts = None
         self.extra_update_ops = None
-        self.classWeightsDict = {}
-        self.leafLabelTensorsDict = {}
-        self.leafClassWeightTensorsDict = {}
-        self.leafSampleWeightTensorsDict = {}
 
     def build_network(self):
         # Create itself
@@ -54,9 +50,6 @@ class FastTreeNetwork(TreeNetwork):
                     self.nodes[curr_index] = child_node
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
-            else:
-                self.leafClassWeightTensorsDict[curr_node.index] = \
-                    tf.placeholder(name="class_weight_tensor_node{0}".format(curr_node.index), dtype=tf.float32)
         # Flags and hyperparameters
         self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
         self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
@@ -133,39 +126,10 @@ class FastTreeNetwork(TreeNetwork):
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
             if node.filteredMask is not None:
                 self.evalDict["Node{0}_filteredMask".format(node.index)] = node.filteredMask
-            # Class weighting tensors
-            if GlobalConstants.USE_CLASS_WEIGHTING:
-                if node.isLeaf:
-                    assert node.index in self.leafClassWeightTensorsDict \
-                           and self.leafClassWeightTensorsDict[node.index] is not None
-                    assert node.index in self.leafSampleWeightTensorsDict \
-                           and self.leafSampleWeightTensorsDict[node.index] is not None
-                    self.evalDict["Node{0}_leafClassWeightTensor".format(node.index)] = \
-                        self.leafClassWeightTensorsDict[node.index]
-                    self.evalDict["Node{0}_leafSampleWeightTensor".format(node.index)] = \
-                        self.leafSampleWeightTensorsDict[node.index]
 
-        self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
-        self.info_gain_dicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
-        for node in self.topologicalSortedNodes:
-            if node.isLeaf:
-                self.leafLabelTensorsDict[node.index] = node.labelTensor
-                self.classWeightsDict[node.index] = np.ones(shape=(self.labelCount,), dtype=np.float32)
-
-    def calculate_class_weights(self, sample_counts_dict, leaf_labels_dict):
-        alpha = GlobalConstants.CLASS_WEIGHT_RUNNING_AVERAGE
-        for node in self.topologicalSortedNodes:
-            if node.isLeaf:
-                leaf_sample_count = sample_counts_dict[self.get_variable_name(name="sample_count", node=node)]
-                assert leaf_labels_dict[node.index].shape[0] == leaf_sample_count
-                for label in range(self.labelCount):
-                    label_count = np.sum(leaf_labels_dict[node.index] == label)
-                    if label_count == 0:
-                        label_count = GlobalConstants.LABEL_EPSILON
-                    curr_weight = self.classWeightsDict[node.index][label]
-                    new_weight = np.log(leaf_sample_count / float(label_count))
-                    self.classWeightsDict[node.index][label] =  alpha * curr_weight + (1.0 - alpha) * new_weight
+        self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
     def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
@@ -286,16 +250,30 @@ class FastTreeNetwork(TreeNetwork):
         logits = tf.matmul(final_feature, softmax_weights) + softmax_biases
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
-        if GlobalConstants.USE_CLASS_WEIGHTING:
-            self.leafSampleWeightTensorsDict[node.index] = \
-                tf.nn.embedding_lookup(self.leafClassWeightTensorsDict[node.index], node.labelTensor)
-            cross_entropy_loss_tensor = tf.multiply(self.leafSampleWeightTensorsDict[node.index],
-                                                    cross_entropy_loss_tensor)
         pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
         loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
         node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
         node.lossList.append(loss)
         return final_feature, logits
+
+    def get_run_ops(self):
+        run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+                   self.infoGainDicts]
+        return run_ops
+
+    def verbose_update(self, eval_dict):
+        if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+            for level in range(self.depth):
+                if level == 0:
+                    continue
+                level_nodes = [node for node in self.topologicalSortedNodes if node.depth == level]
+                sum_of_samples = 0
+                for node in level_nodes:
+                    filtered_mask = eval_dict["Node{0}_filteredMask".format(node.index)]
+                    sum_of_samples += np.sum(filtered_mask)
+                if sum_of_samples != GlobalConstants.BATCH_SIZE:
+                    print("ERR")
+                assert sum_of_samples == GlobalConstants.BATCH_SIZE
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
@@ -304,33 +282,16 @@ class FastTreeNetwork(TreeNetwork):
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
                                            is_train=True, use_masking=True)
         # Prepare result tensors to collect
-        run_ops = [self.optimizer, self.learningRate, self.sample_count_tensors, self.isOpenTensors,
-                   self.info_gain_dicts,
-                   self.leafClassWeightTensorsDict,
-                   self.leafSampleWeightTensorsDict,
-                   self.leafLabelTensorsDict]
+        run_ops = self.get_run_ops()
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]
-        leaf_label_tensors_dict = results[-1]
-        self.calculate_class_weights(sample_counts_dict=sample_counts, leaf_labels_dict=leaf_label_tensors_dict)
         # Unit Test for Unified Batch Normalization
         if GlobalConstants.USE_VERBOSE:
-            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
-                for level in range(self.depth):
-                    if level == 0:
-                        continue
-                    level_nodes = [node for node in self.topologicalSortedNodes if node.depth == level]
-                    sum_of_samples = 0
-                    for node in level_nodes:
-                        filtered_mask = results[-1]["Node{0}_filteredMask".format(node.index)]
-                        sum_of_samples += np.sum(filtered_mask)
-                    if sum_of_samples != GlobalConstants.BATCH_SIZE:
-                        print("ERR")
-                    assert sum_of_samples == GlobalConstants.BATCH_SIZE
+            self.verbose_update(eval_dict=results[-1])
         # Unit Test for Unified Batch Normalization
         return lr, sample_counts, is_open_indicators
 
@@ -365,9 +326,6 @@ class FastTreeNetwork(TreeNetwork):
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:
-                for node in self.topologicalSortedNodes:
-                    if node.isLeaf:
-                        feed_dict[self.leafClassWeightTensorsDict[node.index]] = self.classWeightsDict[node.index]
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
@@ -377,10 +335,6 @@ class FastTreeNetwork(TreeNetwork):
         else:
             feed_dict[self.classificationDropoutKeepProb] = 1.0
             if not self.isBaseline:
-                for node in self.topologicalSortedNodes:
-                    if node.isLeaf:
-                        feed_dict[self.leafClassWeightTensorsDict[node.index]] = \
-                            np.ones(shape=(self.labelCount,), dtype=np.float32)
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
