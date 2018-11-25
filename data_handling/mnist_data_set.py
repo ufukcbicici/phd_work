@@ -7,6 +7,7 @@ from auxillary.constants import DatasetTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.data_set import DataSet
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
 from simple_tf.global_params import GlobalConstants
 
@@ -94,6 +95,7 @@ class MnistDataSet(DataSet):
             self.currentIndex = self.currentIndex % num_of_samples
         else:
             self.isNewEpoch = False
+        samples = np.expand_dims(samples, axis=3)
         if GlobalConstants.USE_SAMPLE_HASHING:
             hash_codes = self.get_unique_codes(samples=samples)
             return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, hash_codes)
@@ -178,3 +180,12 @@ class MnistDataSet(DataSet):
         np_images /= 255.0
         np_labels = np.array(labels).astype(np.int64)
         return np_images, np_labels
+
+    def get_image_size(self):
+        return MnistDataSet.MNIST_SIZE
+
+    def get_num_of_channels(self):
+        return 1
+
+    def get_data_type(self):
+        return tf.float32

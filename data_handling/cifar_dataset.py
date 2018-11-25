@@ -7,26 +7,31 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
+from data_handling.data_set import DataSet
 
 
 class CifarDataSet(MnistDataSet):
     CIFAR_SIZE = 32
+    CIFAR100_COARSE_LABEL_COUNT = 20
+    CIFAR100_FINE_LABEL_COUNT = 100
 
     @staticmethod
-    def augment_training_image_fn(image, labels):
+    def augment_training_image_fn(image, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels):
         # print(image.__class__)
         image = tf.image.resize_image_with_crop_or_pad(image, CifarDataSet.CIFAR_SIZE + 4, CifarDataSet.CIFAR_SIZE + 4)
         image = tf.random_crop(image, [CifarDataSet.CIFAR_SIZE, CifarDataSet.CIFAR_SIZE, 3])
         image = tf.image.random_flip_left_right(image)
         image = tf.image.per_image_standardization(image)
-        return image, labels
+        return image, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels
 
     @staticmethod
-    def augment_test_image_fn(image, labels):
+    def augment_test_image_fn(image, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels):
         image = tf.image.per_image_standardization(image)
-        return image, labels
+        return image, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels
 
     def __init__(self,
+                 session,
+                 batch_sizes,
                  validation_sample_count,
                  save_validation_as=None,
                  load_validation_from=None,
@@ -38,20 +43,33 @@ class CifarDataSet(MnistDataSet):
                                       os.sep + "data" + os.sep + "cifar100" + os.sep + "train",
                  meta_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
                            os.sep + "data" + os.sep + "cifar100" + os.sep + "meta"):
+        self.sess = session
+        self.isCifar100 = is_cifar100
+        self.batchSizesDict = batch_sizes
         self.trainDataset = None
         self.validationDataset = None
         self.testDataset = None
+        self.trainingOneHotLabels = None
+        self.testOneHotLabels = None
+        self.validationOneHotLabels = None
         self.trainIter = None
         self.validationIter = None
         self.testIter = None
         self.trainInitOp = None
         self.validationInitOp = None
         self.testInitOp = None
-        self.trainFeatureLabelPair = {}
-        self.validationFeatureLabelPair = {}
-        self.testFeatureLabelPair = {}
+        self.outputsDict = {}
         self.augmentationMultiplier = augmentation_multiplier
         self.batchSize = tf.placeholder(tf.int64)
+        self.currInitOp = None
+        self.currOutputs = None
+        # Coarse Labels
+        self.trainingCoarseLabels = None
+        self.trainingCoarseOneHotLabels = None
+        self.testCoarseLabels = None
+        self.testCoarseOneHotLabels = None
+        self.validationCoarseLabels = None
+        self.validationCoarseOneHotLabels = None
         super().__init__(validation_sample_count=validation_sample_count, save_validation_as=save_validation_as,
                          load_validation_from=load_validation_from, test_images_path=test_images_path,
                          test_labels_path=None, training_images_path=training_images_path,
@@ -68,14 +86,28 @@ class CifarDataSet(MnistDataSet):
         self.testSamples = self.testSamples.reshape((self.testSamples.shape[0], 3,
                                                      CifarDataSet.CIFAR_SIZE, CifarDataSet.CIFAR_SIZE)) \
             .transpose([0, 2, 3, 1])
-        # Pack coarse and fine labels into a Nx2 array. Each i.th row corresponds to (coarse,fine) labels.
+        # Unpack fine and coarse labels
         training_coarse_labels = np.array(training_data[b"coarse_labels"]).reshape(
             (len(training_data[b"coarse_labels"]), 1))
         training_fine_labels = np.array(training_data[b"fine_labels"]).reshape((len(training_data[b"fine_labels"]), 1))
         test_coarse_labels = np.array(test_data[b"coarse_labels"]).reshape((len(test_data[b"coarse_labels"]), 1))
         test_fine_labels = np.array(test_data[b"fine_labels"]).reshape((len(test_data[b"fine_labels"]), 1))
-        self.trainingLabels = np.concatenate([training_coarse_labels, training_fine_labels], axis=1)
-        self.testLabels = np.concatenate([test_coarse_labels, test_fine_labels], axis=1)
+        # Pack
+        self.trainingLabels = training_fine_labels
+        self.trainingCoarseLabels = training_coarse_labels
+        self.testLabels = test_fine_labels
+        self.testCoarseLabels = test_coarse_labels
+        # Convert labels to one hot encoding.
+        self.trainingOneHotLabels = np.zeros((self.trainingLabels.shape[0], CifarDataSet.CIFAR100_FINE_LABEL_COUNT))
+        self.trainingOneHotLabels[np.arange(self.trainingLabels.shape[0]), self.trainingLabels] = 1
+        self.trainingCoarseOneHotLabels = np.zeros((self.trainingLabels.shape[0],
+                                                    CifarDataSet.CIFAR100_COARSE_LABEL_COUNT))
+        self.trainingCoarseOneHotLabels[np.arange(self.trainingLabels.shape[0]), self.trainingCoarseLabels] = 1
+        self.testOneHotLabels = np.zeros((self.testLabels.shape[0], CifarDataSet.CIFAR100_FINE_LABEL_COUNT))
+        self.testOneHotLabels[np.arange(self.testLabels.shape[0]), self.testLabels] = 1
+        self.testCoarseOneHotLabels = np.zeros((self.testLabels.shape[0], CifarDataSet.CIFAR100_COARSE_LABEL_COUNT))
+        self.testCoarseOneHotLabels[np.arange(self.testLabels.shape[0]), self.testCoarseLabels] = 1
+        # Validation Set
         if self.validationLoadFile is None:
             indices = np.arange(0, self.validationSampleCount)
             if self.validationSaveFile is not None:
@@ -84,25 +116,42 @@ class CifarDataSet(MnistDataSet):
             indices = UtilityFuncs.load_npz(file_name=self.validationLoadFile)["random_indices"]
         self.validationSamples = self.trainingSamples[indices]
         self.validationLabels = self.trainingLabels[indices]
+        self.validationOneHotLabels = self.trainingOneHotLabels[indices]
+        self.validationCoarseLabels = self.trainingCoarseLabels[indices]
+        self.validationCoarseOneHotLabels = self.trainingCoarseOneHotLabels[indices]
         self.trainingSamples = np.delete(self.trainingSamples, indices, 0)
         self.trainingLabels = np.delete(self.trainingLabels, indices, 0)
-        self.set_current_data_set_type(dataset_type=DatasetTypes.training)
+        self.trainingOneHotLabels = np.delete(self.trainingOneHotLabels, indices, 0)
+        self.validationCoarseLabels = np.delete(self.validationCoarseLabels, indices, 0)
+        self.validationCoarseOneHotLabels = np.delete(self.validationCoarseOneHotLabels, indices, 0)
         # Load into Tensorflow Datasets
         # dataset = tf.data.Dataset.from_tensor_slices((self.trainingSamples, self.trainingLabels))
-        self.trainDataset = tf.data.Dataset.from_tensor_slices((self.trainingSamples, self.trainingLabels))
-        self.validationDataset = tf.data.Dataset.from_tensor_slices((self.validationSamples, self.validationLabels))
-        self.testDataset = tf.data.Dataset.from_tensor_slices((self.testSamples, self.testLabels))
-
+        self.trainDataset = tf.data.Dataset.from_tensor_slices((self.trainingSamples,
+                                                                self.trainingLabels,
+                                                                self.trainingOneHotLabels,
+                                                                self.trainingCoarseLabels,
+                                                                self.trainingCoarseOneHotLabels))
+        self.validationDataset = tf.data.Dataset.from_tensor_slices((self.validationSamples,
+                                                                     self.validationLabels,
+                                                                     self.validationOneHotLabels,
+                                                                     self.validationCoarseLabels,
+                                                                     self.validationCoarseOneHotLabels))
+        self.testDataset = tf.data.Dataset.from_tensor_slices((self.testSamples,
+                                                               self.testLabels,
+                                                               self.testOneHotLabels,
+                                                               self.testCoarseLabels,
+                                                               self.testCoarseOneHotLabels))
         # Create augmented training set
-        # self.trainDataset = self.trainDataset.shuffle(buffer_size=self.trainingSamples.shape[0])
+        self.trainDataset = self.trainDataset.shuffle(buffer_size=self.trainingSamples.shape[0])
         self.trainDataset = self.trainDataset.map(CifarDataSet.augment_training_image_fn)
         self.trainDataset = self.trainDataset.repeat(self.augmentationMultiplier)
         self.trainDataset = self.trainDataset.batch(batch_size=self.batchSize)
         self.trainDataset = self.trainDataset.prefetch(buffer_size=self.batchSize)
         self.trainIter = tf.data.Iterator.from_structure(self.trainDataset.output_types,
                                                          self.trainDataset.output_shapes)
-        features, labels = self.trainIter.get_next()
-        self.trainFeatureLabelPair["training"] = (features, labels)
+        features, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels = self.trainIter.get_next()
+        self.outputsDict[DatasetTypes.training] = [features, labels, one_hot_labels, coarse_labels,
+                                                   coarse_one_hot_labels]
         self.trainInitOp = self.trainIter.make_initializer(self.trainDataset)
 
         # Create validation set
@@ -111,6 +160,10 @@ class CifarDataSet(MnistDataSet):
         self.validationDataset = self.validationDataset.prefetch(buffer_size=self.batchSize)
         self.validationIter = tf.data.Iterator.from_structure(self.validationDataset.output_types,
                                                               self.validationDataset.output_shapes)
+        features, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels = self.validationIter.get_next()
+        self.outputsDict[DatasetTypes.validation] = [features, labels, one_hot_labels, coarse_labels,
+                                                     coarse_one_hot_labels]
+        self.validationInitOp = self.validationIter.make_initializer(self.validationDataset)
 
         # Create test set
         self.testDataset = self.testDataset.map(CifarDataSet.augment_test_image_fn)
@@ -118,28 +171,41 @@ class CifarDataSet(MnistDataSet):
         self.testDataset = self.testDataset.prefetch(buffer_size=self.batchSize)
         self.testIter = tf.data.Iterator.from_structure(self.testDataset.output_types,
                                                         self.testDataset.output_shapes)
+        features, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels = self.testIter.get_next()
+        self.outputsDict[DatasetTypes.test] = [features, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels]
+        self.testInitOp = self.testIter.make_initializer(self.testDataset)
 
+        self.set_current_data_set_type(dataset_type=DatasetTypes.training)
         sess = tf.Session()
-        # sess.run(train_init_op, feed_dict={self.batchSize: 250})
+        sess.run(self.trainInitOp, feed_dict={self.batchSize: 250})
+        labels = tf.placeholder(tf.int64, name="LabelsArr")
 
-        # f, l = sess.run([features, labels])
-        # self.visualize_cifar_sample(image=f[5], labels=l[5])
-
+        nodes_prev = [n for n in tf.get_default_graph().as_graph_def().node]
+        print(len(nodes_prev))
+        nodes_prev = None
         epoch = 0
         while epoch < 10:
             counter = 0
-            sess.run(self.trainInitOp, feed_dict={self.batchSize: 250})
+            sess.run(self.testInitOp, feed_dict={self.batchSize: 250})
             while True:
                 try:
-                    f, l = sess.run([features, labels])
-                    if counter == 0:
-                        self.visualize_cifar_sample(image=f[5], labels=l[5])
-                    counter += f.shape[0]
+                    x, fine_y, fine_y_one_hot, coarse_y, coarse_y_one_hot = sess.run(self.outputsDict[DatasetTypes.test])
+                    # fine_labels = labels[:, 1]
+                    # coarse_labels = labels[:, 0]
+                    # fl, cl = sess.run([fine_labels, coarse_labels], {labels: l})
+                    # if counter == 0:
+                    #     self.visualize_cifar_sample(image=f[5], labels=l[5])
+                    counter += fine_y.shape[0]
+                    print(counter)
+                    nodes_next = [n for n in tf.get_default_graph().as_graph_def().node]
+                    print(len(nodes_next))
+                    nodes_next = None
                 except tf.errors.OutOfRangeError:
                     break
             print(counter)
             epoch += 1
 
+        #
         print("X")
 
     def visualize_cifar_sample(self, image, labels):
@@ -149,3 +215,44 @@ class CifarDataSet(MnistDataSet):
         plt.title('Label is {label}'.format(label=labels))
         plt.imshow(image)
         plt.show()
+
+    def reset(self):
+        batch_size = self.batchSizesDict[self.currentDataSetType]
+        self.sess.run(self.currInitOp, feed_dict={self.batchSize: batch_size})
+
+    def set_current_data_set_type(self, dataset_type):
+        self.currentDataSetType = dataset_type
+        if self.currentDataSetType == DatasetTypes.training:
+            self.currInitOp = self.trainInitOp
+            self.currOutputs = self.outputsDict[DatasetTypes.training]
+        elif self.currentDataSetType == DatasetTypes.test:
+            self.currInitOp = self.testInitOp
+            self.currOutputs = self.outputsDict[DatasetTypes.test]
+        elif self.currentDataSetType == DatasetTypes.validation:
+            self.currInitOp = self.validationInitOp
+            self.currOutputs = self.outputsDict[DatasetTypes.validation]
+        else:
+            raise Exception("Unknown dataset type")
+        self.reset()
+
+    def get_label_count(self):
+        if self.isCifar100:
+            return 100
+
+    def get_next_batch(self, batch_size):
+        while True:
+            try:
+                samples, labels, one_hot_labels, coarse_labels, coarse_one_hot_labels = \
+                    self.sess.run(self.outputsDict[self.currentDataSetType])
+                self.isNewEpoch = False
+                return DataSet.MiniBatch(samples, labels, None, one_hot_labels, None, coarse_labels,
+                                         coarse_one_hot_labels)
+            except tf.errors.OutOfRangeError:
+                self.isNewEpoch = True
+                break
+
+    def get_image_size(self):
+        return CifarDataSet.CIFAR_SIZE
+
+    def get_num_of_channels(self):
+        return 3

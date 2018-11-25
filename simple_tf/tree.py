@@ -29,14 +29,17 @@ class TreeNetwork:
         self.summaryFunc = summary_func
         self.degreeList = degree_list
         self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
-                                         shape=(None, GlobalConstants.IMAGE_SIZE,
-                                                GlobalConstants.IMAGE_SIZE,
-                                                GlobalConstants.NUM_CHANNELS))
-        self.labelTensor = tf.placeholder(tf.int64, shape=(None,))
+                                         shape=(None, dataset.get_image_size(),
+                                                dataset.get_image_size(),
+                                                dataset.get_num_of_channels()),
+                                         name="dataTensor")
+        self.labelTensor = tf.placeholder(tf.int64, shape=(None,), name="labelTensor")
         self.oneHotLabelTensor = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
-                                                shape=(None, GlobalConstants.NUM_LABELS))
-        self.indicesTensor = tf.placeholder(tf.int64, shape=(None,))
-        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None,))
+                                                shape=(None, dataset.get_label_count()), name="oneHotLabelTensor")
+        self.indicesTensor = tf.placeholder(tf.int64, shape=(None,), name="indicesTensor")
+        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None,), name="filteredMask")
+        self.coarseLabelTensor = tf.placeholder(tf.int64, shape=(None,), name="coarseLabelTensor")
+        self.coarseOneHotLabelTensor = tf.placeholder(tf.int64, shape=(None,), name="coarseOneHotLabelTensor")
         self.evalDict = {}
         self.mainLoss = None
         self.residueLoss = None
@@ -82,6 +85,7 @@ class TreeNetwork:
         self.decisionLossCoefficientCalculator = None
         self.isBaseline = None
         self.labelCount = dataset.get_label_count()
+        self.numChannels = dataset.get_num_of_channels()
         # Algorithms
         self.modeTracker = ModeTracker(network=self)
         self.accuracyCalculator = AccuracyCalculator(network=self)
