@@ -259,16 +259,15 @@ class CifarDataSet(MnistDataSet):
             return 100
 
     def get_next_batch(self, batch_size):
-        while True:
-            try:
-                samples, labels, indices, one_hot_labels, coarse_labels, coarse_one_hot_labels = \
-                    self.sess.run(self.outputsDict[self.currentDataSetType])
-                self.isNewEpoch = False
-                return DataSet.MiniBatch(samples, labels, indices, one_hot_labels, None, coarse_labels,
-                                         coarse_one_hot_labels)
-            except tf.errors.OutOfRangeError:
-                self.isNewEpoch = True
-                break
+        try:
+            samples, labels, indices, one_hot_labels, coarse_labels, coarse_one_hot_labels = \
+                self.sess.run(self.outputsDict[self.currentDataSetType])
+            self.isNewEpoch = False
+            return DataSet.MiniBatch(samples, labels, indices, one_hot_labels, None, coarse_labels,
+                                     coarse_one_hot_labels)
+        except tf.errors.OutOfRangeError:
+            self.isNewEpoch = True
+            return None
 
     def get_image_size(self):
         return CifarDataSet.CIFAR_SIZE

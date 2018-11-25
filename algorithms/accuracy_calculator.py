@@ -182,32 +182,33 @@ class AccuracyCalculator:
         branch_probs_dict = {}
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
-            batch_sample_count = 0.0
-            for node in self.network.topologicalSortedNodes:
-                if not node.isLeaf:
-                    info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
-                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index, array=branch_prob)
-                    if node.index not in info_gain_dict:
-                        info_gain_dict[node.index] = []
-                    info_gain_dict[node.index].append(np.asscalar(info_gain))
-                    continue
-                if results[self.network.get_variable_name(name="is_open", node=node)] == 0.0:
-                    continue
-                posterior_probs = results[self.network.get_variable_name(name="posterior_probs", node=node)]
-                true_labels = results["Node{0}_label_tensor".format(node.index)]
-                final_features = results[self.network.get_variable_name(name="final_feature_final", node=node)]
-                # batch_sample_count += results[self.get_variable_name(name="sample_count", node=node)]
-                predicted_labels = np.argmax(posterior_probs, axis=1)
-                batch_sample_count += predicted_labels.shape[0]
-                UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
-                                                     array=predicted_labels)
-                UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
-                                                     array=true_labels)
-                UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
-                                                     array=final_features)
-            if batch_sample_count != GlobalConstants.EVAL_BATCH_SIZE:
-                raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
+            if results is not None:
+                batch_sample_count = 0.0
+                for node in self.network.topologicalSortedNodes:
+                    if not node.isLeaf:
+                        info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index, array=branch_prob)
+                        if node.index not in info_gain_dict:
+                            info_gain_dict[node.index] = []
+                        info_gain_dict[node.index].append(np.asscalar(info_gain))
+                        continue
+                    if results[self.network.get_variable_name(name="is_open", node=node)] == 0.0:
+                        continue
+                    posterior_probs = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                    true_labels = results["Node{0}_label_tensor".format(node.index)]
+                    final_features = results[self.network.get_variable_name(name="final_feature_final", node=node)]
+                    # batch_sample_count += results[self.get_variable_name(name="sample_count", node=node)]
+                    predicted_labels = np.argmax(posterior_probs, axis=1)
+                    batch_sample_count += predicted_labels.shape[0]
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                                                         array=predicted_labels)
+                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                         array=true_labels)
+                    UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
+                                                         array=final_features)
+                if batch_sample_count != GlobalConstants.EVAL_BATCH_SIZE:
+                    raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
             if dataset.isNewEpoch:
                 break
         print("****************Dataset:{0}****************".format(dataset_type))
@@ -306,35 +307,35 @@ class AccuracyCalculator:
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
-            for node in self.network.topologicalSortedNodes:
-                if not node.isLeaf:
-                    # info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
-                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index,
-                                                         array=branch_prob)
-                    # if node.index not in info_gain_dict:
-                    #     info_gain_dict[node.index] = []
-                    # info_gain_dict[node.index].append(np.asscalar(info_gain))
-                    continue
-                else:
-                    posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
-                    # predicted_labels = np.argmax(posterior_prob, axis=1)
-                    true_labels = results["Node{0}_label_tensor".format(node.index)]
-                    final_features = results[self.network.get_variable_name(name="final_feature_final", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
-                                                         array=posterior_prob)
-                    # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
-                    #                                      array=predicted_labels)
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
-                                                         array=true_labels)
-                    UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
-                                                         array=final_features)
-                    residue_posteriors = sess.run([self.network.evalDict["residue_probabilities"]],
-                                                  feed_dict={self.network.residueInputTensor: final_features,
-                                                             self.network.classificationDropoutKeepProb: 1.0})
-                    UtilityFuncs.concat_to_np_array_dict(dct=residue_posteriors_dict, key=node.index,
-                                                         array=residue_posteriors[0])
-
+            if results is not None:
+                for node in self.network.topologicalSortedNodes:
+                    if not node.isLeaf:
+                        # info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index,
+                                                             array=branch_prob)
+                        # if node.index not in info_gain_dict:
+                        #     info_gain_dict[node.index] = []
+                        # info_gain_dict[node.index].append(np.asscalar(info_gain))
+                        continue
+                    else:
+                        posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                        # predicted_labels = np.argmax(posterior_prob, axis=1)
+                        true_labels = results["Node{0}_label_tensor".format(node.index)]
+                        final_features = results[self.network.get_variable_name(name="final_feature_final", node=node)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                                                             array=posterior_prob)
+                        # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                        #                                      array=predicted_labels)
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                             array=true_labels)
+                        UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
+                                                             array=final_features)
+                        residue_posteriors = sess.run([self.network.evalDict["residue_probabilities"]],
+                                                      feed_dict={self.network.residueInputTensor: final_features,
+                                                                 self.network.classificationDropoutKeepProb: 1.0})
+                        UtilityFuncs.concat_to_np_array_dict(dct=residue_posteriors_dict, key=node.index,
+                                                             array=residue_posteriors[0])
             if dataset.isNewEpoch:
                 break
         # Integrity check
@@ -471,23 +472,24 @@ class AccuracyCalculator:
         dataset.set_current_data_set_type(dataset_type=dataset_type)
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
-            for node in self.network.topologicalSortedNodes:
-                if not node.isLeaf:
-                    info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
-                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict_mask_on, key=node.index,
-                                                         array=branch_prob)
-                    if node.index not in info_gain_dict:
-                        info_gain_dict[node.index] = []
-                    info_gain_dict[node.index].append(np.asscalar(info_gain))
-                else:
-                    posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
-                    predicted_labels = np.argmax(posterior_prob, axis=1)
-                    true_labels = results["Node{0}_label_tensor".format(node.index)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
-                                                         array=predicted_labels)
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
-                                                         array=true_labels)
+            if results is not None:
+                for node in self.network.topologicalSortedNodes:
+                    if not node.isLeaf:
+                        info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict_mask_on, key=node.index,
+                                                             array=branch_prob)
+                        if node.index not in info_gain_dict:
+                            info_gain_dict[node.index] = []
+                        info_gain_dict[node.index].append(np.asscalar(info_gain))
+                    else:
+                        posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                        predicted_labels = np.argmax(posterior_prob, axis=1)
+                        true_labels = results["Node{0}_label_tensor".format(node.index)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                                                             array=predicted_labels)
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                             array=true_labels)
             if dataset.isNewEpoch:
                 break
         # Measure Information Gain
@@ -518,24 +520,25 @@ class AccuracyCalculator:
         hash_codes = {}
         while True:
             results, minibatch = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
-            for node in self.network.topologicalSortedNodes:
-                if not node.isLeaf:
-                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    activations = results[self.network.get_variable_name(name="activations", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
-                                                         array=branch_prob)
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_activations, key=node.index,
-                                                         array=activations)
-                else:
-                    posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
-                    true_labels = results["Node{0}_label_tensor".format(node.index)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
-                                                         array=posterior_prob)
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
-                                                         array=true_labels)
-                    if GlobalConstants.USE_SAMPLE_HASHING:
-                        UtilityFuncs.concat_to_np_array_dict(dct=hash_codes, key=node.index,
-                                                             array=minibatch.hash_codes)
+            if results is not None:
+                for node in self.network.topologicalSortedNodes:
+                    if not node.isLeaf:
+                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        activations = results[self.network.get_variable_name(name="activations", node=node)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
+                                                             array=branch_prob)
+                        UtilityFuncs.concat_to_np_array_dict(dct=branch_activations, key=node.index,
+                                                             array=activations)
+                    else:
+                        posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                        true_labels = results["Node{0}_label_tensor".format(node.index)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                                                             array=posterior_prob)
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                             array=true_labels)
+                        if GlobalConstants.USE_SAMPLE_HASHING:
+                            UtilityFuncs.concat_to_np_array_dict(dct=hash_codes, key=node.index,
+                                                                 array=minibatch.hash_codes)
 
             if dataset.isNewEpoch:
                 break
@@ -589,20 +592,21 @@ class AccuracyCalculator:
         posterior_probs = {}
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
-            for node in self.network.topologicalSortedNodes:
-                if not node.isLeaf:
-                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
-                                                         array=branch_prob)
-                else:
-                    posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
-                    true_labels = results["Node{0}_label_tensor".format(node.index)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
-                                                         array=posterior_prob)
-                    # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
-                    #                                      array=predicted_labels)
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
-                                                         array=true_labels)
+            if results is not None:
+                for node in self.network.topologicalSortedNodes:
+                    if not node.isLeaf:
+                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
+                                                             array=branch_prob)
+                    else:
+                        posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                        true_labels = results["Node{0}_label_tensor".format(node.index)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=posterior_probs, key=node.index,
+                                                             array=posterior_prob)
+                        # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                        #                                      array=predicted_labels)
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                             array=true_labels)
             if dataset.isNewEpoch:
                 break
         label_dict = list(leaf_true_labels_dict.values())[0]
@@ -724,29 +728,30 @@ class AccuracyCalculator:
         modes_per_leaves = self.network.modeTracker.get_modes()
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
-            for node in self.network.topologicalSortedNodes:
-                if not node.isLeaf:
-                    branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
-                                                         array=branch_prob)
-                else:
-                    posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
-                    true_labels = results["Node{0}_label_tensor".format(node.index)]
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
-                                                         array=posterior_prob)
-                    # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
-                    #                                      array=predicted_labels)
-                    UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
-                                                         array=true_labels)
-            residue_posterior_prob = results["residue_probabilities"]
-            residue_true_labels = results["residue_labels"]
-            residue_sample_indices = results["residue_indices"]
-            UtilityFuncs.concat_to_np_array_dict(dct=residue_posterior_probs_dict, key=-1,
-                                                 array=residue_posterior_prob)
-            UtilityFuncs.concat_to_np_array_dict(dct=residue_true_labels_dict, key=-1,
-                                                 array=residue_true_labels)
-            UtilityFuncs.concat_to_np_array_dict(dct=residue_sample_indices_dict, key=-1,
-                                                 array=residue_sample_indices)
+            if results is not None:
+                for node in self.network.topologicalSortedNodes:
+                    if not node.isLeaf:
+                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
+                                                             array=branch_prob)
+                    else:
+                        posterior_prob = results[self.network.get_variable_name(name="posterior_probs", node=node)]
+                        true_labels = results["Node{0}_label_tensor".format(node.index)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
+                                                             array=posterior_prob)
+                        # UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                        #                                      array=predicted_labels)
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                             array=true_labels)
+                residue_posterior_prob = results["residue_probabilities"]
+                residue_true_labels = results["residue_labels"]
+                residue_sample_indices = results["residue_indices"]
+                UtilityFuncs.concat_to_np_array_dict(dct=residue_posterior_probs_dict, key=-1,
+                                                     array=residue_posterior_prob)
+                UtilityFuncs.concat_to_np_array_dict(dct=residue_true_labels_dict, key=-1,
+                                                     array=residue_true_labels)
+                UtilityFuncs.concat_to_np_array_dict(dct=residue_sample_indices_dict, key=-1,
+                                                     array=residue_sample_indices)
             if dataset.isNewEpoch:
                 break
         label_dict = list(leaf_true_labels_dict.values())[0]

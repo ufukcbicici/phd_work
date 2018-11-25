@@ -1,9 +1,11 @@
-import numpy as np
+from collections import deque
 import tensorflow as tf
-
+import numpy as np
 from simple_tf.cign.fast_tree import FastTreeNetwork
+
 # USE CLASS BALANCING
 from simple_tf.global_params import GlobalConstants
+from simple_tf.node import Node
 
 
 class ClassWeightedTree(FastTreeNetwork):
@@ -90,9 +92,11 @@ class ClassWeightedTree(FastTreeNetwork):
                     self.classWeightsDict[node.index][label] = alpha * curr_weight + (1.0 - alpha) * new_weight
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
-        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+        if minibatch is None:
+            return None, None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
                                            is_train=True, use_masking=True)
         # Prepare result tensors to collect

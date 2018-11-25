@@ -276,9 +276,11 @@ class FastTreeNetwork(TreeNetwork):
                 assert sum_of_samples == GlobalConstants.BATCH_SIZE
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
-        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+        if minibatch is None:
+            return None, None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
                                            is_train=True, use_masking=True)
         # Prepare result tensors to collect
@@ -298,6 +300,8 @@ class FastTreeNetwork(TreeNetwork):
     def eval_network(self, sess, dataset, use_masking):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        if minibatch is None:
+            return None, None
         minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
                                       minibatch.indices, minibatch.one_hot_labels, minibatch.hash_codes)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,

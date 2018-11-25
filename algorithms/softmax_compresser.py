@@ -133,30 +133,31 @@ class SoftmaxCompresser:
             self.dataset.set_current_data_set_type(dataset_type=dataset_type)
             while True:
                 results = self.network.eval_network(sess=sess, dataset=self.dataset, use_masking=True)
-                for node in self.network.topologicalSortedNodes:
-                    if not node.isLeaf:
-                        continue
-                    leaf_node = node
-                    posterior_ref = self.network.get_variable_name(name="posterior_probs", node=leaf_node)
-                    posterior_probs = results[posterior_ref]
-                    UtilityFuncs.concat_to_np_array_dict(dct=network_output.posteriorsDict, key=leaf_node.index,
-                                                         array=posterior_probs)
-                    final_feature_ref = self.network.get_variable_name(name="final_eval_feature", node=leaf_node)
-                    final_leaf_features = results[final_feature_ref]
-                    UtilityFuncs.concat_to_np_array_dict(dct=network_output.featureVectorsDict, key=leaf_node.index,
-                                                         array=final_leaf_features)
-                    one_hot_label_ref = "Node{0}_one_hot_label_tensor".format(leaf_node.index)
-                    one_hot_labels = results[one_hot_label_ref]
-                    UtilityFuncs.concat_to_np_array_dict(dct=network_output.oneHotLabelsDict, key=leaf_node.index,
-                                                         array=one_hot_labels)
-                    logits_ref = self.network.get_variable_name(name="logits", node=leaf_node)
-                    logits = results[logits_ref]
-                    UtilityFuncs.concat_to_np_array_dict(dct=network_output.logitsDict, key=leaf_node.index,
-                                                         array=logits)
-                    softmax_weights_ref = self.network.get_variable_name(name="fc_softmax_weights", node=leaf_node)
-                    softmax_weights[leaf_node.index] = results[softmax_weights_ref]
-                    softmax_biases_ref = self.network.get_variable_name(name="fc_softmax_biases", node=leaf_node)
-                    softmax_biases[leaf_node.index] = results[softmax_biases_ref]
+                if results is not None:
+                    for node in self.network.topologicalSortedNodes:
+                        if not node.isLeaf:
+                            continue
+                        leaf_node = node
+                        posterior_ref = self.network.get_variable_name(name="posterior_probs", node=leaf_node)
+                        posterior_probs = results[posterior_ref]
+                        UtilityFuncs.concat_to_np_array_dict(dct=network_output.posteriorsDict, key=leaf_node.index,
+                                                             array=posterior_probs)
+                        final_feature_ref = self.network.get_variable_name(name="final_eval_feature", node=leaf_node)
+                        final_leaf_features = results[final_feature_ref]
+                        UtilityFuncs.concat_to_np_array_dict(dct=network_output.featureVectorsDict, key=leaf_node.index,
+                                                             array=final_leaf_features)
+                        one_hot_label_ref = "Node{0}_one_hot_label_tensor".format(leaf_node.index)
+                        one_hot_labels = results[one_hot_label_ref]
+                        UtilityFuncs.concat_to_np_array_dict(dct=network_output.oneHotLabelsDict, key=leaf_node.index,
+                                                             array=one_hot_labels)
+                        logits_ref = self.network.get_variable_name(name="logits", node=leaf_node)
+                        logits = results[logits_ref]
+                        UtilityFuncs.concat_to_np_array_dict(dct=network_output.logitsDict, key=leaf_node.index,
+                                                             array=logits)
+                        softmax_weights_ref = self.network.get_variable_name(name="fc_softmax_weights", node=leaf_node)
+                        softmax_weights[leaf_node.index] = results[softmax_weights_ref]
+                        softmax_biases_ref = self.network.get_variable_name(name="fc_softmax_biases", node=leaf_node)
+                        softmax_biases[leaf_node.index] = results[softmax_biases_ref]
                 if self.dataset.isNewEpoch:
                     network_outputs[dataset_type] = network_output
                     break

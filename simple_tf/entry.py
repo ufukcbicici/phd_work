@@ -1017,27 +1017,30 @@ def cifar100_training():
             leaf_info_rows = []
             while True:
                 start_time = time.time()
-                lr, sample_counts, is_open_indicators = network.update_params_with_momentum(sess=sess,
-                                                                                            dataset=dataset,
-                                                                                            epoch=epoch_id,
-                                                                                            iteration=iteration_counter)
-                elapsed_time = time.time() - start_time
-                total_time += elapsed_time
-                print("Iteration:{0}".format(iteration_counter))
-                print("Lr:{0}".format(lr))
-                # Print sample counts (classification)
-                sample_count_str = "Classification:   "
-                for k, v in sample_counts.items():
-                    sample_count_str += "[{0}={1}]".format(k, v)
-                    node_index = network.get_node_from_variable_name(name=k).index
-                    leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
-                print(sample_count_str)
-                # Print node open indicators
-                indicator_str = ""
-                for k, v in is_open_indicators.items():
-                    indicator_str += "[{0}={1}]".format(k, v)
-                print(indicator_str)
-                iteration_counter += 1
+                minibatch = network.get_next_batch(dataset=dataset)
+                if minibatch is not None:
+                    lr, sample_counts, is_open_indicators = \
+                        network.update_params_with_momentum(sess=sess,
+                                                            minibatch=minibatch,
+                                                            epoch=epoch_id,
+                                                            iteration=iteration_counter)
+                    elapsed_time = time.time() - start_time
+                    total_time += elapsed_time
+                    print("Iteration:{0}".format(iteration_counter))
+                    print("Lr:{0}".format(lr))
+                    # Print sample counts (classification)
+                    sample_count_str = "Classification:   "
+                    for k, v in sample_counts.items():
+                        sample_count_str += "[{0}={1}]".format(k, v)
+                        node_index = network.get_node_from_variable_name(name=k).index
+                        leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
+                    print(sample_count_str)
+                    # Print node open indicators
+                    indicator_str = ""
+                    for k, v in is_open_indicators.items():
+                        indicator_str += "[{0}={1}]".format(k, v)
+                    print(indicator_str)
+                    iteration_counter += 1
                 if dataset.isNewEpoch:
                     # moving_results_1 = sess.run(moving_stat_vars)
                     if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
@@ -1114,7 +1117,6 @@ def cifar100_training():
         # Reset the computation graph
         tf.reset_default_graph()
         run_id += 1
-
 
     # dataset.visualize_sample(sample_index=150)
     print("X")
