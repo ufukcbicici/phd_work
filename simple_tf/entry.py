@@ -7,7 +7,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
-from simple_tf.tree import TreeNetwork
+from simple_tf.cign.tree import TreeNetwork
 
 # from algorithms.softmax_compresser import SoftmaxCompresser
 from algorithms.ensemble import Ensemble
