@@ -125,6 +125,13 @@ class UtilityFuncs:
         return modes
 
     @staticmethod
+    def convert_labels_to_one_hot(labels, max_label):
+        assert (len(labels.shape) == 1)
+        one_hot_labels = np.zeros((labels.shape[0], max_label))
+        one_hot_labels[np.arange(labels.shape[0]), labels[:]] = 1
+        return one_hot_labels
+
+    @staticmethod
     def distribute_evenly_to_threads(num_of_threads, list_to_distribute):
         thread_dict = {}
         curr_thread_id = 0
