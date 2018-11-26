@@ -1017,13 +1017,11 @@ def cifar100_training():
             leaf_info_rows = []
             while True:
                 start_time = time.time()
-                minibatch = network.get_next_batch(dataset=dataset)
-                if minibatch is not None:
-                    lr, sample_counts, is_open_indicators = \
-                        network.update_params_with_momentum(sess=sess,
-                                                            minibatch=minibatch,
-                                                            epoch=epoch_id,
-                                                            iteration=iteration_counter)
+                lr, sample_counts, is_open_indicators = network.update_params_with_momentum(sess=sess,
+                                                                                            dataset=dataset,
+                                                                                            epoch=epoch_id,
+                                                                                            iteration=iteration_counter)
+                if all([lr, sample_counts, is_open_indicators]):
                     elapsed_time = time.time() - start_time
                     total_time += elapsed_time
                     print("Iteration:{0}".format(iteration_counter))
@@ -1117,6 +1115,7 @@ def cifar100_training():
         # Reset the computation graph
         tf.reset_default_graph()
         run_id += 1
+
 
     # dataset.visualize_sample(sample_index=150)
     print("X")

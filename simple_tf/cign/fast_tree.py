@@ -302,8 +302,6 @@ class FastTreeNetwork(TreeNetwork):
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         if minibatch is None:
             return None, None
-        minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
-                                      minibatch.indices, minibatch.one_hot_labels, minibatch.hash_codes)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
                                            is_train=False, use_masking=use_masking)
         results = sess.run(self.evalDict, feed_dict)
