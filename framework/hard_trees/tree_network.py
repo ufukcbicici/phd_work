@@ -265,7 +265,7 @@ class TreeNetwork(Network):
                                                          ChannelTypes.label_input.value,
                                                          ChannelTypes.indices_input.value} and not key.endswith(
                     GlobalInputNames.parameter_update.value)])
-            samples, labels, indices_list = self.dataset.get_next_batch(batch_size=batch_size)
+            samples, labels, indices_list = self.dataset.get_next_batch()
             # Prepare the feed dict: Samples, labels and indices first.
             feed_dict = {self.get_networkwise_input(name=ChannelTypes.data_input.value): samples,
                          self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,
@@ -344,7 +344,7 @@ class TreeNetwork(Network):
             while True:
                 kv_store_rows = []
                 # Get the next batch
-                samples, labels, indices_list = self.dataset.get_next_batch(batch_size=batch_size)
+                samples, labels, indices_list = self.dataset.get_next_batch)
                 # Prepare the feed dict: Samples, labels and indices first.
                 feed_dict = {self.get_networkwise_input(name=ChannelTypes.data_input.value): samples,
                              self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,
@@ -410,7 +410,7 @@ class TreeNetwork(Network):
             kv_store_rows = []
             while True:
                 # Get the next batch
-                samples, labels, indices_list = self.dataset.get_next_batch(batch_size=eval_batch_size)
+                samples, labels, indices_list = self.dataset.get_next_batch()
                 # Prepare the feed dict: Samples, labels and indices first, set the probability thresholds to 0.
                 feed_dict = {self.get_networkwise_input(name=ChannelTypes.data_input.value): samples,
                              self.get_networkwise_input(name=ChannelTypes.label_input.value): labels,

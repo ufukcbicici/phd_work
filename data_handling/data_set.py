@@ -25,13 +25,13 @@ class DataSet:
     def load_dataset(self):
         pass
 
-    def get_next_batch(self, batch_size):
+    def get_next_batch(self):
         pass
 
     def reset(self):
         pass
 
-    def set_current_data_set_type(self, dataset_type):
+    def set_current_data_set_type(self, dataset_type, batch_size):
         pass
 
     def get_current_sample_count(self):

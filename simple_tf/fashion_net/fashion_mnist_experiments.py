@@ -5,7 +5,7 @@ from data_handling.fashion_mnist import FashionMnistDataSet
 
 dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
 dataset.set_current_data_set_type(dataset_type=DatasetTypes.test)
-samples, labels, indices_list, one_hot_labels = dataset.get_next_batch(batch_size=10000)
+samples, labels, indices_list, one_hot_labels = dataset.get_next_batch()
 
 sums = set()
 for sample in samples:

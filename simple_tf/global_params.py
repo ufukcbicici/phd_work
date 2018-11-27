@@ -2,6 +2,7 @@ from enum import Enum
 
 import tensorflow as tf
 
+from auxillary.constants import DatasetTypes
 from auxillary.parameters import DecayingParameter, DiscreteParameter, DecayingParameterV2
 
 
@@ -58,7 +59,7 @@ class GlobalConstants:
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.01
     DECAY_STEP = 15000
-    DECAY_RATE = 0.5 # INITIAL_LR/EPOCH_COUNT
+    DECAY_RATE = 0.5  # INITIAL_LR/EPOCH_COUNT
     # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
     #                                                decay=DECAY_RATE)
     # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
@@ -227,7 +228,7 @@ class GlobalConstants:
     TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,))
     TRAIN_INDEX_TENSOR = tf.placeholder(tf.int64, shape=(None,))
     TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(None, NUM_LABELS))
-    # TEST
-    # TEST_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
-    # TEST_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(EVAL_BATCH_SIZE,))
-    # TEST_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(EVAL_BATCH_SIZE, NUM_LABELS))
+
+    BATCH_SIZES_DICT = {DatasetTypes.training: BATCH_SIZE,
+                        DatasetTypes.test: EVAL_BATCH_SIZE,
+                        DatasetTypes.validation: EVAL_BATCH_SIZE}

@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
-from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
+# from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 from data_handling.data_set import DataSet
 
 
@@ -45,7 +45,6 @@ class CifarDataSet(MnistDataSet):
                            os.sep + "data" + os.sep + "cifar100" + os.sep + "meta"):
         self.sess = session
         self.isCifar100 = is_cifar100
-        self.batchSizesDict = batch_sizes
         self.trainDataset = None
         self.validationDataset = None
         self.testDataset = None
@@ -73,10 +72,14 @@ class CifarDataSet(MnistDataSet):
         self.testCoarseOneHotLabels = None
         self.validationCoarseLabels = None
         self.validationCoarseOneHotLabels = None
-        super().__init__(validation_sample_count=validation_sample_count, save_validation_as=save_validation_as,
+        super().__init__(batch_sizes=batch_sizes, validation_sample_count=validation_sample_count,
+                         save_validation_as=save_validation_as,
                          load_validation_from=load_validation_from, test_images_path=test_images_path,
                          test_labels_path=None, training_images_path=training_images_path,
                          training_labels_path=None)
+
+    def set_curr_session(self, sess):
+        self.sess = sess
 
     def load_dataset(self):
         training_data = UtilityFuncs.unpickle(file=self.trainImagesPath)
@@ -185,7 +188,8 @@ class CifarDataSet(MnistDataSet):
                                                one_hot_labels, coarse_labels, coarse_one_hot_labels]
         self.testInitOp = self.testIter.make_initializer(self.testDataset)
 
-        self.set_current_data_set_type(dataset_type=DatasetTypes.training)
+        self.set_current_data_set_type(dataset_type=DatasetTypes.training,
+                                       batch_size=self.batchSizesDict[DatasetTypes.training])
 
         # Experimental
         # # sess = tf.Session()
@@ -236,10 +240,10 @@ class CifarDataSet(MnistDataSet):
         plt.show()
 
     def reset(self):
-        batch_size = self.batchSizesDict[self.currentDataSetType]
-        self.sess.run(self.currInitOp, feed_dict={self.batchSize: batch_size})
+        pass
 
-    def set_current_data_set_type(self, dataset_type):
+    def set_current_data_set_type(self, dataset_type, batch_size):
+        assert batch_size is not None
         self.currentDataSetType = dataset_type
         if self.currentDataSetType == DatasetTypes.training:
             self.currInitOp = self.trainInitOp
@@ -252,13 +256,13 @@ class CifarDataSet(MnistDataSet):
             self.currOutputs = self.outputsDict[DatasetTypes.validation]
         else:
             raise Exception("Unknown dataset type")
-        self.reset()
+        self.sess.run(self.currInitOp, feed_dict={self.batchSize: batch_size})
 
     def get_label_count(self):
         if self.isCifar100:
             return 100
 
-    def get_next_batch(self, batch_size):
+    def get_next_batch(self):
         try:
             samples, labels, indices, one_hot_labels, coarse_labels, coarse_one_hot_labels = \
                 self.sess.run(self.outputsDict[self.currentDataSetType])

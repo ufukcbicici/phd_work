@@ -317,7 +317,7 @@ def main():
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
-            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
             print("*************Epoch {0}*************".format(epoch_id))
             total_time = 0.0
             leaf_info_rows = []
@@ -445,7 +445,8 @@ def main():
 
 
 def main_fast_tree():
-    dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
+    dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None,
+                                  batch_sizes=GlobalConstants.BATCH_SIZES_DICT)
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
@@ -610,7 +611,7 @@ def main_fast_tree():
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
-            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
             print("*************Epoch {0}*************".format(epoch_id))
             total_time = 0.0
             leaf_info_rows = []
@@ -951,12 +952,10 @@ def cifar100_training():
     decision_dropout_probs = [0.0]
     sess = tf.Session()
     dataset = CifarDataSet(session=sess,
-                           batch_sizes={DatasetTypes.training: GlobalConstants.BATCH_SIZE,
-                                        DatasetTypes.test: GlobalConstants.EVAL_BATCH_SIZE,
-                                        DatasetTypes.validation: GlobalConstants.EVAL_BATCH_SIZE},
+                           batch_sizes=GlobalConstants.BATCH_SIZES_DICT,
                            validation_sample_count=0, load_validation_from=None)
     # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
-    dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+    dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
 
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
@@ -974,6 +973,7 @@ def cifar100_training():
         else:
             sess = tf.Session()
 
+        dataset.set_curr_session(sess=sess)
         network = FastTreeNetwork(
             node_build_funcs=[fashion_net_for_cifar100.baseline],
             grad_func=fashion_net_for_cifar100.grad_func,
@@ -1011,7 +1011,7 @@ def cifar100_training():
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
-            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
             print("*************Epoch {0}*************".format(epoch_id))
             total_time = 0.0
             leaf_info_rows = []

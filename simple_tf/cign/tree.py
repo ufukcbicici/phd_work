@@ -599,7 +599,7 @@ class TreeNetwork:
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         vars = self.variableManager.trainable_variables()
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        minibatch = dataset.get_next_batch()
         samples = minibatch.samples
         labels = minibatch.labels
         indices_list = minibatch.indices
@@ -809,7 +809,7 @@ class TreeNetwork:
 
     def eval_network(self, sess, dataset, use_masking):
         # if is_train:
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        minibatch = dataset.get_next_batch()
         samples = minibatch.samples
         labels = minibatch.labels
         indices_list = minibatch.indices
