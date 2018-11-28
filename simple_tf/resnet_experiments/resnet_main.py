@@ -27,9 +27,9 @@ import tensorflow as tf
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('dataset', 'cifar100', 'cifar10 or cifar100.')
 tf.app.flags.DEFINE_string('mode', 'train', 'train or eval.')
-tf.app.flags.DEFINE_string('train_data_path', 'C:\\Users\\t67rt\\Desktop\\phd_work\\phd_work\\data\\cifar100\\train',
+tf.app.flags.DEFINE_string('train_data_path', 'C:\\Users\\ufuk.bicici\\PycharmProjects\\phd_work\\data\\cifar100\\train',
                            'Filepattern for training data.')
-tf.app.flags.DEFINE_string('eval_data_path', 'C:\\Users\\t67rt\\Desktop\\phd_work\\phd_work\\data\\cifar100\\test',
+tf.app.flags.DEFINE_string('eval_data_path', 'C:\\Users\\ufuk.bicici\\PycharmProjects\\phd_work\\data\\cifar100\\test',
                            'Filepattern for eval data')
 tf.app.flags.DEFINE_integer('image_size', 32, 'Image side length.')
 tf.app.flags.DEFINE_string('train_dir', '',
@@ -195,7 +195,7 @@ def main(_):
                                min_lrn_rate=0.0001,
                                lrn_rate=0.1,
                                num_residual_units=5,
-                               use_bottleneck=False,
+                               use_bottleneck=True,
                                weight_decay_rate=0.0002,
                                relu_leakiness=0.1,
                                optimizer='mom')

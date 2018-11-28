@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from auxillary.constants import DatasetTypes
 from auxillary.parameters import DecayingParameter, DiscreteParameter, DecayingParameterV2
+from simple_tf.resnet_experiments.resnet_generator import ResnetGenerator
 
 
 class GradientType(Enum):
@@ -194,6 +195,11 @@ class GlobalConstants:
     FASHION_F_RESIDUE = 128
     FASHION_F_RESIDUE_LAYER_COUNT = 1
     FASHION_F_RESIDUE_USE_DROPOUT = False
+
+    # Resnet Baseline Params
+    RESNET_HYPERPARAMS = ResnetGenerator.ResnetHParams(num_residual_units=54, use_bottleneck=True,
+                                                       num_of_features_per_block=[16, 64, 128, 256],
+                                                       first_conv_filter_size=3, relu_leakiness=0.1)
 
     # MultiPath Evaluation Schedules
     # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]

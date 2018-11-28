@@ -21,21 +21,18 @@ def fast_tree_batch_norm(x, masked_x, network, node, decay, iteration, is_traini
         gamma = None
         beta = None
     mu, sigma = tf.nn.moments(masked_x, [0])
-    new_pop_mean = tf.where(iteration > 0, (decay * pop_mean + (1.0 - decay) * mu), mu)
-    new_pop_var = tf.where(iteration > 0, (decay * pop_var + (1.0 - decay) * sigma), sigma)
-    pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean)
-    pop_var_assign_op = tf.assign(pop_var, new_pop_var)
-    tf.add_to_collection(name=tf.GraphKeys.UPDATE_OPS, value=pop_mean_assign_op)
-    tf.add_to_collection(name=tf.GraphKeys.UPDATE_OPS, value=pop_var_assign_op)
     final_mean = tf.where(is_training_phase > 0, mu, pop_mean)
     final_var = tf.where(is_training_phase > 0, sigma, pop_var)
-    # normed_masked_x = tf.nn.batch_normalization(x=masked_x, mean=final_mean, variance=final_var, offset=beta,
-    #                                             scale=gamma,
-    #                                             variance_epsilon=1e-5)
     normed_x = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
                                          variance_epsilon=1e-5)
-    # return normed_x, normed_masked_x, mu, sigma, final_mean, final_var, pop_mean, pop_var
-    return normed_x
+    with tf.control_dependencies([normed_x]):
+        new_pop_mean = tf.where(iteration > 0, (decay * pop_mean + (1.0 - decay) * mu), mu)
+        new_pop_var = tf.where(iteration > 0, (decay * pop_var + (1.0 - decay) * sigma), sigma)
+        pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean)
+        pop_var_assign_op = tf.assign(pop_var, new_pop_var)
+        tf.add_to_collection(name=tf.GraphKeys.UPDATE_OPS, value=pop_mean_assign_op)
+        tf.add_to_collection(name=tf.GraphKeys.UPDATE_OPS, value=pop_var_assign_op)
+        return normed_x
 
 # Nasıl çalışıyor?
 # 1) is_training_phase = 1 ise:
@@ -45,6 +42,7 @@ def fast_tree_batch_norm(x, masked_x, network, node, decay, iteration, is_traini
 # Bunları optimizer ile güncelleyeceğiz.
 # 2) is_training_phase = 0 ise: (Evaluation)
 #
+
 
 def batch_norm(x, network, node, decay, iteration, is_decision_phase, is_training_phase):
     gamma_name = network.get_variable_name(node=node, name="gamma")
