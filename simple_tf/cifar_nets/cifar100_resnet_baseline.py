@@ -3,6 +3,7 @@ from simple_tf.global_params import GlobalConstants
 from simple_tf.resnet_experiments.resnet_generator import ResnetGenerator
 from data_handling.cifar_dataset import CifarDataSet
 
+
 def baseline(node, network, variables=None):
     network.mask_input_nodes(node=node)
     strides = GlobalConstants.RESNET_HYPERPARAMS.strides
@@ -20,43 +21,50 @@ def baseline(node, network, variables=None):
         x = ResnetGenerator.bottleneck_residual(x=x, node=node, in_filter=filters[0], out_filter=filters[1],
                                                 stride=ResnetGenerator.stride_arr(strides[0]),
                                                 activate_before_residual=activate_before_residual[0],
-                                                relu_leakiness=relu_leakiness, is_train=network.isTrain)
+                                                relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
         for i in range(num_of_units_per_block):
             with tf.variable_scope("block_1_{0}".format(i + 1)):
                 x = ResnetGenerator.bottleneck_residual(x=x, node=node, in_filter=filters[1],
                                                         out_filter=filters[1],
                                                         stride=ResnetGenerator.stride_arr(1),
                                                         activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain)
+                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
     # Block 2
     with tf.variable_scope('block_2_0'):
         x = ResnetGenerator.bottleneck_residual(x=x, node=node, in_filter=filters[1], out_filter=filters[2],
                                                 stride=ResnetGenerator.stride_arr(strides[1]),
                                                 activate_before_residual=activate_before_residual[1],
-                                                relu_leakiness=relu_leakiness, is_train=network.isTrain)
+                                                relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
         for i in range(num_of_units_per_block):
             with tf.variable_scope("block_2_{0}".format(i + 1)):
                 x = ResnetGenerator.bottleneck_residual(x=x, node=node, in_filter=filters[2],
                                                         out_filter=filters[2],
                                                         stride=ResnetGenerator.stride_arr(1),
                                                         activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain)
+                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
     # Block 3
     with tf.variable_scope('block_3_0'):
         x = ResnetGenerator.bottleneck_residual(x=x, node=node, in_filter=filters[2], out_filter=filters[3],
                                                 stride=ResnetGenerator.stride_arr(strides[2]),
                                                 activate_before_residual=activate_before_residual[2],
-                                                relu_leakiness=relu_leakiness, is_train=network.isTrain)
+                                                relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
         for i in range(num_of_units_per_block):
             with tf.variable_scope("block_2_{0}".format(i + 1)):
                 x = ResnetGenerator.bottleneck_residual(x=x, node=node, in_filter=filters[3],
                                                         out_filter=filters[3],
                                                         stride=ResnetGenerator.stride_arr(1),
                                                         activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain)
+                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
     # Logit Layers
     with tf.variable_scope('unit_last'):
-        x = ResnetGenerator.get_output(x=x, node=node, is_train=network.isTrain, leakiness=relu_leakiness)
+        x = ResnetGenerator.get_output(x=x, node=node, is_train=network.isTrain, leakiness=relu_leakiness,
+                                       bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
     net_shape = x.get_shape().as_list()
     assert len(net_shape) == 4
     x = tf.reshape(x, [-1, net_shape[1] * net_shape[2] * net_shape[3]])

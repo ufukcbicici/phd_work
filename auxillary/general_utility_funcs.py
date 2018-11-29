@@ -125,6 +125,10 @@ class UtilityFuncs:
         return modes
 
     @staticmethod
+    def get_variable_name(name, node):
+        return "Node{0}_{1}".format(node.index, name)
+
+    @staticmethod
     def convert_labels_to_one_hot(labels, max_label):
         assert (len(labels.shape) == 1)
         one_hot_labels = np.zeros((labels.shape[0], max_label))
