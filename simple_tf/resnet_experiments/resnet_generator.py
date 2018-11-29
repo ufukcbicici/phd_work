@@ -2,15 +2,18 @@ import tensorflow as tf
 import numpy as np
 from collections import namedtuple
 
+from simple_tf.global_params import GlobalConstants
+
 
 class ResnetGenerator:
     # BottleneckGroup = namedtuple('BottleneckGroup', ['num_blocks', 'num_filters', 'bottleneck_size', 'down_sample'])
     ResnetHParams = namedtuple('ResnetHParams',
                                'num_residual_units, use_bottleneck, '
-                               'num_of_features_per_block, relu_leakiness, first_conv_filter_size')
+                               'num_of_features_per_block, relu_leakiness, first_conv_filter_size, strides, '
+                               'activate_before_residual')
 
     @staticmethod
-    def _conv(name, x, filter_size, in_filters, out_filters, strides):
+    def conv(name, x, filter_size, in_filters, out_filters, strides):
         """Convolution."""
         with tf.variable_scope(name):
             n = filter_size * filter_size * out_filters
@@ -21,60 +24,58 @@ class ResnetGenerator:
             return tf.nn.conv2d(x, kernel, strides, padding='SAME')
 
     @staticmethod
-    def _batch_norm(name, x):
-        """Batch normalization."""
-        with tf.variable_scope(name):
-            params_shape = [x.get_shape()[-1]]
-
-            beta = tf.get_variable(
-                'beta', params_shape, tf.float32,
-                initializer=tf.constant_initializer(0.0, tf.float32))
-            gamma = tf.get_variable(
-                'gamma', params_shape, tf.float32,
-                initializer=tf.constant_initializer(1.0, tf.float32))
-
-            if self.mode == 'train':
-                mean, variance = tf.nn.moments(x, [0, 1, 2], name='moments')
-
-                moving_mean = tf.get_variable(
-                    'moving_mean', params_shape, tf.float32,
-                    initializer=tf.constant_initializer(0.0, tf.float32),
-                    trainable=False)
-                moving_variance = tf.get_variable(
-                    'moving_variance', params_shape, tf.float32,
-                    initializer=tf.constant_initializer(1.0, tf.float32),
-                    trainable=False)
-
-                self._extra_train_ops.append(moving_averages.assign_moving_average(
-                    moving_mean, mean, 0.9))
-                self._extra_train_ops.append(moving_averages.assign_moving_average(
-                    moving_variance, variance, 0.9))
-            else:
-                mean = tf.get_variable(
-                    'moving_mean', params_shape, tf.float32,
-                    initializer=tf.constant_initializer(0.0, tf.float32),
-                    trainable=False)
-                variance = tf.get_variable(
-                    'moving_variance', params_shape, tf.float32,
-                    initializer=tf.constant_initializer(1.0, tf.float32),
-                    trainable=False)
-                tf.summary.histogram(mean.op.name, mean)
-                tf.summary.histogram(variance.op.name, variance)
-            # epsilon used to be 1e-5. Maybe 0.001 solves NaN problem in deeper net.
-            y = tf.nn.batch_normalization(
-                x, mean, variance, beta, gamma, 0.001)
-            y.set_shape(x.get_shape())
-            return y
+    def batch_norm(name, x, is_train):
+        name = "{0}_bn".format(name)
+        normalized_x = tf.layers.batch_normalization(inputs=x, name=name,
+                                                     momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                     training=tf.cast(is_train, tf.bool))
+        return normalized_x
 
     @staticmethod
-    def _stride_arr(stride):
+    def stride_arr(stride):
         """Map a stride scalar to the stride array for tf.nn.conv2d."""
         return [1, stride, stride, 1]
 
     @staticmethod
-    def _relu(x, leakiness=0.0):
+    def relu(x, leakiness=0.0):
         """Relu, with optional leaky support."""
-        return tf.where(tf.less(x, 0.0), leakiness * x, x, name='leaky_relu')
+        if leakiness <= 0.0:
+            return tf.nn.relu(features=x, name="relu")
+        else:
+            return tf.nn.leaky_relu(features=x, alpha=leakiness, name="leaky_relu")
+
+    @staticmethod
+    def bottleneck_residual(x, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual):
+        """Bottleneck residual unit with 3 sub layers."""
+        if activate_before_residual:
+            with tf.variable_scope('common_bn_relu'):
+                x = ResnetGenerator.batch_norm('init_bn', x, is_train)
+                x = ResnetGenerator.relu(x, relu_leakiness)
+                orig_x = x
+        else:
+            with tf.variable_scope('residual_bn_relu'):
+                orig_x = x
+                x = ResnetGenerator.batch_norm('init_bn', x, is_train)
+                x = ResnetGenerator.relu(x, relu_leakiness)
+
+        with tf.variable_scope('sub1'):
+            x = ResnetGenerator.conv('conv1', x, 1, in_filter, out_filter / 4, stride)
+
+        with tf.variable_scope('sub2'):
+            x = ResnetGenerator.batch_norm('bn2', x, is_train)
+            x = ResnetGenerator.relu(x, relu_leakiness)
+            x = ResnetGenerator.conv('conv2', x, 3, out_filter / 4, out_filter / 4, [1, 1, 1, 1])
+
+        with tf.variable_scope('sub3'):
+            x = ResnetGenerator.batch_norm('bn3', x, is_train)
+            x = ResnetGenerator.relu(x, relu_leakiness)
+            x = ResnetGenerator.conv('conv3', x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
+
+        with tf.variable_scope('sub_add'):
+            if in_filter != out_filter:
+                orig_x = ResnetGenerator.conv('project', orig_x, 1, in_filter, out_filter, stride)
+            x += orig_x
+        return x
 
     @staticmethod
     def get_input(input, node, resnet_hyperparams):
@@ -82,10 +83,6 @@ class ResnetGenerator:
         name = "Node{0}_init_conv".format(node.index)
         input_filters = input.get_shape().as_list()[-1]
         out_filters = resnet_hyperparams.num_of_features_per_block[0]
-        x = ResnetGenerator._conv(name, input, resnet_hyperparams.first_conv_filter_size,
-                                  input_filters, out_filters, ResnetGenerator._stride_arr(1))
+        x = ResnetGenerator.conv(name, input, resnet_hyperparams.first_conv_filter_size,
+                                 input_filters, out_filters, ResnetGenerator.stride_arr(1))
         return x
-
-
-
-

@@ -199,7 +199,8 @@ class GlobalConstants:
     # Resnet Baseline Params
     RESNET_HYPERPARAMS = ResnetGenerator.ResnetHParams(num_residual_units=54, use_bottleneck=True,
                                                        num_of_features_per_block=[16, 64, 128, 256],
-                                                       first_conv_filter_size=3, relu_leakiness=0.1)
+                                                       first_conv_filter_size=3, relu_leakiness=0.1,
+                                                       strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
     # MultiPath Evaluation Schedules
     # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]
