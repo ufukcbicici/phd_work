@@ -946,9 +946,9 @@ def ensemble_training():
 def cifar100_training():
     classification_wd = [0.002]
     decision_wd = [0.0]
-    info_gain_balance_coeffs = [5.0]
+    info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]
-    classification_dropout_probs = [0.15]
+    classification_dropout_probs = [0.0]
     decision_dropout_probs = [0.0]
     sess = tf.Session()
     dataset = CifarDataSet(session=sess,
