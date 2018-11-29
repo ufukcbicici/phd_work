@@ -984,9 +984,8 @@ def cifar100_training():
 
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(15000, 0.005),
-                                                                               (30000, 0.0025),
-                                                                               (40000, 0.00025)])
+                                                                     schedule=[(40000, 0.01),
+                                                                               (60000, 0.001)])
         network.build_network()
         # Init
         init = tf.global_variables_initializer()
@@ -1115,7 +1114,6 @@ def cifar100_training():
         # Reset the computation graph
         tf.reset_default_graph()
         run_id += 1
-
 
     # dataset.visualize_sample(sample_index=150)
     print("X")
