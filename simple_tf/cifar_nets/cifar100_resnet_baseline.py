@@ -74,3 +74,19 @@ def baseline(node, network, variables=None):
     # Evaluation
     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
+
+
+def grad_func(network):
+    pass
+
+
+def threshold_calculator_func(network):
+    pass
+
+
+def residue_network_func(network):
+    pass
+
+
+def tensorboard_func(network):
+    pass

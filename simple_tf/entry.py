@@ -18,7 +18,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, FixedParameter
 from data_handling.cifar_dataset import CifarDataSet
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.cifar_nets import fashion_net_for_cifar100
+from simple_tf.cifar_nets import fashion_net_for_cifar100, cifar100_resnet_baseline
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline, fashion_cign_connected_v2
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
@@ -944,7 +944,7 @@ def ensemble_training():
 
 
 def cifar100_training():
-    classification_wd = [0.0]
+    classification_wd = [0.002]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     # classification_dropout_probs = [0.15]
@@ -975,11 +975,11 @@ def cifar100_training():
 
         dataset.set_curr_session(sess=sess)
         network = FastTreeNetwork(
-            node_build_funcs=[fashion_net_for_cifar100.baseline],
-            grad_func=fashion_net_for_cifar100.grad_func,
-            threshold_func=fashion_net_for_cifar100.threshold_calculator_func,
-            residue_func=fashion_net_for_cifar100.residue_network_func,
-            summary_func=fashion_net_for_cifar100.tensorboard_func,
+            node_build_funcs=[cifar100_resnet_baseline.baseline],
+            grad_func=cifar100_resnet_baseline.grad_func,
+            threshold_func=cifar100_resnet_baseline.threshold_calculator_func,
+            residue_func=cifar100_resnet_baseline.residue_network_func,
+            summary_func=cifar100_resnet_baseline.tensorboard_func,
             degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
 
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
