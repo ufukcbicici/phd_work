@@ -71,3 +71,6 @@ def baseline(node, network, variables=None):
     # Loss
     final_feature, logits = network.apply_loss(node=node, final_feature=output,
                                                softmax_weights=weight, softmax_biases=bias)
+    # Evaluation
+    node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
+    node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
