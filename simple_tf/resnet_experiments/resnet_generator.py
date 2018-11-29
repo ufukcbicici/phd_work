@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from collections import namedtuple
-
+from simple_tf.cign.tree import TreeNetwork
 from simple_tf.global_params import GlobalConstants
 
 
@@ -25,7 +25,6 @@ class ResnetGenerator:
 
     @staticmethod
     def batch_norm(name, x, is_train):
-        name = "{0}_bn".format(name)
         normalized_x = tf.layers.batch_normalization(inputs=x, name=name,
                                                      momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                      training=tf.cast(is_train, tf.bool))
@@ -45,44 +44,59 @@ class ResnetGenerator:
             return tf.nn.leaky_relu(features=x, alpha=leakiness, name="leaky_relu")
 
     @staticmethod
-    def bottleneck_residual(x, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual):
+    def global_avg_pool(x):
+        assert x.get_shape().ndims == 4
+        return tf.reduce_mean(x, [1, 2])
+
+    @staticmethod
+    def bottleneck_residual(x, node, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual):
         """Bottleneck residual unit with 3 sub layers."""
         if activate_before_residual:
-            with tf.variable_scope('common_bn_relu'):
-                x = ResnetGenerator.batch_norm('init_bn', x, is_train)
+            with tf.variable_scope("Node{0}_common_bn_relu".format(node.index)):
+                x = ResnetGenerator.batch_norm(TreeNetwork.get_variable_name(name="init_bn", node=node), x, is_train)
                 x = ResnetGenerator.relu(x, relu_leakiness)
                 orig_x = x
         else:
-            with tf.variable_scope('residual_bn_relu'):
+            with tf.variable_scope("Node{0}_residual_bn_relu".format(node.index)):
                 orig_x = x
-                x = ResnetGenerator.batch_norm('init_bn', x, is_train)
+                x = ResnetGenerator.batch_norm(TreeNetwork.get_variable_name(name="init_bn", node=node), x, is_train)
                 x = ResnetGenerator.relu(x, relu_leakiness)
 
-        with tf.variable_scope('sub1'):
-            x = ResnetGenerator.conv('conv1', x, 1, in_filter, out_filter / 4, stride)
+        with tf.variable_scope("Node{0}_sub1".format(node.index)):
+            x = ResnetGenerator.conv(TreeNetwork.get_variable_name(name="conv_1", node=node), x, 1, in_filter,
+                                     out_filter / 4, stride)
 
-        with tf.variable_scope('sub2'):
-            x = ResnetGenerator.batch_norm('bn2', x, is_train)
+        with tf.variable_scope("Node{0}_sub2".format(node.index)):
+            x = ResnetGenerator.batch_norm(TreeNetwork.get_variable_name(name="bn2", node=node), x, is_train)
             x = ResnetGenerator.relu(x, relu_leakiness)
-            x = ResnetGenerator.conv('conv2', x, 3, out_filter / 4, out_filter / 4, [1, 1, 1, 1])
+            x = ResnetGenerator.conv(TreeNetwork.get_variable_name(name="conv2", node=node), x, 3, out_filter / 4,
+                                     out_filter / 4, [1, 1, 1, 1])
 
-        with tf.variable_scope('sub3'):
-            x = ResnetGenerator.batch_norm('bn3', x, is_train)
+        with tf.variable_scope("Node{0}_sub3".format(node.index)):
+            x = ResnetGenerator.batch_norm(TreeNetwork.get_variable_name(name="bn3", node=node), x, is_train)
             x = ResnetGenerator.relu(x, relu_leakiness)
-            x = ResnetGenerator.conv('conv3', x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
+            x = ResnetGenerator.conv(TreeNetwork.get_variable_name(name="conv3", node=node), x, 1, out_filter / 4,
+                                     out_filter, [1, 1, 1, 1])
 
-        with tf.variable_scope('sub_add'):
+        with tf.variable_scope("Node{0}_sub_add".format(node.index)):
             if in_filter != out_filter:
-                orig_x = ResnetGenerator.conv('project', orig_x, 1, in_filter, out_filter, stride)
+                orig_x = ResnetGenerator.conv(TreeNetwork.get_variable_name(name="project", node=node), orig_x, 1,
+                                              in_filter, out_filter, stride)
             x += orig_x
         return x
 
     @staticmethod
-    def get_input(input, node, resnet_hyperparams):
+    def get_input(input, node, out_filters, first_conv_filter_size):
         assert input.get_shape().ndims == 4
-        name = "Node{0}_init_conv".format(node.index)
+        name = TreeNetwork.get_variable_name(name="init_conv", node=node)
         input_filters = input.get_shape().as_list()[-1]
-        out_filters = resnet_hyperparams.num_of_features_per_block[0]
-        x = ResnetGenerator.conv(name, input, resnet_hyperparams.first_conv_filter_size,
+        x = ResnetGenerator.conv(name, input, first_conv_filter_size,
                                  input_filters, out_filters, ResnetGenerator.stride_arr(1))
         return x
+
+    @staticmethod
+    def get_output(x, node, is_train, leakiness):
+        name = TreeNetwork.get_variable_name(name="final_bn", node=node)
+        x = ResnetGenerator.batch_norm(name, x, is_train)
+        x = ResnetGenerator.relu(x, leakiness)
+        x = ResnetGenerator.global_avg_pool(x)

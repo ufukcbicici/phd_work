@@ -653,7 +653,8 @@ class TreeNetwork:
     # if v in res_grads:
     #     total_grad += res_grads[v]
 
-    def get_variable_name(self, name, node):
+    @staticmethod
+    def get_variable_name(name, node):
         return "Node{0}_{1}".format(node.index, name)
 
     def get_node_from_variable_name(self, name):
