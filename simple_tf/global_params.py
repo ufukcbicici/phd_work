@@ -2,7 +2,9 @@ from enum import Enum
 
 import tensorflow as tf
 
+from auxillary.constants import DatasetTypes
 from auxillary.parameters import DecayingParameter, DiscreteParameter, DecayingParameterV2
+from simple_tf.resnet_experiments.resnet_generator import ResnetGenerator
 
 
 class GradientType(Enum):
@@ -39,8 +41,8 @@ class GlobalConstants:
     TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
     EPOCH_REPORT_PERIOD = 1
-    BATCH_SIZE = 125
-    EVAL_BATCH_SIZE = 10000
+    BATCH_SIZE = 128
+    EVAL_BATCH_SIZE = 250
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
@@ -56,18 +58,16 @@ class GlobalConstants:
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
-    INITIAL_LR = 0.01
+    INITIAL_LR = 0.1
     DECAY_STEP = 15000
-    DECAY_RATE = 0.5 # INITIAL_LR/EPOCH_COUNT
+    DECAY_RATE = 0.5  # INITIAL_LR/EPOCH_COUNT
     # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
     #                                                decay=DECAY_RATE)
     # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
     #                                              decay_period=DECAY_STEP)
     LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator", value=INITIAL_LR,
-                                                 schedule=[(15000, 0.01),
-                                                           (30000, 0.005),
-                                                           (40000, 0.0005),
-                                                           (64000, 0.00025)])
+                                                 schedule=[(40000, 0.01),
+                                                           (60000, 0.001)])
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
@@ -194,6 +194,12 @@ class GlobalConstants:
     FASHION_F_RESIDUE_LAYER_COUNT = 1
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
+    # Resnet Baseline Params
+    RESNET_HYPERPARAMS = ResnetGenerator.ResnetHParams(num_residual_units=18, use_bottleneck=True,
+                                                       num_of_features_per_block=[16, 64, 128, 256],
+                                                       first_conv_filter_size=3, relu_leakiness=0.1,
+                                                       strides=[1, 2, 2], activate_before_residual=[True, False, False])
+
     # MultiPath Evaluation Schedules
     # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]
     # MULTIPATH_SCHEDULES.extend([i*0.001 for i in range(50)])
@@ -227,7 +233,7 @@ class GlobalConstants:
     TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,))
     TRAIN_INDEX_TENSOR = tf.placeholder(tf.int64, shape=(None,))
     TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(None, NUM_LABELS))
-    # TEST
-    # TEST_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
-    # TEST_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(EVAL_BATCH_SIZE,))
-    # TEST_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(EVAL_BATCH_SIZE, NUM_LABELS))
+
+    BATCH_SIZES_DICT = {DatasetTypes.training: BATCH_SIZE,
+                        DatasetTypes.test: EVAL_BATCH_SIZE,
+                        DatasetTypes.validation: EVAL_BATCH_SIZE}

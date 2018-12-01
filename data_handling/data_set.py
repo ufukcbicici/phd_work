@@ -4,7 +4,15 @@ import numpy as np
 
 
 class DataSet:
-    MiniBatch = namedtuple('MiniBatch', ['samples', 'labels', 'indices', 'one_hot_labels', 'hash_codes'])
+    MiniBatch = \
+        namedtuple('MiniBatch',
+                   ['samples',
+                    'labels',
+                    'indices',
+                    'one_hot_labels',
+                    'hash_codes',
+                    'coarse_labels',
+                    'coarse_one_hot_labels'])
 
     def __init__(self):
         self.dataShape = None
@@ -17,13 +25,13 @@ class DataSet:
     def load_dataset(self):
         pass
 
-    def get_next_batch(self, batch_size):
+    def get_next_batch(self):
         pass
 
     def reset(self):
         pass
 
-    def set_current_data_set_type(self, dataset_type):
+    def set_current_data_set_type(self, dataset_type, batch_size):
         pass
 
     def get_current_sample_count(self):
@@ -42,3 +50,12 @@ class DataSet:
             sample = samples[i]
             hash_codes[i] = hash(sample.tostring())
         return hash_codes
+
+    def get_image_size(self):
+        pass
+
+    def get_num_of_channels(self):
+        pass
+
+    def get_data_type(self):
+        pass

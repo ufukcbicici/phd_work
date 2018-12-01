@@ -7,7 +7,7 @@ def baseline(node, network, variables=None):
     # Convolution 1
     conv1_weights = tf.Variable(
         tf.truncated_normal([GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_1_SIZE,
-                             GlobalConstants.NUM_CHANNELS, GlobalConstants.FASHION_NUM_FILTERS_1], stddev=0.1,
+                             network.numChannels, GlobalConstants.FASHION_NUM_FILTERS_1], stddev=0.1,
                             seed=GlobalConstants.SEED,
                             dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv1_weight",
                                                                                              node=node))

@@ -29,14 +29,17 @@ class TreeNetwork:
         self.summaryFunc = summary_func
         self.degreeList = degree_list
         self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
-                                         shape=(None, GlobalConstants.IMAGE_SIZE,
-                                                GlobalConstants.IMAGE_SIZE,
-                                                GlobalConstants.NUM_CHANNELS))
-        self.labelTensor = tf.placeholder(tf.int64, shape=(None,))
+                                         shape=(None, dataset.get_image_size(),
+                                                dataset.get_image_size(),
+                                                dataset.get_num_of_channels()),
+                                         name="dataTensor")
+        self.labelTensor = tf.placeholder(tf.int64, shape=(None,), name="labelTensor")
         self.oneHotLabelTensor = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
-                                                shape=(None, GlobalConstants.NUM_LABELS))
-        self.indicesTensor = tf.placeholder(tf.int64, shape=(None,))
-        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None,))
+                                                shape=(None, dataset.get_label_count()), name="oneHotLabelTensor")
+        self.indicesTensor = tf.placeholder(tf.int64, shape=(None,), name="indicesTensor")
+        self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None,), name="filteredMask")
+        self.coarseLabelTensor = tf.placeholder(tf.int64, shape=(None,), name="coarseLabelTensor")
+        self.coarseOneHotLabelTensor = tf.placeholder(tf.int64, shape=(None,), name="coarseOneHotLabelTensor")
         self.evalDict = {}
         self.mainLoss = None
         self.residueLoss = None
@@ -47,7 +50,7 @@ class TreeNetwork:
         self.residueGradients = None
         self.regularizationGradients = None
         self.decisionGradients = None
-        self.sample_count_tensors = None
+        self.sampleCountTensors = None
         self.isOpenTensors = None
         self.momentumStatesDict = {}
         self.newValuesDict = {}
@@ -82,6 +85,7 @@ class TreeNetwork:
         self.decisionLossCoefficientCalculator = None
         self.isBaseline = None
         self.labelCount = dataset.get_label_count()
+        self.numChannels = dataset.get_num_of_channels()
         # Algorithms
         self.modeTracker = ModeTracker(network=self)
         self.accuracyCalculator = AccuracyCalculator(network=self)
@@ -240,7 +244,7 @@ class TreeNetwork:
         self.evalDict["ResidueLoss"] = self.residueLoss
         self.evalDict["DecisionLoss"] = self.decisionLoss
         self.evalDict["NetworkLoss"] = self.finalLoss
-        self.sample_count_tensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.gradFunc(network=self)
 
@@ -251,16 +255,20 @@ class TreeNetwork:
         self.mainLoss = tf.add_n(primary_losses)
 
     def build_regularization_loss(self):
-        vars = self.variableManager.trainable_variables()
+        vars = tf.trainable_variables()
         l2_loss_list = []
+        decayed_variables = []
+        non_decayed_variables = []
         for v in vars:
             is_decision_pipeline_variable = self.is_decision_variable(variable=v)
             # assert (not is_decision_pipeline_variable)
             loss_tensor = tf.nn.l2_loss(v)
             self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
-            if "bias" in v.name or "shift" in v.name or "scale" in v.name:
+            if "bias" in v.name or "shift" in v.name or "scale" in v.name or "gamma" in v.name or "beta" in v.name:
+                non_decayed_variables.append(v)
                 l2_loss_list.append(0.0 * loss_tensor)
             else:
+                decayed_variables.append(v)
                 if is_decision_pipeline_variable:
                     l2_loss_list.append(self.decisionWeightDecayCoeff * loss_tensor)
                 else:
@@ -444,7 +452,7 @@ class TreeNetwork:
         run_ops = [self.classificationGradients,
                    self.regularizationGradients,
                    self.residueGradients,
-                   self.sample_count_tensors,
+                   self.sampleCountTensors,
                    vars,
                    self.isOpenTensors]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
@@ -563,7 +571,7 @@ class TreeNetwork:
             self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
             self.get_noise_coefficient(feed_dict=feed_dict, iteration=iteration, update=False)
             self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
-        run_ops = [self.decisionGradients, self.sample_count_tensors, self.isOpenTensors, info_gain_dicts]
+        run_ops = [self.decisionGradients, self.sampleCountTensors, self.isOpenTensors, info_gain_dicts]
         if iteration % GlobalConstants.SUMMARY_PERIOD == 0:
             run_ops.append(self.decisionPathSummaries)
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
@@ -595,7 +603,7 @@ class TreeNetwork:
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         vars = self.variableManager.trainable_variables()
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        minibatch = dataset.get_next_batch()
         samples = minibatch.samples
         labels = minibatch.labels
         indices_list = minibatch.indices
@@ -649,7 +657,8 @@ class TreeNetwork:
     # if v in res_grads:
     #     total_grad += res_grads[v]
 
-    def get_variable_name(self, name, node):
+    @staticmethod
+    def get_variable_name(name, node):
         return "Node{0}_{1}".format(node.index, name)
 
     def get_node_from_variable_name(self, name):
@@ -805,7 +814,7 @@ class TreeNetwork:
 
     def eval_network(self, sess, dataset, use_masking):
         # if is_train:
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        minibatch = dataset.get_next_batch()
         samples = minibatch.samples
         labels = minibatch.labels
         indices_list = minibatch.indices

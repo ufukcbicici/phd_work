@@ -129,7 +129,7 @@ class Ensemble:
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         feed_dict = {}
         for network, dataset in zip(self.networks, self.datasets):
-            minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+            minibatch = dataset.get_next_batch()
             minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
                                           minibatch.indices, minibatch.one_hot_labels, minibatch.hash_codes)
             minibatches.append(minibatch)
@@ -148,7 +148,7 @@ class Ensemble:
 
     def eval(self, sess, dataset, use_masking):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        minibatch = dataset.get_next_batch()
         minibatch = DataSet.MiniBatch(np.expand_dims(minibatch.samples, axis=3), minibatch.labels,
                                       minibatch.indices, minibatch.one_hot_labels, minibatch.hash_codes)
         feed_dict = {}
