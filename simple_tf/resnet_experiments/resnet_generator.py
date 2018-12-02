@@ -76,7 +76,7 @@ class ResnetGenerator:
             x = ResnetGenerator.conv("conv3", x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
 
         with tf.variable_scope("sub_add"):
-            if in_filter != out_filter:
+            if in_filter != out_filter or not all([d == 1 for d in stride]):
                 orig_x = ResnetGenerator.conv("project", orig_x, 1, in_filter, out_filter, stride)
             x += orig_x
         return x
