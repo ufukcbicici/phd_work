@@ -41,7 +41,7 @@ class GlobalConstants:
     TOTAL_EPOCH_COUNT = 300
     EPOCH_COUNT = 300
     EPOCH_REPORT_PERIOD = 1
-    BATCH_SIZE = 128
+    BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 250
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
@@ -65,9 +65,11 @@ class GlobalConstants:
     #                                                decay=DECAY_RATE)
     # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
     #                                              decay_period=DECAY_STEP)
-    LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator", value=INITIAL_LR,
+    LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+                                                 value=INITIAL_LR,
                                                  schedule=[(40000, 0.01),
-                                                           (60000, 0.001)])
+                                                           (60000, 0.001),
+                                                           (80000, 0.0001)])
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
