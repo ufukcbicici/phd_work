@@ -2,8 +2,14 @@ from collections import deque
 
 import tensorflow as tf
 import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.collections import PatchCollection
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.node import Node
+from simple_tf.cigj.jungle_node import NodeType
+from simple_tf.cigj.jungle_node import JungleNode
 
 
 class Jungle(FastTreeNetwork):
@@ -18,5 +24,89 @@ class Jungle(FastTreeNetwork):
         root_node.softmaxDecay = tf.placeholder(name=softmax_decay_name, dtype=tf.float32)
         self.dagObject.add_node(node=root_node)
         self.nodes[curr_index] = root_node
+        self.depthToNodesDict = {}
         d = deque()
         d.append(root_node)
+        # Create Trellis structure. Add a h node to every non-root and non-leaf layer.
+        degree_list = [degree if depth == 0 or depth == len(degree_list)-1 else degree + 1 for depth, degree in
+                       enumerate(degree_list)]
+        assert degree_list[0] == 1
+        assert degree_list[-1] == 1
+        for depth, num_of_nodes in enumerate(degree_list):
+            for i in range(num_of_nodes):
+                if depth == 0:
+                    node_type = NodeType.root_node
+                elif depth == len(degree_list) - 1:
+                    node_type = NodeType.leaf_node
+                elif i < num_of_nodes - 1:
+                    node_type = NodeType.f_node
+                elif i == num_of_nodes - 1:
+                    node_type = NodeType.h_node
+                else:
+                    raise Exception("Unknown node type.")
+                curr_node = JungleNode(index=curr_index, depth=depth, node_type=node_type)
+                self.nodes[curr_index] = curr_node
+                curr_index += 1
+                if depth not in self.depthToNodesDict:
+                    self.depthToNodesDict[depth] = []
+                self.depthToNodesDict[depth].append(curr_node)
+                # Make this node a child to every node in the previous layer
+                if depth - 1 in self.depthToNodesDict:
+                    for parent_node in self.depthToNodesDict[depth - 1]:
+                        self.dagObject.add_edge(parent=parent_node, child=curr_node)
+                # Decorate node accordingly with its type
+                self.decorate_node(node=curr_node)
+
+    def decorate_node(self, node):
+        if node.nodeType == NodeType.h_node:
+            threshold_name = self.get_variable_name(name="threshold", node=node)
+            softmax_decay_name = self.get_variable_name(name="softmax_decay", node=node)
+            node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
+            node.softmaxDecay = tf.placeholder(name=softmax_decay_name, dtype=tf.float32)
+
+    # For debugging
+    def print_trellis_structure(self):
+        # G = self.dagObject.dagObject
+        max_layer_width = max([len(l) for l in self.depthToNodesDict.values()])
+        total_depth = len(self.depthToNodesDict)
+        vertical_spacing = 50
+        horizontal_spacing = 50
+        node_radius = 0.025
+        total_width = vertical_spacing * (max_layer_width - 1) + 2*node_radius
+        total_height = horizontal_spacing * (total_depth - 1) + 2*node_radius
+        node_circles = []
+        for curr_depth in range(self.depth):
+            nodes_of_curr_depth = self.depthToNodesDict[curr_depth]
+            if len(nodes_of_curr_depth) > 1:
+                horizontal_step_size = (1.0 - 2 * node_radius) / float(len(nodes_of_curr_depth) - 1.0)
+                vertical_step_size = (1.0 - 2 * node_radius) / float(len(self.depthToNodesDict) - 1.0)
+            else:
+                horizontal_step_size = 0.0
+                vertical_step_size = 0.0
+            for index_in_depth, node in enumerate(nodes_of_curr_depth):
+                if node.nodeType == NodeType.root_node:
+                    node_circles.append(plt.Circle((0.5, 1.0 - node_radius), node_radius, color='r'))
+                elif node.nodeType == NodeType.leaf_node:
+                    node_circles.append(plt.Circle((0.5, node_radius), node_radius, color='y'))
+                elif node.nodeType == NodeType.f_node:
+                    node_circles.append(plt.Circle((node_radius + index_in_depth*horizontal_step_size,
+                                                    1.0 - node_radius - curr_depth*vertical_step_size), node_radius, color='b'))
+                elif node.nodeType == NodeType.h_node:
+                    node_circles.append(plt.Circle((node_radius + index_in_depth*horizontal_step_size,
+                                                    1.0 - node_radius - curr_depth*vertical_step_size), node_radius, color='g'))
+                else:
+                    raise Exception("Unknown node type.")
+        fig, ax = plt.subplots()
+        for circle in node_circles:
+            ax.add_artist(circle)
+        plt.show()
+        print("X")
+        # pos_dict = {}
+        # for node in index_sorted_nodes:
+        #     if node.index == 0:
+        #         pos_dict[node] = (total_width/2, node_dim)
+        #     elif node.index == len(index_sorted_nodes) - 1:
+        #         pos_dict[node] = (total_width/2, total_height-node_dim)
+        #     else:
+        #
+
