@@ -28,7 +28,7 @@ class Jungle(FastTreeNetwork):
         d = deque()
         d.append(root_node)
         # Create Trellis structure. Add a h node to every non-root and non-leaf layer.
-        degree_list = [degree if depth == 0 or depth == len(degree_list)-1 else degree + 1 for depth, degree in
+        degree_list = [degree if depth == 0 or depth == len(degree_list) - 1 else degree + 1 for depth, degree in
                        enumerate(degree_list)]
         assert degree_list[0] == 1
         assert degree_list[-1] == 1
@@ -72,9 +72,12 @@ class Jungle(FastTreeNetwork):
         vertical_spacing = 50
         horizontal_spacing = 50
         node_radius = 0.025
-        total_width = vertical_spacing * (max_layer_width - 1) + 2*node_radius
-        total_height = horizontal_spacing * (total_depth - 1) + 2*node_radius
+        total_width = vertical_spacing * (max_layer_width - 1) + 2 * node_radius
+        total_height = horizontal_spacing * (total_depth - 1) + 2 * node_radius
         node_circles = []
+        node_positions = {}
+        edge_arrows = []
+        # Draw Nodes as Vertices (Circles)
         for curr_depth in range(self.depth):
             nodes_of_curr_depth = self.depthToNodesDict[curr_depth]
             if len(nodes_of_curr_depth) > 1:
@@ -86,16 +89,30 @@ class Jungle(FastTreeNetwork):
             for index_in_depth, node in enumerate(nodes_of_curr_depth):
                 if node.nodeType == NodeType.root_node:
                     node_circles.append(plt.Circle((0.5, 1.0 - node_radius), node_radius, color='r'))
+                    node_positions[node] = (0.5, 1.0 - node_radius)
                 elif node.nodeType == NodeType.leaf_node:
                     node_circles.append(plt.Circle((0.5, node_radius), node_radius, color='y'))
+                    node_positions[node] = (0.5, node_radius)
                 elif node.nodeType == NodeType.f_node:
-                    node_circles.append(plt.Circle((node_radius + index_in_depth*horizontal_step_size,
-                                                    1.0 - node_radius - curr_depth*vertical_step_size), node_radius, color='b'))
+                    node_circles.append(plt.Circle((node_radius + index_in_depth * horizontal_step_size,
+                                                    1.0 - node_radius - curr_depth * vertical_step_size), node_radius,
+                                                   color='b'))
+                    node_positions[node] = (node_radius + index_in_depth * horizontal_step_size,
+                                            1.0 - node_radius - curr_depth * vertical_step_size)
                 elif node.nodeType == NodeType.h_node:
-                    node_circles.append(plt.Circle((node_radius + index_in_depth*horizontal_step_size,
-                                                    1.0 - node_radius - curr_depth*vertical_step_size), node_radius, color='g'))
+                    node_circles.append(plt.Circle((node_radius + index_in_depth * horizontal_step_size,
+                                                    1.0 - node_radius - curr_depth * vertical_step_size), node_radius,
+                                                   color='g'))
+                    node_positions[node] = (node_radius + index_in_depth * horizontal_step_size,
+                                            1.0 - node_radius - curr_depth * vertical_step_size)
                 else:
                     raise Exception("Unknown node type.")
+        # Draw Edges as Arrows
+        for edge in self.dagObject.get_edges():
+            source = edge[0]
+            destination = edge[1]
+
+
         fig, ax = plt.subplots()
         for circle in node_circles:
             ax.add_artist(circle)
@@ -109,4 +126,3 @@ class Jungle(FastTreeNetwork):
         #         pos_dict[node] = (total_width/2, total_height-node_dim)
         #     else:
         #
-

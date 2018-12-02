@@ -43,3 +43,7 @@ class Dag:
 
     def get_shortest_path_length(self, source, dest):
         return len(nx.shortest_path(self.dagObject, source, dest)) - 1
+
+    def get_edges(self):
+        edges = self.dagObject.edges
+        return [e for e in edges]
