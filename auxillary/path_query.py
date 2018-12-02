@@ -22,13 +22,7 @@ def get_query(min_run_id, max_run_id, condition, iteration_lower_limit, add_unio
     return qry
 
 
-print('Number of arguments:', len(sys.argv), 'arguments.')
-
-min_id = sys.argv[1]
-max_id = sys.argv[2]
-
-
-def execute_path_query():
+def execute_path_query(min_id, max_id, do_print=True):
     step1 = 250
     step2 = 500
     low_limit = 10000
@@ -49,8 +43,10 @@ def execute_path_query():
     # print(query)
 
     rows = DbLogger.read_query(query=query)
-    for row in rows:
-        print(row)
+    if do_print:
+        for row in rows:
+            print(row)
+    return rows
 
 # SELECT RunId, Avg(Accuracy) AS Accuracy, AVG(LeafEvaluated) AS LeafEvaluated, COUNT(1) AS CNT
 # FROM
