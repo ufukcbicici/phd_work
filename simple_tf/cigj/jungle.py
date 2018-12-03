@@ -47,12 +47,34 @@ class Jungle(FastTreeNetwork):
                     for parent_node in self.depthToNodesDict[depth - 1]:
                         self.dagObject.add_edge(parent=parent_node, child=curr_node)
                 # Decorate node accordingly with its type
-                self.decorate_node(node=curr_node)
+                # self.decorate_node(node=curr_node)
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
+        self.indexHolders = {}
+        for node in self.topologicalSortedNodes:
+            if node.nodeType == NodeType.h_node:
+                assert node.depth not in self.indexHolders
+                self.indexHolders[node.depth] = tf.range(self.batchSize)
 
-    def decorate_node(self, node):
-        if node.nodeType == NodeType.h_node:
-            UtilityFuncs.get_variable_name(name="conv1_weight", node=node)
+    def stitch_samples(self, node):
+        assert node.nodeType == NodeType.h_node
+        parents = self.dagObject.parents(node=node)
+        # Layer 1 h_node. This receives non-partitioned, complete minibatch from the root node. No stitching needed.
+        if len(parents) == 1:
+            assert parents[0].nodeType == NodeType.root_node and node.depth == 1
+            return parents[0].fOpsList[-1]
+        # Need stitching
+        else:
+            raise NotImplementedError()
+
+    def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+
+
+
+
+
+    # def decorate_node(self, node):
+    #     if node.nodeType == NodeType.h_node:
+    #         UtilityFuncs.get_variable_name(name="conv1_weight", node=node)
 
         # if node.nodeType == NodeType.h_node:
         #     threshold_name = self.get_variable_name(name="threshold", node=node)
