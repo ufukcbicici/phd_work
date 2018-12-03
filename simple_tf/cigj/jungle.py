@@ -16,17 +16,7 @@ class Jungle(FastTreeNetwork):
     def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         curr_index = 0
-        is_leaf = 0 == (self.depth - 1)
-        root_node = Node(index=curr_index, depth=0, is_root=True, is_leaf=is_leaf)
-        threshold_name = self.get_variable_name(name="threshold", node=root_node)
-        root_node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
-        softmax_decay_name = self.get_variable_name(name="softmax_decay", node=root_node)
-        root_node.softmaxDecay = tf.placeholder(name=softmax_decay_name, dtype=tf.float32)
-        self.dagObject.add_node(node=root_node)
-        self.nodes[curr_index] = root_node
         self.depthToNodesDict = {}
-        d = deque()
-        d.append(root_node)
         # Create Trellis structure. Add a h node to every non-root and non-leaf layer.
         degree_list = [degree if depth == 0 or depth == len(degree_list) - 1 else degree + 1 for depth, degree in
                        enumerate(degree_list)]
@@ -56,6 +46,7 @@ class Jungle(FastTreeNetwork):
                         self.dagObject.add_edge(parent=parent_node, child=curr_node)
                 # Decorate node accordingly with its type
                 self.decorate_node(node=curr_node)
+        self.topologicalSortedNodes = self.dagObject.get_topological_sort()
 
     def decorate_node(self, node):
         if node.nodeType == NodeType.h_node:
@@ -119,6 +110,10 @@ class Jungle(FastTreeNetwork):
                      node_positions[destination][1] - node_positions[source][1],
                      head_width=0.01, head_length=0.01, fc='k', ec='k',
                      length_includes_head=True)
+        # Draw node texts
+        for node in self.topologicalSortedNodes:
+            node_pos = node_positions[node]
+            ax.text(node_pos[0], node_pos[1], "{0}".format(node.index))
         plt.show()
         print("X")
         # pos_dict = {}
