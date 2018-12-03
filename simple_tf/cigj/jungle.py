@@ -113,7 +113,7 @@ class Jungle(FastTreeNetwork):
         # Draw node texts
         for node in self.topologicalSortedNodes:
             node_pos = node_positions[node]
-            ax.text(node_pos[0], node_pos[1], "{0}".format(node.index))
+            ax.text(node_pos[0], node_pos[1], "{0}".format(node.index), fontsize=16, color="c")
         plt.show()
         print("X")
         # pos_dict = {}
