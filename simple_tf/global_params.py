@@ -43,7 +43,6 @@ class GlobalConstants:
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 250
-    CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
     USE_FAST_TREE_MODE = True
@@ -239,3 +238,10 @@ class GlobalConstants:
     BATCH_SIZES_DICT = {DatasetTypes.training: BATCH_SIZE,
                         DatasetTypes.test: EVAL_BATCH_SIZE,
                         DatasetTypes.validation: EVAL_BATCH_SIZE}
+
+    # CIGJ
+    CIGJ_FASHION_NET_ROOT_CHANNEL_COUNT = 32
+    CIGJ_FASHION_NET_L1_CHANNEL_COUNT = 24
+    CIGJ_FASHION_NET_L2_CHANNEL_COUNT = 48
+    CIGJ_FASHION_NET_L3_FC_1_DIMENSION = 128
+    CIGJ_FASHION_NET_L3_FC_2_DIMENSION = 64

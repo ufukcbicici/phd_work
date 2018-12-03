@@ -6,6 +6,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.collections import PatchCollection
+
+from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.node import Node
 from simple_tf.cigj.jungle_node import NodeType
@@ -50,10 +52,13 @@ class Jungle(FastTreeNetwork):
 
     def decorate_node(self, node):
         if node.nodeType == NodeType.h_node:
-            threshold_name = self.get_variable_name(name="threshold", node=node)
-            softmax_decay_name = self.get_variable_name(name="softmax_decay", node=node)
-            node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
-            node.softmaxDecay = tf.placeholder(name=softmax_decay_name, dtype=tf.float32)
+            UtilityFuncs.get_variable_name(name="conv1_weight", node=node)
+
+        # if node.nodeType == NodeType.h_node:
+        #     threshold_name = self.get_variable_name(name="threshold", node=node)
+        #     softmax_decay_name = self.get_variable_name(name="softmax_decay", node=node)
+        #     node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
+        #     node.softmaxDecay = tf.placeholder(name=softmax_decay_name, dtype=tf.float32)
 
     # For debugging
     def print_trellis_structure(self):
@@ -110,3 +115,5 @@ class Jungle(FastTreeNetwork):
         plt.show()
         print("X")
 
+    # def apply_decision(self):
+    #     pass

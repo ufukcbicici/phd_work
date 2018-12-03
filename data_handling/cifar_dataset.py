@@ -59,7 +59,6 @@ class CifarDataSet(MnistDataSet):
         self.testInitOp = None
         self.outputsDict = {}
         self.augmentationMultiplier = augmentation_multiplier
-        self.batchSize = tf.placeholder(tf.int64)
         self.currInitOp = None
         self.currOutputs = None
         self.trainingIndices = None

@@ -18,6 +18,7 @@ class FastTreeNetwork(TreeNetwork):
         self.optimizer = None
         self.infoGainDicts = None
         self.extra_update_ops = None
+        self.batchSize = tf.placeholder(tf.int64)
 
     def build_network(self):
         # Create itself
@@ -277,12 +278,11 @@ class FastTreeNetwork(TreeNetwork):
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch()
         if minibatch is None:
             return None, None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
-                                           is_train=True, use_masking=True)
+                                           is_train=True, use_masking=True, batch_size=GlobalConstants.BATCH_SIZE)
         # Prepare result tensors to collect
         run_ops = self.get_run_ops()
         if GlobalConstants.USE_VERBOSE:
@@ -298,19 +298,19 @@ class FastTreeNetwork(TreeNetwork):
         return lr, sample_counts, is_open_indicators
 
     def eval_network(self, sess, dataset, use_masking):
-        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
         minibatch = dataset.get_next_batch()
         if minibatch is None:
             return None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
-                                           is_train=False, use_masking=use_masking)
+                                           is_train=False, use_masking=use_masking,
+                                           batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         results = sess.run(self.evalDict, feed_dict)
         # for k, v in results.items():
         #     if "final_feature_mag" in k:
         #         print("{0}={1}".format(k, v))
         return results, minibatch
 
-    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking, batch_size):
         feed_dict = {self.dataTensor: minibatch.samples,
                      self.labelTensor: minibatch.labels,
                      self.indicesTensor: minibatch.indices,
@@ -324,7 +324,8 @@ class FastTreeNetwork(TreeNetwork):
                      self.useMasking: int(use_masking),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration,
-                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
+                     self.batchSize: batch_size,
+                     self.filteredMask: np.ones((batch_size,), dtype=bool)}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:
