@@ -116,11 +116,4 @@ class Jungle(FastTreeNetwork):
             ax.text(node_pos[0], node_pos[1], "{0}".format(node.index), fontsize=16, color="c")
         plt.show()
         print("X")
-        # pos_dict = {}
-        # for node in index_sorted_nodes:
-        #     if node.index == 0:
-        #         pos_dict[node] = (total_width/2, node_dim)
-        #     elif node.index == len(index_sorted_nodes) - 1:
-        #         pos_dict[node] = (total_width/2, total_height-node_dim)
-        #     else:
-        #
+
