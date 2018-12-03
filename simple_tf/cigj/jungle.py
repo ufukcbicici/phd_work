@@ -59,16 +59,9 @@ class Jungle(FastTreeNetwork):
     def print_trellis_structure(self):
         fig, ax = plt.subplots()
         # G = self.dagObject.dagObject
-        max_layer_width = max([len(l) for l in self.depthToNodesDict.values()])
-        total_depth = len(self.depthToNodesDict)
-        vertical_spacing = 50
-        horizontal_spacing = 50
         node_radius = 0.05
-        total_width = vertical_spacing * (max_layer_width - 1) + 2 * node_radius
-        total_height = horizontal_spacing * (total_depth - 1) + 2 * node_radius
         node_circles = []
         node_positions = {}
-        edge_arrows = []
         # Draw Nodes as Vertices (Circles)
         for curr_depth in range(self.depth):
             nodes_of_curr_depth = self.depthToNodesDict[curr_depth]
