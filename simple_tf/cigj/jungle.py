@@ -43,7 +43,8 @@ class Jungle(FastTreeNetwork):
                 if depth not in self.depthToNodesDict:
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
-                # Each F node will have the H node in the same layer as parent as well.
+
+
 
 
 
@@ -55,6 +56,24 @@ class Jungle(FastTreeNetwork):
                 #         self.dagObject.add_edge(parent=parent_node, child=curr_node)
                 # Decorate node accordingly with its type
                 # self.decorate_node(node=curr_node)
+        # Each H node will have the whole previous layer as the parent.
+        # Each F node will have the H of the same layer as the parent.
+        # Root has the Layer 1 H as its child.
+        # Leaf will have the whole previous layer as the parent.
+        for node in self.nodes.values():
+            if node.nodeType == NodeType.root_node:
+                continue
+            elif node.nodeType == NodeType.h_node or node.nodeType == NodeType.leaf_node:
+                assert node.depth - 1 in self.depthToNodesDict
+                for parent_node in self.depthToNodesDict[node.depth - 1]:
+                    self.dagObject.add_edge(parent=parent_node, child=node)
+            elif node.nodeType == NodeType.f_node:
+                h_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.h_node]
+                assert len(h_nodes) == 1
+                parent = h_nodes[0]
+                self.dagObject.add_edge(parent=parent, child=node)
+            else:
+                raise Exception("Unknown node type.")
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         self.indexHolders = {}
         for node in self.topologicalSortedNodes:

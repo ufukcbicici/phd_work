@@ -10,7 +10,7 @@ from tensorflow import keras
 from data_handling.data_set import DataSet
 
 
-class CifarDataSet(MnistDataSet):
+class CifarDataSet(DataSet):
     CIFAR_SIZE = 32
     CIFAR100_COARSE_LABEL_COUNT = 20
     CIFAR100_FINE_LABEL_COUNT = 100
@@ -59,6 +59,7 @@ class CifarDataSet(MnistDataSet):
         self.testInitOp = None
         self.outputsDict = {}
         self.augmentationMultiplier = augmentation_multiplier
+        self.batchSize = tf.placeholder(tf.int64)
         self.currInitOp = None
         self.currOutputs = None
         self.trainingIndices = None
