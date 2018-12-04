@@ -69,7 +69,8 @@ class MnistDataSet(DataSet):
         self.trainingLabels = np.delete(self.trainingLabels, indices, 0)
         # print("X")
 
-    def get_next_batch(self, batch_size):
+    def get_next_batch(self, batch_size=None):
+        assert batch_size is not None
         num_of_samples = self.get_current_sample_count()
         curr_end_index = self.currentIndex + batch_size - 1
         # Check if the interval [curr_start_index, curr_end_index] is inside data boundaries.
@@ -110,7 +111,7 @@ class MnistDataSet(DataSet):
         np.random.shuffle(self.currentIndices)
         self.isNewEpoch = False
 
-    def set_current_data_set_type(self, dataset_type):
+    def set_current_data_set_type(self, dataset_type, batch_size=None):
         self.currentDataSetType = dataset_type
         if self.currentDataSetType == DatasetTypes.training:
             self.currentSamples = self.trainingSamples
