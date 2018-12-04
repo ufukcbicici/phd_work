@@ -51,17 +51,6 @@ class FastTreeNetwork(TreeNetwork):
                     self.nodes[curr_index] = child_node
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
-        # Flags and hyperparameters
-        self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
-        self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
-        self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
-        self.useMasking = tf.placeholder(name="use_masking_flag", dtype=tf.int64)
-        self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
-        self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
-        self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
-        self.noiseCoefficient = tf.placeholder(name="noise_coefficient", dtype=tf.float32)
-        self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient",
-                                                                  dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         self.isBaseline = len(self.topologicalSortedNodes) == 1

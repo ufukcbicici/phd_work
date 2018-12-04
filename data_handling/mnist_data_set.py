@@ -179,3 +179,9 @@ class MnistDataSet(DataSet):
         np_images /= 255.0
         np_labels = np.array(labels).astype(np.int64)
         return np_images, np_labels
+
+    def get_image_size(self):
+        return MnistDataSet.MNIST_SIZE
+
+    def get_num_of_channels(self):
+        return 1

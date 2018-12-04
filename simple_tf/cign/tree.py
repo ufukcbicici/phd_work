@@ -60,18 +60,9 @@ class TreeNetwork:
         self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
         self.decisionWeightDecayCoeff = tf.placeholder(name="decision_weight_decay_coefficient", dtype=tf.float32)
         self.residueInputTensor = None
-        self.useThresholding = None
-        self.iterationHolder = None
         self.decisionLossCoefficient = tf.placeholder(name="decision_loss_coefficient", dtype=tf.float32)
-        self.decisionDropoutKeepProb = None
         self.decisionDropoutKeepProbCalculator = None
-        self.classificationDropoutKeepProb = None
-        self.informationGainBalancingCoefficient = None
-        self.noiseCoefficient = None
         self.noiseCoefficientCalculator = None
-        self.isTrain = None
-        self.useMasking = None
-        self.isDecisionPhase = None
         self.mainLossParamsDict = {}
         self.residueParamsDict = {}
         self.regularizationParamsDict = {}
@@ -91,6 +82,17 @@ class TreeNetwork:
         self.accuracyCalculator = AccuracyCalculator(network=self)
         self.variableManager = VariableManager(network=self)
         self.softmaxCompresser = None
+        # Flags and hyperparameters
+        self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
+        self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
+        self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
+        self.useMasking = tf.placeholder(name="use_masking_flag", dtype=tf.int64)
+        self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
+        self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
+        self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
+        self.noiseCoefficient = tf.placeholder(name="noise_coefficient", dtype=tf.float32)
+        self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient",
+                                                                  dtype=tf.float32)
 
     # def get_parent_index(self, node_index):
     #     parent_index = int((node_index - 1) / self.treeDegree)
