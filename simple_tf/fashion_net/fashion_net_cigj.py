@@ -4,7 +4,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
 
 
-def root_func(node, network):
+def f_root_func(node, network):
     # Convolution 1
     # OK
     conv1_weights = tf.Variable(
@@ -22,36 +22,6 @@ def root_func(node, network):
     relu1 = tf.nn.relu(tf.nn.bias_add(conv1, conv1_biases))
     pool1 = tf.nn.max_pool(relu1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     node.fOpsList.extend([pool1])
-
-
-def h_l1_func(node, network):
-    h_net = network.stitch_samples(node=node)
-    net_shape = h_net.get_shape().as_list()
-    # Global Average Pooling
-    h_net = tf.nn.avg_pool(h_net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
-    net_shape = h_net.get_shape().as_list()
-    h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
-    feature_size = h_net.get_shape().as_list()[-1]
-    fc_h_weights = tf.Variable(tf.truncated_normal(
-        [feature_size, GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0]],
-        stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_decision_weights", node=node))
-    fc_h_bias = tf.Variable(
-        tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0]], dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_decision_bias", node=node))
-    h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
-    h_net = tf.nn.relu(h_net)
-    h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
-    ig_feature = h_net
-    node.hOpsList.extend([ig_feature])
-    ig_feature_size = ig_feature.get_shape().as_list()[-1]
-    layer_degree = network.node_degree[node.depth]
-    hyperplane_weights = tf.Variable(
-        tf.truncated_normal([ig_feature_size, layer_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                            dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="hyperplane_weights", node=node))
-    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[layer_degree], dtype=GlobalConstants.DATA_TYPE),
-                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
 
 
 def f_l1_func(node, network):
@@ -77,7 +47,7 @@ def f_l1_func(node, network):
     node.fOpsList.extend([pool])
 
 
-def l2_func(node, network):
+def f_l2_func(node, network):
     # Convolution 2
     # OK
     conv3_weights = tf.Variable(
@@ -100,7 +70,7 @@ def l2_func(node, network):
     node.fOpsList.extend([pool])
 
 
-def l3_func(node, network):
+def f_l3_func(node, network):
     parent_F, parent_H = network.mask_input_nodes(node=node)
     net = tf.contrib.layers.flatten(parent_F)
     flattened_F_feature_size = net.get_shape().as_list()[-1]
@@ -133,5 +103,27 @@ def l3_func(node, network):
     node.fOpsList.extend([dropped_layer_2])
 
 
-def leaf_func(node, network):
+def f_leaf_func(node, network):
     parent_F, parent_H = network.mask_input_nodes(node=node)
+
+
+def h_l1_func(node, network):
+    h_net = network.stitch_samples(node=node)
+    net_shape = h_net.get_shape().as_list()
+    # Global Average Pooling
+    h_net = tf.nn.avg_pool(h_net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
+    net_shape = h_net.get_shape().as_list()
+    h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
+    feature_size = h_net.get_shape().as_list()[-1]
+    fc_h_weights = tf.Variable(tf.truncated_normal(
+        [feature_size, GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0]],
+        stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="fc_decision_weights", node=node))
+    fc_h_bias = tf.Variable(
+        tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0]], dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="fc_decision_bias", node=node))
+    h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
+    h_net = tf.nn.relu(h_net)
+    h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = h_net
+    node.hOpsList.extend([ig_feature])

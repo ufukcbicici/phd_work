@@ -127,10 +127,7 @@ def cifar100_training():
             sess = tf.Session(config=config)
         else:
             sess = tf.Session()
-        dataset = CifarDataSet(session=sess,
-                               batch_sizes=GlobalConstants.BATCH_SIZES_DICT,
-                               validation_sample_count=0, load_validation_from=None)
-        dataset.set_curr_session(sess=sess)
+        dataset = CifarDataSet(session=sess, validation_sample_count=0, load_validation_from=None)
         # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
         network = FastTreeNetwork(

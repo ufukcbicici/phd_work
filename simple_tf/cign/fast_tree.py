@@ -18,7 +18,7 @@ class FastTreeNetwork(TreeNetwork):
         self.optimizer = None
         self.infoGainDicts = None
         self.extra_update_ops = None
-        self.batchSize = tf.placeholder(tf.int64)
+        self.batchSize = tf.placeholder(tf.int32)
 
     def build_network(self):
         # Create itself

@@ -10,16 +10,18 @@ from matplotlib.collections import PatchCollection
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
+from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
 from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.cigj.jungle_node import JungleNode
 
 
 class Jungle(FastTreeNetwork):
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
+    def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         curr_index = 0
         self.depthToNodesDict = {}
+        self.hFuncs = h_funcs
         # Create Trellis structure. Add a h node to every non-root and non-leaf layer.
         degree_list = [degree if depth == 0 or depth == len(degree_list) - 1 else degree + 1 for depth, degree in
                        enumerate(degree_list)]
@@ -43,14 +45,7 @@ class Jungle(FastTreeNetwork):
                 if depth not in self.depthToNodesDict:
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
-
-
-
-
-
-
-
-                # # Make this node a child to every node in the previous layer
+                # Make this node a child to every node in the previous layer
                 # if depth - 1 in self.depthToNodesDict:
                 #     for parent_node in self.depthToNodesDict[depth - 1]:
                 #         self.dagObject.add_edge(parent=parent_node, child=curr_node)
@@ -75,11 +70,9 @@ class Jungle(FastTreeNetwork):
             else:
                 raise Exception("Unknown node type.")
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
-        self.indexHolders = {}
-        for node in self.topologicalSortedNodes:
-            if node.nodeType == NodeType.h_node:
-                assert node.depth not in self.indexHolders
-                self.indexHolders[node.depth] = tf.range(self.batchSize)
+        # Build nodes
+        self.nodeBuildFuncs[0](node=self.nodes[0], network=self)
+        self.hFuncs[0](node=self.topologicalSortedNodes[1], network=self)
 
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
@@ -93,38 +86,49 @@ class Jungle(FastTreeNetwork):
             raise NotImplementedError()
 
     def apply_decision(self, node, branching_feature):
+        # Step 1: Create Hyperplanes
         node_degree = self.degreeList[node.depth]
         ig_feature_size = branching_feature.get_shape().as_list()[-1]
         hyperplane_weights = tf.Variable(
             tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
                                 dtype=GlobalConstants.DATA_TYPE),
-            name=self.get_variable_name(name="hyperplane_weights", node=node))
+            name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
         hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                        name=self.get_variable_name(name="hyperplane_biases", node=node))
+                                        name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                               training=tf.cast(self.isTrain,
                                                                                tf.bool))
+        # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
-        p_n_given_x = tf.nn.softmax(decayed_activation)
-        p_c_given_x = node.oneHotLabelTensor
-
-
-
-
-
-    # def decorate_node(self, node):
-    #     if node.nodeType == NodeType.h_node:
-    #         UtilityFuncs.get_variable_name(name="conv1_weight", node=node)
-
-        # if node.nodeType == NodeType.h_node:
-        #     threshold_name = self.get_variable_name(name="threshold", node=node)
-        #     softmax_decay_name = self.get_variable_name(name="softmax_decay", node=node)
-        #     node.probabilityThreshold = tf.placeholder(name=threshold_name, dtype=tf.float32)
-        #     node.softmaxDecay = tf.placeholder(name=softmax_decay_name, dtype=tf.float32)
+        p_F_given_x = tf.nn.softmax(decayed_activation)
+        p_c_given_x = self.oneHotLabelTensor
+        node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
+                                                  balance_coefficient=self.informationGainBalancingCoefficient)
+        node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
+        node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
+        node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
+        node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
+        node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
+        node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
+        # Step 3: Sample from p(F|x)
+        dist = tf.distributions.Categorical(probs=p_F_given_x)
+        samples = dist.sample(self.batchSize)
+        one_hot_samples = tf.one_hot(indices=samples, depth=node_degree, axis=-1)
+        node.evalDict[UtilityFuncs.get_variable_name(name="samples", node=node)] = samples
+        node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_samples", node=node)] = one_hot_samples
+        # Step 4: Apply masking to corresponding F nodes in the same layer.
+        child_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
+        child_F_nodes = sorted(child_F_nodes, key=lambda c_node: c_node.index)
+        for index in range(len(child_F_nodes)):
+            child_node = child_F_nodes[index]
+            child_index = child_node.index
+            node.maskTensors[child_index] = one_hot_samples[:, index]
+            node.evalDict[UtilityFuncs.get_variable_name(name="mask_vector_{0}_{1}".format(index, child_index),
+                                                         node=node)] = node.maskTensors[child_index]
 
     # For debugging
     def print_trellis_structure(self):
