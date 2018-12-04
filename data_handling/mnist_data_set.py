@@ -97,9 +97,10 @@ class MnistDataSet(DataSet):
             self.isNewEpoch = False
         if GlobalConstants.USE_SAMPLE_HASHING:
             hash_codes = self.get_unique_codes(samples=samples)
-            return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, hash_codes)
+            return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, hash_codes,
+                                     None, None)
         else:
-            return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, None)
+            return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, None, None, None)
 
     def reset(self):
         self.currentIndex = 0

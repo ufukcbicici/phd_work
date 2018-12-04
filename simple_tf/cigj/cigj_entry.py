@@ -23,7 +23,11 @@ def cigj_training():
                           fashion_net_cigj.f_leaf_func],
         h_funcs=[fashion_net_cigj.h_l1_func], grad_func=None, threshold_func=None, residue_func=None, summary_func=None,
         degree_list=[1, 3, 3, 3, 1], dataset=dataset)
-    jungle.print_trellis_structure()
+    init = tf.global_variables_initializer()
+    sess.run(init)
+    jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
+
+    # jungle.print_trellis_structure()
 
 cigj_training()
 # batch_size = tf.placeholder(dtype=tf.int32)

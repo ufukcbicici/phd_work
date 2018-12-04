@@ -45,12 +45,6 @@ class Jungle(FastTreeNetwork):
                 if depth not in self.depthToNodesDict:
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
-                # Make this node a child to every node in the previous layer
-                # if depth - 1 in self.depthToNodesDict:
-                #     for parent_node in self.depthToNodesDict[depth - 1]:
-                #         self.dagObject.add_edge(parent=parent_node, child=curr_node)
-                # Decorate node accordingly with its type
-                # self.decorate_node(node=curr_node)
         # Each H node will have the whole previous layer as the parent.
         # Each F node will have the H of the same layer as the parent.
         # Root has the Layer 1 H as its child.
