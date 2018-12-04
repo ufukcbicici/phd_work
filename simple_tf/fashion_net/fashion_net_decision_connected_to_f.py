@@ -69,24 +69,12 @@ def root_func(node, network, variables=None):
     # node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
     node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, dropped_ig_feature, ig_feature])
     # node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, ig_feature])
-    ig_feature_size = ig_feature.get_shape().as_list()[-1]
-    hyperplane_weights = tf.Variable(
-        tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                            dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="hyperplane_weights", node=node))
-    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
-    node.variablesSet.add(hyperplane_weights)
-    node.variablesSet.add(hyperplane_biases)
     # Decisions
 
     if GlobalConstants.USE_UNIFIED_BATCH_NORM:
-        network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature,
-                                                       hyperplane_weights=hyperplane_weights,
-                                                       hyperplane_biases=hyperplane_biases)
+        network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature)
     else:
-        network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
-                               hyperplane_biases=hyperplane_biases)
+        network.apply_decision(node=node, branching_feature=ig_feature)
     # ***************** H: Connected to F *****************
 
 
@@ -138,23 +126,11 @@ def l1_func(node, network, variables=None):
     # node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
     node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, dropped_ig_feature, ig_feature])
     # node.hOpsList.extend([flat_pool, raw_ig_feature, relu_ig_feature, ig_feature])
-    ig_feature_size = ig_feature.get_shape().as_list()[-1]
-    hyperplane_weights = tf.Variable(
-        tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                            dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="hyperplane_weights", node=node))
-    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
-    node.variablesSet.add(hyperplane_weights)
-    node.variablesSet.add(hyperplane_biases)
     # Decisions
     if GlobalConstants.USE_UNIFIED_BATCH_NORM:
-        network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature,
-                                                       hyperplane_weights=hyperplane_weights,
-                                                       hyperplane_biases=hyperplane_biases)
+        network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature)
     else:
-        network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
-                               hyperplane_biases=hyperplane_biases)
+        network.apply_decision(node=node, branching_feature=ig_feature)
     # ***************** H: Connected to F *****************
 
 

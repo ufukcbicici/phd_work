@@ -9,6 +9,7 @@ from matplotlib.collections import PatchCollection
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
+from simple_tf.global_params import GlobalConstants
 from simple_tf.node import Node
 from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.cigj.jungle_node import JungleNode
@@ -66,7 +67,25 @@ class Jungle(FastTreeNetwork):
         else:
             raise NotImplementedError()
 
-    def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision(self, node, branching_feature):
+        node_degree = self.degreeList[node.depth]
+        ig_feature_size = branching_feature.get_shape().as_list()[-1]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=self.get_variable_name(name="hyperplane_biases", node=node))
+        if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
+            branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
+                                                              momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                              training=tf.cast(self.isTrain,
+                                                                               tf.bool))
+        activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
+        node.activationsDict[node.index] = activations
+        decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
+        p_n_given_x = tf.nn.softmax(decayed_activation)
+        p_c_given_x = node.oneHotLabelTensor
 
 
 

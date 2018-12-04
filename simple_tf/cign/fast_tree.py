@@ -132,7 +132,17 @@ class FastTreeNetwork(TreeNetwork):
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
-    def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision(self, node, branching_feature):
+        node_degree = self.degreeList[node.depth]
+        ig_feature_size = branching_feature.get_shape().as_list()[-1]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=self.get_variable_name(name="hyperplane_biases", node=node))
+        node.variablesSet.add(hyperplane_weights)
+        node.variablesSet.add(hyperplane_biases)
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
@@ -166,7 +176,17 @@ class FastTreeNetwork(TreeNetwork):
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
-    def apply_decision_with_unified_batch_norm(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision_with_unified_batch_norm(self, node, branching_feature):
+        node_degree = self.degreeList[node.depth]
+        ig_feature_size = branching_feature.get_shape().as_list()[-1]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=self.get_variable_name(name="hyperplane_biases", node=node))
+        node.variablesSet.add(hyperplane_weights)
+        node.variablesSet.add(hyperplane_biases)
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
         normed_x = fast_tree_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
                                         network=self, node=node,

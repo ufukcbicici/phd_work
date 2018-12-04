@@ -100,26 +100,14 @@ def root_func(node, network, variables=None):
     dropped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
     ig_feature = dropped_ig_feature
     # ***************** Dropout *****************
-    ig_feature_size = ig_feature.get_shape().as_list()[-1]
-    # OK
-    hyperplane_weights = tf.Variable(
-        tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                            dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="hyperplane_weights", node=node))
-    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
-    node.hOpsList.extend([conv_h_1, relu_h_1, pool_h_1, conv_h_2, relu_h_2, pool_h_2])
     node.variablesSet.add(conv_h_weights_1)
     node.variablesSet.add(conv_h_bias_1)
     node.variablesSet.add(conv_h_weights_2)
     node.variablesSet.add(conv_h_bias_2)
     node.variablesSet.add(fc_h_weights)
     node.variablesSet.add(fc_h_bias)
-    node.variablesSet.add(hyperplane_weights)
-    node.variablesSet.add(hyperplane_biases)
     # Decisions
-    network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
-                           hyperplane_biases=hyperplane_biases)
+    network.apply_decision(node=node, branching_feature=ig_feature)
     # ***************** H: Convolution Layers *****************
 
 
@@ -184,25 +172,13 @@ def l1_func(node, network, variables=None):
     dropped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
     ig_feature = dropped_ig_feature
     # ***************** Dropout *****************
-    ig_feature_size = ig_feature.get_shape().as_list()[-1]
-    # OK
-    hyperplane_weights = tf.Variable(
-        tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                            dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="hyperplane_weights", node=node))
-    # OK
-    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
     node.hOpsList.extend([conv_h, relu_h, pool_h])
     node.variablesSet.add(conv_h_weights)
     node.variablesSet.add(conv_h_bias)
     node.variablesSet.add(fc_h_weights)
     node.variablesSet.add(fc_h_bias)
-    node.variablesSet.add(hyperplane_weights)
-    node.variablesSet.add(hyperplane_biases)
     # Decisions
-    network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
-                           hyperplane_biases=hyperplane_biases)
+    network.apply_decision(node=node, branching_feature=ig_feature)
     # ***************** H: Convolution Layer *****************
 
 

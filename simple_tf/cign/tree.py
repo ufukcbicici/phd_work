@@ -734,7 +734,17 @@ class TreeNetwork:
         final_feature = feature + (self.noiseCoefficient * z_noise)
         return final_feature
 
-    def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision(self, node, branching_feature):
+        node_degree = self.degreeList[node.depth]
+        ig_feature_size = branching_feature.get_shape().as_list()[-1]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=self.get_variable_name(name="hyperplane_biases", node=node))
+        node.variablesSet.add(hyperplane_weights)
+        node.variablesSet.add(hyperplane_biases)
         # Apply necessary transformations before decision phase
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = self.apply_batch_norm_prior_to_decision(feature=branching_feature, node=node)

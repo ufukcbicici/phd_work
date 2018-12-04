@@ -33,12 +33,25 @@ def h_l1_func(node, network):
     h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
     feature_size = h_net.get_shape().as_list()[-1]
     fc_h_weights = tf.Variable(tf.truncated_normal(
-        [feature_size, decision_feature_size],
+        [feature_size, GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0]],
         stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="fc_decision_weights", node=node))
     fc_h_bias = tf.Variable(
-        tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE),
+        tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0]], dtype=GlobalConstants.DATA_TYPE),
         name=network.get_variable_name(name="fc_decision_bias", node=node))
+    h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
+    h_net = tf.nn.relu(h_net)
+    h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = h_net
+    node.hOpsList.extend([ig_feature])
+    ig_feature_size = ig_feature.get_shape().as_list()[-1]
+    layer_degree = network.node_degree[node.depth]
+    hyperplane_weights = tf.Variable(
+        tf.truncated_normal([ig_feature_size, layer_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                            dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="hyperplane_weights", node=node))
+    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[layer_degree], dtype=GlobalConstants.DATA_TYPE),
+                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
 
 
 def f_l1_func(node, network):
