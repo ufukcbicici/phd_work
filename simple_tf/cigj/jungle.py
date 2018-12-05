@@ -17,7 +17,8 @@ from simple_tf.cigj.jungle_node import JungleNode
 
 
 class Jungle(FastTreeNetwork):
-    def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
+    def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
+                 dataset):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         curr_index = 0
         self.depthToNodesDict = {}
@@ -85,12 +86,17 @@ class Jungle(FastTreeNetwork):
         # Layer 1 h_node. This receives non-partitioned, complete minibatch from the root node. No stitching needed.
         if len(parents) == 1:
             assert parents[0].nodeType == NodeType.root_node and node.depth == 1
-            return parents[0].fOpsList[-1]
+            node.F_output = parents[0].F_output
+            node.labelTensor = parents[0].labelTensor
+            node.indicesTensor = parents[0].indicesTensor
+            node.oneHotLabelTensor = parents[0].oneHotLabelTensor
+            return parents[0].F_output, None
         # Need stitching
         else:
             raise NotImplementedError()
 
     def apply_decision(self, node, branching_feature):
+        assert node.nodeType == NodeType.h_node
         # Step 1: Create Hyperplanes
         node_degree = self.degreeList[node.depth]
         ig_feature_size = branching_feature.get_shape().as_list()[-1]
@@ -123,7 +129,7 @@ class Jungle(FastTreeNetwork):
         dist = tf.distributions.Categorical(probs=p_F_given_x)
         samples = dist.sample()
         one_hot_samples = tf.one_hot(indices=samples, depth=node_degree, axis=-1, dtype=tf.int64)
-        one_hot_argmax =  tf.one_hot(indices=tf.argmax(p_F_given_x, axis=1), depth=node_degree, axis=-1, dtype=tf.int64)
+        one_hot_argmax = tf.one_hot(indices=tf.argmax(p_F_given_x, axis=1), depth=node_degree, axis=-1, dtype=tf.int64)
         one_hot_indices = tf.where(self.isTrain > 0, one_hot_samples, one_hot_argmax)
         node.evalDict[UtilityFuncs.get_variable_name(name="samples", node=node)] = samples
         node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_samples", node=node)] = one_hot_samples
@@ -137,6 +143,40 @@ class Jungle(FastTreeNetwork):
             node.maskTensors[child_index] = one_hot_indices[:, index]
             node.evalDict[UtilityFuncs.get_variable_name(name="mask_vector_{0}_{1}".format(index, child_index),
                                                          node=node)] = node.maskTensors[child_index]
+
+    def mask_input_nodes(self, node):
+        if node.nodeType == NodeType.root_node:
+            node.labelTensor = self.labelTensor
+            node.indicesTensor = self.indicesTensor
+            node.oneHotLabelTensor = self.oneHotLabelTensor
+            node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
+            # For reporting
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+        elif node.nodeType == NodeType.f_node:
+            parents = self.dagObject.parents(node=node)
+            assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
+            parent_node = parents[0]
+            mask_tensor = parent_node.maskTensors[node.index]
+            sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
+            node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
+            # Mask all inputs (F, H)
+            parent_F = tf.boolean_mask(parent_node.F_output, mask_tensor)
+            parent_H = tf.boolean_mask(parent_node.H_output, mask_tensor)
+            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
+            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
+            # For reporting
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            node.evalDict[self.get_variable_name(name="parent_F", node=node)] = parent_F
+            node.evalDict[self.get_variable_name(name="parent_H", node=node)] = parent_H
+            node.evalDict[self.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
+            node.evalDict[self.get_variable_name(name="indicesTensor", node=node)] = node.indicesTensor
+            node.evalDict[self.get_variable_name(name="oneHotLabelTensor", node=node)] = node.oneHotLabelTensor
+            return parent_F, parent_H
+        else:
+            raise Exception("Unknown node type.")
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:

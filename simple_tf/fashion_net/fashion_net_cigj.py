@@ -6,70 +6,45 @@ from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.global_params import GlobalConstants
 
 
-def f_root_func(node, network):
-    # Convolution 1
+def build_conv_layer(input, node, filter_size, num_of_input_channels, num_of_output_channels):
     # OK
-    conv1_weights = tf.Variable(
-        tf.truncated_normal([GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_1_SIZE,
-                             GlobalConstants.NUM_CHANNELS, GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[0]],
+    conv_weights = tf.Variable(
+        tf.truncated_normal([filter_size, filter_size, num_of_input_channels, num_of_output_channels],
                             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-        name=UtilityFuncs.get_variable_name(name="conv1_weight", node=node))
+        name=UtilityFuncs.get_variable_name(name="conv_weight", node=node))
     # OK
-    conv1_biases = tf.Variable(
-        tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[0]], dtype=GlobalConstants.DATA_TYPE),
-        name=UtilityFuncs.get_variable_name(name="conv1_bias", node=node))
-    # Shared Conv Layer
+    conv_biases = tf.Variable(
+        tf.constant(0.1, shape=[num_of_output_channels], dtype=GlobalConstants.DATA_TYPE),
+        name=UtilityFuncs.get_variable_name(name="conv_bias", node=node))
+    conv = tf.nn.conv2d(input, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
+    relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
+    pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    return pool
+
+
+def f_root_func(node, network):
+
     network.mask_input_nodes(node=node)
-    conv1 = tf.nn.conv2d(network.dataTensor, conv1_weights, strides=[1, 1, 1, 1], padding='SAME')
-    relu1 = tf.nn.relu(tf.nn.bias_add(conv1, conv1_biases))
-    pool1 = tf.nn.max_pool(relu1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    node.fOpsList.extend([pool1])
+    node.F_output = build_conv_layer(input=network.dataTensor, node=node,
+                                     filter_size=GlobalConstants.FASHION_FILTERS_1_SIZE,
+                                     num_of_input_channels=GlobalConstants.NUM_CHANNELS,
+                                     num_of_output_channels=GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[0])
 
 
 def f_l1_func(node, network):
-    # Convolution 2
-    # OK
-    conv2_weights = tf.Variable(
-        tf.truncated_normal([GlobalConstants.FASHION_FILTERS_2_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
-                             GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[0],
-                             GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[1]],
-                            stddev=0.1,
-                            seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-        name=UtilityFuncs.get_variable_name(name="conv2_weight", node=node))
-    # OK
-    conv2_biases = tf.Variable(
-        tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[1]], dtype=GlobalConstants.DATA_TYPE),
-        name=UtilityFuncs.get_variable_name(name="conv2_bias",
-                                       node=node))
-    # L1 Conv Layer
     parent_F, parent_H = network.mask_input_nodes(node=node)
-    conv = tf.nn.conv2d(parent_F, conv2_weights, strides=[1, 1, 1, 1], padding='SAME')
-    relu = tf.nn.relu(tf.nn.bias_add(conv, conv2_biases))
-    pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    node.fOpsList.extend([pool])
+    node.F_output = build_conv_layer(input=parent_F, node=node,
+                                     filter_size=GlobalConstants.FASHION_FILTERS_2_SIZE,
+                                     num_of_input_channels=GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[0],
+                                     num_of_output_channels=GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[1])
 
 
 def f_l2_func(node, network):
-    # Convolution 2
-    # OK
-    conv3_weights = tf.Variable(
-        tf.truncated_normal([GlobalConstants.FASHION_FILTERS_3_SIZE, GlobalConstants.FASHION_FILTERS_3_SIZE,
-                             GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[1],
-                             GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[2]],
-                            stddev=0.1,
-                            seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-        name=UtilityFuncs.get_variable_name(name="conv3_weight", node=node))
-    # OK
-    conv3_biases = tf.Variable(
-        tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[2]], dtype=GlobalConstants.DATA_TYPE),
-        name=UtilityFuncs.get_variable_name(name="conv3_bias",
-                                       node=node))
-    # L1 Conv Layer
     parent_F, parent_H = network.mask_input_nodes(node=node)
-    conv = tf.nn.conv2d(parent_F, conv3_weights, strides=[1, 1, 1, 1], padding='SAME')
-    relu = tf.nn.relu(tf.nn.bias_add(conv, conv3_biases))
-    pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    node.fOpsList.extend([pool])
+    node.F_output = build_conv_layer(input=parent_F, node=node,
+                                     filter_size=GlobalConstants.FASHION_FILTERS_3_SIZE,
+                                     num_of_input_channels=GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[1],
+                                     num_of_output_channels=GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[2])
 
 
 def f_l3_func(node, network):
@@ -110,7 +85,7 @@ def f_leaf_func(node, network):
 
 
 def h_l1_func(node, network):
-    h_net = network.stitch_samples(node=node)
+    h_net, _ = network.stitch_samples(node=node)
     net_shape = h_net.get_shape().as_list()
     # Global Average Pooling
     h_net = tf.nn.avg_pool(h_net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
@@ -128,7 +103,7 @@ def h_l1_func(node, network):
     h_net = tf.nn.relu(h_net)
     h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
     ig_feature = h_net
-    node.hOpsList.extend([ig_feature])
+    node.H_output = h_net
     network.apply_decision(node=node, branching_feature=ig_feature)
 
 
@@ -138,7 +113,8 @@ def threshold_calculator_func(network):
         if node.nodeType == NodeType.h_node:
             # Softmax Decay
             decay_name = network.get_variable_name(name="softmax_decay", node=node)
-            node.softmaxDecayCalculator = DecayingParameter(name=decay_name, value=GlobalConstants.SOFTMAX_DECAY_INITIAL,
+            node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
+                                                            value=GlobalConstants.SOFTMAX_DECAY_INITIAL,
                                                             decay=GlobalConstants.SOFTMAX_DECAY_COEFFICIENT,
                                                             decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
                                                             min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
