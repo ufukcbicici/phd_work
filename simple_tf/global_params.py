@@ -77,7 +77,7 @@ class GlobalConstants:
     #                                           decay_period=1, min_limit=0.0)
     SOFTMAX_DECAY_INITIAL = 25.0
     SOFTMAX_DECAY_COEFFICIENT = 0.9999
-    SOFTMAX_DECAY_PERIOD = 2
+    SOFTMAX_DECAY_PERIOD = 3
     SOFTMAX_DECAY_MIN_LIMIT = 1.0
     SOFTMAX_TEST_TEMPERATURE = 50.0
     DROPOUT_INITIAL_PROB = 0.75

@@ -45,6 +45,17 @@ class Jungle(FastTreeNetwork):
                 if depth not in self.depthToNodesDict:
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
+        # Build network as a DAG
+        self.build_network()
+        # Build auxillary variables
+        self.thresholdFunc(network=self)
+        # Build the network eval dict
+        for node in self.topologicalSortedNodes:
+            for k, v in node.evalDict.items():
+                assert k not in self.evalDict
+                self.evalDict[k] = v
+
+    def build_network(self):
         # Each H node will have the whole previous layer as the parent.
         # Each F node will have the H of the same layer as the parent.
         # Root has the Layer 1 H as its child.
@@ -64,7 +75,7 @@ class Jungle(FastTreeNetwork):
             else:
                 raise Exception("Unknown node type.")
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
-        # Build nodes
+        # Build node computational graphs
         self.nodeBuildFuncs[0](node=self.nodes[0], network=self)
         self.hFuncs[0](node=self.topologicalSortedNodes[1], network=self)
 
@@ -110,7 +121,7 @@ class Jungle(FastTreeNetwork):
         node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
         # Step 3: Sample from p(F|x)
         dist = tf.distributions.Categorical(probs=p_F_given_x)
-        samples = dist.sample(self.batchSize)
+        samples = dist.sample()
         one_hot_samples = tf.one_hot(indices=samples, depth=node_degree, axis=-1)
         node.evalDict[UtilityFuncs.get_variable_name(name="samples", node=node)] = samples
         node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_samples", node=node)] = one_hot_samples
@@ -123,6 +134,48 @@ class Jungle(FastTreeNetwork):
             node.maskTensors[child_index] = one_hot_samples[:, index]
             node.evalDict[UtilityFuncs.get_variable_name(name="mask_vector_{0}_{1}".format(index, child_index),
                                                          node=node)] = node.maskTensors[child_index]
+
+    def get_softmax_decays(self, feed_dict, iteration, update):
+        for node in self.topologicalSortedNodes:
+            if node.nodeType != NodeType.h_node:
+                continue
+            # Decay for Softmax
+            decay = node.softmaxDecayCalculator.value
+            if update:
+                feed_dict[node.softmaxDecay] = decay
+                UtilityFuncs.print("{0} value={1}".format(node.softmaxDecayCalculator.name, decay))
+                # Update the Softmax Decay
+                node.softmaxDecayCalculator.update(iteration=iteration + 1)
+            else:
+                feed_dict[node.softmaxDecay] = GlobalConstants.SOFTMAX_TEST_TEMPERATURE
+
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking, batch_size):
+        feed_dict = {self.dataTensor: minibatch.samples,
+                     self.labelTensor: minibatch.labels,
+                     self.indicesTensor: minibatch.indices,
+                     self.oneHotLabelTensor: minibatch.one_hot_labels,
+                     # self.globalCounter: iteration,
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                     self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
+                     # self.isDecisionPhase: int(is_decision_phase),
+                     self.isTrain: int(is_train),
+                     self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
+                     self.iterationHolder: iteration,
+                     self.batchSize: batch_size}
+        if is_train:
+            feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
+            if not self.isBaseline:
+                self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
+                # self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
+                feed_dict[self.decisionDropoutKeepProb] = GlobalConstants.DECISION_DROPOUT_PROB
+                self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
+        else:
+            feed_dict[self.classificationDropoutKeepProb] = 1.0
+            if not self.isBaseline:
+                self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
+                feed_dict[self.decisionDropoutKeepProb] = 1.0
+                self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
+        return feed_dict
 
     # For debugging
     def print_trellis_structure(self):
@@ -177,7 +230,7 @@ class Jungle(FastTreeNetwork):
             node_pos = node_positions[node]
             ax.text(node_pos[0], node_pos[1], "{0}".format(node.index), fontsize=16, color="c")
         plt.show()
-        print("X")
+        UtilityFuncs.print("X")
 
     # def apply_decision(self):
     #     pass

@@ -84,6 +84,7 @@ class MnistDataSet(DataSet):
             raise Exception("Invalid index positions: self.currentIndex={0} - curr_end_index={1}"
                             .format(self.currentIndex, curr_end_index))
         samples = self.currentSamples[indices_list]
+        samples = np.expand_dims(samples, axis=3)
         labels = self.currentLabels[indices_list]
         one_hot_labels = np.zeros(shape=(batch_size, self.get_label_count()))
         one_hot_labels[np.arange(batch_size), labels.astype(np.int)] = 1.0

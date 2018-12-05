@@ -129,35 +129,16 @@ def h_l1_func(node, network):
     h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
     ig_feature = h_net
     node.hOpsList.extend([ig_feature])
+    network.apply_decision(node=node, branching_feature=ig_feature)
 
 
 def threshold_calculator_func(network):
-    # Noise Coefficient
-    network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
-                                                           decay=0.0,
-                                                           decay_period=1,
-                                                           min_limit=0.0)
-    # Decision Loss Coefficient
-    # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
-    #                                                               value=0.0,
-    #                                                               schedule=[(12000, 1.0)])
     network.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator", value=1.0)
     for node in network.topologicalSortedNodes:
         if node.nodeType == NodeType.h_node:
-
-
-        # if node.isLeaf:
-        #     continue
-        # # Probability Threshold
-        # node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
-        # initial_value = 1.0 / float(node_degree)
-        # threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
-        # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-        #                                                  decay_period=12000,
-        #                                                  min_limit=0.4)
-        # # Softmax Decay
-        # decay_name = network.get_variable_name(name="softmax_decay", node=node)
-        # node.softmaxDecayCalculator = DecayingParameter(name=decay_name, value=GlobalConstants.SOFTMAX_DECAY_INITIAL,
-        #                                                 decay=GlobalConstants.SOFTMAX_DECAY_COEFFICIENT,
-        #                                                 decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
-        #                                                 min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+            # Softmax Decay
+            decay_name = network.get_variable_name(name="softmax_decay", node=node)
+            node.softmaxDecayCalculator = DecayingParameter(name=decay_name, value=GlobalConstants.SOFTMAX_DECAY_INITIAL,
+                                                            decay=GlobalConstants.SOFTMAX_DECAY_COEFFICIENT,
+                                                            decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
+                                                            min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
