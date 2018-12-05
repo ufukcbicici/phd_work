@@ -119,19 +119,22 @@ class Jungle(FastTreeNetwork):
         node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
-        # Step 3: Sample from p(F|x)
+        # Step 3: Sample from p(F|x) when training, select argmax_F p(F|x) during inference
         dist = tf.distributions.Categorical(probs=p_F_given_x)
         samples = dist.sample()
-        one_hot_samples = tf.one_hot(indices=samples, depth=node_degree, axis=-1)
+        one_hot_samples = tf.one_hot(indices=samples, depth=node_degree, axis=-1, dtype=tf.int64)
+        one_hot_argmax =  tf.one_hot(indices=tf.argmax(p_F_given_x, axis=1), depth=node_degree, axis=-1, dtype=tf.int64)
+        one_hot_indices = tf.where(self.isTrain > 0, one_hot_samples, one_hot_argmax)
         node.evalDict[UtilityFuncs.get_variable_name(name="samples", node=node)] = samples
         node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_samples", node=node)] = one_hot_samples
+        node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_indices", node=node)] = one_hot_indices
         # Step 4: Apply masking to corresponding F nodes in the same layer.
         child_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
         child_F_nodes = sorted(child_F_nodes, key=lambda c_node: c_node.index)
         for index in range(len(child_F_nodes)):
             child_node = child_F_nodes[index]
             child_index = child_node.index
-            node.maskTensors[child_index] = one_hot_samples[:, index]
+            node.maskTensors[child_index] = one_hot_indices[:, index]
             node.evalDict[UtilityFuncs.get_variable_name(name="mask_vector_{0}_{1}".format(index, child_index),
                                                          node=node)] = node.maskTensors[child_index]
 
