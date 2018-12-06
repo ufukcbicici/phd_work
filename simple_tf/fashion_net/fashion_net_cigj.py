@@ -22,6 +22,28 @@ def build_conv_layer(input, node, filter_size, num_of_input_channels, num_of_out
     return pool
 
 
+def h_transform(input, node, network, h_feature_size):
+    h_net = input
+    net_shape = h_net.get_shape().as_list()
+    # Global Average Pooling
+    h_net = tf.nn.avg_pool(h_net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
+    net_shape = h_net.get_shape().as_list()
+    h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
+    feature_size = h_net.get_shape().as_list()[-1]
+    fc_h_weights = tf.Variable(tf.truncated_normal(
+        [feature_size, h_feature_size],
+        stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="fc_decision_weights", node=node))
+    fc_h_bias = tf.Variable(
+        tf.constant(0.1, shape=[h_feature_size], dtype=GlobalConstants.DATA_TYPE),
+        name=network.get_variable_name(name="fc_decision_bias", node=node))
+    h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
+    h_net = tf.nn.relu(h_net)
+    h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
+    ig_feature = h_net
+    return ig_feature
+
+
 def f_root_func(node, network):
 
     network.mask_input_nodes(node=node)
@@ -86,25 +108,8 @@ def f_leaf_func(node, network):
 
 def h_l1_func(node, network):
     h_net, _ = network.stitch_samples(node=node)
-    net_shape = h_net.get_shape().as_list()
-    # Global Average Pooling
-    h_net = tf.nn.avg_pool(h_net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
-    net_shape = h_net.get_shape().as_list()
-    h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
-    feature_size = h_net.get_shape().as_list()[-1]
-    fc_h_weights = tf.Variable(tf.truncated_normal(
-        [feature_size, GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0]],
-        stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_decision_weights", node=node))
-    fc_h_bias = tf.Variable(
-        tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0]], dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_decision_bias", node=node))
-    h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
-    h_net = tf.nn.relu(h_net)
-    h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
-    ig_feature = h_net
-    node.H_output = h_net
-    network.apply_decision(node=node, branching_feature=ig_feature)
+    node.H_output = h_transform(input=h_net, network=network, node=node, h_feature_size=GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0])
+    network.apply_decision(node=node, branching_feature=node.H_output)
 
 
 def threshold_calculator_func(network):
