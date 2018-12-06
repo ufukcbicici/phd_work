@@ -46,6 +46,8 @@ class Jungle(FastTreeNetwork):
                 if depth not in self.depthToNodesDict:
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
+        # Indexing mechanism
+        self.batchIndices = tf.range(self.batchSize)
         # Build network as a DAG
         self.build_network()
         # Build auxillary variables
@@ -104,6 +106,7 @@ class Jungle(FastTreeNetwork):
             node.labelTensor = parents[0].labelTensor
             node.indicesTensor = parents[0].indicesTensor
             node.oneHotLabelTensor = parents[0].oneHotLabelTensor
+            node.batchIndicesTensor = parents[0].batchIndicesTensor
             return parents[0].F_output, None
         # Need stitching
         else:
@@ -164,6 +167,7 @@ class Jungle(FastTreeNetwork):
             node.indicesTensor = self.indicesTensor
             node.oneHotLabelTensor = self.oneHotLabelTensor
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
+            node.batchIndicesTensor = self.batchIndices
             # For reporting
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
@@ -180,6 +184,7 @@ class Jungle(FastTreeNetwork):
             node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
             node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
             node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
+            node.batchIndicesTensor = tf.boolean_mask(parent_node.batchIndicesTensor, mask_tensor)
             # For reporting
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
@@ -188,6 +193,7 @@ class Jungle(FastTreeNetwork):
             node.evalDict[self.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
             node.evalDict[self.get_variable_name(name="indicesTensor", node=node)] = node.indicesTensor
             node.evalDict[self.get_variable_name(name="oneHotLabelTensor", node=node)] = node.oneHotLabelTensor
+            node.evalDict[self.get_variable_name(name="batchIndicesTensor", node=node)] = node.batchIndicesTensor
             return parent_F, parent_H
         else:
             raise Exception("Unknown node type.")

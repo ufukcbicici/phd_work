@@ -19,6 +19,7 @@ class JungleNode(Node):
         self.nodeType = node_type
         self.F_output = None
         self.H_output = None
+        self.batchIndicesTensor = None
         super().__init__(index, depth, is_root, is_leaf)
         if self.nodeType == NodeType.h_node:
             self.softmaxDecay = tf.placeholder(name=UtilityFuncs.get_variable_name(name="softmax_decay", node=self),
