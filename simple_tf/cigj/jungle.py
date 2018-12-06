@@ -128,7 +128,7 @@ class Jungle(FastTreeNetwork):
         # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
-        decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
+        decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1, ))
         p_F_given_x = tf.nn.softmax(decayed_activation)
         p_c_given_x = self.oneHotLabelTensor
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
