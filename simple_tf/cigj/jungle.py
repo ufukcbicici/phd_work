@@ -77,8 +77,22 @@ class Jungle(FastTreeNetwork):
                 raise Exception("Unknown node type.")
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         # Build node computational graphs
-        self.nodeBuildFuncs[0](node=self.nodes[0], network=self)
-        self.hFuncs[0](node=self.topologicalSortedNodes[1], network=self)
+        for node in self.topologicalSortedNodes:
+            if node.depth > 1:
+                break
+            if node.nodeType == NodeType.root_node:
+                self.nodeBuildFuncs[0](node=node, network=self)
+                assert node.F_output is not None and node.H_output is None
+                node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+            elif node.nodeType == NodeType.h_node:
+                self.hFuncs[node.depth - 1](node=node, network=self)
+                assert node.F_output is not None and node.H_output is not None
+                node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+                node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
+            elif node.nodeType == NodeType.f_node:
+                self.nodeBuildFuncs[node.depth](node=node, network=self)
+                assert node.F_output is not None and node.H_output is None
+                node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
 
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node

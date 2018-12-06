@@ -108,7 +108,8 @@ def f_leaf_func(node, network):
 
 def h_l1_func(node, network):
     h_net, _ = network.stitch_samples(node=node)
-    node.H_output = h_transform(input=h_net, network=network, node=node, h_feature_size=GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0])
+    node.H_output = h_transform(input=h_net, network=network, node=node,
+                                h_feature_size=GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[0])
     network.apply_decision(node=node, branching_feature=node.H_output)
 
 
