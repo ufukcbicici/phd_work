@@ -52,17 +52,15 @@ init = tf.global_variables_initializer()
 sess.run(init)
 
 
-def func(dependencies):
+def func(dependencies, indices, updates, shape):
     with tf.control_dependencies(dependencies):
-        square_op = tf.square(sparse_tensor)
-        return square_op
+        scatter = tf.scatter_nd(indices, updates, shape)
+        return scatter
 
 
-square_op1 = func(dependencies=[shape_assign_op])
-square_op2 = tf.square(square_op1)
-
-
-res = sess.run([square_op2, shape_tensor], feed_dict={sparse_tensor: sparse_arr, indices_tensor: indices,
+stitch_op = func(dependencies=[shape_assign_op], indices=indices_tensor, updates=sparse_tensor, shape=shape_assign_op)
+# square_op2 = tf.square(square_op1)
+res = sess.run([stitch_op], feed_dict={sparse_tensor: sparse_arr, indices_tensor: indices,
                                           batch_size_tensor: batch_size})
 print("X")
 
