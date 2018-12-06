@@ -60,7 +60,7 @@ def func(dependencies, indices, updates, shape):
 
 stitch_op = func(dependencies=[shape_assign_op], indices=indices_tensor, updates=sparse_tensor, shape=shape_assign_op)
 # square_op2 = tf.square(square_op1)
-res = sess.run([stitch_op], feed_dict={sparse_tensor: sparse_arr, indices_tensor: indices,
+res = sess.run([shape_tensor], feed_dict={sparse_tensor: sparse_arr, indices_tensor: indices,
                                           batch_size_tensor: batch_size})
 print("X")
 
