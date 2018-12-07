@@ -36,34 +36,18 @@ def cigj_training():
 
 # cigj_training()
 
-batch_size = 250
-sparse_length = 110
-sparse_arr = np.random.uniform(low=-1.0, high=1.0, size=(sparse_length, 14, 14, 32))
-indices = np.array(sorted(np.random.choice(a=batch_size, size=sparse_length, replace=False).tolist()))
-
-sparse_tensor = tf.placeholder(name="sparse_arr", dtype=tf.float32)
-indices_tensor = tf.placeholder(name="indices", dtype=tf.int32)
-batch_size_tensor = tf.placeholder(name="batch_size", dtype=tf.int32)
-shape_tensor = tf.Variable(name="shape", trainable=False, initial_value=[0] * 4)
-shape_assign_op = tf.assign(shape_tensor, tf.shape(sparse_tensor))
-# set_batch_size_op = tf.assign(shape_tensor[0], batch_size_tensor)
-sess = tf.Session()
-init = tf.global_variables_initializer()
-sess.run(init)
 
 
-def func(dependencies, indices, updates, shape):
-    with tf.control_dependencies(dependencies):
-        scatter = tf.scatter_nd(indices, updates, shape)
-        return scatter
-
-
-stitch_op = func(dependencies=[shape_assign_op], indices=indices_tensor, updates=sparse_tensor, shape=shape_assign_op)
-# square_op2 = tf.square(square_op1)
-res = sess.run([shape_tensor], feed_dict={sparse_tensor: sparse_arr, indices_tensor: indices,
-                                          batch_size_tensor: batch_size})
-print("X")
-
+# with tf.control_dependencies([shape_assign_op]):
+#     set_batch_size_op = tf.assign(shape_tensor[0], batch_size_tensor)
+#     with tf.control_dependencies([set_batch_size_op]):
+#         x = tf.identity(shape_tensor)
+#
+# sess = tf.Session()
+# init = tf.global_variables_initializer()
+# sess.run(init)
+# result = sess.run([x], feed_dict={sparse_tensor: sparse_arr, batch_size_tensor: batch_size})
+# print("X")
 # square_sparse = tf.square(sparse_tensor)
 #
 # sess = tf.Session()
