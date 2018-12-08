@@ -32,13 +32,17 @@ for exp_index in range(1000):
         sparse_transformed_x.append(tf.scatter_nd(indices, transformed_x[mask_index], (batch_size, 14, 14, 32)))
     original_x = tf.add_n(sparse_x)
     transformed_x = tf.add_n(sparse_transformed_x)
+    loss = tf.reduce_sum(transformed_x)
+    grads = tf.gradients(loss, input_tensor)
     results = sess.run([one_hot_samples, arg_max_tensor, masked_x, transformed_x, masked_indices, sparse_x,
-                        sparse_transformed_x, original_x, transformed_x],
+                        sparse_transformed_x, loss, grads, original_x, transformed_x],
                        feed_dict={activation_tensor: activation_arr, input_tensor: x})
+    grads_x_tf = results[-3]
     original_x_tf = results[-2]
     transformed_x_tf = results[-1]
     res1 = np.allclose(x, original_x_tf)
     res2 = np.allclose(x_squared, transformed_x_tf)
+    res3 = np.allclose(2.0*x, grads_x_tf)
     print("X")
 
 
