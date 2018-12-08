@@ -48,6 +48,7 @@ class Jungle(FastTreeNetwork):
                 self.depthToNodesDict[depth].append(curr_node)
         # Indexing mechanism
         self.batchIndices = tf.range(self.batchSize)
+        self.shapeTensorsDict = {}
         # Build network as a DAG
         self.build_network()
         # Build auxillary variables
@@ -80,7 +81,7 @@ class Jungle(FastTreeNetwork):
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         # Build node computational graphs
         for node in self.topologicalSortedNodes:
-            if node.depth > 1:
+            if node.depth > 2:
                 break
             if node.nodeType == NodeType.root_node:
                 self.nodeBuildFuncs[0](node=node, network=self)
@@ -91,10 +92,27 @@ class Jungle(FastTreeNetwork):
                 assert node.F_output is not None and node.H_output is not None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
                 node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
-            elif node.nodeType == NodeType.f_node:
+            elif node.nodeType == NodeType.f_node and node.depth < 2:
                 self.nodeBuildFuncs[node.depth](node=node, network=self)
                 assert node.F_output is not None and node.H_output is None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+
+    def stitch_tensor(self, h_node, input_tensor, indices, name):
+        shape_tensor_name = UtilityFuncs.get_variable_name(name="{0}_shape_tensor".format(name), node=h_node)
+        shape_tensor = tf.Variable(name=shape_tensor_name, trainable=False,
+                                   initial_value=[0] * len(input_tensor.get_shape().as_list()))
+        self.shapeTensorsDict[shape_tensor_name] = shape_tensor
+        # Get the shape of the f_output as a tensor
+        shape_assign_op = tf.assign(shape_tensor, tf.shape(input_tensor))
+        with tf.control_dependencies([shape_assign_op]):
+            # Set the first element as the batch size
+            set_batch_size_op = tf.assign(shape_tensor[0], self.batchSize)
+            with tf.control_dependencies([set_batch_size_op]):
+                # Get indices of the f_node in the appropriate format
+                indices = tf.expand_dims(indices, -1)
+                # Obtain the sparse output
+                sparse_output = tf.scatter_nd(indices, input_tensor, shape_tensor)
+                return sparse_output
 
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
@@ -110,7 +128,29 @@ class Jungle(FastTreeNetwork):
             return parents[0].F_output, None
         # Need stitching
         else:
-            raise NotImplementedError()
+            # Get all F nodes in the previous layer
+            parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=node)
+                              if f_node.nodeType == NodeType.f_node]
+            parent_h_nodes = [h_node for h_node in self.dagObject.parents(node=node)
+                              if h_node.nodeType == NodeType.h_node]
+            assert len(parent_h_nodes) == 1
+            parent_h_node = parent_h_nodes[0]
+            parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
+            sparse_f_outputs = []
+            for parent_f_node in parent_f_nodes:
+                sparse_f_output = self.stitch_tensor(h_node=node, indices=parent_f_node.batchIndicesTensor,
+                                                     input_tensor=parent_f_node.F_output, name="F_output")
+                sparse_indices_output = self.stitch_tensor(h_node=node, indices=parent_f_node.batchIndicesTensor,
+                                                           input_tensor=parent_f_node.batchIndicesTensor,
+                                                           name="batch_indices")
+                node.evalDict[sparse_f_output.name] = sparse_f_output
+                sparse_f_outputs.append(sparse_f_output)
+                node.evalDict[sparse_indices_output.name] = sparse_indices_output
+            # Sum all outputs
+            node.F_output = tf.add_n(sparse_f_outputs)
+            # Reflect the parent H output as it is
+            h_input = parent_h_node.H_output
+            return node.F_output, h_input
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -131,7 +171,7 @@ class Jungle(FastTreeNetwork):
         # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
-        decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1, ))
+        decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
         p_F_given_x = tf.nn.softmax(decayed_activation)
         p_c_given_x = self.oneHotLabelTensor
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
@@ -295,5 +335,5 @@ class Jungle(FastTreeNetwork):
         plt.show()
         UtilityFuncs.print("X")
 
-    # def apply_decision(self):
-    #     pass
+        # def apply_decision(self):
+        #     pass

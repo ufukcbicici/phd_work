@@ -113,6 +113,13 @@ def h_l1_func(node, network):
     network.apply_decision(node=node, branching_feature=node.H_output)
 
 
+def h_l2_func(node, network):
+    h_net, _ = network.stitch_samples(node=node)
+    node.H_output = h_transform(input=h_net, network=network, node=node,
+                                h_feature_size=GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[1])
+    network.apply_decision(node=node, branching_feature=node.H_output)
+
+
 def threshold_calculator_func(network):
     network.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator", value=1.0)
     for node in network.topologicalSortedNodes:
