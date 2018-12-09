@@ -303,7 +303,6 @@ class Jungle(FastTreeNetwork):
         results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
         print("X")
 
-
     # For debugging
     def print_trellis_structure(self):
         fig, ax = plt.subplots()
