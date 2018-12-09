@@ -45,7 +45,6 @@ def h_transform(input, node, network, h_feature_size):
 
 
 def f_root_func(node, network):
-
     network.mask_input_nodes(node=node)
     node.F_output = build_conv_layer(input=network.dataTensor, node=node,
                                      filter_size=GlobalConstants.FASHION_FILTERS_1_SIZE,
@@ -99,7 +98,7 @@ def f_l3_func(node, network):
     dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
     hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
     dropped_layer_2 = tf.nn.dropout(hidden_layer_2, network.classificationDropoutKeepProb)
-    node.fOpsList.extend([dropped_layer_2])
+    node.F_output = dropped_layer_2
 
 
 def f_leaf_func(node, network):
@@ -117,6 +116,13 @@ def h_l2_func(node, network):
     h_net, _ = network.stitch_samples(node=node)
     node.H_output = h_transform(input=h_net, network=network, node=node,
                                 h_feature_size=GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[1])
+    network.apply_decision(node=node, branching_feature=node.H_output)
+
+
+def h_l3_func(node, network):
+    h_net, _ = network.stitch_samples(node=node)
+    node.H_output = h_transform(input=h_net, network=network, node=node,
+                                h_feature_size=GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[2])
     network.apply_decision(node=node, branching_feature=node.H_output)
 
 

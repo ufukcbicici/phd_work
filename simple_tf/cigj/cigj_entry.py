@@ -22,7 +22,7 @@ def cigj_training():
                           fashion_net_cigj.f_l2_func,
                           fashion_net_cigj.f_l3_func,
                           fashion_net_cigj.f_leaf_func],
-        h_funcs=[fashion_net_cigj.h_l1_func, fashion_net_cigj.h_l2_func],
+        h_funcs=[fashion_net_cigj.h_l1_func, fashion_net_cigj.h_l2_func, fashion_net_cigj.h_l3_func],
         grad_func=None,
         threshold_func=fashion_net_cigj.threshold_calculator_func,
         residue_func=None, summary_func=None,
