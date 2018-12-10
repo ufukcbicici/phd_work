@@ -301,6 +301,14 @@ class Jungle(FastTreeNetwork):
         init = tf.global_variables_initializer()
         sess.run(init)
         results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
+        for node in self.topologicalSortedNodes:
+            if node.nodeType == NodeType.leaf_node:
+                continue
+            f_output_name = UtilityFuncs.get_variable_name(name="F_output", node=node)
+            h_output_name = UtilityFuncs.get_variable_name(name="H_output", node=node)
+            node.F_outputShape = results[f_output_name].shape
+            if node.nodeType == NodeType.h_node:
+                node.H_outputShape = results[h_output_name].shape
         print("X")
 
     # For debugging
