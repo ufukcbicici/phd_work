@@ -1,29 +1,25 @@
-from collections import deque
-
-import tensorflow as tf
-import numpy as np
-import networkx as nx
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
-from matplotlib.collections import PatchCollection
+import tensorflow as tf
 
 from auxillary.dag_utilities import Dag
 from auxillary.general_utility_funcs import UtilityFuncs
+from simple_tf.cigj.jungle_node import JungleNode
+from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 from simple_tf.info_gain import InfoGainLoss
-from simple_tf.node import Node
-from simple_tf.cigj.jungle_node import NodeType
-from simple_tf.cigj.jungle_node import JungleNode
 
 
 class Jungle(FastTreeNetwork):
     def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
-                 dataset):
+                 dataset, shape_func):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         curr_index = 0
         self.depthToNodesDict = {}
         self.hFuncs = h_funcs
+        self.currentGraph = tf.get_default_graph()
+        self.batchIndices = tf.range(self.batchSize)
+        self.shapeFunc = shape_func
         # Create Trellis structure. Add a h node to every non-root and non-leaf layer.
         degree_list = [degree if depth == 0 or depth == len(degree_list) - 1 else degree + 1 for depth, degree in
                        enumerate(degree_list)]
@@ -47,18 +43,15 @@ class Jungle(FastTreeNetwork):
                 if depth not in self.depthToNodesDict:
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
-        # Indexing mechanism
-        self.batchIndices = tf.range(self.batchSize)
-        self.shapeTensorsDict = {}
         # Build network as a DAG
-        # Obtain Shapes
-        self.shapeSensingMode = True
-        self.build_network()
-        self.get_node_output_shapes(dataset=dataset)
-        tf.reset_default_graph()
-        # Build the actual network
+        shapes = self.shapeFunc(network=self, dataset=dataset)
+        self.shapeTensorsDict = {}
         self.shapeSensingMode = False
         self.build_network()
+
+    def get_session(self):
+        sess = tf.Session(graph=self.currentGraph)
+        return sess
 
     def build_network(self):
         # Each H node will have the whole previous layer as the parent.
@@ -146,21 +139,18 @@ class Jungle(FastTreeNetwork):
             assert len(parent_h_nodes) == 1
             parent_h_node = parent_h_nodes[0]
             parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
-            if not self.shapeSensingMode:
-                sparse_f_outputs = []
-                for parent_f_node in parent_f_nodes:
-                    sparse_f_output = self.stitch_tensor(h_node=node, indices=parent_f_node.batchIndicesTensor,
-                                                         input_tensor=parent_f_node.F_output, name="F_output")
-                    sparse_indices_output = self.stitch_tensor(h_node=node, indices=parent_f_node.batchIndicesTensor,
-                                                               input_tensor=parent_f_node.batchIndicesTensor,
-                                                               name="batch_indices")
-                    node.evalDict[sparse_f_output.name] = sparse_f_output
-                    sparse_f_outputs.append(sparse_f_output)
-                    node.evalDict[sparse_indices_output.name] = sparse_indices_output
-                # Sum all outputs
-                node.F_output = tf.add_n(sparse_f_outputs)
-            else:
-                node.F_output = tf.add_n([node.F_output for node in parent_f_nodes])
+            sparse_f_outputs = []
+            for parent_f_node in parent_f_nodes:
+                sparse_f_output = self.stitch_tensor(h_node=node, indices=parent_f_node.batchIndicesTensor,
+                                                     input_tensor=parent_f_node.F_output, name="F_output")
+                sparse_indices_output = self.stitch_tensor(h_node=node, indices=parent_f_node.batchIndicesTensor,
+                                                           input_tensor=parent_f_node.batchIndicesTensor,
+                                                           name="batch_indices")
+                node.evalDict[sparse_f_output.name] = sparse_f_output
+                sparse_f_outputs.append(sparse_f_output)
+                node.evalDict[sparse_indices_output.name] = sparse_indices_output
+            # Sum all outputs
+            node.F_output = tf.add_n(sparse_f_outputs)
             # Reflect the parent H output as it is
             h_input = parent_h_node.H_output
             return node.F_output, h_input
@@ -228,29 +218,26 @@ class Jungle(FastTreeNetwork):
             parents = self.dagObject.parents(node=node)
             assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
             parent_node = parents[0]
-            if not self.shapeSensingMode:
-                mask_tensor = parent_node.maskTensors[node.index]
-                sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
-                node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
-                # Mask all inputs (F, H)
-                parent_F = tf.boolean_mask(parent_node.F_output, mask_tensor)
-                parent_H = tf.boolean_mask(parent_node.H_output, mask_tensor)
-                node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-                node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-                node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
-                node.batchIndicesTensor = tf.boolean_mask(parent_node.batchIndicesTensor, mask_tensor)
-                # For reporting
-                node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
-                node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
-                node.evalDict[self.get_variable_name(name="parent_F", node=node)] = parent_F
-                node.evalDict[self.get_variable_name(name="parent_H", node=node)] = parent_H
-                node.evalDict[self.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
-                node.evalDict[self.get_variable_name(name="indicesTensor", node=node)] = node.indicesTensor
-                node.evalDict[self.get_variable_name(name="oneHotLabelTensor", node=node)] = node.oneHotLabelTensor
-                node.evalDict[self.get_variable_name(name="batchIndicesTensor", node=node)] = node.batchIndicesTensor
-                return parent_F, parent_H
-            else:
-                return parent_node.F_output, parent_node.H_output
+            mask_tensor = parent_node.maskTensors[node.index]
+            sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
+            node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
+            # Mask all inputs (F, H)
+            parent_F = tf.boolean_mask(parent_node.F_output, mask_tensor)
+            parent_H = tf.boolean_mask(parent_node.H_output, mask_tensor)
+            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
+            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
+            node.batchIndicesTensor = tf.boolean_mask(parent_node.batchIndicesTensor, mask_tensor)
+            # For reporting
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            node.evalDict[self.get_variable_name(name="parent_F", node=node)] = parent_F
+            node.evalDict[self.get_variable_name(name="parent_H", node=node)] = parent_H
+            node.evalDict[self.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
+            node.evalDict[self.get_variable_name(name="indicesTensor", node=node)] = node.indicesTensor
+            node.evalDict[self.get_variable_name(name="oneHotLabelTensor", node=node)] = node.oneHotLabelTensor
+            node.evalDict[self.get_variable_name(name="batchIndicesTensor", node=node)] = node.batchIndicesTensor
+            return parent_F, parent_H
         else:
             raise Exception("Unknown node type.")
 
@@ -297,7 +284,7 @@ class Jungle(FastTreeNetwork):
         return feed_dict
 
     def get_node_output_shapes(self, dataset):
-        sess = tf.Session()
+        sess = self.get_session()
         init = tf.global_variables_initializer()
         sess.run(init)
         results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=True)

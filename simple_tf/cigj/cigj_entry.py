@@ -5,6 +5,7 @@ from data_handling.cifar_dataset import CifarDataSet
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cigj.jungle import Jungle
 from simple_tf.fashion_net import fashion_net_cigj
+from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
 from simple_tf.global_params import GlobalConstants
 
 
@@ -15,18 +16,18 @@ def cigj_training():
     info_gain_balance_coeffs = [1.0]
     classification_dropout_probs = [0.0]
     decision_dropout_probs = [0.0]
-    sess = tf.Session()
     jungle = Jungle(
-        node_build_funcs=[fashion_net_cigj.f_root_func,
-                          fashion_net_cigj.f_l1_func,
-                          fashion_net_cigj.f_l2_func,
-                          fashion_net_cigj.f_l3_func,
-                          fashion_net_cigj.f_leaf_func],
-        h_funcs=[fashion_net_cigj.h_l1_func, fashion_net_cigj.h_l2_func, fashion_net_cigj.h_l3_func],
+        node_build_funcs=[FashionNetCigj.f_root_func,
+                          FashionNetCigj.f_l1_func,
+                          FashionNetCigj.f_l2_func,
+                          FashionNetCigj.f_l3_func,
+                          FashionNetCigj.f_leaf_func],
+        h_funcs=[FashionNetCigj.h_l1_func, FashionNetCigj.h_l2_func, FashionNetCigj.h_l3_func],
         grad_func=None,
-        threshold_func=fashion_net_cigj.threshold_calculator_func,
+        threshold_func=FashionNetCigj.threshold_calculator_func,
         residue_func=None, summary_func=None,
-        degree_list=[1, 3, 3, 3, 1], dataset=dataset)
+        degree_list=[1, 3, 3, 3, 1], dataset=dataset, shape_func=FashionNetCigj.get_layer_shapes)
+    sess = jungle.get_session()
     init = tf.global_variables_initializer()
     sess.run(init)
     jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
