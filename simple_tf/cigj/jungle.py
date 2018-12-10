@@ -44,7 +44,7 @@ class Jungle(FastTreeNetwork):
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
         # Build network as a DAG
-        shapes = self.shapeFunc(network=self, dataset=dataset)
+        self.shapeFunc(network=self, dataset=dataset)
         self.shapeTensorsDict = {}
         self.shapeSensingMode = False
         self.build_network()
@@ -100,8 +100,8 @@ class Jungle(FastTreeNetwork):
                 assert k not in self.evalDict
                 self.evalDict[k] = v
 
-    def stitch_tensor(self, h_node, input_tensor, indices, name):
-        shape_tensor_name = UtilityFuncs.get_variable_name(name="{0}_shape_tensor".format(name), node=h_node)
+    def stitch_tensor(self, f_node, input_tensor, indices, name):
+        shape_tensor_name = UtilityFuncs.get_variable_name(name="{0}_shape_tensor".format(name), node=f_node)
         shape_tensor = tf.Variable(name=shape_tensor_name, trainable=False,
                                    initial_value=[0] * len(input_tensor.get_shape().as_list()))
         self.shapeTensorsDict[shape_tensor_name] = shape_tensor
@@ -141,9 +141,10 @@ class Jungle(FastTreeNetwork):
             parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
             sparse_f_outputs = []
             for parent_f_node in parent_f_nodes:
-                sparse_f_output = self.stitch_tensor(h_node=node, indices=parent_f_node.batchIndicesTensor,
+                sparse_f_output = self.stitch_tensor(f_node=parent_f_node, indices=parent_f_node.batchIndicesTensor,
                                                      input_tensor=parent_f_node.F_output, name="F_output")
-                sparse_indices_output = self.stitch_tensor(h_node=node, indices=parent_f_node.batchIndicesTensor,
+                sparse_indices_output = self.stitch_tensor(f_node=parent_f_node,
+                                                           indices=parent_f_node.batchIndicesTensor,
                                                            input_tensor=parent_f_node.batchIndicesTensor,
                                                            name="batch_indices")
                 node.evalDict[sparse_f_output.name] = sparse_f_output
