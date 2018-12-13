@@ -240,7 +240,7 @@ class GlobalConstants:
                         DatasetTypes.validation: EVAL_BATCH_SIZE}
 
     # CIGJ
-    CIGJ_FASHION_NET_CONV_CHANNELS = [32, 24, 48]
+    CIGJ_FASHION_NET_CONV_CHANNELS = [1, 32, 24, 48]
     CIGJ_FASHION_NET_CONV_FILTER_SIZES = [5, 5, 1]
     CIGJ_FASHION_NET_FC_DIMS = [128, 64]
     CIGJ_FASHION_NET_H_POOL_SIZES = [7, 4, 2]

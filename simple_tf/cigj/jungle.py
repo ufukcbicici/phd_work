@@ -123,12 +123,10 @@ class Jungle(FastTreeNetwork):
         # Layer 1 h_node. This receives non-partitioned, complete minibatch from the root node. No stitching needed.
         if len(parents) == 1:
             assert parents[0].nodeType == NodeType.root_node and node.depth == 1
+            node.F_input = parents[0].F_output
+            node.H_input = None
             node.F_output = parents[0].F_output
             node.labelTensor = parents[0].labelTensor
-            node.indicesTensor = parents[0].indicesTensor
-            node.oneHotLabelTensor = parents[0].oneHotLabelTensor
-            node.batchIndicesTensor = parents[0].batchIndicesTensor
-            return parents[0].F_output, None
         # Need stitching
         else:
             # Get all F nodes in the previous layer
@@ -139,22 +137,16 @@ class Jungle(FastTreeNetwork):
             assert len(parent_h_nodes) == 1
             parent_h_node = parent_h_nodes[0]
             parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
-            sparse_f_outputs = []
-            for parent_f_node in parent_f_nodes:
-                sparse_f_output = self.stitch_tensor(f_node=parent_f_node, indices=parent_f_node.batchIndicesTensor,
-                                                     input_tensor=parent_f_node.F_output, name="F_output")
-                sparse_indices_output = self.stitch_tensor(f_node=parent_f_node,
-                                                           indices=parent_f_node.batchIndicesTensor,
-                                                           input_tensor=parent_f_node.batchIndicesTensor,
-                                                           name="batch_indices")
-                node.evalDict[sparse_f_output.name] = sparse_f_output
-                sparse_f_outputs.append(sparse_f_output)
-                node.evalDict[sparse_indices_output.name] = sparse_indices_output
-            # Sum all outputs
-            node.F_output = tf.add_n(sparse_f_outputs)
-            # Reflect the parent H output as it is
-            h_input = parent_h_node.H_output
-            return node.F_output, h_input
+            f_inputs = [node.F_output for node in parent_f_nodes]
+            original_stitched = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+
+            node.F_output = tf.dynamic_partition(data=node.F_output, partitions=indices_tensor,
+                                                 num_partitions=node_degree)
+            node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
+                                                 num_partitions=node_degree)
+            node.labelTensor = tf.dynamic_partition(data=node.labelTensor, partitions=indices_tensor,
+                                                    num_partitions=node_degree)
+
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -180,105 +172,37 @@ class Jungle(FastTreeNetwork):
         p_c_given_x = self.oneHotLabelTensor
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
                                                   balance_coefficient=self.informationGainBalancingCoefficient)
+        # Step 3: Sample from p(F|x) when training, select argmax_F p(F|x) during inference
+        dist = tf.distributions.Categorical(probs=p_F_given_x)
+        samples = dist.sample()
+        arg_max_indices = tf.argmax(p_F_given_x, axis=1)
+        # Step 4: Apply partitioning for corresponding F nodes in the same layer.
+        indices_tensor = tf.where(self.isTrain > 0, samples, arg_max_indices)
+        node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
+                                                     num_partitions=node_degree)
+        node.F_output = tf.dynamic_partition(data=node.F_output, partitions=indices_tensor, num_partitions=node_degree)
+        node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor, num_partitions=node_degree)
+        node.labelTensor = tf.dynamic_partition(data=node.labelTensor, partitions=indices_tensor,
+                                                num_partitions=node_degree)
+        # Reporting
         node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
         node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
         node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
         node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
-        # Step 3: Sample from p(F|x) when training, select argmax_F p(F|x) during inference
-        dist = tf.distributions.Categorical(probs=p_F_given_x)
-        samples = dist.sample()
-        one_hot_samples = tf.one_hot(indices=samples, depth=node_degree, axis=-1, dtype=tf.int64)
-        one_hot_argmax = tf.one_hot(indices=tf.argmax(p_F_given_x, axis=1), depth=node_degree, axis=-1, dtype=tf.int64)
-        one_hot_indices = tf.where(self.isTrain > 0, one_hot_samples, one_hot_argmax)
+        node.evalDict[UtilityFuncs.get_variable_name(name="condition_indices", node=node)] = node.conditionIndices
+        node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
         node.evalDict[UtilityFuncs.get_variable_name(name="samples", node=node)] = samples
-        node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_samples", node=node)] = one_hot_samples
-        node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_indices", node=node)] = one_hot_indices
-        # Step 4: Apply partitioning for corresponding F nodes in the same layer.
-        arg_max_tensor =
-        condition_indices = tf.dynamic_partition(data=self.batchIndices, partitions=arg_max_tensor,
-                                                 num_partitions=child_count)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        child_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
-        child_F_nodes = sorted(child_F_nodes, key=lambda c_node: c_node.index)
-        for index in range(len(child_F_nodes)):
-            child_node = child_F_nodes[index]
-            child_index = child_node.index
-            node.maskTensors[child_index] = one_hot_indices[:, index]
-            node.evalDict[UtilityFuncs.get_variable_name(name="mask_vector_{0}_{1}".format(index, child_index),
-                                                         node=node)] = node.maskTensors[child_index]
-
-
-
-        # assert node.nodeType == NodeType.h_node
-        # # Step 1: Create Hyperplanes
-        # node_degree = self.degreeList[node.depth]
-        # ig_feature_size = branching_feature.get_shape().as_list()[-1]
-        # hyperplane_weights = tf.Variable(
-        #     tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-        #                         dtype=GlobalConstants.DATA_TYPE),
-        #     name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
-        # hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-        #                                 name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
-        # if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-        #     branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
-        #                                                       momentum=GlobalConstants.BATCH_NORM_DECAY,
-        #                                                       training=tf.cast(self.isTrain,
-        #                                                                        tf.bool))
-        # # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
-        # activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
-        # node.activationsDict[node.index] = activations
-        # decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
-        # p_F_given_x = tf.nn.softmax(decayed_activation)
-        # p_c_given_x = self.oneHotLabelTensor
-        # node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
-        #                                           balance_coefficient=self.informationGainBalancingCoefficient)
-        # node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
-        # node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
-        # node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
-        # node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
-        # node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-        # node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
-        # # Step 3: Sample from p(F|x) when training, select argmax_F p(F|x) during inference
-        # dist = tf.distributions.Categorical(probs=p_F_given_x)
-        # samples = dist.sample()
-        # one_hot_samples = tf.one_hot(indices=samples, depth=node_degree, axis=-1, dtype=tf.int64)
-        # one_hot_argmax = tf.one_hot(indices=tf.argmax(p_F_given_x, axis=1), depth=node_degree, axis=-1, dtype=tf.int64)
-        # one_hot_indices = tf.where(self.isTrain > 0, one_hot_samples, one_hot_argmax)
-        # node.evalDict[UtilityFuncs.get_variable_name(name="samples", node=node)] = samples
-        # node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_samples", node=node)] = one_hot_samples
-        # node.evalDict[UtilityFuncs.get_variable_name(name="one_hot_indices", node=node)] = one_hot_indices
-        # # Step 4: Apply masking to corresponding F nodes in the same layer.
-        # child_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
-        # child_F_nodes = sorted(child_F_nodes, key=lambda c_node: c_node.index)
-        # for index in range(len(child_F_nodes)):
-        #     child_node = child_F_nodes[index]
-        #     child_index = child_node.index
-        #     node.maskTensors[child_index] = one_hot_indices[:, index]
-        #     node.evalDict[UtilityFuncs.get_variable_name(name="mask_vector_{0}_{1}".format(index, child_index),
-        #                                                  node=node)] = node.maskTensors[child_index]
+        node.evalDict[UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)] = arg_max_indices
+        node.evalDict[UtilityFuncs.get_variable_name(name="indices_tensor", node=node)] = indices_tensor
 
     def mask_input_nodes(self, node):
         if node.nodeType == NodeType.root_node:
+            node.F_input = self.dataTensor
+            node.H_input = None
             node.labelTensor = self.labelTensor
-            node.indicesTensor = self.indicesTensor
-            node.oneHotLabelTensor = self.oneHotLabelTensor
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
-            node.batchIndicesTensor = self.batchIndices
             # For reporting
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
@@ -286,28 +210,13 @@ class Jungle(FastTreeNetwork):
             parents = self.dagObject.parents(node=node)
             assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
             parent_node = parents[0]
-            mask_tensor = parent_node.maskTensors[node.index]
-            sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
-            node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
-            # Mask all inputs (F, H)
-            parent_F = tf.boolean_mask(parent_node.F_output, mask_tensor)
-            parent_H = tf.boolean_mask(parent_node.H_output, mask_tensor)
-            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
-            node.batchIndicesTensor = tf.boolean_mask(parent_node.batchIndicesTensor, mask_tensor)
-            # For reporting
-            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
-            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
-            node.evalDict[self.get_variable_name(name="parent_F", node=node)] = parent_F
-            node.evalDict[self.get_variable_name(name="parent_H", node=node)] = parent_H
-            node.evalDict[self.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
-            node.evalDict[self.get_variable_name(name="indicesTensor", node=node)] = node.indicesTensor
-            node.evalDict[self.get_variable_name(name="oneHotLabelTensor", node=node)] = node.oneHotLabelTensor
-            node.evalDict[self.get_variable_name(name="batchIndicesTensor", node=node)] = node.batchIndicesTensor
-            return parent_F, parent_H
-        else:
-            raise Exception("Unknown node type.")
+            sibling_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
+            sibling_F_nodes = {node_index: order_index for order_index, node_index in
+                               enumerate(sorted(sibling_F_nodes, key=lambda c_node: c_node.index))}
+            sibling_order_index = sibling_F_nodes[node.index]
+            node.F_input = parent_node.F_output[sibling_order_index]
+            node.H_input = parent_node.H_output[sibling_order_index]
+            node.labelTensor = parent_node.labelTensor[sibling_order_index]
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:

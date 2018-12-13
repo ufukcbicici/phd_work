@@ -17,12 +17,12 @@ def cigj_training():
     classification_dropout_probs = [0.0]
     decision_dropout_probs = [0.0]
     jungle = Jungle(
-        node_build_funcs=[FashionNetCigj.f_root_func,
-                          FashionNetCigj.f_l1_func,
-                          FashionNetCigj.f_l2_func,
+        node_build_funcs=[FashionNetCigj.f_conv_layer_func,
+                          FashionNetCigj.f_conv_layer_func,
+                          FashionNetCigj.f_conv_layer_func,
                           FashionNetCigj.f_l3_func,
                           FashionNetCigj.f_leaf_func],
-        h_funcs=[FashionNetCigj.h_l1_func, FashionNetCigj.h_l2_func, FashionNetCigj.h_l3_func],
+        h_funcs=[FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func],
         grad_func=None,
         threshold_func=FashionNetCigj.threshold_calculator_func,
         residue_func=None, summary_func=None,

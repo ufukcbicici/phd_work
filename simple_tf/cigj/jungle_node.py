@@ -17,6 +17,8 @@ class JungleNode(Node):
         is_root = node_type == NodeType.root_node
         is_leaf = node_type == NodeType.leaf_node
         self.nodeType = node_type
+        self.F_input = None
+        self.H_input = None
         self.F_output = None
         self.H_output = None
         self.partitioned_F_outputs = None

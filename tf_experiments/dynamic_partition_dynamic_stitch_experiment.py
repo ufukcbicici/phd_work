@@ -37,7 +37,8 @@ for exp_index in range(1000):
     init = tf.global_variables_initializer()
     sess.run(init)
     t4 = time.time()
-    results = sess.run([original_stitched, transformed_stitched, indices_stitched, grads],
+    results = sess.run([original_stitched, transformed_stitched, indices_stitched, grads, condition_indices,
+                        partition_list],
                        feed_dict={input_tensor: x, activation_tensor: activation_arr, batch_size_tensor: batch_size})
     t5 = time.time()
     res0 = np.allclose(x, results[0])
