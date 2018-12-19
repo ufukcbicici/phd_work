@@ -73,6 +73,11 @@ class Jungle(FastTreeNetwork):
                                      candidate_node.nodeType == NodeType.root_node)]
                 for parent_node in parent_nodes:
                     self.dagObject.add_edge(parent=parent_node, child=node)
+        self.topologicalSortedNodes = self.dagObject.get_topological_sort()
+        # Build auxillary variables
+        self.thresholdFunc(network=self)
+
+
 
         # for node in self.nodes.values():
         #     if node.nodeType == NodeType.root_node:

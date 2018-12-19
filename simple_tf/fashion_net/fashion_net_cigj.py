@@ -77,39 +77,17 @@ class FashionNetCigj:
     @staticmethod
     def f_l3_func(node, network):
         network.mask_input_nodes(node=node)
-        net = tf.contrib.layers.flatten(parent_F)
-        flattened_F_feature_size = net.get_shape().as_list()[-1]
-        # Parameters
-        # OK
-        fc_weights_1 = tf.Variable(tf.truncated_normal(
-            [flattened_F_feature_size,
-             GlobalConstants.CIGJ_FASHION_NET_FC_DIMS[0]],
-            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=UtilityFuncs.get_variable_name(name="fc_weights_1", node=node))
-        # OK
-        fc_biases_1 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_FC_DIMS[0]],
-                                              dtype=GlobalConstants.DATA_TYPE),
-                                  name=UtilityFuncs.get_variable_name(name="fc_biases_1", node=node))
-        # OK
-        fc_weights_2 = tf.Variable(tf.truncated_normal(
-            [GlobalConstants.CIGJ_FASHION_NET_FC_DIMS[0],
-             GlobalConstants.CIGJ_FASHION_NET_FC_DIMS[1]],
-            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=UtilityFuncs.get_variable_name(name="fc_weights_2", node=node))
-        # OK
-        fc_biases_2 = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_FC_DIMS[1]],
-                                              dtype=GlobalConstants.DATA_TYPE),
-                                  name=UtilityFuncs.get_variable_name(name="fc_biases_2", node=node))
-        # Layers
-        hidden_layer_1 = tf.nn.relu(tf.matmul(net, fc_weights_1) + fc_biases_1)
-        dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
-        hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
-        dropped_layer_2 = tf.nn.dropout(hidden_layer_2, network.classificationDropoutKeepProb)
-        node.F_output = dropped_layer_2
-
-    @staticmethod
-    def f_leaf_func(node, network):
-        parent_F, parent_H = network.mask_input_nodes(node=node)
+        flattened_F_feature_size = node.F_input.get_shape().as_list()[-1]
+        dimensions = [flattened_F_feature_size]
+        dimensions.extend(GlobalConstants.CIGJ_FASHION_NET_FC_DIMS)
+        net = node.F_input
+        for layer in range(len(dimensions)):
+            net = FashionNetCigj.build_fc_layer(input=net, node=node,
+                                                input_dim=dimensions[layer],
+                                                output_dim=dimensions[layer + 1],
+                                                dropout_prob_tensor=network.classificationDropoutKeepProb,
+                                                name_suffix="{0}".format(layer))
+        node.F_output = net
 
     @staticmethod
     def h_func(node, network):
