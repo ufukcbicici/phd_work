@@ -65,9 +65,9 @@ class FashionNetCigj:
     @staticmethod
     def f_conv_layer_func(node, network):
         network.mask_input_nodes(node=node)
-        filter_size = GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES[node.depth - 1]
-        num_of_input_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth - 1]
-        num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth]
+        filter_size = GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES[node.depth]
+        num_of_input_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth]
+        num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth + 1]
         node.F_output = FashionNetCigj.build_conv_layer(input=node.F_input,
                                                         node=node,
                                                         filter_size=filter_size,
@@ -90,10 +90,14 @@ class FashionNetCigj:
         node.F_output = net
 
     @staticmethod
+    def f_leaf_func(node, network):
+        pass
+
+    @staticmethod
     def h_func(node, network):
         network.stitch_samples(node=node)
-        h_feature_size = GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[node.depth - 1]
-        pool_size = GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES[node.depth - 1]
+        h_feature_size = GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[node.depth]
+        pool_size = GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES[node.depth]
         node.H_output = FashionNetCigj.h_transform(input=node.F_input, network=network, node=node,
                                                    h_feature_size=h_feature_size,
                                                    pool_size=pool_size)

@@ -19,6 +19,7 @@ class Jungle(FastTreeNetwork):
         self.hFuncs = h_funcs
         self.currentGraph = tf.get_default_graph()
         self.batchIndices = tf.range(self.batchSize)
+        # self.decisionNoiseFactor = tf.placeholder(name="decision_noise_factor", dtype=tf.float32)
         # Create Trellis structure. Add a h node to every non-root and non-leaf layer.
         degree_list = [degree if depth == len(degree_list) - 1 else degree + 1 for depth, degree in
                        enumerate(degree_list)]
@@ -68,57 +69,35 @@ class Jungle(FastTreeNetwork):
             else:
                 assert node.nodeType == NodeType.h_node
                 parent_nodes = [candidate_node for candidate_node in self.nodes.values()
-                                if candidate_node.depth == node.depth
+                                if (candidate_node.depth == node.depth
                                 and (candidate_node.nodeType == NodeType.f_node or
-                                     candidate_node.nodeType == NodeType.root_node)]
+                                     candidate_node.nodeType == NodeType.root_node)) or
+                                (candidate_node.depth == node.depth - 1 and candidate_node.nodeType == NodeType.h_node)]
                 for parent_node in parent_nodes:
                     self.dagObject.add_edge(parent=parent_node, child=node)
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         # Build auxillary variables
         self.thresholdFunc(network=self)
-
-
-
-        # for node in self.nodes.values():
-        #     if node.nodeType == NodeType.root_node:
-        #         continue
-        #     elif node.nodeType == NodeType.h_node or node.nodeType == NodeType.leaf_node:
-        #         assert node.depth - 1 in self.depthToNodesDict
-        #         for parent_node in self.depthToNodesDict[node.depth - 1]:
-        #             self.dagObject.add_edge(parent=parent_node, child=node)
-        #     elif node.nodeType == NodeType.f_node:
-        #         h_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.h_node]
-        #         assert len(h_nodes) == 1
-        #         parent = h_nodes[0]
-        #         self.dagObject.add_edge(parent=parent, child=node)
-        #     else:
-        #         raise Exception("Unknown node type.")
-        # self.topologicalSortedNodes = self.dagObject.get_topological_sort()
-        # # Build auxillary variables
-        # self.thresholdFunc(network=self)
-        # # Build node computational graphs
-        # for node in self.topologicalSortedNodes:
-        #     if node.isLeaf:
-        #         break
-        #     if node.nodeType == NodeType.root_node:
-        #         self.nodeBuildFuncs[0](node=node, network=self)
-        #         assert node.F_output is not None and node.H_output is None
-        #         node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
-        #     elif node.nodeType == NodeType.h_node:
-        #         self.hFuncs[node.depth - 1](node=node, network=self)
-        #         assert node.F_output is not None and node.H_output is not None
-        #         node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
-        #         node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
-        #     elif node.nodeType == NodeType.f_node:
-        #         self.nodeBuildFuncs[node.depth](node=node, network=self)
-        #         assert node.F_output is not None and node.H_output is None
-        #         node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
-        # # Build the network eval dict
-        # self.evalDict = {}
-        # for node in self.topologicalSortedNodes:
-        #     for k, v in node.evalDict.items():
-        #         assert k not in self.evalDict
-        #         self.evalDict[k] = v
+        # Build node computational graphs
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                break
+            if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
+                    node.nodeType == NodeType.leaf_node:
+                self.nodeBuildFuncs[0](node=node, network=self)
+                assert node.F_output is not None and node.H_output is None
+                node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+            elif node.nodeType == NodeType.h_node:
+                self.hFuncs[node.depth - 1](node=node, network=self)
+                assert node.F_output is not None and node.H_output is not None
+                node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+                node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
+        # Build the network eval dict
+        self.evalDict = {}
+        for node in self.topologicalSortedNodes:
+            for k, v in node.evalDict.items():
+                assert k not in self.evalDict
+                self.evalDict[k] = v
 
     def stitch_tensor(self, f_node, input_tensor, indices, name):
         shape_tensor_name = UtilityFuncs.get_variable_name(name="{0}_shape_tensor".format(name), node=f_node)
@@ -140,25 +119,24 @@ class Jungle(FastTreeNetwork):
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
         parents = self.dagObject.parents(node=node)
-        # Layer 1 h_node. This receives non-partitioned, complete minibatch from the root node. No stitching needed.
+        # Layer 0 h_node. This receives non-partitioned, complete minibatch from the root node. No stitching needed.
         if len(parents) == 1:
-            assert parents[0].nodeType == NodeType.root_node and node.depth == 1
+            assert parents[0].nodeType == NodeType.root_node and node.depth == 0
             node.F_input = parents[0].F_output
             node.H_input = None
-            node.F_output = parents[0].F_output
             node.labelTensor = parents[0].labelTensor
         # Need stitching
         else:
-            # Get all F nodes in the previous layer
+            # Get all F nodes in the same layer
             parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=node)
                               if f_node.nodeType == NodeType.f_node]
             parent_h_nodes = [h_node for h_node in self.dagObject.parents(node=node)
                               if h_node.nodeType == NodeType.h_node]
-            assert len(parent_h_nodes) == 1
-            parent_h_node = parent_h_nodes[0]
-            parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
-            f_inputs = [node.F_output for node in parent_f_nodes]
-            original_stitched = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+            # assert len(parent_h_nodes) == 1
+            # parent_h_node = parent_h_nodes[0]
+            # parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
+            # f_inputs = [node.F_output for node in parent_f_nodes]
+            # original_stitched = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
 
             # node.F_output = tf.dynamic_partition(data=node.F_output, partitions=indices_tensor,
             #                                      num_partitions=node_degree)
@@ -169,52 +147,55 @@ class Jungle(FastTreeNetwork):
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
-        # Step 1: Create Hyperplanes
-        node_degree = self.degreeList[node.depth]
-        ig_feature_size = branching_feature.get_shape().as_list()[-1]
-        hyperplane_weights = tf.Variable(
-            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE),
-            name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
-        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                        name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
-        if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-            branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
+        node.H_output = branching_feature
+        node_degree = self.degreeList[node.depth + 1]
+        if node_degree > 1:
+            # Step 1: Create Hyperplanes
+            ig_feature_size = node.H_output.get_shape().as_list()[-1]
+            hyperplane_weights = tf.Variable(
+                tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                    dtype=GlobalConstants.DATA_TYPE),
+                name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
+            hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                            name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
+            if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
+                node.H_output = tf.layers.batch_normalization(inputs=node.H_output,
                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                                              training=tf.cast(self.isTrain,
-                                                                               tf.bool))
-        # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
-        activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
-        node.activationsDict[node.index] = activations
-        decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
-        p_F_given_x = tf.nn.softmax(decayed_activation)
-        p_c_given_x = self.oneHotLabelTensor
-        node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
-                                                  balance_coefficient=self.informationGainBalancingCoefficient)
-        # Step 3: Sample from p(F|x) when training, select argmax_F p(F|x) during inference
-        dist = tf.distributions.Categorical(probs=p_F_given_x)
-        samples = dist.sample()
-        arg_max_indices = tf.argmax(p_F_given_x, axis=1)
-        # Step 4: Apply partitioning for corresponding F nodes in the same layer.
-        indices_tensor = tf.where(self.isTrain > 0, samples, arg_max_indices)
-        node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
-                                                     num_partitions=node_degree)
-        node.F_output = tf.dynamic_partition(data=node.F_output, partitions=indices_tensor, num_partitions=node_degree)
-        node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor, num_partitions=node_degree)
-        node.labelTensor = tf.dynamic_partition(data=node.labelTensor, partitions=indices_tensor,
-                                                num_partitions=node_degree)
-        # Reporting
-        node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
-        node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
-        node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
-        node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
-        node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-        node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
-        node.evalDict[UtilityFuncs.get_variable_name(name="condition_indices", node=node)] = node.conditionIndices
-        node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
-        node.evalDict[UtilityFuncs.get_variable_name(name="samples", node=node)] = samples
-        node.evalDict[UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)] = arg_max_indices
-        node.evalDict[UtilityFuncs.get_variable_name(name="indices_tensor", node=node)] = indices_tensor
+                                                              training=tf.cast(self.isTrain, tf.bool))
+            # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
+            activations = tf.matmul(node.H_output, hyperplane_weights) + hyperplane_biases
+            node.activationsDict[node.index] = activations
+            decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
+            p_F_given_x = tf.nn.softmax(decayed_activation)
+            p_c_given_x = self.oneHotLabelTensor
+            node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
+                                                      balance_coefficient=self.informationGainBalancingCoefficient)
+            # Step 3: Select argmax_F p(F|x)
+            indices_tensor = tf.argmax(p_F_given_x, axis=1)
+            # Step 4: Apply partitioning for corresponding F nodes in the same layer.
+            node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
+                                                         num_partitions=node_degree)
+            node.F_output = tf.dynamic_partition(data=node.F_input, partitions=indices_tensor,
+                                                 num_partitions=node_degree)
+            node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
+                                                 num_partitions=node_degree)
+            node.labelTensor = tf.dynamic_partition(data=node.labelTensor, partitions=indices_tensor,
+                                                    num_partitions=node_degree)
+            # Reporting
+            node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
+            node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
+            node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
+            node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
+            node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
+            node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
+            node.evalDict[UtilityFuncs.get_variable_name(name="condition_indices", node=node)] = node.conditionIndices
+            node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
+            node.evalDict[UtilityFuncs.get_variable_name(name="indices_tensor", node=node)] = indices_tensor
+        else:
+            node.conditionIndices = [self.batchIndices]
+            node.F_output = [node.F_input]
+            node.H_output = [node.H_output]
+            node.labelTensor = [node.labelTensor]
 
     def mask_input_nodes(self, node):
         if node.nodeType == NodeType.root_node:
@@ -226,16 +207,17 @@ class Jungle(FastTreeNetwork):
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
         elif node.nodeType == NodeType.f_node:
-            parents = self.dagObject.parents(node=node)
-            assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
-            parent_node = parents[0]
-            sibling_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
-            sibling_F_nodes = {node_index: order_index for order_index, node_index in
-                               enumerate(sorted(sibling_F_nodes, key=lambda c_node: c_node.index))}
-            sibling_order_index = sibling_F_nodes[node.index]
-            node.F_input = parent_node.F_output[sibling_order_index]
-            node.H_input = parent_node.H_output[sibling_order_index]
-            node.labelTensor = parent_node.labelTensor[sibling_order_index]
+            raise NotImplementedError()
+            # parents = self.dagObject.parents(node=node)
+            # assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
+            # parent_node = parents[0]
+            # sibling_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
+            # sibling_F_nodes = {node_index: order_index for order_index, node_index in
+            #                    enumerate(sorted(sibling_F_nodes, key=lambda c_node: c_node.index))}
+            # sibling_order_index = sibling_F_nodes[node.index]
+            # node.F_input = parent_node.F_output[sibling_order_index]
+            # node.H_input = parent_node.H_output[sibling_order_index]
+            # node.labelTensor = parent_node.labelTensor[sibling_order_index]
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:
