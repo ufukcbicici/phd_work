@@ -26,7 +26,7 @@ def cigj_training():
         grad_func=None,
         threshold_func=FashionNetCigj.threshold_calculator_func,
         residue_func=None, summary_func=None,
-        degree_list=[1, 3, 3, 3, 1], dataset=dataset, shape_func=FashionNetCigj.get_layer_shapes)
+        degree_list=[1, 3, 3, 3, 1], dataset=dataset)
     sess = jungle.get_session()
     init = tf.global_variables_initializer()
     sess.run(init)

@@ -12,31 +12,30 @@ from simple_tf.info_gain import InfoGainLoss
 
 class Jungle(FastTreeNetwork):
     def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
-                 dataset, shape_func):
+                 dataset):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         curr_index = 0
         self.depthToNodesDict = {}
         self.hFuncs = h_funcs
         self.currentGraph = tf.get_default_graph()
         self.batchIndices = tf.range(self.batchSize)
-        self.shapeFunc = shape_func
         # Create Trellis structure. Add a h node to every non-root and non-leaf layer.
-        degree_list = [degree if depth == 0 or depth == len(degree_list) - 1 else degree + 1 for depth, degree in
+        degree_list = [degree if depth == len(degree_list) - 1 else degree + 1 for depth, degree in
                        enumerate(degree_list)]
-        assert degree_list[0] == 1
+        assert degree_list[0] == 2
         assert degree_list[-1] == 1
         for depth, num_of_nodes in enumerate(degree_list):
-            for i in range(num_of_nodes):
-                if depth == 0:
+            # root node, F_nodes, leaf nodes and H_node
+            for index_in_depth in range(num_of_nodes):
+                if depth < len(degree_list) - 1 and index_in_depth == num_of_nodes - 1:
+                    node_type = NodeType.h_node
+                elif depth == 0 and index_in_depth == 0:
+                    assert num_of_nodes == 2
                     node_type = NodeType.root_node
                 elif depth == len(degree_list) - 1:
                     node_type = NodeType.leaf_node
-                elif i == 0:
-                    node_type = NodeType.h_node
-                elif i > 0:
-                    node_type = NodeType.f_node
                 else:
-                    raise Exception("Unknown node type.")
+                    node_type = NodeType.f_node
                 curr_node = JungleNode(index=curr_index, depth=depth, node_type=node_type)
                 self.nodes[curr_index] = curr_node
                 curr_index += 1
@@ -44,61 +43,77 @@ class Jungle(FastTreeNetwork):
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
         # Build network as a DAG
-        self.shapeFunc(network=self, dataset=dataset)
-        self.shapeTensorsDict = {}
-        self.shapeSensingMode = False
         self.build_network()
+        self.print_trellis_structure()
 
     def get_session(self):
         sess = tf.Session(graph=self.currentGraph)
         return sess
 
     def build_network(self):
-        # Each H node will have the whole previous layer as the parent.
-        # Each F node will have the H of the same layer as the parent.
-        # Root has the Layer 1 H as its child.
-        # Leaf will have the whole previous layer as the parent.
+        # Each H node will have the F nodes and the root node in the same layer as the parents.
+        # Each F node and leaf node have the H node in the previous layer as the parent.
         self.dagObject = Dag()
         for node in self.nodes.values():
+            print(node.nodeType)
             if node.nodeType == NodeType.root_node:
                 continue
-            elif node.nodeType == NodeType.h_node or node.nodeType == NodeType.leaf_node:
-                assert node.depth - 1 in self.depthToNodesDict
-                for parent_node in self.depthToNodesDict[node.depth - 1]:
-                    self.dagObject.add_edge(parent=parent_node, child=node)
-            elif node.nodeType == NodeType.f_node:
-                h_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.h_node]
-                assert len(h_nodes) == 1
-                parent = h_nodes[0]
-                self.dagObject.add_edge(parent=parent, child=node)
+            elif node.nodeType == NodeType.f_node or node.nodeType == NodeType.leaf_node:
+                parent_h_nodes = [candidate_node for candidate_node in self.nodes.values()
+                                  if candidate_node.depth == node.depth - 1
+                                  and candidate_node.nodeType == NodeType.h_node]
+                assert len(parent_h_nodes) == 1
+                parent_h_node = parent_h_nodes[0]
+                self.dagObject.add_edge(parent=parent_h_node, child=node)
             else:
-                raise Exception("Unknown node type.")
-        self.topologicalSortedNodes = self.dagObject.get_topological_sort()
-        # Build auxillary variables
-        self.thresholdFunc(network=self)
-        # Build node computational graphs
-        for node in self.topologicalSortedNodes:
-            if node.isLeaf:
-                break
-            if node.nodeType == NodeType.root_node:
-                self.nodeBuildFuncs[0](node=node, network=self)
-                assert node.F_output is not None and node.H_output is None
-                node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
-            elif node.nodeType == NodeType.h_node:
-                self.hFuncs[node.depth - 1](node=node, network=self)
-                assert node.F_output is not None and node.H_output is not None
-                node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
-                node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
-            elif node.nodeType == NodeType.f_node:
-                self.nodeBuildFuncs[node.depth](node=node, network=self)
-                assert node.F_output is not None and node.H_output is None
-                node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
-        # Build the network eval dict
-        self.evalDict = {}
-        for node in self.topologicalSortedNodes:
-            for k, v in node.evalDict.items():
-                assert k not in self.evalDict
-                self.evalDict[k] = v
+                assert node.nodeType == NodeType.h_node
+                parent_nodes = [candidate_node for candidate_node in self.nodes.values()
+                                if candidate_node.depth == node.depth
+                                and (candidate_node.nodeType == NodeType.f_node or
+                                     candidate_node.nodeType == NodeType.root_node)]
+                for parent_node in parent_nodes:
+                    self.dagObject.add_edge(parent=parent_node, child=node)
+
+        # for node in self.nodes.values():
+        #     if node.nodeType == NodeType.root_node:
+        #         continue
+        #     elif node.nodeType == NodeType.h_node or node.nodeType == NodeType.leaf_node:
+        #         assert node.depth - 1 in self.depthToNodesDict
+        #         for parent_node in self.depthToNodesDict[node.depth - 1]:
+        #             self.dagObject.add_edge(parent=parent_node, child=node)
+        #     elif node.nodeType == NodeType.f_node:
+        #         h_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.h_node]
+        #         assert len(h_nodes) == 1
+        #         parent = h_nodes[0]
+        #         self.dagObject.add_edge(parent=parent, child=node)
+        #     else:
+        #         raise Exception("Unknown node type.")
+        # self.topologicalSortedNodes = self.dagObject.get_topological_sort()
+        # # Build auxillary variables
+        # self.thresholdFunc(network=self)
+        # # Build node computational graphs
+        # for node in self.topologicalSortedNodes:
+        #     if node.isLeaf:
+        #         break
+        #     if node.nodeType == NodeType.root_node:
+        #         self.nodeBuildFuncs[0](node=node, network=self)
+        #         assert node.F_output is not None and node.H_output is None
+        #         node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+        #     elif node.nodeType == NodeType.h_node:
+        #         self.hFuncs[node.depth - 1](node=node, network=self)
+        #         assert node.F_output is not None and node.H_output is not None
+        #         node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+        #         node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
+        #     elif node.nodeType == NodeType.f_node:
+        #         self.nodeBuildFuncs[node.depth](node=node, network=self)
+        #         assert node.F_output is not None and node.H_output is None
+        #         node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+        # # Build the network eval dict
+        # self.evalDict = {}
+        # for node in self.topologicalSortedNodes:
+        #     for k, v in node.evalDict.items():
+        #         assert k not in self.evalDict
+        #         self.evalDict[k] = v
 
     def stitch_tensor(self, f_node, input_tensor, indices, name):
         shape_tensor_name = UtilityFuncs.get_variable_name(name="{0}_shape_tensor".format(name), node=f_node)
@@ -140,13 +155,12 @@ class Jungle(FastTreeNetwork):
             f_inputs = [node.F_output for node in parent_f_nodes]
             original_stitched = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
 
-            node.F_output = tf.dynamic_partition(data=node.F_output, partitions=indices_tensor,
-                                                 num_partitions=node_degree)
-            node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
-                                                 num_partitions=node_degree)
-            node.labelTensor = tf.dynamic_partition(data=node.labelTensor, partitions=indices_tensor,
-                                                    num_partitions=node_degree)
-
+            # node.F_output = tf.dynamic_partition(data=node.F_output, partitions=indices_tensor,
+            #                                      num_partitions=node_degree)
+            # node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
+            #                                      num_partitions=node_degree)
+            # node.labelTensor = tf.dynamic_partition(data=node.labelTensor, partitions=indices_tensor,
+            #                                         num_partitions=node_degree)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
