@@ -43,11 +43,12 @@ class FashionNetCigj:
     @staticmethod
     def h_transform(input, node, network, h_feature_size, pool_size):
         h_net = input
-        h_net_shape = tf.shape(h_net)
-        # Parametric Average Pooling
-        h_net = tf.nn.avg_pool(h_net, ksize=[1, pool_size, pool_size, 1], strides=[1, pool_size, pool_size, 1],
-                               padding='SAME')
-        h_net = tf.contrib.layers.flatten(h_net)
+        # Parametric Average Pooling if the input layer is convolutional
+        assert len(h_net.get_shape().as_list()) == 2 or len(h_net.get_shape().as_list()) == 4
+        if len(h_net.get_shape().as_list()) == 4:
+            h_net = tf.nn.avg_pool(h_net, ksize=[1, pool_size, pool_size, 1], strides=[1, pool_size, pool_size, 1],
+                                   padding='SAME')
+            h_net = tf.contrib.layers.flatten(h_net)
         feature_size = h_net.get_shape().as_list()[-1]
         fc_h_weights = tf.Variable(tf.truncated_normal(
             [feature_size, h_feature_size],

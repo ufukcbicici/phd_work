@@ -13,6 +13,7 @@ from simple_tf.info_gain import InfoGainLoss
 class Jungle(FastTreeNetwork):
     def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                  dataset):
+        assert len(node_build_funcs) == len(h_funcs) + 1
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         curr_index = 0
         self.depthToNodesDict = {}
@@ -52,7 +53,8 @@ class Jungle(FastTreeNetwork):
         return sess
 
     def build_network(self):
-        # Each H node will have the F nodes and the root node in the same layer as the parents.
+        # Each H node will have the F nodes and the root node in the same layer and the H node in the previous layer
+        # as the parents.
         # Each F node and leaf node have the H node in the previous layer as the parent.
         self.dagObject = Dag()
         for node in self.nodes.values():
@@ -84,11 +86,11 @@ class Jungle(FastTreeNetwork):
                 break
             if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
                     node.nodeType == NodeType.leaf_node:
-                self.nodeBuildFuncs[0](node=node, network=self)
+                self.nodeBuildFuncs[node.depth](node=node, network=self)
                 assert node.F_output is not None and node.H_output is None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
             elif node.nodeType == NodeType.h_node:
-                self.hFuncs[node.depth - 1](node=node, network=self)
+                self.hFuncs[node.depth](node=node, network=self)
                 assert node.F_output is not None and node.H_output is not None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
                 node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
@@ -99,23 +101,6 @@ class Jungle(FastTreeNetwork):
                 assert k not in self.evalDict
                 self.evalDict[k] = v
 
-    def stitch_tensor(self, f_node, input_tensor, indices, name):
-        shape_tensor_name = UtilityFuncs.get_variable_name(name="{0}_shape_tensor".format(name), node=f_node)
-        shape_tensor = tf.Variable(name=shape_tensor_name, trainable=False,
-                                   initial_value=[0] * len(input_tensor.get_shape().as_list()))
-        self.shapeTensorsDict[shape_tensor_name] = shape_tensor
-        # Get the shape of the f_output as a tensor
-        shape_assign_op = tf.assign(shape_tensor, tf.shape(input_tensor))
-        with tf.control_dependencies([shape_assign_op]):
-            # Set the first element as the batch size
-            set_batch_size_op = tf.assign(shape_tensor[0], self.batchSize)
-            with tf.control_dependencies([set_batch_size_op]):
-                # Get indices of the f_node in the appropriate format
-                indices = tf.expand_dims(indices, -1)
-                # Obtain the sparse output
-                sparse_output = tf.scatter_nd(indices, input_tensor, shape_tensor)
-                return sparse_output
-
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
         parents = self.dagObject.parents(node=node)
@@ -124,7 +109,6 @@ class Jungle(FastTreeNetwork):
             assert parents[0].nodeType == NodeType.root_node and node.depth == 0
             node.F_input = parents[0].F_output
             node.H_input = None
-            node.labelTensor = parents[0].labelTensor
         # Need stitching
         else:
             # Get all F nodes in the same layer
@@ -132,11 +116,22 @@ class Jungle(FastTreeNetwork):
                               if f_node.nodeType == NodeType.f_node]
             parent_h_nodes = [h_node for h_node in self.dagObject.parents(node=node)
                               if h_node.nodeType == NodeType.h_node]
-            # assert len(parent_h_nodes) == 1
-            # parent_h_node = parent_h_nodes[0]
-            # parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
-            # f_inputs = [node.F_output for node in parent_f_nodes]
-            # original_stitched = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+            assert len(parent_h_nodes) == 1
+            parent_h_node = parent_h_nodes[0]
+            parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
+            assert all([f_node.H_output is None for f_node in parent_f_nodes])
+            f_inputs = [node.F_output for node in parent_f_nodes]
+            node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+            node.H_input = parent_h_node.H_output
+            # sorted(sibling_F_nodes, key=lambda c_node: c_node.index)
+
+
+
+
+
+
+
+            original_stitched = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
 
             # node.F_output = tf.dynamic_partition(data=node.F_output, partitions=indices_tensor,
             #                                      num_partitions=node_degree)
@@ -171,15 +166,13 @@ class Jungle(FastTreeNetwork):
             node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
                                                       balance_coefficient=self.informationGainBalancingCoefficient)
             # Step 3: Select argmax_F p(F|x)
-            indices_tensor = tf.argmax(p_F_given_x, axis=1)
+            indices_tensor = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
             # Step 4: Apply partitioning for corresponding F nodes in the same layer.
             node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
                                                          num_partitions=node_degree)
             node.F_output = tf.dynamic_partition(data=node.F_input, partitions=indices_tensor,
                                                  num_partitions=node_degree)
-            node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
-                                                 num_partitions=node_degree)
-            node.labelTensor = tf.dynamic_partition(data=node.labelTensor, partitions=indices_tensor,
+            node.labelTensor = tf.dynamic_partition(data=self.labelTensor, partitions=indices_tensor,
                                                     num_partitions=node_degree)
             # Reporting
             node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
@@ -207,17 +200,17 @@ class Jungle(FastTreeNetwork):
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
         elif node.nodeType == NodeType.f_node:
-            raise NotImplementedError()
-            # parents = self.dagObject.parents(node=node)
-            # assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
-            # parent_node = parents[0]
-            # sibling_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
-            # sibling_F_nodes = {node_index: order_index for order_index, node_index in
-            #                    enumerate(sorted(sibling_F_nodes, key=lambda c_node: c_node.index))}
-            # sibling_order_index = sibling_F_nodes[node.index]
-            # node.F_input = parent_node.F_output[sibling_order_index]
-            # node.H_input = parent_node.H_output[sibling_order_index]
-            # node.labelTensor = parent_node.labelTensor[sibling_order_index]
+            # raise NotImplementedError()
+            parents = self.dagObject.parents(node=node)
+            assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
+            parent_node = parents[0]
+            sibling_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
+            sibling_F_nodes = {node.index: order_index for order_index, node in
+                               enumerate(sorted(sibling_F_nodes, key=lambda c_node: c_node.index))}
+            sibling_order_index = sibling_F_nodes[node.index]
+            node.F_input = parent_node.F_output[sibling_order_index]
+            node.H_input = parent_node.H_output[sibling_order_index]
+            node.labelTensor = parent_node.labelTensor[sibling_order_index]
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:
