@@ -172,7 +172,7 @@ class Jungle(FastTreeNetwork):
             node.conditionIndices = [self.batchIndices]
             node.F_output = [node.F_input]
             node.H_output = [node.H_output]
-            node.labelTensor = [node.labelTensor]
+            node.labelTensor = [self.labelTensor]
 
     def apply_loss_jungle(self, node, final_feature):
         assert len(final_feature.get_shape().as_list()) == 2
@@ -186,6 +186,8 @@ class Jungle(FastTreeNetwork):
                                         name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node))
         self.apply_loss(node=node, final_feature=final_feature, softmax_weights=fc_softmax_weights,
                         softmax_biases=fc_softmax_biases)
+        assert len(node.lossList) == 1
+        node.F_output = node.lossList[0]
 
     def mask_input_nodes(self, node):
         if node.nodeType == NodeType.root_node:
@@ -196,15 +198,16 @@ class Jungle(FastTreeNetwork):
             # For reporting
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
-        elif node.nodeType == NodeType.f_node:
+        elif node.nodeType == NodeType.f_node or node.nodeType == NodeType.leaf_node:
             # raise NotImplementedError()
             parents = self.dagObject.parents(node=node)
             assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
             parent_node = parents[0]
-            sibling_F_nodes = [node for node in self.depthToNodesDict[node.depth] if node.nodeType == NodeType.f_node]
-            sibling_F_nodes = {node.index: order_index for order_index, node in
-                               enumerate(sorted(sibling_F_nodes, key=lambda c_node: c_node.index))}
-            sibling_order_index = sibling_F_nodes[node.index]
+            sibling_nodes = [node for node in self.depthToNodesDict[node.depth]
+                             if node.nodeType == NodeType.f_node or node.nodeType == NodeType.leaf_node]
+            sibling_nodes = {node.index: order_index for order_index, node in
+                               enumerate(sorted(sibling_nodes, key=lambda c_node: c_node.index))}
+            sibling_order_index = sibling_nodes[node.index]
             node.F_input = parent_node.F_output[sibling_order_index]
             node.H_input = parent_node.H_output[sibling_order_index]
             node.labelTensor = parent_node.labelTensor[sibling_order_index]
