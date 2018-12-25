@@ -82,6 +82,8 @@ class Jungle(FastTreeNetwork):
         self.thresholdFunc(network=self)
         # Build node computational graphs
         for node in self.topologicalSortedNodes:
+            if node.depth > 3:
+                continue
             if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
                     node.nodeType == NodeType.leaf_node:
                 self.nodeBuildFuncs[node.depth](node=node, network=self)
