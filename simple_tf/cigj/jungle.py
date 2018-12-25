@@ -122,23 +122,7 @@ class Jungle(FastTreeNetwork):
             assert all([f_node.H_output is None for f_node in parent_f_nodes])
             f_inputs = [node.F_output for node in parent_f_nodes]
             node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-            node.H_input = parent_h_node.H_output
-            # sorted(sibling_F_nodes, key=lambda c_node: c_node.index)
-
-
-
-
-
-
-
-            original_stitched = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-
-            # node.F_output = tf.dynamic_partition(data=node.F_output, partitions=indices_tensor,
-            #                                      num_partitions=node_degree)
-            # node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
-            #                                      num_partitions=node_degree)
-            # node.labelTensor = tf.dynamic_partition(data=node.labelTensor, partitions=indices_tensor,
-            #                                         num_partitions=node_degree)
+            node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=parent_h_node.H_output)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -171,6 +155,8 @@ class Jungle(FastTreeNetwork):
             node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
                                                          num_partitions=node_degree)
             node.F_output = tf.dynamic_partition(data=node.F_input, partitions=indices_tensor,
+                                                 num_partitions=node_degree)
+            node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
                                                  num_partitions=node_degree)
             node.labelTensor = tf.dynamic_partition(data=self.labelTensor, partitions=indices_tensor,
                                                     num_partitions=node_degree)
