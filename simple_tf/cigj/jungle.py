@@ -82,8 +82,6 @@ class Jungle(FastTreeNetwork):
         self.thresholdFunc(network=self)
         # Build node computational graphs
         for node in self.topologicalSortedNodes:
-            if node.isLeaf:
-                break
             if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
                     node.nodeType == NodeType.leaf_node:
                 self.nodeBuildFuncs[node.depth](node=node, network=self)
@@ -176,6 +174,19 @@ class Jungle(FastTreeNetwork):
             node.H_output = [node.H_output]
             node.labelTensor = [node.labelTensor]
 
+    def apply_loss_jungle(self, node, final_feature):
+        assert len(final_feature.get_shape().as_list()) == 2
+        final_feature_dim = final_feature.get_shape().as_list()[-1]
+        fc_softmax_weights = tf.Variable(
+            tf.truncated_normal([final_feature_dim, self.labelCount], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=UtilityFuncs.get_variable_name(name="fc_softmax_weights", node=node))
+        fc_softmax_biases = tf.Variable(tf.constant(0.1, shape=[self.labelCount],
+                                                    dtype=GlobalConstants.DATA_TYPE),
+                                        name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node))
+        self.apply_loss(node=node, final_feature=final_feature, softmax_weights=fc_softmax_weights,
+                        softmax_biases=fc_softmax_biases)
+
     def mask_input_nodes(self, node):
         if node.nodeType == NodeType.root_node:
             node.F_input = self.dataTensor
@@ -239,21 +250,6 @@ class Jungle(FastTreeNetwork):
                 feed_dict[self.decisionDropoutKeepProb] = 1.0
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
         return feed_dict
-
-    def get_node_output_shapes(self, dataset):
-        sess = self.get_session()
-        init = tf.global_variables_initializer()
-        sess.run(init)
-        results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
-        for node in self.topologicalSortedNodes:
-            if node.nodeType == NodeType.leaf_node:
-                continue
-            f_output_name = UtilityFuncs.get_variable_name(name="F_output", node=node)
-            h_output_name = UtilityFuncs.get_variable_name(name="H_output", node=node)
-            node.F_outputShape = results[f_output_name].shape
-            if node.nodeType == NodeType.h_node:
-                node.H_outputShape = results[h_output_name].shape
-        print("X")
 
     # For debugging
     def print_trellis_structure(self):

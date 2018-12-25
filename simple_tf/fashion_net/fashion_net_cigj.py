@@ -33,8 +33,7 @@ class FashionNetCigj:
             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
             name=UtilityFuncs.get_variable_name(name="fc_weights{0}".format(name_suffix), node=node))
         # OK
-        fc_biases = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.CIGJ_FASHION_NET_FC_DIMS[0]],
-                                            dtype=GlobalConstants.DATA_TYPE),
+        fc_biases = tf.Variable(tf.constant(0.1, shape=[output_dim], dtype=GlobalConstants.DATA_TYPE),
                                 name=UtilityFuncs.get_variable_name(name="fc_biases{0}".format(name_suffix), node=node))
         hidden_layer = tf.nn.relu(tf.matmul(input, fc_weights) + fc_biases)
         dropped_layer = tf.nn.dropout(hidden_layer, dropout_prob_tensor)
@@ -78,11 +77,11 @@ class FashionNetCigj:
     @staticmethod
     def f_l3_func(node, network):
         network.mask_input_nodes(node=node)
-        flattened_F_feature_size = node.F_input.get_shape().as_list()[-1]
+        net = tf.contrib.layers.flatten(node.F_input)
+        flattened_F_feature_size = net.get_shape().as_list()[-1]
         dimensions = [flattened_F_feature_size]
         dimensions.extend(GlobalConstants.CIGJ_FASHION_NET_FC_DIMS)
-        net = node.F_input
-        for layer in range(len(dimensions)):
+        for layer in range(len(dimensions) - 1):
             net = FashionNetCigj.build_fc_layer(input=net, node=node,
                                                 input_dim=dimensions[layer],
                                                 output_dim=dimensions[layer + 1],
@@ -92,7 +91,8 @@ class FashionNetCigj:
 
     @staticmethod
     def f_leaf_func(node, network):
-        pass
+        final_feature = node.F_input
+        network.apply_loss_jungle(node=node, final_feature=final_feature)
 
     @staticmethod
     def h_func(node, network):
