@@ -313,7 +313,23 @@ class FastTreeNetwork(TreeNetwork):
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
                                            is_train=False, use_masking=use_masking,
                                            batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        results = sess.run(self.evalDict, feed_dict)
+
+        # n_dict = {k: v for k, v in self.evalDict.items() if
+        #           "Node10" not in k and "Node11" not in k and "Node12" not in k and "Node13" not in k}
+        # n_dict2 = {k: v for k, v in self.evalDict.items() if
+        #            "Node6" not in k and "Node7" not in k and "Node8" not in k and "Node9" not in k and
+        #            "Node10" not in k and "Node11" not in k and "Node12" not in k and "Node13" not in k}
+        # small_dict = {k: v for k, v in self.evalDict.items() if
+        #               "Node0" in k or "Node1" in k or "Node2" in k or "Node3" in k or "Node4" in k}
+        small_dict = {}
+        for node in self.topologicalSortedNodes:
+            if node.index >= 6:
+                continue
+            for k, v in node.evalDict.items():
+                assert k not in small_dict
+                small_dict[k] = v
+        # results = sess.run(self.evalDict, feed_dict)
+        results = sess.run(small_dict, feed_dict)
         # for k, v in results.items():
         #     if "final_feature_mag" in k:
         #         print("{0}={1}".format(k, v))

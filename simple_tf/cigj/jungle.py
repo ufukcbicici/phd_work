@@ -82,6 +82,8 @@ class Jungle(FastTreeNetwork):
         self.thresholdFunc(network=self)
         # Build node computational graphs
         for node in self.topologicalSortedNodes:
+            # if node.depth > 3 or (node.depth == 3 and node.nodeType == NodeType.h_node):
+            print("Building node {0}".format(node.index))
             if node.depth > 3:
                 continue
             if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
@@ -121,8 +123,12 @@ class Jungle(FastTreeNetwork):
             parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
             assert all([f_node.H_output is None for f_node in parent_f_nodes])
             f_inputs = [node.F_output for node in parent_f_nodes]
-            node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-            node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=parent_h_node.H_output)
+            control_dependencies = []
+            control_dependencies.extend(parent_h_node.H_output)
+            control_dependencies.extend(f_inputs)
+            with tf.control_dependencies(control_dependencies):
+                node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+                node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=parent_h_node.H_output)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node

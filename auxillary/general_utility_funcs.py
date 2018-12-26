@@ -42,10 +42,13 @@ class UtilityFuncs:
 
     @staticmethod
     def tf_safe_flatten(input_tensor):
-        shape_tensor = tf.shape(input_tensor)
-        flat_shape = tf.stack([shape_tensor[0], tf.reduce_prod(shape_tensor[1:])], axis=0)
-        flattened_tensor = tf.reshape(input_tensor, shape=flat_shape)
-        return flattened_tensor
+        flattened_dim = np.prod(np.array(input_tensor.get_shape().as_list())[1:])
+        flattened = tf.reshape(input_tensor, shape=(-1, flattened_dim))
+        return flattened
+        # shape_tensor = tf.shape(input_tensor)
+        # flat_shape = tf.stack([shape_tensor[0], tf.reduce_prod(shape_tensor[1:])], axis=0)
+        # flattened_tensor = tf.reshape(input_tensor, shape=flat_shape)
+        # return flattened_tensor
 
     @staticmethod
     def get_max_val_acc_from_baseline_results(results_folder):
