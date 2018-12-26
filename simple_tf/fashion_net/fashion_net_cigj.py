@@ -47,7 +47,8 @@ class FashionNetCigj:
         if len(h_net.get_shape().as_list()) == 4:
             h_net = tf.nn.avg_pool(h_net, ksize=[1, pool_size, pool_size, 1], strides=[1, pool_size, pool_size, 1],
                                    padding='SAME')
-            h_net = tf.contrib.layers.flatten(h_net)
+            h_net = UtilityFuncs.tf_safe_flatten(input_tensor=h_net)
+            # h_net = tf.contrib.layers.flatten(h_net)
         feature_size = h_net.get_shape().as_list()[-1]
         fc_h_weights = tf.Variable(tf.truncated_normal(
             [feature_size, h_feature_size],
@@ -77,7 +78,8 @@ class FashionNetCigj:
     @staticmethod
     def f_l3_func(node, network):
         network.mask_input_nodes(node=node)
-        net = tf.contrib.layers.flatten(node.F_input)
+        # net = tf.contrib.layers.flatten(node.F_input)
+        net = UtilityFuncs.tf_safe_flatten(input_tensor=node.F_input)
         flattened_F_feature_size = net.get_shape().as_list()[-1]
         dimensions = [flattened_F_feature_size]
         dimensions.extend(GlobalConstants.CIGJ_FASHION_NET_FC_DIMS)

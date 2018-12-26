@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import tensorflow as tf
 from os import listdir
 from os.path import isfile, join
 import itertools
@@ -38,6 +39,13 @@ class UtilityFuncs:
     def get_cartesian_product(list_of_lists):
         cartesian_product = list(itertools.product(*list_of_lists))
         return cartesian_product
+
+    @staticmethod
+    def tf_safe_flatten(input_tensor):
+        shape_tensor = tf.shape(input_tensor)
+        flat_shape = tf.stack([shape_tensor[0], tf.reduce_prod(shape_tensor[1:])], axis=0)
+        flattened_tensor = tf.reshape(input_tensor, shape=flat_shape)
+        return flattened_tensor
 
     @staticmethod
     def get_max_val_acc_from_baseline_results(results_folder):
