@@ -83,7 +83,7 @@ class Jungle(FastTreeNetwork):
         # Build node computational graphs
         for node in self.topologicalSortedNodes:
             # if node.depth > 3 or (node.depth == 3 and node.nodeType == NodeType.h_node):
-            print("Building node {0}".format(node.index))
+            print("Building node {0}.".format(node.index))
             if node.depth > 3:
                 continue
             if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
@@ -126,9 +126,20 @@ class Jungle(FastTreeNetwork):
             control_dependencies = []
             control_dependencies.extend(parent_h_node.H_output)
             control_dependencies.extend(f_inputs)
+            dbg_list = []
             with tf.control_dependencies(control_dependencies):
-                node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-                node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=parent_h_node.H_output)
+                input_shapes = [tf.shape(x) for x in f_inputs]
+                shape_prods = [tf.reduce_prod(x) for x in input_shapes]
+                shape_sum = tf.add_n(shape_prods)
+                dbg_list.extend(input_shapes)
+                dbg_list.extend([tf.shape(x) for x in parent_h_node.conditionIndices])
+                dbg_list.extend([tf.shape(x) for x in parent_h_node.F_output])
+                dbg_list.extend([tf.shape(x) for x in parent_h_node.H_output])
+                dbg_list.extend([tf.shape(x) for x in parent_h_node.labelTensor])
+                assert_op = tf.Assert(tf.greater(shape_sum, 0), dbg_list, 1000)
+                with tf.control_dependencies([assert_op]):
+                    node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+                    node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=parent_h_node.H_output)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -216,9 +227,13 @@ class Jungle(FastTreeNetwork):
             sibling_nodes = {node.index: order_index for order_index, node in
                                enumerate(sorted(sibling_nodes, key=lambda c_node: c_node.index))}
             sibling_order_index = sibling_nodes[node.index]
-            node.F_input = parent_node.F_output[sibling_order_index]
-            node.H_input = parent_node.H_output[sibling_order_index]
-            node.labelTensor = parent_node.labelTensor[sibling_order_index]
+            with tf.control_dependencies([
+                parent_node.F_output[sibling_order_index],
+                parent_node.H_output[sibling_order_index],
+                parent_node.labelTensor[sibling_order_index]]):
+                node.F_input = tf.identity(parent_node.F_output[sibling_order_index])
+                node.H_input = tf.identity(parent_node.H_output[sibling_order_index])
+                node.labelTensor = tf.identity(parent_node.labelTensor[sibling_order_index])
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:

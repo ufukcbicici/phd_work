@@ -67,62 +67,50 @@ class FashionNetCigj:
     @staticmethod
     def f_conv_layer_func(node, network):
         network.mask_input_nodes(node=node)
-        control_dependencies = [tensor for tensor in [node.F_input, node.H_input, node.labelTensor]
-                                if tensor is not None]
-        with tf.control_dependencies(control_dependencies):
-            filter_size = GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES[node.depth]
-            num_of_input_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth]
-            num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth + 1]
-            node.F_output = FashionNetCigj.build_conv_layer(input=node.F_input,
-                                                            node=node,
-                                                            filter_size=filter_size,
-                                                            num_of_input_channels=num_of_input_channels,
-                                                            num_of_output_channels=num_of_output_channels)
+        filter_size = GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES[node.depth]
+        num_of_input_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth]
+        num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth + 1]
+        node.F_output = FashionNetCigj.build_conv_layer(input=node.F_input,
+                                                        node=node,
+                                                        filter_size=filter_size,
+                                                        num_of_input_channels=num_of_input_channels,
+                                                        num_of_output_channels=num_of_output_channels)
 
     @staticmethod
     def f_l3_func(node, network):
         network.mask_input_nodes(node=node)
-        control_dependencies = [tensor for tensor in [node.F_input, node.H_input, node.labelTensor]
-                                if tensor is not None]
-        with tf.control_dependencies(control_dependencies):
-            net = tf.contrib.layers.flatten(node.F_input)
-            # net = UtilityFuncs.tf_safe_flatten(input_tensor=node.F_input)
-            flattened_F_feature_size = net.get_shape().as_list()[-1]
-            dimensions = [flattened_F_feature_size]
-            dimensions.extend(GlobalConstants.CIGJ_FASHION_NET_FC_DIMS)
-            for layer in range(len(dimensions) - 1):
-                net = FashionNetCigj.build_fc_layer(input=net, node=node,
-                                                    input_dim=dimensions[layer],
-                                                    output_dim=dimensions[layer + 1],
-                                                    dropout_prob_tensor=network.classificationDropoutKeepProb,
-                                                    name_suffix="{0}".format(layer))
-            node.F_output = net
+        net = tf.contrib.layers.flatten(node.F_input)
+        # net = UtilityFuncs.tf_safe_flatten(input_tensor=node.F_input)
+        flattened_F_feature_size = net.get_shape().as_list()[-1]
+        dimensions = [flattened_F_feature_size]
+        dimensions.extend(GlobalConstants.CIGJ_FASHION_NET_FC_DIMS)
+        for layer in range(len(dimensions) - 1):
+            net = FashionNetCigj.build_fc_layer(input=net, node=node,
+                                                input_dim=dimensions[layer],
+                                                output_dim=dimensions[layer + 1],
+                                                dropout_prob_tensor=network.classificationDropoutKeepProb,
+                                                name_suffix="{0}".format(layer))
+        node.F_output = net
 
     @staticmethod
     def f_leaf_func(node, network):
         network.mask_input_nodes(node=node)
-        control_dependencies = [tensor for tensor in [node.F_input, node.H_input, node.labelTensor]
-                                if tensor is not None]
-        with tf.control_dependencies(control_dependencies):
-            final_feature = node.F_input
-            network.apply_loss_jungle(node=node, final_feature=final_feature)
+        final_feature = node.F_input
+        network.apply_loss_jungle(node=node, final_feature=final_feature)
 
     @staticmethod
     def h_func(node, network):
         network.stitch_samples(node=node)
-        control_dependencies = [tensor for tensor in [node.F_input, node.H_input, node.labelTensor]
-                                if tensor is not None]
-        with tf.control_dependencies(control_dependencies):
-            node_degree = network.degreeList[node.depth + 1]
-            if node_degree > 1:
-                h_feature_size = GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[node.depth]
-                pool_size = GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES[node.depth]
-                node.H_output = FashionNetCigj.h_transform(input=node.F_input, network=network, node=node,
-                                                           h_feature_size=h_feature_size,
-                                                           pool_size=pool_size)
-            else:
-                node.H_output = node.H_input
-            network.apply_decision(node=node, branching_feature=node.H_output)
+        node_degree = network.degreeList[node.depth + 1]
+        if node_degree > 1:
+            h_feature_size = GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[node.depth]
+            pool_size = GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES[node.depth]
+            node.H_output = FashionNetCigj.h_transform(input=node.F_input, network=network, node=node,
+                                                       h_feature_size=h_feature_size,
+                                                       pool_size=pool_size)
+        else:
+            node.H_output = node.H_input
+        network.apply_decision(node=node, branching_feature=node.H_output)
 
     @staticmethod
     def threshold_calculator_func(network):

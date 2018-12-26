@@ -329,7 +329,9 @@ class FastTreeNetwork(TreeNetwork):
                 assert k not in small_dict
                 small_dict[k] = v
         # results = sess.run(self.evalDict, feed_dict)
-        results = sess.run(small_dict, feed_dict)
+        for i in range(10000):
+            print("Run {0}".format(i))
+            results = sess.run(small_dict, feed_dict)
         # for k, v in results.items():
         #     if "final_feature_mag" in k:
         #         print("{0}={1}".format(k, v))
