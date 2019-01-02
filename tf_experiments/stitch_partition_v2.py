@@ -34,8 +34,8 @@ stitched = tf.dynamic_stitch(indices=condition_indices, data=transformed_list)
 sess = tf.Session()
 samples = np.random.uniform(size=(batch_size, 28, 28, 1))
 indices_arr = np.zeros(shape=(batch_size, ), dtype=np.int32)
-indices_arr[-1] = 2
-indices_arr[-2] = 1
+indices_arr[-1] = 0
+indices_arr[-2] = 0
 feed_dict = {dataTensor: samples,
              batch_size_tensor: batch_size,
              # indices_tensor: np.argmax(np.random.uniform(size=(GlobalConstants.EVAL_BATCH_SIZE, child_count)), axis=1)}
