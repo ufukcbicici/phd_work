@@ -64,8 +64,8 @@ with warnings.catch_warnings():
     print("entropy_p_z={0}".format(entropy_p_z))
 
     # Gumbel Softmax Entropy
-    temperature = 0.05
-    z_sample_count = 1000
+    temperature = 0.01
+    z_sample_count = 100
     uniform = tf.distributions.Uniform(low=0.0, high=1.0)
     batch_size_tensor = tf.placeholder(name="batch_size", dtype=tf.int32)
     z_sample_count_tensor = tf.placeholder(name="z_sample_count", dtype=tf.int32)
@@ -83,12 +83,12 @@ with warnings.catch_warnings():
     z_samples = logits / nominator
 
     # ExpConcrete
-
-
-
+    log_sum_exp = tf.expand_dims(tf.reduce_logsumexp(temp_divided, axis=2), axis=2)
+    y_samples = temp_divided - log_sum_exp
+    z_samples_stable = tf.exp(y_samples)
 
     results = sess.run([gumbel_sample, uniform_sample, probs, log_probs, pre_transform,
-                        temp_divided, logits, nominator, z_samples],
+                        temp_divided, logits, nominator, z_samples, y_samples, z_samples_stable],
                        feed_dict={x_tensor: x.samples,
                                   batch_size_tensor: sample_count,
                                   z_sample_count_tensor: z_sample_count,

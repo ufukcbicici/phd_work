@@ -3,6 +3,7 @@ import tensorflow_probability as tfp
 import numpy as np
 from scipy.integrate import quad
 from scipy.integrate import dblquad
+from scipy.special import logsumexp
 import pdb
 import warnings
 from data_handling.fashion_mnist import FashionMnistDataSet
@@ -81,6 +82,43 @@ def gumbel_softmax_density_v2(x, alpha, temperature):
 
 probs2d = np.array([0.6, 0.4])
 probs3d = np.array([0.6, 0.3, 0.1])
+temperature = 0.1
+
+uniform_samples = np.random.uniform(low=0.0, high=1.0, size=(10000, 3))
+gumbel_samples = -1.0 * np.log(-1.0 * np.log(uniform_samples))
+# Concrete
+log_probs = np.log(probs3d)
+pre_transform = log_probs + gumbel_samples
+temp_divided = pre_transform / temperature
+logits = np.exp(temp_divided)
+nominator = np.expand_dims(np.sum(logits, axis=1), axis=1)
+z_samples = logits / nominator
+log_sum_exp = np.expand_dims(logsumexp(temp_divided, axis=1), axis=1)
+y_samples = temp_divided - log_sum_exp
+z_samples_stable = np.exp(y_samples)
+print("X")
+# log_probs = tf.expand_dims(log_probs, dim=1)
+# pre_transform = log_probs + gumbel_sample
+# temp_divided = pre_transform / temperature_tensor
+# logits = tf.math.exp(temp_divided)
+# nominator = tf.expand_dims(tf.reduce_sum(logits, axis=2), dim=2)
+# z_samples = logits / nominator
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # a = np.array([1.0, 0.0])
 # b = np.array([0.0, 1.0])
 # ba = b - a
