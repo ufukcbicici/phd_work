@@ -68,8 +68,8 @@ class GlobalConstants:
     LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                  value=INITIAL_LR,
                                                  schedule=[(40000, 0.01),
-                                                           (60000, 0.001),
-                                                           (80000, 0.0001)])
+                                                           (70000, 0.001),
+                                                           (100000, 0.0001)])
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
