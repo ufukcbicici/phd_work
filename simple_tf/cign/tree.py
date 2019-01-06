@@ -60,18 +60,9 @@ class TreeNetwork:
         self.weightDecayCoeff = tf.placeholder(name="weight_decay_coefficient", dtype=tf.float32)
         self.decisionWeightDecayCoeff = tf.placeholder(name="decision_weight_decay_coefficient", dtype=tf.float32)
         self.residueInputTensor = None
-        self.useThresholding = None
-        self.iterationHolder = None
         self.decisionLossCoefficient = tf.placeholder(name="decision_loss_coefficient", dtype=tf.float32)
-        self.decisionDropoutKeepProb = None
         self.decisionDropoutKeepProbCalculator = None
-        self.classificationDropoutKeepProb = None
-        self.informationGainBalancingCoefficient = None
-        self.noiseCoefficient = None
         self.noiseCoefficientCalculator = None
-        self.isTrain = None
-        self.useMasking = None
-        self.isDecisionPhase = None
         self.mainLossParamsDict = {}
         self.residueParamsDict = {}
         self.regularizationParamsDict = {}
@@ -91,6 +82,17 @@ class TreeNetwork:
         self.accuracyCalculator = AccuracyCalculator(network=self)
         self.variableManager = VariableManager(network=self)
         self.softmaxCompresser = None
+        # Flags and hyperparameters
+        self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
+        self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
+        self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
+        self.useMasking = tf.placeholder(name="use_masking_flag", dtype=tf.int64)
+        self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
+        self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
+        self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
+        self.noiseCoefficient = tf.placeholder(name="noise_coefficient", dtype=tf.float32)
+        self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient",
+                                                                  dtype=tf.float32)
 
     # def get_parent_index(self, node_index):
     #     parent_index = int((node_index - 1) / self.treeDegree)
@@ -255,16 +257,20 @@ class TreeNetwork:
         self.mainLoss = tf.add_n(primary_losses)
 
     def build_regularization_loss(self):
-        vars = self.variableManager.trainable_variables()
+        vars = tf.trainable_variables()
         l2_loss_list = []
+        decayed_variables = []
+        non_decayed_variables = []
         for v in vars:
             is_decision_pipeline_variable = self.is_decision_variable(variable=v)
             # assert (not is_decision_pipeline_variable)
             loss_tensor = tf.nn.l2_loss(v)
             self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
-            if "bias" in v.name or "shift" in v.name or "scale" in v.name:
+            if "bias" in v.name or "shift" in v.name or "scale" in v.name or "gamma" in v.name or "beta" in v.name:
+                non_decayed_variables.append(v)
                 l2_loss_list.append(0.0 * loss_tensor)
             else:
+                decayed_variables.append(v)
                 if is_decision_pipeline_variable:
                     l2_loss_list.append(self.decisionWeightDecayCoeff * loss_tensor)
                 else:
@@ -599,7 +605,7 @@ class TreeNetwork:
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         vars = self.variableManager.trainable_variables()
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        minibatch = dataset.get_next_batch()
         samples = minibatch.samples
         labels = minibatch.labels
         indices_list = minibatch.indices
@@ -653,7 +659,8 @@ class TreeNetwork:
     # if v in res_grads:
     #     total_grad += res_grads[v]
 
-    def get_variable_name(self, name, node):
+    @staticmethod
+    def get_variable_name(name, node):
         return "Node{0}_{1}".format(node.index, name)
 
     def get_node_from_variable_name(self, name):
@@ -729,7 +736,17 @@ class TreeNetwork:
         final_feature = feature + (self.noiseCoefficient * z_noise)
         return final_feature
 
-    def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision(self, node, branching_feature):
+        node_degree = self.degreeList[node.depth]
+        ig_feature_size = branching_feature.get_shape().as_list()[-1]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=self.get_variable_name(name="hyperplane_biases", node=node))
+        node.variablesSet.add(hyperplane_weights)
+        node.variablesSet.add(hyperplane_biases)
         # Apply necessary transformations before decision phase
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = self.apply_batch_norm_prior_to_decision(feature=branching_feature, node=node)
@@ -809,7 +826,7 @@ class TreeNetwork:
 
     def eval_network(self, sess, dataset, use_masking):
         # if is_train:
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        minibatch = dataset.get_next_batch()
         samples = minibatch.samples
         labels = minibatch.labels
         indices_list = minibatch.indices

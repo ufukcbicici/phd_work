@@ -174,7 +174,7 @@ class AccuracyCalculator:
                                 format(dataset_type, node.index, l), np.asscalar(label_distribution[l])))
 
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration):
-        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
         final_features_dict = {}
@@ -304,7 +304,7 @@ class AccuracyCalculator:
         final_features_dict = {}
         residue_posteriors_dict = {}
         # Run with mask off
-        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=False)
             if results is not None:
@@ -469,7 +469,7 @@ class AccuracyCalculator:
         leaf_true_labels_dict = {}
         leaf_predicted_labels_dict = {}
         # Run with mask on
-        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
             if results is not None:
@@ -509,7 +509,7 @@ class AccuracyCalculator:
                                          dataset=dataset, dataset_type=dataset_type)
 
     def calculate_accuracy_multipath(self, sess, dataset, dataset_type, run_id, iteration):
-        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
         info_gain_dict = {}
@@ -583,7 +583,7 @@ class AccuracyCalculator:
         DbLogger.write_into_table(rows=all_results, table=DbLogger.multipath_results_table, col_count=6)
 
     def calculate_accuracy_with_route_correction(self, sess, dataset, dataset_type):
-        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
         info_gain_dict = {}
@@ -718,7 +718,7 @@ class AccuracyCalculator:
         return corrected_accuracy, marginalized_corrected_accuracy
 
     def calculate_accuracy_with_residue_network(self, sess, dataset, dataset_type):
-        dataset.set_current_data_set_type(dataset_type=dataset_type)
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         leaf_true_labels_dict = {}
         leaf_sample_indices_dict = {}
         leaf_posterior_probs_dict = {}

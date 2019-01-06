@@ -27,9 +27,9 @@ import tensorflow as tf
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('dataset', 'cifar100', 'cifar10 or cifar100.')
 tf.app.flags.DEFINE_string('mode', 'train', 'train or eval.')
-tf.app.flags.DEFINE_string('train_data_path', 'C:\\Users\\t67rt\\Desktop\\phd_work\\phd_work\\data\\cifar100\\train',
+tf.app.flags.DEFINE_string('train_data_path', 'C:\\Users\\t67rt\\Desktop\\phd_work\\phd_work\\data\\cifar100_bin\\train.bin',
                            'Filepattern for training data.')
-tf.app.flags.DEFINE_string('eval_data_path', 'C:\\Users\\t67rt\\Desktop\\phd_work\\phd_work\\data\\cifar100\\test',
+tf.app.flags.DEFINE_string('eval_data_path', 'C:\\Users\\t67rt\\Desktop\\phd_work\\phd_work\\data\\cifar100_bin\\test.bin',
                            'Filepattern for eval data')
 tf.app.flags.DEFINE_integer('image_size', 32, 'Image side length.')
 tf.app.flags.DEFINE_string('train_dir', '',
@@ -67,6 +67,7 @@ def train(hps):
     truth = tf.argmax(model.labels, axis=1)
     predictions = tf.argmax(model.predictions, axis=1)
     precision = tf.reduce_mean(tf.to_float(tf.equal(predictions, truth)))
+    batch_size = tf.size(predictions)
 
     summary_hook = tf.train.SummarySaverHook(
         save_steps=100,
@@ -77,8 +78,9 @@ def train(hps):
     logging_hook = tf.train.LoggingTensorHook(
         tensors={'step': model.global_step,
                  'loss': model.cost,
-                 'precision': precision},
-        every_n_iter=100)
+                 'precision': precision,
+                 'batch_size': batch_size},
+        every_n_iter=391)
 
     class _LearningRateSetterHook(tf.train.SessionRunHook):
         """Sets learning_rate based on global step."""
@@ -194,8 +196,8 @@ def main(_):
                                num_classes=num_classes,
                                min_lrn_rate=0.0001,
                                lrn_rate=0.1,
-                               num_residual_units=5,
-                               use_bottleneck=False,
+                               num_residual_units=6,
+                               use_bottleneck=True,
                                weight_decay_rate=0.0002,
                                relu_leakiness=0.1,
                                optimizer='mom')

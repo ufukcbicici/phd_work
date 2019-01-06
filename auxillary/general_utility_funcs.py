@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import tensorflow as tf
 from os import listdir
 from os.path import isfile, join
 import itertools
@@ -10,6 +11,10 @@ from auxillary.parameters import DecayingParameter, FixedParameter
 class UtilityFuncs:
     def __init__(self):
         pass
+
+    @staticmethod
+    def print(string):
+        print(string)
 
     @staticmethod
     def compare_floats(f1, f2, eps=1e-10):
@@ -34,6 +39,16 @@ class UtilityFuncs:
     def get_cartesian_product(list_of_lists):
         cartesian_product = list(itertools.product(*list_of_lists))
         return cartesian_product
+
+    @staticmethod
+    def tf_safe_flatten(input_tensor):
+        flattened_dim = np.prod(np.array(input_tensor.get_shape().as_list())[1:])
+        flattened = tf.reshape(input_tensor, shape=(-1, flattened_dim))
+        return flattened
+        # shape_tensor = tf.shape(input_tensor)
+        # flat_shape = tf.stack([shape_tensor[0], tf.reduce_prod(shape_tensor[1:])], axis=0)
+        # flattened_tensor = tf.reshape(input_tensor, shape=flat_shape)
+        # return flattened_tensor
 
     @staticmethod
     def get_max_val_acc_from_baseline_results(results_folder):
@@ -123,6 +138,10 @@ class UtilityFuncs:
                 modes.add(tpl[0])
                 cumulative_prob += tpl[1]
         return modes
+
+    @staticmethod
+    def get_variable_name(name, node):
+        return "Node{0}_{1}".format(node.index, name)
 
     @staticmethod
     def convert_labels_to_one_hot(labels, max_label):

@@ -14,7 +14,6 @@
 # ==============================================================================
 
 """ResNet model.
-
 Related papers:
 https://arxiv.org/pdf/1603.05027v2.pdf
 https://arxiv.org/pdf/1512.03385v1.pdf
@@ -42,7 +41,6 @@ class ResNet(object):
 
     def __init__(self, hps, images, labels, mode):
         """ResNet constructor.
-
     Args:
       hps: Hyperparameters.
       images: Batches of images. [batch_size, image_size, image_size, 3]
@@ -81,7 +79,7 @@ class ResNet(object):
             filters = [16, 64, 128, 256]
         else:
             res_func = self._residual
-            filters = [16, 16, 32, 64]
+            filters = [16, 64, 128, 256]
             # Uncomment the following codes to use w28-10 wide residual network.
             # It is more memory efficient than very deep residual network and has
             # comparably good performance.

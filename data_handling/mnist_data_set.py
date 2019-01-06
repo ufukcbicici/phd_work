@@ -7,7 +7,6 @@ from auxillary.constants import DatasetTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.data_set import DataSet
 import matplotlib.pyplot as plt
-import tensorflow as tf
 
 from simple_tf.global_params import GlobalConstants
 
@@ -70,7 +69,8 @@ class MnistDataSet(DataSet):
         self.trainingLabels = np.delete(self.trainingLabels, indices, 0)
         # print("X")
 
-    def get_next_batch(self, batch_size):
+    def get_next_batch(self, batch_size=None):
+        assert batch_size is not None
         num_of_samples = self.get_current_sample_count()
         curr_end_index = self.currentIndex + batch_size - 1
         # Check if the interval [curr_start_index, curr_end_index] is inside data boundaries.
@@ -84,6 +84,7 @@ class MnistDataSet(DataSet):
             raise Exception("Invalid index positions: self.currentIndex={0} - curr_end_index={1}"
                             .format(self.currentIndex, curr_end_index))
         samples = self.currentSamples[indices_list]
+        samples = np.expand_dims(samples, axis=3)
         labels = self.currentLabels[indices_list]
         one_hot_labels = np.zeros(shape=(batch_size, self.get_label_count()))
         one_hot_labels[np.arange(batch_size), labels.astype(np.int)] = 1.0
@@ -95,12 +96,12 @@ class MnistDataSet(DataSet):
             self.currentIndex = self.currentIndex % num_of_samples
         else:
             self.isNewEpoch = False
-        samples = np.expand_dims(samples, axis=3)
         if GlobalConstants.USE_SAMPLE_HASHING:
             hash_codes = self.get_unique_codes(samples=samples)
-            return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, hash_codes)
+            return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, hash_codes,
+                                     None, None)
         else:
-            return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, None)
+            return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, None, None, None)
 
     def reset(self):
         self.currentIndex = 0
@@ -112,7 +113,7 @@ class MnistDataSet(DataSet):
         np.random.shuffle(self.currentIndices)
         self.isNewEpoch = False
 
-    def set_current_data_set_type(self, dataset_type):
+    def set_current_data_set_type(self, dataset_type, batch_size=None):
         self.currentDataSetType = dataset_type
         if self.currentDataSetType == DatasetTypes.training:
             self.currentSamples = self.trainingSamples
@@ -186,6 +187,3 @@ class MnistDataSet(DataSet):
 
     def get_num_of_channels(self):
         return 1
-
-    def get_data_type(self):
-        return tf.float32

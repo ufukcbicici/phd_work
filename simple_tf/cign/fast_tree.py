@@ -18,6 +18,7 @@ class FastTreeNetwork(TreeNetwork):
         self.optimizer = None
         self.infoGainDicts = None
         self.extra_update_ops = None
+        self.batchSize = tf.placeholder(tf.int32)
 
     def build_network(self):
         # Create itself
@@ -50,17 +51,6 @@ class FastTreeNetwork(TreeNetwork):
                     self.nodes[curr_index] = child_node
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
-        # Flags and hyperparameters
-        self.useThresholding = tf.placeholder(name="threshold_flag", dtype=tf.int64)
-        self.iterationHolder = tf.placeholder(name="iteration", dtype=tf.int64)
-        self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
-        self.useMasking = tf.placeholder(name="use_masking_flag", dtype=tf.int64)
-        self.isDecisionPhase = tf.placeholder(name="is_decision_phase", dtype=tf.int64)
-        self.decisionDropoutKeepProb = tf.placeholder(name="decision_dropout_keep_prob", dtype=tf.float32)
-        self.classificationDropoutKeepProb = tf.placeholder(name="classification_dropout_keep_prob", dtype=tf.float32)
-        self.noiseCoefficient = tf.placeholder(name="noise_coefficient", dtype=tf.float32)
-        self.informationGainBalancingCoefficient = tf.placeholder(name="info_gain_balance_coefficient",
-                                                                  dtype=tf.float32)
         # Build symbolic networks
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         self.isBaseline = len(self.topologicalSortedNodes) == 1
@@ -75,7 +65,7 @@ class FastTreeNetwork(TreeNetwork):
         # Build the residue loss
         self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
-        self.variableManager.get_all_node_variables()
+        # self.variableManager.get_all_node_variables()
         # Build main classification loss
         self.build_main_loss()
         # Build information gain loss
@@ -131,7 +121,17 @@ class FastTreeNetwork(TreeNetwork):
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
-    def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision(self, node, branching_feature):
+        node_degree = self.degreeList[node.depth]
+        ig_feature_size = branching_feature.get_shape().as_list()[-1]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=self.get_variable_name(name="hyperplane_biases", node=node))
+        node.variablesSet.add(hyperplane_weights)
+        node.variablesSet.add(hyperplane_biases)
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
@@ -165,7 +165,17 @@ class FastTreeNetwork(TreeNetwork):
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
-    def apply_decision_with_unified_batch_norm(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision_with_unified_batch_norm(self, node, branching_feature):
+        node_degree = self.degreeList[node.depth]
+        ig_feature_size = branching_feature.get_shape().as_list()[-1]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=self.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=self.get_variable_name(name="hyperplane_biases", node=node))
+        node.variablesSet.add(hyperplane_weights)
+        node.variablesSet.add(hyperplane_biases)
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
         normed_x = fast_tree_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
                                         network=self, node=node,
@@ -277,12 +287,11 @@ class FastTreeNetwork(TreeNetwork):
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
         if minibatch is None:
             return None, None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
-                                           is_train=True, use_masking=True)
+                                           is_train=True, use_masking=True, batch_size=GlobalConstants.BATCH_SIZE)
         # Prepare result tensors to collect
         run_ops = self.get_run_ops()
         if GlobalConstants.USE_VERBOSE:
@@ -298,19 +307,37 @@ class FastTreeNetwork(TreeNetwork):
         return lr, sample_counts, is_open_indicators
 
     def eval_network(self, sess, dataset, use_masking):
-        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         if minibatch is None:
             return None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
-                                           is_train=False, use_masking=use_masking)
-        results = sess.run(self.evalDict, feed_dict)
+                                           is_train=False, use_masking=use_masking,
+                                           batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+
+        # n_dict = {k: v for k, v in self.evalDict.items() if
+        #           "Node10" not in k and "Node11" not in k and "Node12" not in k and "Node13" not in k}
+        # n_dict2 = {k: v for k, v in self.evalDict.items() if
+        #            "Node6" not in k and "Node7" not in k and "Node8" not in k and "Node9" not in k and
+        #            "Node10" not in k and "Node11" not in k and "Node12" not in k and "Node13" not in k}
+        # small_dict = {k: v for k, v in self.evalDict.items() if
+        #               "Node0" in k or "Node1" in k or "Node2" in k or "Node3" in k or "Node4" in k}
+        small_dict = {}
+        for node in self.topologicalSortedNodes:
+            if node.index >= 6:
+                continue
+            for k, v in node.evalDict.items():
+                assert k not in small_dict
+                small_dict[k] = v
+        # results = sess.run(self.evalDict, feed_dict)
+        for i in range(10000):
+            print("Run {0}".format(i))
+            results = sess.run(small_dict, feed_dict)
         # for k, v in results.items():
         #     if "final_feature_mag" in k:
         #         print("{0}={1}".format(k, v))
         return results, minibatch
 
-    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking, batch_size):
         feed_dict = {self.dataTensor: minibatch.samples,
                      self.labelTensor: minibatch.labels,
                      self.indicesTensor: minibatch.indices,
@@ -324,7 +351,8 @@ class FastTreeNetwork(TreeNetwork):
                      self.useMasking: int(use_masking),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration,
-                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
+                     self.batchSize: batch_size,
+                     self.filteredMask: np.ones((batch_size,), dtype=bool)}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:

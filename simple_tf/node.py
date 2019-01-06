@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+
 class Node:
     def __init__(self, index, depth, is_root, is_leaf):
         self.index = index

@@ -18,7 +18,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, FixedParameter
 from data_handling.cifar_dataset import CifarDataSet
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.cifar_nets import fashion_net_for_cifar100
+from simple_tf.cifar_nets import fashion_net_for_cifar100, cifar100_resnet_baseline
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline, fashion_cign_connected_v2
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
@@ -31,11 +31,11 @@ from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 def get_explanation_string(network):
     total_param_count = 0
-    for v in network.variableManager.trainable_variables():
+    for v in tf.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "FashionMnist Thin Tree v3\n"
+    explanation = "Resnet Baseline Tests\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -317,7 +317,7 @@ def main():
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
-            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
             print("*************Epoch {0}*************".format(epoch_id))
             total_time = 0.0
             leaf_info_rows = []
@@ -445,7 +445,8 @@ def main():
 
 
 def main_fast_tree():
-    dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
+    dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None,
+                                  batch_sizes=GlobalConstants.BATCH_SIZES_DICT)
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
@@ -610,7 +611,7 @@ def main_fast_tree():
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
-            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
             print("*************Epoch {0}*************".format(epoch_id))
             total_time = 0.0
             leaf_info_rows = []
@@ -942,186 +943,3 @@ def ensemble_training():
         run_id += 1
 
 
-def cifar100_training():
-    classification_wd = [0.0]
-    decision_wd = [0.0]
-    info_gain_balance_coeffs = [5.0]
-    # classification_dropout_probs = [0.15]
-    classification_dropout_probs = [0.15]
-    decision_dropout_probs = [0.0]
-    sess = tf.Session()
-    dataset = CifarDataSet(session=sess,
-                           batch_sizes={DatasetTypes.training: GlobalConstants.BATCH_SIZE,
-                                        DatasetTypes.test: GlobalConstants.EVAL_BATCH_SIZE,
-                                        DatasetTypes.validation: GlobalConstants.EVAL_BATCH_SIZE},
-                           validation_sample_count=0, load_validation_from=None)
-    # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
-    dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
-
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
-                                                                          decision_wd,
-                                                                          info_gain_balance_coeffs,
-                                                                          classification_dropout_probs,
-                                                                          decision_dropout_probs])
-    run_id = 0
-    for tpl in cartesian_product:
-        # try:
-        # Session initialization
-        if GlobalConstants.USE_CPU:
-            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-            config = tf.ConfigProto(device_count={'GPU': 0})
-            sess = tf.Session(config=config)
-        else:
-            sess = tf.Session()
-
-        network = FastTreeNetwork(
-            node_build_funcs=[fashion_net_for_cifar100.baseline],
-            grad_func=fashion_net_for_cifar100.grad_func,
-            threshold_func=fashion_net_for_cifar100.threshold_calculator_func,
-            residue_func=fashion_net_for_cifar100.residue_network_func,
-            summary_func=fashion_net_for_cifar100.tensorboard_func,
-            degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
-
-        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
-                                                                     value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(15000, 0.005),
-                                                                               (30000, 0.0025),
-                                                                               (40000, 0.00025)])
-        network.build_network()
-        # Init
-        init = tf.global_variables_initializer()
-        print("********************NEW RUN:{0}********************".format(run_id))
-        # Restart the network; including all annealed parameters.
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
-        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
-        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
-        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
-        network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
-        network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
-        network.thresholdFunc(network=network)
-        experiment_id = DbLogger.get_run_id()
-        explanation = get_explanation_string(network=network)
-        series_id = int(run_id / 15)
-        explanation += "\n Series:{0}".format(series_id)
-        DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
-        sess.run(init)
-        network.reset_network(dataset=dataset, run_id=experiment_id)
-        # moving_stat_vars = [var for var in ops.get_collection(ops.GraphKeys.GLOBAL_VARIABLES) if "moving" in var.name]
-        # moving_results_0 = sess.run(moving_stat_vars)
-        iteration_counter = 0
-        for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
-            # An epoch is a complete pass on the whole dataset.
-            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
-            print("*************Epoch {0}*************".format(epoch_id))
-            total_time = 0.0
-            leaf_info_rows = []
-            while True:
-                start_time = time.time()
-                lr, sample_counts, is_open_indicators = network.update_params_with_momentum(sess=sess,
-                                                                                            dataset=dataset,
-                                                                                            epoch=epoch_id,
-                                                                                            iteration=iteration_counter)
-                if all([lr, sample_counts, is_open_indicators]):
-                    elapsed_time = time.time() - start_time
-                    total_time += elapsed_time
-                    print("Iteration:{0}".format(iteration_counter))
-                    print("Lr:{0}".format(lr))
-                    # Print sample counts (classification)
-                    sample_count_str = "Classification:   "
-                    for k, v in sample_counts.items():
-                        sample_count_str += "[{0}={1}]".format(k, v)
-                        node_index = network.get_node_from_variable_name(name=k).index
-                        leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
-                    print(sample_count_str)
-                    # Print node open indicators
-                    indicator_str = ""
-                    for k, v in is_open_indicators.items():
-                        indicator_str += "[{0}={1}]".format(k, v)
-                    print(indicator_str)
-                    iteration_counter += 1
-                if dataset.isNewEpoch:
-                    # moving_results_1 = sess.run(moving_stat_vars)
-                    if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
-                        print("Epoch Time={0}".format(total_time))
-                        if not network.modeTracker.isCompressed:
-                            training_accuracy, training_confusion = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.training,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy, validation_confusion = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.test,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
-                            if not network.isBaseline:
-                                validation_accuracy_corrected, validation_marginal_corrected = \
-                                    network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                               dataset_type=DatasetTypes.test,
-                                                               run_id=experiment_id,
-                                                               iteration=iteration_counter,
-                                                               calculation_type=
-                                                               AccuracyCalcType.route_correction)
-                                if epoch_id >= 90:
-                                    network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                               dataset_type=DatasetTypes.test,
-                                                               run_id=experiment_id,
-                                                               iteration=iteration_counter,
-                                                               calculation_type=
-                                                               AccuracyCalcType.multi_path)
-                            else:
-                                validation_accuracy_corrected = 0.0
-                                validation_marginal_corrected = 0.0
-                            DbLogger.write_into_table(
-                                rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                       validation_accuracy, validation_accuracy_corrected,
-                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
-                            # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
-                            if GlobalConstants.SAVE_CONFUSION_MATRICES:
-                                DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
-                                                          col_count=7)
-                                DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
-                                                          col_count=7)
-                        else:
-                            training_accuracy_best_leaf, training_confusion_residue = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.training,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy_best_leaf, validation_confusion_residue = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.test,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
-                            DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id,
-                                                             training_accuracy_best_leaf,
-                                                             validation_accuracy_best_leaf,
-                                                             validation_confusion_residue,
-                                                             0.0, 0.0, "XXX")], table=DbLogger.logsTable,
-                                                      col_count=9)
-                        leaf_info_rows = []
-                    break
-            # Compress softmax classifiers
-            if GlobalConstants.USE_SOFTMAX_DISTILLATION:
-                do_compress = network.check_for_compression(dataset=dataset, run_id=experiment_id,
-                                                            iteration=iteration_counter, epoch=epoch_id)
-                if do_compress:
-                    print("**********************Compressing the network**********************")
-                    network.softmaxCompresser.compress_network_softmax(sess=sess)
-                    print("**********************Compressing the network**********************")
-        # except Exception as e:
-        #     print(e)
-        #     print("ERROR!!!!")
-        # Reset the computation graph
-        tf.reset_default_graph()
-        run_id += 1
-
-
-    # dataset.visualize_sample(sample_index=150)
-    print("X")
-
-
-# main()
-# main_fast_tree()
-# ensemble_training()
-cifar100_training()

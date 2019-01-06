@@ -55,9 +55,9 @@ class ClassWeightedTree(FastTreeNetwork):
         node.lossList.append(loss)
         return final_feature, logits
 
-    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking, batch_size):
         feed_dict = super().prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
-                                              is_train=is_train, use_masking=use_masking)
+                                              is_train=is_train, use_masking=use_masking, batch_size=batch_size)
         if is_train:
             if not self.isBaseline:
                 for node in self.topologicalSortedNodes:
@@ -93,12 +93,11 @@ class ClassWeightedTree(FastTreeNetwork):
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.BATCH_SIZE)
+        minibatch = dataset.get_next_batch()
         if minibatch is None:
             return None, None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
-                                           is_train=True, use_masking=True)
+                                           is_train=True, use_masking=True, batch_size=GlobalConstants.BATCH_SIZE)
         # Prepare result tensors to collect
         run_ops = self.get_run_ops()
         if GlobalConstants.USE_VERBOSE:

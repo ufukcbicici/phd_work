@@ -31,7 +31,7 @@ batch_size = 100
 dataset = MnistDataSet(validation_sample_count=5000)
 dataset.load_dataset()
 
-samples, labels, indices_list = dataset.get_next_batch(batch_size=batch_size)
+samples, labels, indices_list = dataset.get_next_batch()
 index_list = np.arange(0, batch_size)
 initializer = tf.contrib.layers.xavier_initializer()
 x = tf.placeholder(tf.float32, name="x")
