@@ -127,7 +127,9 @@ def cifar100_training():
             sess = tf.Session(config=config)
         else:
             sess = tf.Session()
-        dataset = CifarDataSet(session=sess, validation_sample_count=0, load_validation_from=None)
+        dataset = CifarDataSet(session=sess,
+                               validation_sample_count=0, load_validation_from=None)
+        dataset.set_curr_session(sess=sess)
         # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
         network = FastTreeNetwork(
@@ -157,7 +159,7 @@ def cifar100_training():
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
-        series_id = int(run_id / 5)
+        series_id = int(run_id / 3)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)

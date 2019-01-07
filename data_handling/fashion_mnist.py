@@ -6,6 +6,7 @@ import numpy as np
 
 class FashionMnistDataSet(MnistDataSet):
     def __init__(self,
+                 batch_sizes,
                  validation_sample_count,
                  save_validation_as=None,
                  load_validation_from=None,
@@ -17,7 +18,7 @@ class FashionMnistDataSet(MnistDataSet):
                                       os.sep + "data" + os.sep + "fashion_mnist" + os.sep + "train-images-idx3-ubyte",
                  training_labels_path=os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)) + \
                                       os.sep + "data" + os.sep + "fashion_mnist" + os.sep + "train-labels-idx1-ubyte"):
-        super().__init__(validation_sample_count=validation_sample_count,
+        super().__init__(batch_sizes=batch_sizes, validation_sample_count=validation_sample_count,
                          save_validation_as=save_validation_as,
                          load_validation_from=load_validation_from, test_images_path=test_images_path,
                          test_labels_path=test_labels_path, training_images_path=training_images_path,

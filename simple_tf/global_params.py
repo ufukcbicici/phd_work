@@ -41,8 +41,8 @@ class GlobalConstants:
     TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
     EPOCH_REPORT_PERIOD = 1
-    BATCH_SIZE = 128
-    EVAL_BATCH_SIZE = 10000
+    BATCH_SIZE = 125
+    EVAL_BATCH_SIZE = 250
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
@@ -195,8 +195,8 @@ class GlobalConstants:
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
     # Resnet Baseline Params
-    RESNET_HYPERPARAMS = ResnetGenerator.ResnetHParams(num_residual_units=54, use_bottleneck=True,
-                                                       num_of_features_per_block=[16, 64, 128, 256],
+    RESNET_HYPERPARAMS = ResnetGenerator.ResnetHParams(num_residual_units=10, use_bottleneck=True,
+                                                       num_of_features_per_block=[16, 64, 64, 64],
                                                        first_conv_filter_size=3, relu_leakiness=0.1,
                                                        strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
