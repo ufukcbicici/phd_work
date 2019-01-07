@@ -279,5 +279,5 @@ def cifar100_training():
 # main()
 # main_fast_tree()
 # ensemble_training()
-# cifar100_training()
+cifar100_training()
 # xxx

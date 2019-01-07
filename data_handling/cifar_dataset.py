@@ -62,6 +62,7 @@ class CifarDataSet(DataSet):
         self.batchSize = tf.placeholder(tf.int64)
         self.currInitOp = None
         self.currOutputs = None
+        self.load_dataset()
 
     def set_curr_session(self, sess):
         self.sess = sess

@@ -48,50 +48,59 @@ class ResnetGenerator:
         return tf.reduce_mean(x, [1, 2])
 
     @staticmethod
-    def bottleneck_residual(x, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual,
+    def bottleneck_residual(x, node, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual,
                             bn_momentum):
         """Bottleneck residual unit with 3 sub layers."""
         if activate_before_residual:
-            with tf.variable_scope("common_bn_relu"):
-                x = ResnetGenerator.batch_norm("init_bn", x, is_train, bn_momentum)
+            with tf.variable_scope("Node{0}_common_bn_relu".format(node.index)):
+                x = ResnetGenerator.batch_norm(UtilityFuncs.get_variable_name(name="init_bn", node=node), x, is_train,
+                                               bn_momentum)
                 x = ResnetGenerator.relu(x, relu_leakiness)
                 orig_x = x
         else:
-            with tf.variable_scope("residual_bn_relu"):
+            with tf.variable_scope("Node{0}_residual_bn_relu".format(node.index)):
                 orig_x = x
-                x = ResnetGenerator.batch_norm("init_bn", x, is_train, bn_momentum)
+                x = ResnetGenerator.batch_norm(UtilityFuncs.get_variable_name(name="init_bn", node=node), x, is_train,
+                                               bn_momentum)
                 x = ResnetGenerator.relu(x, relu_leakiness)
 
-        with tf.variable_scope("sub1"):
-            x = ResnetGenerator.conv("conv_1", x, 1, in_filter, out_filter / 4, stride)
+        with tf.variable_scope("Node{0}_sub1".format(node.index)):
+            x = ResnetGenerator.conv(UtilityFuncs.get_variable_name(name="conv_1", node=node), x, 1, in_filter,
+                                     out_filter / 4, stride)
 
-        with tf.variable_scope("sub2"):
-            x = ResnetGenerator.batch_norm("bn2", x, is_train, bn_momentum)
+        with tf.variable_scope("Node{0}_sub2".format(node.index)):
+            x = ResnetGenerator.batch_norm(UtilityFuncs.get_variable_name(name="bn2", node=node), x, is_train,
+                                           bn_momentum)
             x = ResnetGenerator.relu(x, relu_leakiness)
-            x = ResnetGenerator.conv("conv2", x, 3, out_filter / 4, out_filter / 4, [1, 1, 1, 1])
+            x = ResnetGenerator.conv(UtilityFuncs.get_variable_name(name="conv2", node=node), x, 3, out_filter / 4,
+                                     out_filter / 4, [1, 1, 1, 1])
 
-        with tf.variable_scope("sub3"):
-            x = ResnetGenerator.batch_norm("bn3", x, is_train, bn_momentum)
+        with tf.variable_scope("Node{0}_sub3".format(node.index)):
+            x = ResnetGenerator.batch_norm(UtilityFuncs.get_variable_name(name="bn3", node=node), x, is_train,
+                                           bn_momentum)
             x = ResnetGenerator.relu(x, relu_leakiness)
-            x = ResnetGenerator.conv("conv3", x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
+            x = ResnetGenerator.conv(UtilityFuncs.get_variable_name(name="conv3", node=node), x, 1, out_filter / 4,
+                                     out_filter, [1, 1, 1, 1])
 
-        with tf.variable_scope("sub_add"):
-            if in_filter != out_filter or not all([d == 1 for d in stride]):
-                orig_x = ResnetGenerator.conv("project", orig_x, 1, in_filter, out_filter, stride)
+        with tf.variable_scope("Node{0}_sub_add".format(node.index)):
+            if in_filter != out_filter:
+                orig_x = ResnetGenerator.conv(UtilityFuncs.get_variable_name(name="project", node=node), orig_x, 1,
+                                              in_filter, out_filter, stride)
             x += orig_x
         return x
 
     @staticmethod
-    def get_input(input, out_filters, first_conv_filter_size):
+    def get_input(input, node, out_filters, first_conv_filter_size):
         assert input.get_shape().ndims == 4
+        name = UtilityFuncs.get_variable_name(name="init_conv", node=node)
         input_filters = input.get_shape().as_list()[-1]
-        x = ResnetGenerator.conv("init_conv", input, first_conv_filter_size, input_filters, out_filters,
-                                 ResnetGenerator.stride_arr(1))
+        x = ResnetGenerator.conv(name, input, first_conv_filter_size,
+                                 input_filters, out_filters, ResnetGenerator.stride_arr(1))
         return x
 
     @staticmethod
-    def get_output(x, is_train, leakiness, bn_momentum):
-        x = ResnetGenerator.batch_norm("final_bn", x, is_train, bn_momentum)
+    def get_output(x, node, is_train, leakiness, bn_momentum):
+        name = UtilityFuncs.get_variable_name(name="final_bn", node=node)
+        x = ResnetGenerator.batch_norm(name, x, is_train, bn_momentum)
         x = ResnetGenerator.relu(x, leakiness)
         x = ResnetGenerator.global_avg_pool(x)
-        return x
