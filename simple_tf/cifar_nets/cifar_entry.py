@@ -19,7 +19,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Resnet Thin Baseline Tests\n"
+    explanation = "Resnet-50 Baseline Tests\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -105,7 +105,7 @@ def get_explanation_string(network):
 
 
 def cifar100_training():
-    classification_wd = [0.0005 * i for i in range(11)] * 3
+    classification_wd = [0.0, 0.0, 0.0]  # [0.0005 * i for i in range(11)] * 3
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
