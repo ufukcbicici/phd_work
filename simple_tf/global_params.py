@@ -194,11 +194,19 @@ class GlobalConstants:
     FASHION_F_RESIDUE_LAYER_COUNT = 1
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
-    # Resnet Baseline Params
+    # Resnet Params
     RESNET_HYPERPARAMS = ResnetGenerator.ResnetHParams(num_residual_units=16, use_bottleneck=True,
                                                        num_of_features_per_block=[16, 64, 64, 64],
                                                        first_conv_filter_size=3, relu_leakiness=0.1,
                                                        strides=[1, 2, 2], activate_before_residual=[True, False, False])
+    RESNET_TREE_DEGREES = [2, 2]
+    RESNET_DECISION_DIMENSION = 128
+
+    RESNET_SOFTMAX_DECAY_INITIAL = 25.0
+    RESNET_SOFTMAX_DECAY_COEFFICIENT = 0.9999
+    RESNET_SOFTMAX_DECAY_PERIOD = 2
+    RESNET_SOFTMAX_DECAY_MIN_LIMIT = 1.0
+    RESNET_SOFTMAX_TEST_TEMPERATURE = 50.0
 
     # MultiPath Evaluation Schedules
     # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]

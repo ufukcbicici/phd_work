@@ -3,6 +3,7 @@ from collections import deque
 import numpy as np
 import tensorflow as tf
 
+from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.data_set import DataSet
 from simple_tf.batch_norm import fast_tree_batch_norm
 from simple_tf.cign.tree import TreeNetwork
@@ -131,12 +132,20 @@ class FastTreeNetwork(TreeNetwork):
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
-    def apply_decision(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision(self, node, branching_feature):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                               training=tf.cast(self.isTrain,
                                                                                tf.bool))
+        ig_feature_size = node.H_output.get_shape().as_list()[-1]
+        node_degree = self.degreeList[node.depth]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
@@ -165,13 +174,21 @@ class FastTreeNetwork(TreeNetwork):
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
-    def apply_decision_with_unified_batch_norm(self, node, branching_feature, hyperplane_weights, hyperplane_biases):
+    def apply_decision_with_unified_batch_norm(self, node, branching_feature):
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
         normed_x = fast_tree_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
                                         network=self, node=node,
                                         decay=GlobalConstants.BATCH_NORM_DECAY,
                                         iteration=self.iterationHolder,
                                         is_training_phase=self.isTrain)
+        ig_feature_size = node.H_output.get_shape().as_list()[-1]
+        node_degree = self.degreeList[node.depth]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
         activations = tf.matmul(normed_x, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay

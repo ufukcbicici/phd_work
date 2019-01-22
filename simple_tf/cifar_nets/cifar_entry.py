@@ -8,7 +8,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import FixedParameter, DiscreteParameter
 from data_handling.cifar_dataset import CifarDataSet
-from simple_tf.cifar_nets import cifar100_resnet_baseline
+from simple_tf.cifar_nets import cifar100_resnet_baseline, cign_resnet
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
@@ -19,7 +19,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Resnet-50 Thin Baseline Tests v2\n"
+    explanation = "Resnet-50 CIGN Tests\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -133,12 +133,13 @@ def cifar100_training():
         # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
         network = FastTreeNetwork(
-            node_build_funcs=[cifar100_resnet_baseline.baseline],
-            grad_func=cifar100_resnet_baseline.grad_func,
-            threshold_func=cifar100_resnet_baseline.threshold_calculator_func,
-            residue_func=cifar100_resnet_baseline.residue_network_func,
-            summary_func=cifar100_resnet_baseline.tensorboard_func,
-            degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
+            node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
+            grad_func=cign_resnet.grad_func,
+            threshold_func=cign_resnet.threshold_calculator_func,
+            residue_func=cign_resnet.residue_network_func,
+            summary_func=cign_resnet.tensorboard_func,
+            degree_list=GlobalConstants.RESNET_TREE_DEGREES,
+            dataset=dataset)
 
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
@@ -220,7 +221,7 @@ def cifar100_training():
                                                                iteration=iteration_counter,
                                                                calculation_type=
                                                                AccuracyCalcType.route_correction)
-                                if epoch_id >= 90:
+                                if epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - 10:
                                     network.calculate_accuracy(sess=sess, dataset=dataset,
                                                                dataset_type=DatasetTypes.test,
                                                                run_id=experiment_id,

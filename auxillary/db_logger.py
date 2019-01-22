@@ -26,13 +26,13 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # Lab
-    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger2.db"
+    # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger2.db"
 
     # Home
     # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Idea GPU
-    # log_db_path = "C://Users//ufuk.bicici//PycharmProjects//phd_work//db_logger.db"
+    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//simple_tf//dblogger.db"
 
     # Idea
     # log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
