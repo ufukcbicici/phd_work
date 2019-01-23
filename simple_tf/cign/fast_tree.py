@@ -138,7 +138,7 @@ class FastTreeNetwork(TreeNetwork):
                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                               training=tf.cast(self.isTrain,
                                                                                tf.bool))
-        ig_feature_size = node.H_output.get_shape().as_list()[-1]
+        ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
         hyperplane_weights = tf.Variable(
             tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
@@ -181,7 +181,7 @@ class FastTreeNetwork(TreeNetwork):
                                         decay=GlobalConstants.BATCH_NORM_DECAY,
                                         iteration=self.iterationHolder,
                                         is_training_phase=self.isTrain)
-        ig_feature_size = node.H_output.get_shape().as_list()[-1]
+        ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
         hyperplane_weights = tf.Variable(
             tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,

@@ -109,7 +109,7 @@ def leaf_func(node, network):
                                                     relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                     bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
     # Logit Layers
-    with tf.variable_scope('unit_last'):
+    with tf.variable_scope(UtilityFuncs.get_variable_name(name="unit_last", node=node)):
         x = ResnetGenerator.get_output(x=x, is_train=network.isTrain, leakiness=relu_leakiness,
                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
     net_shape = x.get_shape().as_list()
@@ -132,7 +132,7 @@ def leaf_func(node, network):
 
 
 def residue_network_func(network):
-    pass
+    return tf.constant(0.0)
 
 
 def grad_func(network):
@@ -164,7 +164,7 @@ def threshold_calculator_func(network):
         # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
         #                                                  decay_period=12000,
         #                                                  min_limit=0.4)
-        network.probThresholdCalculator = FixedParameter(name=threshold_name, value=0.0)
+        node.probThresholdCalculator = FixedParameter(name=threshold_name, value=0.0)
         # Softmax Decay
         decay_name = network.get_variable_name(name="softmax_decay", node=node)
         node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
