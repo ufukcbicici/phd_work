@@ -1,5 +1,7 @@
+import numpy as np
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
+from auxillary.general_utility_funcs import UtilityFuncs
 
 
 def analyze_entropy(run_id, dataset_type):
@@ -19,11 +21,20 @@ def analyze_entropy(run_id, dataset_type):
         i0 = key_value.index("Leaf:")
         i1 = key_value.index("True Label:")
         leaf_id = key_value[i0 + len("Leaf:"):i1-1]
-        label_id = key_value[i1 + len("True Label"):len(key_value)]
+        label_id = key_value[i1 + 1 + len("True Label"):len(key_value)]
         if leaf_id not in iteration_dict[iteration]:
             iteration_dict[iteration][leaf_id] = {}
         iteration_dict[iteration][leaf_id][label_id] = value
-        print("X")
+    # Analyze entropies
+    for iteration in iteration_dict.keys():
+        leaf_dict = iteration_dict[iteration]
+        for leaf_id, freq_dict in leaf_dict.items():
+            freq_array = np.zeros(shape=(len(freq_dict)))
+            for label_id, freq in freq_dict.items():
+                freq_array[int(label_id)] = freq
+            prob_distribution = freq_array / np.sum(freq_array)
+            entropy = UtilityFuncs.calculate_distribution_entropy(distribution=prob_distribution)
+    print("X")
 
 
 analyze_entropy(run_id=3, dataset_type=DatasetTypes.test)

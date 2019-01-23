@@ -6,6 +6,7 @@ from os.path import isfile, join
 import itertools
 
 from auxillary.parameters import DecayingParameter, FixedParameter
+from simple_tf.global_params import GlobalConstants
 
 
 class UtilityFuncs:
@@ -160,5 +161,12 @@ class UtilityFuncs:
             thread_dict[curr_thread_id].append(item)
             curr_thread_id = (curr_thread_id + 1) % num_of_threads
         return thread_dict
+
+    @staticmethod
+    def calculate_distribution_entropy(distribution):
+        log_prob = np.log(distribution + GlobalConstants.INFO_GAIN_LOG_EPSILON)
+        prob_log_prob = distribution * log_prob
+        entropy = -1.0 * np.sum(prob_log_prob)
+        return entropy
 
 

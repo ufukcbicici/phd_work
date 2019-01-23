@@ -2,8 +2,6 @@ import tensorflow as tf
 import numpy as np
 from collections import namedtuple
 
-from auxillary.general_utility_funcs import UtilityFuncs
-
 
 class ResnetGenerator:
     # BottleneckGroup = namedtuple('BottleneckGroup', ['num_blocks', 'num_filters', 'bottleneck_size', 'down_sample'])
