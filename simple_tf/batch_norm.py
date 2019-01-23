@@ -14,9 +14,9 @@ def fast_tree_batch_norm(x, masked_x, network, node, decay, iteration, is_traini
     if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
         gamma = tf.Variable(name=gamma_name, initial_value=tf.ones([x.get_shape()[-1]]))
         beta = tf.Variable(name=beta_name, initial_value=tf.zeros([x.get_shape()[-1]]))
-        if node is not None:
-            node.variablesSet.add(gamma)
-            node.variablesSet.add(beta)
+        # if node is not None:
+        #     node.variablesSet.add(gamma)
+        #     node.variablesSet.add(beta)
     else:
         gamma = None
         beta = None
@@ -61,8 +61,8 @@ def batch_norm(x, network, node, decay, iteration, is_decision_phase, is_trainin
     if GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM:
         gamma = tf.Variable(name=gamma_name, initial_value=tf.ones([x.get_shape()[-1]]))
         beta = tf.Variable(name=beta_name, initial_value=tf.zeros([x.get_shape()[-1]]))
-        node.variablesSet.add(gamma)
-        node.variablesSet.add(beta)
+        # node.variablesSet.add(gamma)
+        # node.variablesSet.add(beta)
     else:
         gamma = None
         beta = None

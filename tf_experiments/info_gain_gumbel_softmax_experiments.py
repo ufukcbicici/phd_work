@@ -150,7 +150,7 @@ for epoch in range(250):
                                                                                     z_sample_count_tensor: z_sample_count,
                                                                                     temperature_tensor: temperature,
                                                                                     balance_coefficient_tensor: balance_coeff})
-        results = sess.run([transformed_x, reduced_x, z_samples, z_samples_stable, z_mean,
+        results = sess.run([transformed_x, reduced_x, z_samples, z_samples_stable, z_mean, probs,
                             labelTensor, label_equalities, z_per_sample, list_of_sums, list_z_x_given_y,
                             list_z_mean_x_given_y,
                             H_z_x, list_H_z_given_y, information_gain_loss],
