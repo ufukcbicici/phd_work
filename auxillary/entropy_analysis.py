@@ -32,6 +32,8 @@ def analyze_entropy(run_id, dataset_type):
             freq_array = np.zeros(shape=(len(freq_dict)))
             for label_id, freq in freq_dict.items():
                 freq_array[int(label_id)] = freq
+                if freq == 0:
+                    print("Zero")
             prob_distribution = freq_array / np.sum(freq_array)
             entropy = UtilityFuncs.calculate_distribution_entropy(distribution=prob_distribution)
     print("X")
