@@ -304,7 +304,9 @@ class FastTreeNetwork(TreeNetwork):
         run_ops = self.get_run_ops()
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
+        print("Before Update Iteration:{0}".format(iteration))
         results = sess.run(run_ops, feed_dict=feed_dict)
+        print("After Update Iteration:{0}".format(iteration))
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]

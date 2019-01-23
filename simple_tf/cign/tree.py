@@ -365,7 +365,7 @@ class TreeNetwork:
     def get_decision_weight(self, feed_dict, iteration, update):
         weight = self.decisionLossCoefficientCalculator.value
         feed_dict[self.decisionLossCoefficient] = weight
-        print("self.decisionLossCoefficient={0}".format(weight))
+        # print("self.decisionLossCoefficient={0}".format(weight))
         if update:
             self.decisionLossCoefficientCalculator.update(iteration=iteration + 1)
 
