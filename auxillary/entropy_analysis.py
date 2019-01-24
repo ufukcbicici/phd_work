@@ -20,7 +20,7 @@ def analyze_entropy(run_id, dataset_type):
             iteration_dict[iteration] = {}
         i0 = key_value.index("Leaf:")
         i1 = key_value.index("True Label:")
-        leaf_id = key_value[i0 + len("Leaf:"):i1-1]
+        leaf_id = key_value[i0 + len("Leaf:"):i1 - 1]
         label_id = key_value[i1 + 1 + len("True Label"):len(key_value)]
         if leaf_id not in iteration_dict[iteration]:
             iteration_dict[iteration][leaf_id] = {}
@@ -44,10 +44,11 @@ def analyze_entropy(run_id, dataset_type):
         print("Iteration:{0}".format(iteration))
         print("Entropies:{0}".format(leaf_entropies))
         print("Freqs:{0}".format(leaf_total_freqs))
-        print("AvgEntropy:{0}".format(sum([(v*leaf_total_freqs[k])/sum(leaf_total_freqs.values())
+        print("AvgEntropy:{0}".format(sum([(v * leaf_total_freqs[k]) / sum(leaf_total_freqs.values())
                                            for k, v in leaf_entropies.items()])))
         print("***********************************************")
     print("X")
+
 
 analyze_entropy(run_id=3971, dataset_type=DatasetTypes.training)
 analyze_entropy(run_id=3971, dataset_type=DatasetTypes.test)
