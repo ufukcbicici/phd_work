@@ -28,15 +28,26 @@ def analyze_entropy(run_id, dataset_type):
     # Analyze entropies
     for iteration in iteration_dict.keys():
         leaf_dict = iteration_dict[iteration]
+        leaf_entropies = {}
+        leaf_total_freqs = {}
         for leaf_id, freq_dict in leaf_dict.items():
             freq_array = np.zeros(shape=(len(freq_dict)))
             for label_id, freq in freq_dict.items():
                 freq_array[int(label_id)] = freq
-                if freq == 0:
-                    print("Zero")
+                # if freq == 0:
+                #     print("Zero")
             prob_distribution = freq_array / np.sum(freq_array)
             entropy = UtilityFuncs.calculate_distribution_entropy(distribution=prob_distribution)
+            leaf_entropies[leaf_id] = entropy
+            leaf_total_freqs[leaf_id] = np.sum(freq_array)
+        print("***********************************************")
+        print("Iteration:{0}".format(iteration))
+        print("Entropies:{0}".format(leaf_entropies))
+        print("Freqs:{0}".format(leaf_total_freqs))
+        print("AvgEntropy:{0}".format(sum([(v*leaf_total_freqs[k])/sum(leaf_total_freqs.values())
+                                           for k, v in leaf_entropies.items()])))
+        print("***********************************************")
     print("X")
 
-
-analyze_entropy(run_id=3, dataset_type=DatasetTypes.test)
+analyze_entropy(run_id=3971, dataset_type=DatasetTypes.training)
+analyze_entropy(run_id=3971, dataset_type=DatasetTypes.test)
