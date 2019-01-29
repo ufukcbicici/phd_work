@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+from algorithms.categorical_encoder import CategoricalEncoder
 
 train_data = pd.read_csv("C://Users//t67rt//Desktop//phd_work//phd_work//geophy//data//train.csv")
 test_data = pd.read_csv("C://Users//t67rt//Desktop//phd_work//phd_work//geophy//data//test.csv")
@@ -29,5 +29,11 @@ for categorical_column in categorical_columns:
         print("{0} {1} not contained.".format(categorical_column, len(not_contained)))
 # Select columns; first categoricals then noncategoricals
 train_data_ordered = train_data[all_columns].copy()
+test_data_ordered = test_data[all_columns].copy()
 labels_ordered = train_data["target__office"].copy()
+# Create one-hot encodings for categorical variables
+categorical_encoder = CategoricalEncoder()
+categorical_encoder.fit(df=train_data_ordered, categorical_columns=categorical_columns)
+categorical_encoder.transform(df=train_data_ordered)
+# (df=train_data_ordered, list_of_categorical_columns=categorical_columns)
 print("X")
