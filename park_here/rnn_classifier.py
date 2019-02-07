@@ -11,7 +11,7 @@ class RnnClassifier:
     def __init__(self, dataset):
         self.dataset = dataset
         self.batch_size = tf.placeholder(dtype=tf.int32, shape=[], name='batch_size')
-        self.input = tf.placeholder(dtype=tf.int32,
+        self.input = tf.placeholder(dtype=tf.float32,
                                     shape=[None, self.dataset.maxLength, Constants.ORIGINAL_DATA_DIMENSION],
                                     name='input')
         self.input_y = tf.placeholder(dtype=tf.int64, shape=[None], name='input_y')
@@ -29,7 +29,7 @@ class RnnClassifier:
         self.contextVector = None
         self.alpha = None
         self.temps = []
-        self.l2_loss = None
+        self.l2_loss = tf.constant(0.0)
         self.logits = None
         self.predictions = None
         self.mainLoss = None
@@ -38,21 +38,22 @@ class RnnClassifier:
         self.accuracy = None
         self.globalStep = None
         self.optimizer = None
+        self.sess = None
 
     def build_classifier(self):
         self.get_embeddings()
         self.get_classifier_structure()
         self.get_softmax_layer()
         self.get_loss()
-        self.get_accuracy()
+        # self.get_accuracy()
         self.get_optimizer()
-        # self.sess = tf.Session()
+        self.sess = tf.Session()
 
     def get_embeddings(self):
         if Constants.EMBEDDING_DIM == 0:
-            return self.input
+            self.embeddings = tf.identity(self.input)
         else:
-            return tf.layers.dense(self.input, Constants.EMBEDDING_DIM, activation=None)
+            self.embeddings = tf.layers.dense(self.input, Constants.EMBEDDING_DIM, activation=None)
 
     @staticmethod
     def get_stacked_lstm_cells(hidden_dimension, num_layers):
@@ -63,7 +64,7 @@ class RnnClassifier:
         return cell
 
     def get_classifier_structure(self):
-        net = self.get_embeddings()
+        net = self.embeddings
         if not Constants.USE_BIDIRECTIONAL:
             cell = RnnClassifier.get_stacked_lstm_cells(hidden_dimension=Constants.LSTM_HIDDEN_DIM,
                                                         num_layers=Constants.NUM_OF_LSTM_LAYERS)
@@ -164,11 +165,11 @@ class RnnClassifier:
                                                                     logits=self.logits)
             self.mainLoss = tf.reduce_mean(losses) + Constants.L2_LAMBDA_COEFFICENT * self.l2_loss
 
-    def get_accuracy(self):
-        with tf.name_scope('accuracy'):
-            self.correctPredictions = tf.equal(self.predictions, self.input_y)
-            self.numOfCorrectPredictions = tf.reduce_sum(tf.cast(self.correctPredictions, tf.float32))
-            self.accuracy = tf.reduce_mean(tf.cast(self.correctPredictions, tf.float32), name='accuracy')
+    # def get_accuracy(self):
+    #     with tf.name_scope('accuracy'):
+    #         self.correctPredictions = tf.equal(self.predictions, self.input_y)
+    #         self.numOfCorrectPredictions = tf.reduce_sum(tf.cast(self.correctPredictions, tf.float32))
+    #         self.accuracy = tf.reduce_mean(tf.cast(self.correctPredictions, tf.float32), name='accuracy')
 
     def get_optimizer(self):
         # Train procedure
@@ -202,11 +203,11 @@ class RnnClassifier:
     #     print("X")
 
     def train(self):
-        sess = tf.Session()
+        self.sess = tf.Session()
         run_id = DbLogger.get_run_id()
         explanation = str(Constants)
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData, col_count=2)
-        sess.run(tf.global_variables_initializer())
+        self.sess.run(tf.global_variables_initializer())
         # trainable_var_dict = {v.name: v for v in tf.trainable_variables()}
         # saver = tf.train.Saver(trainable_var_dict)
         # tf.assign(self.embeddings, self.wordEmbeddings).eval(session=self.sess)
@@ -216,7 +217,7 @@ class RnnClassifier:
             print("*************Epoch {0}*************".format(epoch_id))
             self.dataset.set_current_dataset_type(dataset_type=DatasetTypes.Training)
             while True:
-                minibatch = self.dataset.get_next_batch(batch_size=Constants.BATCH_SIZE)
+                minibatch = self.dataset.get_next_batch(batch_size=Constants.BATCH_SIZE, wrap_around=True)
                 feed_dict = {self.batch_size: Constants.BATCH_SIZE,
                              self.input: minibatch.sequences,
                              self.input_y: minibatch.labels,
@@ -224,7 +225,7 @@ class RnnClassifier:
                              self.sequence_length: minibatch.lengths}
                 # sequences, labels, lengths
                 run_ops = [self.optimizer, self.mainLoss]
-                results = sess.run(run_ops, feed_dict=feed_dict)
+                results = self.sess.run(run_ops, feed_dict=feed_dict)
                 losses.append(results[1])
                 iteration += 1
                 if iteration % 100 == 0:
@@ -233,78 +234,39 @@ class RnnClassifier:
                     losses = []
                 if self.dataset.isNewEpoch:
                     print("Original results")
-                    training_accuracy, doc_training_accuracy = self.test(dataset_type=DatasetTypes.Training)
-                    test_accuracy, doc_test_accuracy = self.test(dataset_type=DatasetTypes.Validation)
-                    DbLogger.write_into_table(rows=[(run_id,
-                                                     iteration,
-                                                     epoch_id,
-                                                     training_accuracy,
-                                                     test_accuracy,
-                                                     test_accuracy,
-                                                     0.0,
-                                                     0.0,
-                                                     "-")],
-                                              table=DbLogger.logsTable, col_count=9)
+                    self.test(dataset_type=DatasetTypes.Training)
+                    self.test(dataset_type=DatasetTypes.Test)
+                    # DbLogger.write_into_table(rows=[(run_id,
+                    #                                  iteration,
+                    #                                  epoch_id,
+                    #                                  training_accuracy,
+                    #                                  test_accuracy,
+                    #                                  test_accuracy,
+                    #                                  0.0,
+                    #                                  0.0,
+                    #                                  "-")],
+                    #                           table=DbLogger.logsTable, col_count=9)
                     break
 
     def test(self, dataset_type):
         confusion_dict = {}
         batch_size = GlobalConstants.BATCH_SIZE
-        if dataset_type == DatasetType.Validation:
-            self.corpus.set_current_dataset_type(dataset_type=DatasetType.Validation)
+        if dataset_type == DatasetTypes.Test:
+            self.dataset.set_current_dataset_type(dataset_type=DatasetTypes.Validation)
         else:
-            self.corpus.set_current_dataset_type(dataset_type=DatasetType.Training)
-        total_correct_count = 0
-        total_count = 0
-        total_correct_document_count = 0
-        total_document_count = 0
-        document_predictions = {}
-        document_correct_labels = {}
+            self.dataset.set_current_dataset_type(dataset_type=DatasetTypes.Training)
+        true_labels = np.array([])
+        predicted_labels = np.array([])
         while True:
-            data, labels, lengths, document_ids = \
-                self.corpus.get_next_training_batch(batch_size=batch_size, wrap_around=False)
-            feed_dict = {self.batch_size: batch_size,
-                         self.input_word_codes: data,
-                         self.input_y: labels,
-                         self.keep_prob: 1.0,
-                         self.sequence_length: lengths,
-                         self.isTrainingFlag: False}
-            run_ops = [self.correctPredictions, self.predictions]
+            minibatch = self.dataset.get_next_batch(batch_size=Constants.BATCH_SIZE, wrap_around=False)
+            feed_dict = {self.batch_size: Constants.BATCH_SIZE,
+                         self.input: minibatch.sequences,
+                         self.input_y: minibatch.labels,
+                         self.keep_prob: Constants.DROPOUT_KEEP_PROB,
+                         self.sequence_length: minibatch.lengths}
+            run_ops = [self.predictions]
             results = self.sess.run(run_ops, feed_dict=feed_dict)
-            for sample_id, document_id in enumerate(document_ids.tolist()):
-                if lengths[sample_id] == 0:
-                    break
-                is_sample_correct = results[0][sample_id]
-                sample_prediction = results[1][sample_id]
-                total_correct_count += is_sample_correct
-                total_count += 1
-                if document_id not in document_predictions:
-                    document_predictions[document_id] = []
-                if document_id not in document_correct_labels:
-                    document_correct_labels[document_id] = []
-                correct_label = labels[sample_id]
-                document_predictions[document_id].append(sample_prediction)
-                document_correct_labels[document_id].append(correct_label)
-            if self.corpus.isNewEpoch:
+            true_labels = np.concatenate((true_labels, minibatch.labels), axis=0)
+            predicted_labels = np.concatenate((predicted_labels, results[0]), axis=0)
+            if self.dataset.isNewEpoch:
                 break
-        accuracy = float(total_correct_count) / float(total_count)
-        print("Dataset:{0} Accuracy:{1}".format(dataset_type, accuracy))
-        # Check document correctness
-        for k, v in document_correct_labels.items():
-            label_set = set(v)
-            assert len(label_set) == 1
-            document_label = list(label_set)[0]
-            prediction_list = document_predictions[k]
-            tpl = Counter(prediction_list).most_common(1)
-            predicted_label = tpl[0][0]
-            if predicted_label == document_label:
-                total_correct_document_count += 1
-            if (document_label, predicted_label) not in confusion_dict:
-                confusion_dict[(document_label, predicted_label)] = 0
-            confusion_dict[(document_label, predicted_label)] += 1
-            total_document_count += 1
-        document_wise_accuracy = float(total_correct_document_count) / float(total_document_count)
-        print("Dataset:{0} Document-Wise Accuracy:{1}".format(dataset_type, document_wise_accuracy))
-        print("Confusion Matrix:")
-        print(confusion_dict)
-        return accuracy, document_wise_accuracy

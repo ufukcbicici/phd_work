@@ -72,7 +72,7 @@ class SignalDataSet:
             self.labelCount = len(label_dict)
         return self.labelCount
 
-    def get_next_batch(self, batch_size=None):
+    def get_next_batch(self, batch_size, wrap_around):
         assert batch_size is not None
         num_of_samples = self.get_current_sample_count()
         curr_end_index = self.currentIndex + batch_size - 1
@@ -81,8 +81,9 @@ class SignalDataSet:
             indices_list = self.currentIndices[self.currentIndex:curr_end_index + 1]
         elif self.currentIndex < num_of_samples <= curr_end_index:
             indices_list = self.currentIndices[self.currentIndex:num_of_samples]
-            curr_end_index = curr_end_index % num_of_samples
-            indices_list.extend(self.currentIndices[0:curr_end_index + 1])
+            if wrap_around:
+                curr_end_index = curr_end_index % num_of_samples
+                indices_list.extend(self.currentIndices[0:curr_end_index + 1])
         else:
             raise Exception("Invalid index positions: self.currentIndex={0} - curr_end_index={1}"
                             .format(self.currentIndex, curr_end_index))
