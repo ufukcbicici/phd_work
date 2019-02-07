@@ -3,6 +3,7 @@ import numpy as np
 from collections import namedtuple
 from sklearn import preprocessing
 
+from auxillary.constants import DatasetTypes
 from park_here.constants import Constants
 
 
@@ -41,6 +42,10 @@ class SignalDataSet:
         self.isNewEpoch = False
         self.currentEpoch = 0
         self.labelCount = None
+        self.currentDataSetType = None
+        # Not used
+        self.validationSamples = None
+        self.validationLabels = None
 
     def reset(self):
         self.currentIndex = 0
@@ -87,15 +92,14 @@ class SignalDataSet:
         # one_hot_labels[np.arange(batch_size), labels.astype(np.int)] = 1.0
         self.currentIndex = self.currentIndex + batch_size
         # Prepare sequence data
-        sequence_data = np.zeros(shape=(batch_size, self.maxLength, Constants.ORIGINAL_DATA_DIMENSION),
-                                 dtype=np.float32)
+        sequences = np.zeros(shape=(batch_size, self.maxLength, Constants.ORIGINAL_DATA_DIMENSION), dtype=np.float32)
         lengths = np.zeros(shape=(batch_size,), dtype=np.int32)
         labels = np.zeros(shape=(batch_size,), dtype=np.int32)
         for batch_index, global_index in enumerate(indices_list):
             sequence = self.currentSamples[global_index]
             lengths[batch_index] = len(sequence)
             labels[batch_index] = self.currentLabels[global_index]
-            sequence_data[batch_index, 0:lengths[batch_index]] = sequence
+            sequences[batch_index, 0:lengths[batch_index]] = sequence
         if num_of_samples <= self.currentIndex:
             self.currentEpoch += 1
             self.isNewEpoch = True
@@ -103,5 +107,19 @@ class SignalDataSet:
             self.currentIndex = self.currentIndex % num_of_samples
         else:
             self.isNewEpoch = False
-        return SignalDataSet.MiniBatch(sequence_data, labels, lengths)
+        return SignalDataSet.MiniBatch(sequences, labels, lengths)
 
+    def set_current_data_set_type(self, dataset_type, batch_size=None):
+        self.currentDataSetType = dataset_type
+        if self.currentDataSetType == DatasetTypes.training:
+            self.currentSamples = self.trainingSamples
+            self.currentLabels = self.trainingLabels
+        elif self.currentDataSetType == DatasetTypes.test:
+            self.currentSamples = self.testSamples
+            self.currentLabels = self.testLabels
+        elif self.currentDataSetType == DatasetTypes.validation:
+            self.currentSamples = self.validationSamples
+            self.currentLabels = self.validationLabels
+        else:
+            raise Exception("Unknown dataset type")
+        self.reset()
