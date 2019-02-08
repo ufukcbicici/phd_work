@@ -1,10 +1,9 @@
 import tensorflow as tf
 import numpy as np
 
-from auxillary.db_logger import DbLogger
-from auxillary.constants import DatasetTypes
 from park_here.constants import Constants
-from simple_tf.global_params import GlobalConstants
+from park_here.signal_dataset import SignalDataSet
+from sklearn.metrics import classification_report
 
 
 class RnnClassifier:
@@ -184,29 +183,8 @@ class RnnClassifier:
         self.optimizer = tf.train.AdamOptimizer(starter_learning_rate).minimize(self.mainLoss,
                                                                                 global_step=self.globalStep)
 
-    # def experiment(self):
-    #     self.corpus.set_current_dataset_type(dataset_type=DatasetType.Training)
-    #     self.sess.run(tf.global_variables_initializer())
-    #     tf.assign(self.embeddings, self.wordEmbeddings).eval(session=self.sess)
-    #     data, labels, lengths, document_ids = \
-    #         self.corpus.get_next_training_batch(batch_size=GlobalConstants.BATCH_SIZE)
-    #     lengths[0] = 10
-    #     lengths[1:] = 15
-    #     feed_dict = {self.batch_size: GlobalConstants.BATCH_SIZE,
-    #                  self.input_word_codes: data,
-    #                  self.input_y: labels,
-    #                  self.keep_prob: GlobalConstants.DROPOUT_KEEP_PROB,
-    #                  self.sequence_length: lengths}
-    #     run_ops = [self.mainLoss, self.outputs, self.finalLstmState, self.stateObject, self.attentionMechanismInput,
-    #                self.contextVector, self.alpha, self.finalState, self.temps]
-    #     results = self.sess.run(run_ops, feed_dict=feed_dict)
-    #     print("X")
-
     def train(self):
         self.sess = tf.Session()
-        run_id = DbLogger.get_run_id()
-        explanation = str(Constants)
-        DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         self.sess.run(tf.global_variables_initializer())
         # trainable_var_dict = {v.name: v for v in tf.trainable_variables()}
         # saver = tf.train.Saver(trainable_var_dict)
@@ -215,27 +193,28 @@ class RnnClassifier:
         iteration = 0
         for epoch_id in range(Constants.TOTAL_EPOCH_COUNT):
             print("*************Epoch {0}*************".format(epoch_id))
-            self.dataset.set_current_dataset_type(dataset_type=DatasetTypes.Training)
+            self.dataset.set_current_dataset_type(dataset_type=SignalDataSet.DatasetTypes.Training)
             while True:
                 minibatch = self.dataset.get_next_batch(batch_size=Constants.BATCH_SIZE, wrap_around=True)
                 feed_dict = {self.batch_size: Constants.BATCH_SIZE,
                              self.input: minibatch.sequences,
                              self.input_y: minibatch.labels,
                              self.keep_prob: Constants.DROPOUT_KEEP_PROB,
-                             self.sequence_length: minibatch.lengths}
+                             self.sequence_length: minibatch.sequence_lengths}
                 # sequences, labels, lengths
                 run_ops = [self.optimizer, self.mainLoss]
                 results = self.sess.run(run_ops, feed_dict=feed_dict)
                 losses.append(results[1])
                 iteration += 1
-                if iteration % 100 == 0:
+                # print("Iteration:{0}".format(iteration))
+                if iteration % 10 == 0:
                     avg_loss = np.mean(np.array(losses))
                     print("Iteration:{0} Avg. Loss:{1}".format(iteration, avg_loss))
                     losses = []
                 if self.dataset.isNewEpoch:
                     print("Original results")
-                    self.test(dataset_type=DatasetTypes.Training)
-                    self.test(dataset_type=DatasetTypes.Test)
+                    self.test(dataset_type=SignalDataSet.DatasetTypes.Training)
+                    self.test(dataset_type=SignalDataSet.DatasetTypes.Test)
                     # DbLogger.write_into_table(rows=[(run_id,
                     #                                  iteration,
                     #                                  epoch_id,
@@ -249,12 +228,10 @@ class RnnClassifier:
                     break
 
     def test(self, dataset_type):
-        confusion_dict = {}
-        batch_size = GlobalConstants.BATCH_SIZE
-        if dataset_type == DatasetTypes.Test:
-            self.dataset.set_current_dataset_type(dataset_type=DatasetTypes.Validation)
+        if dataset_type == SignalDataSet.DatasetTypes.Test:
+            self.dataset.set_current_dataset_type(dataset_type=SignalDataSet.DatasetTypes.Test)
         else:
-            self.dataset.set_current_dataset_type(dataset_type=DatasetTypes.Training)
+            self.dataset.set_current_dataset_type(dataset_type=SignalDataSet.DatasetTypes.Training)
         true_labels = np.array([])
         predicted_labels = np.array([])
         while True:
@@ -263,10 +240,17 @@ class RnnClassifier:
                          self.input: minibatch.sequences,
                          self.input_y: minibatch.labels,
                          self.keep_prob: Constants.DROPOUT_KEEP_PROB,
-                         self.sequence_length: minibatch.lengths}
-            run_ops = [self.predictions]
+                         self.sequence_length: minibatch.sequence_lengths}
+            run_ops = [self.predictions, self.logits]
             results = self.sess.run(run_ops, feed_dict=feed_dict)
             true_labels = np.concatenate((true_labels, minibatch.labels), axis=0)
             predicted_labels = np.concatenate((predicted_labels, results[0]), axis=0)
             if self.dataset.isNewEpoch:
                 break
+        total_correct_number = np.sum(true_labels == predicted_labels)
+        accuracy = total_correct_number / true_labels.shape[0]
+        print("{0} Accuracy:{1}".format(dataset_type, accuracy))
+        report = classification_report(y_true=true_labels, y_pred=predicted_labels,
+                                       target_names=self.dataset.labelEncoder.inverse_transform(
+                                           [c for c in range(self.dataset.get_label_count())]))
+        print(report)
