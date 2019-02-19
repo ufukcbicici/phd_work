@@ -32,10 +32,10 @@ class DbLogger:
     # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Idea GPU
-    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//simple_tf//dblogger.db"
+    # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//simple_tf//dblogger.db"
 
     # Idea
-    # log_db_path = "C://Users//ufuk.bicici//Desktop//tf//phd_work//simple_tf//bnnlogger.db"
+    log_db_path = "C://Users//ufuk.bicici//Desktop//PHD//phd_work//simple_tf//bnnlogger.db"
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}
