@@ -40,7 +40,7 @@ class ModeTrackingStrategy(Enum):
 class GlobalConstants:
     TOTAL_EPOCH_COUNT = 600
     EPOCH_COUNT = 600
-    EPOCH_REPORT_PERIOD = 1
+    EPOCH_REPORT_PERIOD = 4
     BATCH_SIZE = 250
     EVAL_BATCH_SIZE = 250
     CURR_BATCH_SIZE = None
@@ -200,7 +200,7 @@ class GlobalConstants:
                                                        first_conv_filter_size=3, relu_leakiness=0.1,
                                                        strides=[1, 2, 2], activate_before_residual=[True, False, False])
     RESNET_TREE_DEGREES = [2, 2]
-    RESNET_DECISION_DIMENSION = 128
+    RESNET_DECISION_DIMENSION = 256
 
     RESNET_SOFTMAX_DECAY_INITIAL = 25.0
     RESNET_SOFTMAX_DECAY_COEFFICIENT = 0.9999

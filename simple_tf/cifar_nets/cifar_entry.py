@@ -1,8 +1,9 @@
+print("CifarEntry1")
 import tensorflow as tf
 import numpy as np
 import os
 import time
-
+print("CifarEntry2")
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -11,6 +12,7 @@ from data_handling.cifar_dataset import CifarDataSet
 from simple_tf.cifar_nets import cifar100_resnet_baseline, cign_resnet
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
+print("CifarEntry3")
 
 
 def get_explanation_string(network):
@@ -101,13 +103,16 @@ def get_explanation_string(network):
         format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
     explanation += "***** ResNet Parameters *****\n"
     explanation += str(GlobalConstants.RESNET_HYPERPARAMS)
+    explanation += "\nDecision Hyperplane Dimension:{0}\n".format(GlobalConstants.RESNET_DECISION_DIMENSION)
     return explanation
 
 
 def cifar100_training():
     # classification_wd = [0.00005 * i for i in range(21)] * 3
     # classification_wd = sorted(classification_wd)
-    classification_wd = [0.0002] * 3
+    print("Starting calculation")
+    classification_wd = [0.00005, 0.0001, 0.00015] * 3
+    classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]
@@ -277,13 +282,17 @@ def cifar100_training():
         # Reset the computation graph
         tf.reset_default_graph()
         run_id += 1
-
-    # dataset.visualize_sample(sample_index=150)
-    print("X")
+    print("Exit 10")
 
 
-# main()
-# main_fast_tree()
-# ensemble_training()
-cifar100_training()
-# xxx
+#
+#     # dataset.visualize_sample(sample_index=150)
+#     print("X")
+#
+#
+# # main()
+# # main_fast_tree()
+# # ensemble_training()
+# # cifar100_training()
+# # xxx
+# print("Trolololo")
