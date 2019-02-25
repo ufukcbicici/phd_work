@@ -247,7 +247,7 @@ class FastTreeNetwork(TreeNetwork):
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
             node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
-            # Mask all inputs: F channel, H channel, activations from ancestors, labels
+            # Mask all inputs: F channel, H  channel, activations from ancestors, labels
             parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
             parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
             for k, v in parent_node.activationsDict.items():
