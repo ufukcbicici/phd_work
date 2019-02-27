@@ -111,7 +111,7 @@ def cifar100_training():
     # classification_wd = [0.00005 * i for i in range(21)] * 3
     # classification_wd = sorted(classification_wd)
     print("Starting calculation")
-    classification_wd = [0.00005, 0.0001, 0.00015] * 3
+    classification_wd = [0.0001] * 4
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
