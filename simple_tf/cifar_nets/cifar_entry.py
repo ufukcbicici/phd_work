@@ -1,9 +1,8 @@
-print("CifarEntry1")
 import tensorflow as tf
 import numpy as np
 import os
 import time
-print("CifarEntry2")
+
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -12,7 +11,6 @@ from data_handling.cifar_dataset import CifarDataSet
 from simple_tf.cifar_nets import cifar100_resnet_baseline, cign_resnet
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
-print("CifarEntry3")
 
 
 def get_explanation_string(network):
@@ -103,16 +101,13 @@ def get_explanation_string(network):
         format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
     explanation += "***** ResNet Parameters *****\n"
     explanation += str(GlobalConstants.RESNET_HYPERPARAMS)
-    explanation += "\nDecision Hyperplane Dimension:{0}\n".format(GlobalConstants.RESNET_DECISION_DIMENSION)
     return explanation
 
 
 def cifar100_training():
     # classification_wd = [0.00005 * i for i in range(21)] * 3
     # classification_wd = sorted(classification_wd)
-    print("Starting calculation")
-    classification_wd = [0.0001] * 4
-    classification_wd = sorted(classification_wd)
+    classification_wd = [0.00005] * 4
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]
@@ -166,7 +161,7 @@ def cifar100_training():
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
-        series_id = int(run_id / 3)
+        series_id = int(run_id / 4)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)
@@ -282,17 +277,13 @@ def cifar100_training():
         # Reset the computation graph
         tf.reset_default_graph()
         run_id += 1
-    print("Exit 10")
+
+    # dataset.visualize_sample(sample_index=150)
+    print("X")
 
 
-#
-#     # dataset.visualize_sample(sample_index=150)
-#     print("X")
-#
-#
-# # main()
-# # main_fast_tree()
-# # ensemble_training()
-# # cifar100_training()
-# # xxx
-# print("Trolololo")
+# main()
+# main_fast_tree()
+# ensemble_training()
+# cifar100_training()
+# xxx
