@@ -68,8 +68,8 @@ class FashionNetCigj:
     def f_conv_layer_func(node, network):
         network.mask_input_nodes(node=node)
         filter_size = GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES[node.depth]
-        num_of_input_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth]
-        num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_CONV_CHANNELS[node.depth + 1]
+        num_of_input_channels = 1 if node.depth == 0 else GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth-1]
+        num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth]
         node.F_output = FashionNetCigj.build_conv_layer(input=node.F_input,
                                                         node=node,
                                                         filter_size=filter_size,
@@ -77,13 +77,13 @@ class FashionNetCigj:
                                                         num_of_output_channels=num_of_output_channels)
 
     @staticmethod
-    def f_l3_func(node, network):
+    def f_fc_layer_func(node, network):
         network.mask_input_nodes(node=node)
         net = tf.contrib.layers.flatten(node.F_input)
         # net = UtilityFuncs.tf_safe_flatten(input_tensor=node.F_input)
         flattened_F_feature_size = net.get_shape().as_list()[-1]
         dimensions = [flattened_F_feature_size]
-        dimensions.extend(GlobalConstants.CIGJ_FASHION_NET_FC_DIMS)
+        dimensions.extend(GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth])
         for layer in range(len(dimensions) - 1):
             net = FashionNetCigj.build_fc_layer(input=net, node=node,
                                                 input_dim=dimensions[layer],

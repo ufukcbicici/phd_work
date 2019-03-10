@@ -245,3 +245,16 @@ class GlobalConstants:
     BATCH_SIZES_DICT = {DatasetTypes.training: BATCH_SIZE,
                         DatasetTypes.test: EVAL_BATCH_SIZE,
                         DatasetTypes.validation: EVAL_BATCH_SIZE}
+
+    # CIGJ - Fashion Net
+    CIGJ_FASHION_NET_CONV_FILTER_SIZES = [5, 5, 1]
+    CIGJ_FASHION_NET_OUTPUT_DIMS = [32, 24, 40, [128, 64]]
+    CIGJ_FASHION_NET_DEGREE_LIST = [1, 3, 3, 3, 1]
+
+    # First Conv Layer Output (Single Sample): 32x14x14 -> H Transform(4x4) (32x2x2)x32
+    # Second Conv Layer Output (Single Sample): 24x7x7 -> H Transform(3x3) (24x3x3)x32
+    # Third Conv Layer Output (Single Sample): 40x4x4 -> H Transform(2x2) (40x2x2)x32
+    # Fourth FC Layer Output (Single Sample): 128x1 -> H Transform (128)x32
+
+    CIGJ_FASHION_NET_H_FEATURES = [32, 32, 32]
+    CIGJ_FASHION_NET_H_POOL_SIZES = [7, 3, 2]

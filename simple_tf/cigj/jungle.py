@@ -16,6 +16,7 @@ class Jungle(FastTreeNetwork):
         assert len(node_build_funcs) == len(h_funcs) + 1
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         curr_index = 0
+        self.batchSize = tf.placeholder(name="batch_size", dtype=tf.int64)
         self.depthToNodesDict = {}
         self.hFuncs = h_funcs
         self.currentGraph = tf.get_default_graph()
@@ -72,8 +73,8 @@ class Jungle(FastTreeNetwork):
                 assert node.nodeType == NodeType.h_node
                 parent_nodes = [candidate_node for candidate_node in self.nodes.values()
                                 if (candidate_node.depth == node.depth
-                                and (candidate_node.nodeType == NodeType.f_node or
-                                     candidate_node.nodeType == NodeType.root_node)) or
+                                    and (candidate_node.nodeType == NodeType.f_node or
+                                         candidate_node.nodeType == NodeType.root_node)) or
                                 (candidate_node.depth == node.depth - 1 and candidate_node.nodeType == NodeType.h_node)]
                 for parent_node in parent_nodes:
                     self.dagObject.add_edge(parent=parent_node, child=node)
@@ -84,7 +85,7 @@ class Jungle(FastTreeNetwork):
         for node in self.topologicalSortedNodes:
             # if node.depth > 3 or (node.depth == 3 and node.nodeType == NodeType.h_node):
             print("Building node {0}.".format(node.index))
-            if node.depth > 3:
+            if node.depth > 0:
                 continue
             if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
                     node.nodeType == NodeType.leaf_node:
@@ -93,7 +94,7 @@ class Jungle(FastTreeNetwork):
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
             elif node.nodeType == NodeType.h_node:
                 self.hFuncs[node.depth](node=node, network=self)
-                assert node.F_output is not None and node.H_output is not None
+                # assert node.F_output is not None and node.H_output is not None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
                 node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
         # Build the network eval dict
@@ -139,7 +140,8 @@ class Jungle(FastTreeNetwork):
                 assert_op = tf.Assert(tf.greater(shape_sum, 0), dbg_list, 1000)
                 with tf.control_dependencies([assert_op]):
                     node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-                    node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=parent_h_node.H_output)
+                    node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
+                                                     data=parent_h_node.H_output)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -166,17 +168,18 @@ class Jungle(FastTreeNetwork):
             p_c_given_x = self.oneHotLabelTensor
             node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
                                                       balance_coefficient=self.informationGainBalancingCoefficient)
-            # Step 3: Select argmax_F p(F|x)
-            indices_tensor = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
-            # Step 4: Apply partitioning for corresponding F nodes in the same layer.
-            node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
-                                                         num_partitions=node_degree)
-            node.F_output = tf.dynamic_partition(data=node.F_input, partitions=indices_tensor,
-                                                 num_partitions=node_degree)
-            node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
-                                                 num_partitions=node_degree)
-            node.labelTensor = tf.dynamic_partition(data=self.labelTensor, partitions=indices_tensor,
-                                                    num_partitions=node_degree)
+            # Step 3: Sample Z from p(F|x) using Gumbel-Max trick
+            indices_tensor = self.sample_from_categorical(probs=p_F_given_x, batch_size=self.batchSize,
+                                                          category_count=tf.constant(node_degree))
+            # # Step 4: Apply partitioning for corresponding F nodes in the same layer.
+            # node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
+            #                                              num_partitions=node_degree)
+            # node.F_output = tf.dynamic_partition(data=node.F_input, partitions=indices_tensor,
+            #                                      num_partitions=node_degree)
+            # node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
+            #                                      num_partitions=node_degree)
+            # node.labelTensor = tf.dynamic_partition(data=self.labelTensor, partitions=indices_tensor,
+            #                                         num_partitions=node_degree)
             # Reporting
             node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
             node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
@@ -225,7 +228,7 @@ class Jungle(FastTreeNetwork):
             sibling_nodes = [node for node in self.depthToNodesDict[node.depth]
                              if node.nodeType == NodeType.f_node or node.nodeType == NodeType.leaf_node]
             sibling_nodes = {node.index: order_index for order_index, node in
-                               enumerate(sorted(sibling_nodes, key=lambda c_node: c_node.index))}
+                             enumerate(sorted(sibling_nodes, key=lambda c_node: c_node.index))}
             sibling_order_index = sibling_nodes[node.index]
             with tf.control_dependencies([
                 parent_node.F_output[sibling_order_index],

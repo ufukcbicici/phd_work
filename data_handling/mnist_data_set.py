@@ -49,7 +49,7 @@ class MnistDataSet(DataSet):
         self.validationSaveFile = save_validation_as
         self.validationLoadFile = load_validation_from
         self.load_dataset()
-        # self.set_current_data_set_type(dataset_type=DatasetTypes.training)
+        self.set_current_data_set_type(dataset_type=DatasetTypes.training)
         self.labelCount = None
 
     # PUBLIC METHODS

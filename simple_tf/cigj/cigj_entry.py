@@ -20,13 +20,13 @@ def cigj_training():
         node_build_funcs=[FashionNetCigj.f_conv_layer_func,
                           FashionNetCigj.f_conv_layer_func,
                           FashionNetCigj.f_conv_layer_func,
-                          FashionNetCigj.f_l3_func,
+                          FashionNetCigj.f_fc_layer_func,
                           FashionNetCigj.f_leaf_func],
         h_funcs=[FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func],
         grad_func=None,
         threshold_func=FashionNetCigj.threshold_calculator_func,
         residue_func=None, summary_func=None,
-        degree_list=[1, 3, 3, 3, 1], dataset=dataset)
+        degree_list=GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST, dataset=dataset)
     sess = jungle.get_session()
     init = tf.global_variables_initializer()
     sess.run(init)

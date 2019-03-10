@@ -318,7 +318,7 @@ class FastTreeNetwork(TreeNetwork):
 
     def eval_network(self, sess, dataset, use_masking):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
-        minibatch = dataset.get_next_batch()
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
         if minibatch is None:
             return None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
