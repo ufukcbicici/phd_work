@@ -46,6 +46,7 @@ class Jungle(FastTreeNetwork):
                     self.depthToNodesDict[depth] = []
                 self.depthToNodesDict[depth].append(curr_node)
         # Build network as a DAG
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         self.build_network()
         self.print_trellis_structure()
 
@@ -252,7 +253,7 @@ class Jungle(FastTreeNetwork):
             else:
                 feed_dict[node.softmaxDecay] = GlobalConstants.SOFTMAX_TEST_TEMPERATURE
 
-    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking, batch_size):
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         feed_dict = {self.dataTensor: minibatch.samples,
                      self.labelTensor: minibatch.labels,
                      self.indicesTensor: minibatch.indices,
@@ -264,7 +265,7 @@ class Jungle(FastTreeNetwork):
                      self.isTrain: int(is_train),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration,
-                     self.batchSize: batch_size}
+                     self.batchSize: GlobalConstants.CURR_BATCH_SIZE}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:
