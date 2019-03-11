@@ -31,16 +31,26 @@ def cigj_training():
     init = tf.global_variables_initializer()
     sess.run(init)
     histogram = np.zeros(shape=(GlobalConstants.EVAL_BATCH_SIZE, 3))
-    for i in range(1000):
-        results, _ = jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
-        print("X")
+    minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+    probs = None
+    for i in range(10000):
+        if i % 100 == 0:
+            print(i)
+        # results, _ = jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
+        results, _ = jungle.eval_minibatch(sess=sess, minibatch=minibatch, use_masking=True)
+        selected_indices = results["Node1_indices_tensor"]
+        if probs is None:
+            probs = results["Node1_p(n|x)"]
+        else:
+            assert np.array_equal(probs, results["Node1_p(n|x)"])
+        histogram[np.arange(histogram.shape[0]), selected_indices] += 1
+    sampled_probs = histogram / np.reshape(np.sum(histogram, axis=1), newshape=(histogram.shape[0], 1))
+    print("X")
 
     # jungle.print_trellis_structure()
 
 
 cigj_training()
-
-
 
 # with tf.control_dependencies([shape_assign_op]):
 #     set_batch_size_op = tf.assign(shape_tensor[0], batch_size_tensor)

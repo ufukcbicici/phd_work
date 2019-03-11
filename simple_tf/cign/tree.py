@@ -295,9 +295,10 @@ class TreeNetwork:
             self.residueLoss = GlobalConstants.RESIDUE_LOSS_COEFFICIENT * self.residueFunc(network=self)
 
     # Sample from categorical distribution using Gumbel-Max trick
-    def sample_from_categorical(self, probs, batch_size, category_count):
+    @staticmethod
+    def sample_from_categorical(probs, batch_size, category_count):
         uniform = tf.distributions.Uniform(low=0.0, high=1.0)
-        uniform_sample = uniform.sample(sample_shape=(batch_size, category_count))
+        uniform_sample = uniform.sample(sample_shape=(tf.cast(batch_size, tf.int32), category_count))
         gumbel_sample = -1.0 * tf.log(-1.0 * tf.log(uniform_sample))
         log_probs = tf.log(probs)
         gumbel_max = gumbel_sample + log_probs
