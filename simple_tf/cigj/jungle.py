@@ -173,8 +173,8 @@ class Jungle(FastTreeNetwork):
             indices_tensor = self.sample_from_categorical(probs=p_F_given_x, batch_size=self.batchSize,
                                                           category_count=tf.constant(node_degree))
             # # Step 4: Apply partitioning for corresponding F nodes in the same layer.
-            # node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
-            #                                              num_partitions=node_degree)
+            node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
+                                                         num_partitions=node_degree)
             # node.F_output = tf.dynamic_partition(data=node.F_input, partitions=indices_tensor,
             #                                      num_partitions=node_degree)
             # node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,

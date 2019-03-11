@@ -31,14 +31,16 @@ for exp_index in range(1000):
     t2 = time.time()
     transformed_partition_list = []
     for partition in partition_list:
-        conv_weights = tf.Variable(
-            tf.truncated_normal([filter_size, filter_size, num_of_input_channels, num_of_output_channels],
-                                stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
-        conv_biases = tf.Variable(tf.constant(0.1, shape=[num_of_output_channels], dtype=GlobalConstants.DATA_TYPE))
-        conv = tf.nn.conv2d(partition, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-        relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
-        pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-        transformed_partition_list.append(pool)
+        # conv_weights = tf.Variable(
+        #     tf.truncated_normal([filter_size, filter_size, num_of_input_channels, num_of_output_channels],
+        #                         stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
+        # conv_biases = tf.Variable(tf.constant(0.1, shape=[num_of_output_channels], dtype=GlobalConstants.DATA_TYPE))
+        # conv = tf.nn.conv2d(partition, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
+        # relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
+        # pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        # transformed_partition_list.append(pool)
+        transformed = tf.pow(partition, 3.0)
+        transformed_partition_list.append(transformed)
     original_stitched = tf.dynamic_stitch(indices=condition_indices, data=partition_list)
     transformed_stitched = tf.dynamic_stitch(indices=condition_indices, data=transformed_partition_list)
     indices_stitched = tf.dynamic_stitch(indices=condition_indices, data=condition_indices)
@@ -54,15 +56,12 @@ for exp_index in range(1000):
                        feed_dict={input_tensor: x, activation_tensor: activation_arr, batch_size_tensor: batch_size})
     t5 = time.time()
 
-
-
-    # res0 = np.allclose(x, results[0])
-    # res1 = np.allclose(np.square(x), results[1])
-    # res2 = np.array_equal(np.arange(batch_size), results[2])
-    # res3 = np.allclose(2.0 * x, results[3])
-    # t6 = time.time()
-    # assert (res0 and res1 and res2 and res3)
-    # tf.reset_default_graph()
-    # print("Is Correct:{0}".format((res0 and res1 and res2 and res3)))
-    # print("t1-t0:{0} t2-t1:{1} t3-t2:{2} t4-t3:{3} t5-t4:{4} t6-t5:{5}"
-    #       .format(t1-t0, t2-t1, t3-t2, t4-t3, t5-t4, t6-t5))
+    res0 = np.allclose(x, results[0])
+    res1 = np.allclose(np.power(x, 3.0), results[1])
+    res2 = np.array_equal(np.arange(batch_size), results[2])
+    res3 = np.allclose(3.0 * np.power(x, 2.0), results[3])
+    t6 = time.time()
+    assert (res0 and res1 and res2 and res3)
+    tf.reset_default_graph()
+    print("{0}- Is Correct:{1}".format(exp_index, (res0 and res1 and res2 and res3)))
+    # print("t1-t0:{0} t2-t1:{1} t3-t2:{2} t4-t3:{3} t5-t4:{4} t6-t5:{5}" .format(t1-t0, t2-t1, t3-t2, t4-t3, t5-t4, t6-t5))
