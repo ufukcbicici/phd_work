@@ -330,6 +330,16 @@ class FastTreeNetwork(TreeNetwork):
         #         print("{0}={1}".format(k, v))
         return results, minibatch
 
+    def eval_minibatch(self, sess, minibatch, use_masking):
+        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=1000000, use_threshold=False,
+                                           is_train=False, use_masking=use_masking)
+        eval_filtered = {k: v for k, v in self.evalDict.items() if v is not None}
+        results = sess.run(eval_filtered, feed_dict)
+        # for k, v in results.items():
+        #     if "final_feature_mag" in k:
+        #         print("{0}={1}".format(k, v))
+        return results, minibatch
+
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         feed_dict = {self.dataTensor: minibatch.samples,
                      self.labelTensor: minibatch.labels,

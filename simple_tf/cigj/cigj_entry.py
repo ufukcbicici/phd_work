@@ -30,7 +30,10 @@ def cigj_training():
     sess = jungle.get_session()
     init = tf.global_variables_initializer()
     sess.run(init)
-    jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
+    histogram = np.zeros(shape=(GlobalConstants.EVAL_BATCH_SIZE, 3))
+    for i in range(1000):
+        results, _ = jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
+        print("X")
 
     # jungle.print_trellis_structure()
 
