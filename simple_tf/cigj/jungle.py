@@ -117,6 +117,7 @@ class Jungle(FastTreeNetwork):
             node.stitchedLabels = self.labelTensor
         # Need stitching
         else:
+            parent_node_degree = self.degreeList[node.depth - 1]
             # Get all F nodes in the same layer
             parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=node)
                               if f_node.nodeType == NodeType.f_node]
@@ -149,14 +150,23 @@ class Jungle(FastTreeNetwork):
                 # node.H_input = tf.identity(parent_node.H_output[sibling_order_index])
                 # node.labelTensor = tf.identity(parent_node.labelTensor[sibling_order_index])
                 # node.conditionIndices = tf.identity(parent_node.conditionIndices[sibling_order_index])
-
-                node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-                node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                 data=parent_h_node.H_output)
-                node.stitchedIndices = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                         data=f_index_inputs)
-                node.stitchedLabels = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                        data=f_label_inputs)
+                if parent_node_degree > 1:
+                    node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+                    node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
+                                                     data=parent_h_node.H_output)
+                    node.stitchedIndices = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
+                                                             data=f_index_inputs)
+                    node.stitchedLabels = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
+                                                            data=f_label_inputs)
+                else:
+                    assert len(f_inputs) == 1
+                    node.F_input = f_inputs[0]
+                    assert len(parent_h_node.H_output) == 1
+                    node.H_input = parent_h_node.H_output
+                    assert len(f_index_inputs) == 1
+                    node.stitchedIndices = f_index_inputs[0]
+                    assert len(f_label_inputs) == 1
+                    node.stitchedLabels = f_label_inputs[0]
         node.evalDict[UtilityFuncs.get_variable_name(name="stitchedIndices", node=node)] = node.stitchedIndices
         node.evalDict[UtilityFuncs.get_variable_name(name="stitchedLabels", node=node)] = node.stitchedLabels
 
