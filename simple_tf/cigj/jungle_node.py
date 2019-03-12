@@ -24,6 +24,9 @@ class JungleNode(Node):
         self.partitioned_F_outputs = None
         self.partitioned_H_outputs = None
         self.conditionIndices = None
+        # This is for debugging purposes
+        self.stitchedIndices = None
+        self.stitchedLabels = None
         super().__init__(index, depth, is_root, is_leaf)
         if self.nodeType == NodeType.h_node:
             self.softmaxDecay = tf.placeholder(name=UtilityFuncs.get_variable_name(name="softmax_decay", node=self),

@@ -1,9 +1,12 @@
 import tensorflow as tf
 import numpy as np
 
+from auxillary.constants import DatasetTypes
+from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.cifar_dataset import CifarDataSet
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cigj.jungle import Jungle
+from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.fashion_net import fashion_net_cigj
 from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
 from simple_tf.global_params import GlobalConstants
@@ -11,6 +14,7 @@ from simple_tf.global_params import GlobalConstants
 
 def cigj_training():
     dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
+    dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
@@ -30,22 +34,34 @@ def cigj_training():
     sess = jungle.get_session()
     init = tf.global_variables_initializer()
     sess.run(init)
-    histogram = np.zeros(shape=(GlobalConstants.EVAL_BATCH_SIZE, 3))
-    minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-    probs = None
-    for i in range(10000):
-        if i % 100 == 0:
-            print(i)
-        # results, _ = jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
-        results, _ = jungle.eval_minibatch(sess=sess, minibatch=minibatch, use_masking=True)
-        selected_indices = results["Node1_indices_tensor"]
-        if probs is None:
-            probs = results["Node1_p(n|x)"]
-        else:
-            assert np.array_equal(probs, results["Node1_p(n|x)"])
-        histogram[np.arange(histogram.shape[0]), selected_indices] += 1
-    sampled_probs = histogram / np.reshape(np.sum(histogram, axis=1), newshape=(histogram.shape[0], 1))
+    results, minibatch = jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
+    # Check consistency of partitioning - stitching
+    for node in jungle.nodes.values():
+        if node.nodeType == NodeType.h_node:
+            if UtilityFuncs.get_variable_name(name="stitchedIndices", node=node) in results:
+                stitched_indices = results[UtilityFuncs.get_variable_name(name="stitchedIndices", node=node)]
+                assert np.array_equal(np.arange(GlobalConstants.CURR_BATCH_SIZE), stitched_indices)
+            if UtilityFuncs.get_variable_name(name="stitchedLabels", node=node) in results:
+                stitched_labels = results[UtilityFuncs.get_variable_name(name="stitchedLabels", node=node)]
+                assert np.array_equal(minibatch.labels, stitched_labels)
     print("X")
+
+    # histogram = np.zeros(shape=(GlobalConstants.EVAL_BATCH_SIZE, 3))
+    # minibatch = dataset.get_next_batch(batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+    # probs = None
+    # for i in range(10000):
+    #     if i % 100 == 0:
+    #         print(i)
+    #     # results, _ = jungle.eval_network(sess=sess, dataset=dataset, use_masking=True)
+    #     results, _ = jungle.eval_minibatch(sess=sess, minibatch=minibatch, use_masking=True)
+    #     selected_indices = results["Node1_indices_tensor"]
+    #     if probs is None:
+    #         probs = results["Node1_p(n|x)"]
+    #     else:
+    #         assert np.array_equal(probs, results["Node1_p(n|x)"])
+    #     histogram[np.arange(histogram.shape[0]), selected_indices] += 1
+    # sampled_probs = histogram / np.reshape(np.sum(histogram, axis=1), newshape=(histogram.shape[0], 1))
+    # print("X")
 
     # jungle.print_trellis_structure()
 
