@@ -130,19 +130,19 @@ class Jungle(FastTreeNetwork):
             control_dependencies.extend(f_inputs)
             dbg_list = []
             with tf.control_dependencies(control_dependencies):
-                input_shapes = [tf.shape(x) for x in f_inputs]
-                shape_prods = [tf.reduce_prod(x) for x in input_shapes]
-                shape_sum = tf.add_n(shape_prods)
-                dbg_list.extend(input_shapes)
-                dbg_list.extend([tf.shape(x) for x in parent_h_node.conditionIndices])
-                dbg_list.extend([tf.shape(x) for x in parent_h_node.F_output])
-                dbg_list.extend([tf.shape(x) for x in parent_h_node.H_output])
-                dbg_list.extend([tf.shape(x) for x in parent_h_node.labelTensor])
-                assert_op = tf.Assert(tf.greater(shape_sum, 0), dbg_list, 1000)
-                with tf.control_dependencies([assert_op]):
-                    node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-                    node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                     data=parent_h_node.H_output)
+                # input_shapes = [tf.shape(x) for x in f_inputs]
+                # shape_prods = [tf.reduce_prod(x) for x in input_shapes]
+                # shape_sum = tf.add_n(shape_prods)
+                # dbg_list.extend(input_shapes)
+                # dbg_list.extend([tf.shape(x) for x in parent_h_node.conditionIndices])
+                # dbg_list.extend([tf.shape(x) for x in parent_h_node.F_output])
+                # dbg_list.extend([tf.shape(x) for x in parent_h_node.H_output])
+                # dbg_list.extend([tf.shape(x) for x in parent_h_node.labelTensor])
+                # assert_op = tf.Assert(tf.greater(shape_sum, 0), dbg_list, 1000)
+                # with tf.control_dependencies([assert_op]):
+                node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+                node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
+                                                 data=parent_h_node.H_output)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
