@@ -86,8 +86,8 @@ class Jungle(FastTreeNetwork):
         for node in self.topologicalSortedNodes:
             # if node.depth > 3 or (node.depth == 3 and node.nodeType == NodeType.h_node):
             print("Building node {0}.".format(node.index))
-            if node.depth > 0:
-                continue
+            # if node.depth > 0:
+            #     continue
             if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
                     node.nodeType == NodeType.leaf_node:
                 self.nodeBuildFuncs[node.depth](node=node, network=self)
@@ -175,12 +175,12 @@ class Jungle(FastTreeNetwork):
             # # Step 4: Apply partitioning for corresponding F nodes in the same layer.
             node.conditionIndices = tf.dynamic_partition(data=self.batchIndices, partitions=indices_tensor,
                                                          num_partitions=node_degree)
-            # node.F_output = tf.dynamic_partition(data=node.F_input, partitions=indices_tensor,
-            #                                      num_partitions=node_degree)
-            # node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
-            #                                      num_partitions=node_degree)
-            # node.labelTensor = tf.dynamic_partition(data=self.labelTensor, partitions=indices_tensor,
-            #                                         num_partitions=node_degree)
+            node.F_output = tf.dynamic_partition(data=node.F_input, partitions=indices_tensor,
+                                                 num_partitions=node_degree)
+            node.H_output = tf.dynamic_partition(data=node.H_output, partitions=indices_tensor,
+                                                 num_partitions=node_degree)
+            node.labelTensor = tf.dynamic_partition(data=self.labelTensor, partitions=indices_tensor,
+                                                    num_partitions=node_degree)
             # Reporting
             node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
             node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
