@@ -117,7 +117,7 @@ class Jungle(FastTreeNetwork):
             node.stitchedLabels = self.labelTensor
         # Need stitching
         else:
-            parent_node_degree = self.degreeList[node.depth - 1]
+            parent_node_degree = self.degreeList[node.depth]
             # Get all F nodes in the same layer
             parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=node)
                               if f_node.nodeType == NodeType.f_node]
