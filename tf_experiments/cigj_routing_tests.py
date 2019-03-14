@@ -1,3 +1,4 @@
+import tensorflow as tf
 from auxillary.constants import DatasetTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
@@ -24,6 +25,7 @@ class CigjTesting:
             threshold_func=FashionNetCigj.threshold_calculator_func,
             residue_func=None, summary_func=None,
             degree_list=GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST, dataset=dataset)
+        jungle_parameters = set(tf.trainable_variables())
         # Create all root-to-leaf model combinations
         list_of_indices = []
         for degree in GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST:
@@ -37,6 +39,9 @@ class CigjTesting:
             threshold_func=FashionNetCigj.threshold_calculator_func,
             residue_func=None, summary_func=None,
             degree_list=[1] * len(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST), dataset=dataset)
+        single_path_variables = set([var for var in tf.trainable_variables() if var not in jungle_parameters])
+        shape_set = set(tuple(v.get_shape().as_list()) for v in single_path_variables)
+        assert len(shape_set) == len(single_path_variables)
         print("X")
 
 

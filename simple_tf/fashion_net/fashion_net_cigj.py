@@ -98,7 +98,6 @@ class FashionNetCigj:
     def f_leaf_func(node, network, use_masking=True):
         if use_masking:
             network.mask_input_nodes(node=node)
-        network.mask_input_nodes(node=node)
         final_feature = node.F_input
         network.apply_loss_jungle(node=node, final_feature=final_feature)
 
@@ -113,7 +112,7 @@ class FashionNetCigj:
                                                        h_feature_size=h_feature_size,
                                                        pool_size=pool_size)
         else:
-            node.H_output = node.H_input
+            node.H_output = tf.constant(0)
         network.apply_decision(node=node, branching_feature=node.H_output)
 
     @staticmethod

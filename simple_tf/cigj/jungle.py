@@ -162,7 +162,7 @@ class Jungle(FastTreeNetwork):
                     assert len(f_inputs) == 1
                     node.F_input = f_inputs[0]
                     assert len(parent_h_node.H_output) == 1
-                    node.H_input = parent_h_node.H_output
+                    node.H_input = parent_h_node.H_output[0]
                     assert len(f_index_inputs) == 1
                     node.stitchedIndices = f_index_inputs[0]
                     assert len(f_label_inputs) == 1
