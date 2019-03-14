@@ -115,7 +115,7 @@ class CigjTesting:
                                                                    single_path_parameters=single_path_parameters,
                                                                    path=path)
 
-            print("X")
+        print("X")
 
 
 CigjTesting.test()
