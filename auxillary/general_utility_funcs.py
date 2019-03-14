@@ -141,8 +141,8 @@ class UtilityFuncs:
         return modes
 
     @staticmethod
-    def get_variable_name(name, node):
-        return "Node{0}_{1}".format(node.index, name)
+    def get_variable_name(name, node, prefix=""):
+        return "{0}Node{1}_{2}".format(prefix, node.index, name)
 
     @staticmethod
     def convert_labels_to_one_hot(labels, max_label):

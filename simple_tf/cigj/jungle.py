@@ -223,6 +223,8 @@ class Jungle(FastTreeNetwork):
             node.F_output = [node.F_input]
             node.H_output = [node.H_output]
             node.labelTensor = [self.labelTensor]
+            node.evalDict[UtilityFuncs.get_variable_name(name="indices_tensor", node=node)] = \
+                tf.zeros(shape=self.batchSize, dtype=tf.int32)
 
     def apply_loss_jungle(self, node, final_feature):
         assert len(final_feature.get_shape().as_list()) == 2
@@ -239,6 +241,15 @@ class Jungle(FastTreeNetwork):
         assert len(node.lossList) == 1
         node.F_output = node.lossList[0]
 
+    def get_node_sibling_index(self, node):
+        sibling_nodes = [node for node in self.depthToNodesDict[node.depth]
+                         if node.nodeType == NodeType.f_node or node.nodeType == NodeType.leaf_node or
+                         node.nodeType == NodeType.root_node]
+        sibling_nodes = {node.index: order_index for order_index, node in
+                         enumerate(sorted(sibling_nodes, key=lambda c_node: c_node.index))}
+        sibling_order_index = sibling_nodes[node.index]
+        return sibling_order_index
+
     def mask_input_nodes(self, node):
         if node.nodeType == NodeType.root_node:
             node.F_input = self.dataTensor
@@ -254,11 +265,7 @@ class Jungle(FastTreeNetwork):
             parents = self.dagObject.parents(node=node)
             assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
             parent_node = parents[0]
-            sibling_nodes = [node for node in self.depthToNodesDict[node.depth]
-                             if node.nodeType == NodeType.f_node or node.nodeType == NodeType.leaf_node]
-            sibling_nodes = {node.index: order_index for order_index, node in
-                             enumerate(sorted(sibling_nodes, key=lambda c_node: c_node.index))}
-            sibling_order_index = sibling_nodes[node.index]
+            sibling_order_index = self.get_node_sibling_index(node=node)
             with tf.control_dependencies([
                 parent_node.F_output[sibling_order_index], parent_node.H_output[sibling_order_index],
                     parent_node.labelTensor[sibling_order_index], parent_node.conditionIndices[sibling_order_index]]):
