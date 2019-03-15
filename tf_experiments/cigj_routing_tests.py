@@ -10,8 +10,14 @@ from simple_tf.global_params import GlobalConstants
 
 class CigjTesting:
     @staticmethod
-    def transfer_single_path_parameters_with_shape(jungle, jungle_parameters,
-                                                   single_path_jungle, single_path_parameters, path):
+    def transfer_single_path_parameters_with_shape(sess,
+                                                   jungle,
+                                                   jungle_parameters,
+                                                   single_path_jungle,
+                                                   single_path_parameters,
+                                                   single_path_placehoders,
+                                                   single_path_assignment_ops,
+                                                   path):
         parameter_pairs = []
         extended_path = [0]
         extended_path.extend(path)
@@ -43,12 +49,14 @@ class CigjTesting:
                 assert len(d_candidates) == 1
                 d_param = d_candidates[0]
                 parameter_pairs.append((s_param, d_param))
-            print("X")
         # Check if the mapping has been correctly done.
         # Check consistency of the shapes
         assert all([tpl[0].get_shape().as_list() == tpl[1].get_shape().as_list() for tpl in parameter_pairs])
         # Check that mapping is one-to-one
         assert len(set([tpl[1] for tpl in parameter_pairs])) == len(parameter_pairs)
+        # Get the source parameter values
+        source_param_values = sess.run([tpl[0] for tpl in parameter_pairs])
+        print("X")
 
     @staticmethod
     def test():
@@ -79,6 +87,9 @@ class CigjTesting:
                 residue_func=None, summary_func=None,
                 degree_list=[1] * len(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST), dataset=dataset)
         single_path_parameters = set([var for var in tf.trainable_variables() if var not in jungle_parameters])
+        single_path_placehoders = {param.name: tf.placeholder(dtype=tf.float32) for param in single_path_parameters}
+        single_path_assignment_ops = {param.name: tf.assign(param, single_path_placehoders[param.name]) for param in
+                                      single_path_parameters}
         shape_set = set(tuple(v.get_shape().as_list()) for v in single_path_parameters)
         assert len(shape_set) == len(single_path_parameters)
         # Create all root-to-leaf model combinations
@@ -109,12 +120,14 @@ class CigjTesting:
             sorted_samples = sorted(samples)
             samples_subset = minibatch.samples[sorted_samples]
             labels_subset = minibatch.labels[sorted_samples]
-            CigjTesting.transfer_single_path_parameters_with_shape(jungle=jungle,
+            CigjTesting.transfer_single_path_parameters_with_shape(sess=sess,
+                                                                   jungle=jungle,
                                                                    jungle_parameters=jungle_parameters,
                                                                    single_path_jungle=single_path_jungle,
                                                                    single_path_parameters=single_path_parameters,
+                                                                   single_path_placehoders=single_path_placehoders,
+                                                                   single_path_assignment_ops=single_path_assignment_ops,
                                                                    path=path)
-
         print("X")
 
 
