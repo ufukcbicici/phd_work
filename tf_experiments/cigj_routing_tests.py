@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 from auxillary.constants import DatasetTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
@@ -56,6 +57,14 @@ class CigjTesting:
         assert len(set([tpl[1] for tpl in parameter_pairs])) == len(parameter_pairs)
         # Get the source parameter values
         source_param_values = sess.run([tpl[0] for tpl in parameter_pairs])
+        dest_param_values = sess.run([tpl[1] for tpl in parameter_pairs])
+        assert not all([np.array_equal(sa, dest_param_values[_i]) for _i, sa in enumerate(source_param_values)])
+        # Assign the source values to destination parameters
+        feed_dict = {single_path_placehoders[tpl[1].name]: source_param_values[_i] for _i, tpl in
+                     enumerate(parameter_pairs)}
+        sess.run([assign_op for assign_op in single_path_assignment_ops.values()], feed_dict=feed_dict)
+        dest_param_values2 = sess.run([tpl[1] for tpl in parameter_pairs])
+        assert all([np.array_equal(sa, dest_param_values2[_i]) for _i, sa in enumerate(source_param_values)])
         print("X")
 
     @staticmethod
