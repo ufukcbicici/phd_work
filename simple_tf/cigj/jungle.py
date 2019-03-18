@@ -236,10 +236,10 @@ class Jungle(FastTreeNetwork):
         fc_softmax_biases = tf.Variable(tf.constant(0.1, shape=[self.labelCount],
                                                     dtype=GlobalConstants.DATA_TYPE),
                                         name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node))
-        self.apply_loss(node=node, final_feature=final_feature, softmax_weights=fc_softmax_weights,
+        final_feature, logits = self.apply_loss(node=node, final_feature=final_feature, softmax_weights=fc_softmax_weights,
                         softmax_biases=fc_softmax_biases)
         assert len(node.lossList) == 1
-        node.F_output = node.lossList[0]
+        node.F_output = final_feature
 
     def get_node_sibling_index(self, node):
         sibling_nodes = [node for node in self.depthToNodesDict[node.depth]
@@ -258,8 +258,12 @@ class Jungle(FastTreeNetwork):
             node.labelTensor = self.labelTensor
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
             # For reporting
-            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
+            node.sampleCountTensor = tf.size(node.labelTensor)
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = node.sampleCountTensor
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
+            node.evalDict[
+                UtilityFuncs.get_variable_name(name="condition_indices", node=node)] = node.conditionIndices
         elif node.nodeType == NodeType.f_node or node.nodeType == NodeType.leaf_node:
             # raise NotImplementedError()
             parents = self.dagObject.parents(node=node)
@@ -272,7 +276,14 @@ class Jungle(FastTreeNetwork):
                 node.F_input = tf.identity(parent_node.F_output[sibling_order_index])
                 node.H_input = tf.identity(parent_node.H_output[sibling_order_index])
                 node.labelTensor = tf.identity(parent_node.labelTensor[sibling_order_index])
+                # For reporting
+                node.sampleCountTensor = tf.size(parent_node.conditionIndices[sibling_order_index])
+                is_used = tf.cast(node.sampleCountTensor, tf.float32) > 0.0
+                node.isOpenIndicatorTensor = tf.where(is_used, 1.0, 0.0)
                 node.conditionIndices = tf.identity(parent_node.conditionIndices[sibling_order_index])
+                node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="condition_indices", node=node)] = node.conditionIndices
 
     def get_softmax_decays(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:

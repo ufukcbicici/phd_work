@@ -24,6 +24,7 @@ class JungleNode(Node):
         self.partitioned_F_outputs = None
         self.partitioned_H_outputs = None
         self.conditionIndices = None
+        self.sampleCountTensor = None
         # This is for debugging purposes
         self.stitchedIndices = None
         self.stitchedLabels = None

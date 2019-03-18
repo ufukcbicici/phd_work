@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 from auxillary.constants import DatasetTypes
 from auxillary.general_utility_funcs import UtilityFuncs
+from data_handling.data_set import DataSet
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cigj.jungle import Jungle
 from simple_tf.cigj.jungle_node import NodeType
@@ -22,6 +23,7 @@ class CigjTesting:
         parameter_pairs = []
         extended_path = [0]
         extended_path.extend(path)
+        source_nodes = []
         for source_node in jungle.topologicalSortedNodes:
             if source_node.nodeType == NodeType.h_node:
                 continue
@@ -32,6 +34,7 @@ class CigjTesting:
             depth = source_node.depth
             if sibling_order_index != extended_path[depth]:
                 continue
+            source_nodes.append(source_node)
             parameters_source.extend([param for param in jungle_parameters
                                       if "Node{0}".format(source_node.index) in param.name])
             destination_nodes = [_node for _node in single_path_jungle.nodes.values()
@@ -66,6 +69,7 @@ class CigjTesting:
         dest_param_values2 = sess.run([tpl[1] for tpl in parameter_pairs])
         assert all([np.array_equal(sa, dest_param_values2[_i]) for _i, sa in enumerate(source_param_values)])
         print("X")
+        return source_nodes
 
     @staticmethod
     def test():
@@ -127,16 +131,63 @@ class CigjTesting:
         # Compare the results of each output with the CIGJ.
         for path, samples in paths_to_samples_dict.items():
             sorted_samples = sorted(samples)
-            samples_subset = minibatch.samples[sorted_samples]
-            labels_subset = minibatch.labels[sorted_samples]
-            CigjTesting.transfer_single_path_parameters_with_shape(sess=sess,
-                                                                   jungle=jungle,
-                                                                   jungle_parameters=jungle_parameters,
-                                                                   single_path_jungle=single_path_jungle,
-                                                                   single_path_parameters=single_path_parameters,
-                                                                   single_path_placehoders=single_path_placehoders,
-                                                                   single_path_assignment_ops=single_path_assignment_ops,
-                                                                   path=path)
+            # samples_subset = minibatch.samples[sorted_samples]
+            # labels_subset = minibatch.labels[sorted_samples]
+            subset_minibatch = DataSet.MiniBatch(minibatch.samples[sorted_samples], minibatch.labels[sorted_samples],
+                                                 minibatch.indices[sorted_samples],
+                                                 minibatch.one_hot_labels[sorted_samples],
+                                                 None, None, None)
+            source_nodes = \
+                CigjTesting.transfer_single_path_parameters_with_shape(sess=sess,
+                                                                       jungle=jungle,
+                                                                       jungle_parameters=jungle_parameters,
+                                                                       single_path_jungle=single_path_jungle,
+                                                                       single_path_parameters=single_path_parameters,
+                                                                       single_path_placehoders=single_path_placehoders,
+                                                                       single_path_assignment_ops=single_path_assignment_ops,
+                                                                       path=path)
+            single_path_results, _ = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch,
+                                                                       use_masking=True)
+            results_list = []
+            for _ in range(1000):
+                p, q = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch, use_masking=True)
+                results_list.append(p)
+            # single_path_results2, _ = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch,
+            #                                                            use_masking=True)
+            # single_path_results3, _ = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch,
+            #                                                            use_masking=True)
+            depthwise_results_equal = {}
+            depthwise_results_allclose = {}
+            for d in range(len(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)):
+                for batch_index in sorted_samples:
+                    depthwise_results_equal[(d, batch_index)] = False
+                    depthwise_results_allclose[(d, batch_index)] = False
+            # Get corresponding jungle results for the current path
+            for source_node in source_nodes:
+                # Get corresponding jungle node F output
+                source_F_output = results[UtilityFuncs.get_variable_name(name="F_output", node=source_node)]
+                source_F_condition_indices = results[UtilityFuncs.get_variable_name(name="condition_indices",
+                                                                                    node=source_node)]
+                destination_nodes = [_node for _node in single_path_jungle.nodes.values()
+                                     if _node.nodeType != NodeType.h_node and _node.depth == source_node.depth]
+                assert len(destination_nodes) == 1
+                destination_node = destination_nodes[0]
+                destination_F_output = single_path_results[UtilityFuncs.get_variable_name(name="F_output",
+                                                                                          node=destination_node)]
+                for d_condition_index, d_batch_index in enumerate(sorted_samples):
+                    d_F = destination_F_output[d_condition_index]
+                    for s_condition_index, s_batch_index in enumerate(source_F_condition_indices):
+                        if s_batch_index == d_batch_index:
+                            s_F = source_F_output[s_condition_index]
+                            depthwise_results_equal[(source_node.depth, d_batch_index)] = np.array_equal(d_F, s_F)
+                            depthwise_results_allclose[(source_node.depth, d_batch_index)] = np.allclose(d_F, s_F,
+                                                                                                         rtol=1e-03)
+                            if depthwise_results_equal[(source_node.depth, d_batch_index)] is False:
+                                print("X")
+                            if depthwise_results_allclose[(source_node.depth, d_batch_index)] is False:
+                                print("X")
+            # assert all(depthwise_results_equal.values())
+            assert all(depthwise_results_allclose.values())
         print("X")
 
 
