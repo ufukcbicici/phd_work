@@ -130,6 +130,7 @@ class CigjTesting:
         # For every path combination, extract the corresponding data and label subsets and run on the single path CNN.
         # Compare the results of each output with the CIGJ.
         for path, samples in paths_to_samples_dict.items():
+            print("Path:{0}".format(path))
             sorted_samples = sorted(samples)
             # samples_subset = minibatch.samples[sorted_samples]
             # labels_subset = minibatch.labels[sorted_samples]
@@ -148,10 +149,10 @@ class CigjTesting:
                                                                        path=path)
             single_path_results, _ = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch,
                                                                        use_masking=True)
-            results_list = []
-            for _ in range(1000):
-                p, q = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch, use_masking=True)
-                results_list.append(p)
+            # results_list = []
+            # for _ in range(1000):
+            #     p, q = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch, use_masking=True)
+            #     results_list.append(p)
             # single_path_results2, _ = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch,
             #                                                            use_masking=True)
             # single_path_results3, _ = single_path_jungle.eval_minibatch(sess=sess, minibatch=subset_minibatch,
@@ -182,8 +183,12 @@ class CigjTesting:
                             depthwise_results_equal[(source_node.depth, d_batch_index)] = np.array_equal(d_F, s_F)
                             depthwise_results_allclose[(source_node.depth, d_batch_index)] = np.allclose(d_F, s_F,
                                                                                                          rtol=1e-03)
-                            if depthwise_results_equal[(source_node.depth, d_batch_index)] is False:
-                                print("X")
+                            print("Output={0} Equal:{1} Allclose:{2}".
+                                  format((source_node.depth, d_batch_index),
+                                         depthwise_results_equal[(source_node.depth, d_batch_index)],
+                                         depthwise_results_allclose[(source_node.depth, d_batch_index)]))
+                            # if depthwise_results_equal[(source_node.depth, d_batch_index)] is False:
+                            #     print("X")
                             if depthwise_results_allclose[(source_node.depth, d_batch_index)] is False:
                                 print("X")
             # assert all(depthwise_results_equal.values())

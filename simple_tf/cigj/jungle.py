@@ -239,7 +239,7 @@ class Jungle(FastTreeNetwork):
         final_feature, logits = self.apply_loss(node=node, final_feature=final_feature, softmax_weights=fc_softmax_weights,
                         softmax_biases=fc_softmax_biases)
         assert len(node.lossList) == 1
-        node.F_output = final_feature
+        node.F_output = logits
 
     def get_node_sibling_index(self, node):
         sibling_nodes = [node for node in self.depthToNodesDict[node.depth]
