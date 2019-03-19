@@ -68,7 +68,6 @@ class CigjTesting:
         sess.run([assign_op for assign_op in single_path_assignment_ops.values()], feed_dict=feed_dict)
         dest_param_values2 = sess.run([tpl[1] for tpl in parameter_pairs])
         assert all([np.array_equal(sa, dest_param_values2[_i]) for _i, sa in enumerate(source_param_values)])
-        print("X")
         return source_nodes
 
     @staticmethod
@@ -129,6 +128,8 @@ class CigjTesting:
         print("X")
         # For every path combination, extract the corresponding data and label subsets and run on the single path CNN.
         # Compare the results of each output with the CIGJ.
+        largest_relative_error = -1
+        largest_deviated_samples = None
         for path, samples in paths_to_samples_dict.items():
             print("Path:{0}".format(path))
             sorted_samples = sorted(samples)
@@ -190,7 +191,17 @@ class CigjTesting:
                             # if depthwise_results_equal[(source_node.depth, d_batch_index)] is False:
                             #     print("X")
                             if depthwise_results_allclose[(source_node.depth, d_batch_index)] is False:
-                                print("X")
+                                max_abs_diff = np.max(np.abs(d_F - s_F))
+                                max_diff_index = np.unravel_index(np.argmax(np.abs(d_F - s_F)), d_F.shape)
+                                max_relative_diff = np.abs(s_F[max_diff_index] - d_F[max_diff_index]) / \
+                                                        np.abs(d_F[max_diff_index])
+                                if max_relative_diff > largest_relative_error:
+                                    largest_relative_error = max_relative_diff
+                                    largest_deviated_samples = [s_F[max_diff_index], d_F[max_diff_index]]
+                                print("{0} max_relative_diff:{1} max_abs_diff:{2} s_F:{3} d_F:{4} max_diff_index:{5}".
+                                      format((source_node.depth, d_batch_index), max_relative_diff, max_abs_diff,
+                                             s_F[max_diff_index], d_F[max_diff_index], max_diff_index))
+
             # assert all(depthwise_results_equal.values())
             # assert all(depthwise_results_allclose.values())
         print("X")
