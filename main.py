@@ -17,3 +17,5 @@ if __name__ == "__main__":
     print("Main - Hello World. With Import.")
     print(tf.__version__)
     cifar_entry.cifar100_training()
+
+
