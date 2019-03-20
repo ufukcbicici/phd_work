@@ -198,9 +198,12 @@ class CigjTesting:
                                 if max_relative_diff > largest_relative_error:
                                     largest_relative_error = max_relative_diff
                                     largest_deviated_samples = [s_F[max_diff_index], d_F[max_diff_index]]
-                                print("{0} max_relative_diff:{1} max_abs_diff:{2} s_F:{3} d_F:{4} max_diff_index:{5}".
-                                      format((source_node.depth, d_batch_index), max_relative_diff, max_abs_diff,
-                                             s_F[max_diff_index], d_F[max_diff_index], max_diff_index))
+                                    print("New max relative error:{0} s_F:{1} d_F:{2}".format(largest_relative_error,
+                                                                                              s_F[max_diff_index],
+                                                                                              d_F[max_diff_index]))
+                                # print("{0} max_relative_diff:{1} max_abs_diff:{2} s_F:{3} d_F:{4} max_diff_index:{5}".
+                                #       format((source_node.depth, d_batch_index), max_relative_diff, max_abs_diff,
+                                #              s_F[max_diff_index], d_F[max_diff_index], max_diff_index))
 
             # assert all(depthwise_results_equal.values())
             # assert all(depthwise_results_allclose.values())

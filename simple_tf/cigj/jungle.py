@@ -104,6 +104,33 @@ class Jungle(FastTreeNetwork):
             for k, v in node.evalDict.items():
                 assert k not in self.evalDict
                 self.evalDict[k] = v
+        # Build main classification loss
+        self.build_main_loss()
+        # Build information gain loss
+        self.build_decision_loss()
+        # Build regularization loss
+        self.build_regularization_loss()
+        # Final Loss
+        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
+        # Build optimizer
+        self.globalCounter = tf.Variable(0, trainable=False)
+        boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
+        values = [GlobalConstants.INITIAL_LR]
+        values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
+        self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
+        self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
+        # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
+        with tf.control_dependencies(self.extra_update_ops):
+            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+                                                                                         global_step=self.globalCounter)
+
+    def build_decision_loss(self):
+        decision_losses = []
+        for node in self.topologicalSortedNodes:
+            if node.nodeType == NodeType.h_node:
+                decision_losses.append(node.infoGainLoss)
+        self.decisionLoss = self.decisionLossCoefficient * tf.add_n(decision_losses)
 
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
