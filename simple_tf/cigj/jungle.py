@@ -128,7 +128,7 @@ class Jungle(FastTreeNetwork):
     def build_decision_loss(self):
         decision_losses = []
         for node in self.topologicalSortedNodes:
-            if node.nodeType == NodeType.h_node:
+            if node.nodeType == NodeType.h_node and node.infoGainLoss is not None:
                 decision_losses.append(node.infoGainLoss)
         self.decisionLoss = self.decisionLossCoefficient * tf.add_n(decision_losses)
 
@@ -343,7 +343,7 @@ class Jungle(FastTreeNetwork):
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
-                # self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
+                self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
                 feed_dict[self.decisionDropoutKeepProb] = GlobalConstants.DECISION_DROPOUT_PROB
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
         else:
