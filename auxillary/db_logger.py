@@ -29,7 +29,7 @@ class DbLogger:
     # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger2.db"
 
     # Home
-    # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
+    log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//bnnlogger.db"
 
     # Idea GPU
     # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//simple_tf//dblogger.db"
@@ -41,7 +41,7 @@ class DbLogger:
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger.db"
 
     # TRUBA 2
-    log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2.db"
+    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2.db"
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}

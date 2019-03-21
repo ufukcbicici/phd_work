@@ -1,5 +1,5 @@
 import os
-
+import time
 import tensorflow as tf
 import numpy as np
 from auxillary.constants import DatasetTypes
@@ -27,7 +27,7 @@ def get_explanation_string(network):
     if not network.isBaseline:
         explanation += "********Decision Loss Weight Settings********\n"
         explanation += network.decisionLossCoefficientCalculator.get_explanation()
-        explanation += "********Decision Loss Weight Settings********\n",
+        explanation += "********Decision Loss Weight Settings********\n"
     explanation += "Batch Norm Decay:{0}\n".format(GlobalConstants.BATCH_NORM_DECAY)
     explanation += "Param Count:{0}\n".format(total_param_count)
     explanation += "Classification Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
@@ -111,7 +111,7 @@ def cigj_training():
             leaf_info_rows = []
             while True:
                 start_time = time.time()
-                lr, sample_counts, is_open_indicators = network.update_params_with_momentum(sess=sess,
+                lr, sample_counts, is_open_indicators = jungle.update_params_with_momentum(sess=sess,
                                                                                             dataset=dataset,
                                                                                             epoch=epoch_id,
                                                                                             iteration=iteration_counter)
