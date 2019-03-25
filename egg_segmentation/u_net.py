@@ -17,14 +17,18 @@ class UNet:
 
     # Data augmentation if we are doing training
     def get_input(self):
+        # Augmented Training Input
         concat_image = tf.concat([self.imageInput, self.maskInput], axis=-1)
         maybe_flipped = tf.image.random_flip_left_right(concat_image)
         maybe_flipped = tf.image.random_flip_up_down(maybe_flipped)
         image = maybe_flipped[:, :, :-1]
         mask = maybe_flipped[:, :, -1:]
-        image = tf.image.random_brightness(image, 0.7)
-        image = tf.image.random_hue(image, 0.3)
-        return image, mask
+        # image = tf.image.random_brightness(image, 0.7)
+        # image = tf.image.random_hue(image, 0.3)
+        # Evaluation Input
+        final_image = tf.where(self.isTrain, image, self.imageInput)
+        final_mask = tf.where(self.isTrain, mask, self.maskInput)
+        return final_image, final_mask
 
     # Get conv layer
     def conv_conv_pool(self,
@@ -88,11 +92,13 @@ dataset.load_dataset()
 unet = UNet(dataset=dataset)
 tf_img, tf_msk = unet.get_input()
 np_img, np_msk = dataset.get_next_image()
-# plt.imshow(np_img)
-# plt.show()
+plt.imshow(np_img)
+plt.show()
 
 # np_img, np_msk = dataset.get_next_image()
 sess = tf.Session()
 res = sess.run([tf_img, tf_msk], feed_dict={unet.isTrain: True, unet.imageInput: np_img, unet.maskInput: np_msk})
+plt.imshow(res[0].astype(np.uint8))
+plt.show()
 
 print("X")

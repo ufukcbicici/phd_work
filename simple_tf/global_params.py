@@ -58,7 +58,7 @@ class GlobalConstants:
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
-    INITIAL_LR = 0.01
+    INITIAL_LR = 0.1
     DECAY_STEP = 15000
     DECAY_RATE = 0.5  # INITIAL_LR/EPOCH_COUNT
     # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
