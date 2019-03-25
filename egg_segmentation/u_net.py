@@ -60,17 +60,17 @@ class UNet:
 
             return net, pool
 
-    def upconv_2D(self, tensor, n_filter, flags, name):
+    def upconv_2D(self, tensor, n_filter, name):
         return tf.layers.conv2d_transpose(
             tensor,
             filters=n_filter,
             kernel_size=2,
             strides=2,
-            kernel_regularizer=tf.contrib.layers.l2_regularizer(flags.reg),
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(self.l2Coefficient),
             name="upsample_{}".format(name))
 
-    def upconv_concat(self, inputA, input_B, n_filter, flags, name):
-        up_conv = self.upconv_2D(inputA, n_filter, flags, name)
+    def upconv_concat(self, inputA, input_B, n_filter, name):
+        up_conv = self.upconv_2D(inputA, n_filter, name)
 
         return tf.concat(
             [up_conv, input_B], axis=-1, name="concat_{}".format(name))
@@ -85,6 +85,17 @@ class UNet:
         conv3, pool3 = self.conv_conv_pool(pool2, [32, 32], name=3)
         conv4, pool4 = self.conv_conv_pool(pool3, [64, 64], name=4)
         conv5 = self.conv_conv_pool(pool4, [128, 128], name=5, pool=False)
+        # Expanding Part
+        up6 = self.upconv_concat(conv5, conv4, 64, name=6)
+        conv6 = self.conv_conv_pool(up6, [64, 64], name=6, pool=False)
+        up7 = self.upconv_concat(conv6, conv3, 32, name=7)
+        conv7 = self.conv_conv_pool(up7, [32, 32], name=7, pool=False)
+        up8 = self.upconv_concat(conv7, conv2, 16, name=8)
+        conv8 = self.conv_conv_pool(up8, [16, 16], name=8, pool=False)
+        up9 = self.upconv_concat(conv8, conv1, 8, name=9)
+        conv9 = self.conv_conv_pool(up9, [8, 8], name=9, pool=False)
+        # Output
+
 
 
 dataset = EggDataset()
