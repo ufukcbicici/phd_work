@@ -354,6 +354,30 @@ class Jungle(FastTreeNetwork):
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
         return feed_dict
 
+    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
+        minibatch = dataset.get_next_batch()
+        if minibatch is None:
+            return None, None, None
+        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
+                                           is_train=True, use_masking=True)
+        # Prepare result tensors to collect
+        run_ops = self.get_run_ops()
+        if GlobalConstants.USE_VERBOSE:
+            run_ops.append(self.evalDict)
+        print("Before Update Iteration:{0}".format(iteration))
+        results = sess.run(run_ops, feed_dict=feed_dict)
+        print("After Update Iteration:{0}".format(iteration))
+        lr = results[1]
+        sample_counts = results[2]
+        is_open_indicators = results[3]
+        # Unit Test for Unified Batch Normalization
+        if GlobalConstants.USE_VERBOSE:
+            self.verbose_update(eval_dict=results[-1])
+        # Unit Test for Unified Batch Normalization
+        return lr, sample_counts, is_open_indicators
+
     # For debugging
     def print_trellis_structure(self):
         fig, ax = plt.subplots()
