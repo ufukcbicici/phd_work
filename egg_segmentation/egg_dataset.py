@@ -100,4 +100,4 @@ class EggDataset:
             self.currentIndex = self.currentIndex % num_of_samples
         else:
             self.isNewEpoch = False
-        return image
+        return np.expand_dims(image[0], axis=0), np.expand_dims(image[1], axis=1)

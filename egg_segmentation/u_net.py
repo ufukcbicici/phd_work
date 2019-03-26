@@ -13,22 +13,28 @@ class UNet:
         self.isTrain = tf.placeholder(name="isTrain", dtype=tf.bool)
         self.imageInput = tf.placeholder(name="imageInput", dtype=tf.float32)
         self.maskInput = tf.placeholder(name="maskInput", dtype=tf.float32)
+        self.imageWidth = tf.placeholder(name="imageWidth", dtype=tf.int32)
+        self.imageHeight = tf.placeholder(name="imageHeight", dtype=tf.int32)
         self.l2Coefficient = tf.placeholder(name="l2Coefficient", dtype=tf.float32)
 
     # Data augmentation if we are doing training
     def get_input(self):
+        self.imageInput = tf.reshape(self.maskInput, [1, self.imageHeight, self.imageWidth, 3])
+        self.maskInput = tf.reshape(self.maskInput, [1, self.imageHeight, self.imageWidth, 1])
         # Augmented Training Input
-        concat_image = tf.concat([self.imageInput, self.maskInput], axis=-1)
-        maybe_flipped = tf.image.random_flip_left_right(concat_image)
-        maybe_flipped = tf.image.random_flip_up_down(maybe_flipped)
-        image = maybe_flipped[:, :, :-1]
-        mask = maybe_flipped[:, :, -1:]
-        # image = tf.image.random_brightness(image, 0.7)
-        # image = tf.image.random_hue(image, 0.3)
-        # Evaluation Input
-        final_image = tf.where(self.isTrain, image, self.imageInput)
-        final_mask = tf.where(self.isTrain, mask, self.maskInput)
-        return final_image, final_mask
+        # concat_image = tf.concat([self.imageInput, self.maskInput], axis=-1)
+        # maybe_flipped = tf.image.random_flip_left_right(concat_image)
+        # maybe_flipped = tf.image.random_flip_up_down(maybe_flipped)
+        # image = maybe_flipped[:, :, :-1]
+        # mask = maybe_flipped[:, :, -1:]
+        # # image = tf.image.random_brightness(image, 0.7)
+        # # image = tf.image.random_hue(image, 0.3)
+        # # Evaluation Input
+        # final_image = tf.where(self.isTrain, image, self.imageInput)
+        # final_mask = tf.where(self.isTrain, mask, self.maskInput)
+        # final_image = tf.expand_dims(final_image, 0)
+        # final_mask = tf.expand_dims(final_mask, 0)
+        return self.imageInput, self.imageInput
 
     # Get conv layer
     def conv_conv_pool(self,
@@ -95,20 +101,23 @@ class UNet:
         up9 = self.upconv_concat(conv8, conv1, 8, name=9)
         conv9 = self.conv_conv_pool(up9, [8, 8], name=9, pool=False)
         # Output
+        return conv9
 
 
 
 dataset = EggDataset()
 dataset.load_dataset()
 unet = UNet(dataset=dataset)
-tf_img, tf_msk = unet.get_input()
+conv_net = unet.build_network()
 np_img, np_msk = dataset.get_next_image()
 plt.imshow(np_img)
 plt.show()
 
 # np_img, np_msk = dataset.get_next_image()
 sess = tf.Session()
-res = sess.run([tf_img, tf_msk], feed_dict={unet.isTrain: True, unet.imageInput: np_img, unet.maskInput: np_msk})
+res = sess.run([conv_net],
+               feed_dict={unet.isTrain: True, unet.imageInput: np_img, unet.maskInput: np_msk,
+                          unet.imageHeight: np_img.shape[0], unet.imageWidth: np_img.shape[1]})
 plt.imshow(res[0].astype(np.uint8))
 plt.show()
 
