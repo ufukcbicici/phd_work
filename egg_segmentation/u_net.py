@@ -91,17 +91,19 @@ class UNet:
         conv3, pool3 = self.conv_conv_pool(pool2, [32, 32], name=3)
         conv4, pool4 = self.conv_conv_pool(pool3, [64, 64], name=4)
         conv5 = self.conv_conv_pool(pool4, [128, 128], name=5, pool=False)
+        up_conv = self.upconv_2D(conv5, 64, name=10)
         # Expanding Part
-        up6 = self.upconv_concat(conv5, conv4, 64, name=6)
-        conv6 = self.conv_conv_pool(up6, [64, 64], name=6, pool=False)
-        up7 = self.upconv_concat(conv6, conv3, 32, name=7)
-        conv7 = self.conv_conv_pool(up7, [32, 32], name=7, pool=False)
-        up8 = self.upconv_concat(conv7, conv2, 16, name=8)
-        conv8 = self.conv_conv_pool(up8, [16, 16], name=8, pool=False)
-        up9 = self.upconv_concat(conv8, conv1, 8, name=9)
-        conv9 = self.conv_conv_pool(up9, [8, 8], name=9, pool=False)
+        # up6 = self.upconv_concat(conv5, conv4, 64, name=6)
+        # conv6 = self.conv_conv_pool(up6, [64, 64], name=6, pool=False)
+        # up7 = self.upconv_concat(conv6, conv3, 32, name=7)
+        # conv7 = self.conv_conv_pool(up7, [32, 32], name=7, pool=False)
+        # up8 = self.upconv_concat(conv7, conv2, 16, name=8)
+        # conv8 = self.conv_conv_pool(up8, [16, 16], name=8, pool=False)
+        # up9 = self.upconv_concat(conv8, conv1, 8, name=9)
+        # conv9 = self.conv_conv_pool(up9, [8, 8], name=9, pool=False)
         # Output
-        return conv9
+        return conv5, up_conv, conv4 #, up6, conv9
+
 
 
 
@@ -109,16 +111,22 @@ dataset = EggDataset()
 dataset.load_dataset()
 unet = UNet(dataset=dataset)
 conv_net = unet.build_network()
-np_img, np_msk = dataset.get_next_image()
-plt.imshow(np_img)
-plt.show()
+while True:
+    np_img, np_msk = dataset.get_next_image()
+    if np_img.shape[1] == 256:
+        break
+# plt.imshow(np_img)
+# plt.show()
 
 # np_img, np_msk = dataset.get_next_image()
 sess = tf.Session()
+init = tf.global_variables_initializer()
+sess.run(init)
+
 res = sess.run([conv_net],
                feed_dict={unet.isTrain: True, unet.imageInput: np_img, unet.maskInput: np_msk,
                           unet.imageHeight: np_img.shape[0], unet.imageWidth: np_img.shape[1]})
-plt.imshow(res[0].astype(np.uint8))
-plt.show()
+# plt.imshow(res[0].astype(np.uint8))
+# plt.show()
 
 print("X")

@@ -91,7 +91,7 @@ class EggDataset:
         self.isNewEpoch = False
         print("X")
 
-    def get_next_image(self):
+    def get_next_image(self, make_divisible_to=None):
         image = self.currentImages[self.currentIndex]
         self.currentIndex += 1
         num_of_samples = len(self.currentImages)
@@ -100,4 +100,9 @@ class EggDataset:
             self.currentIndex = self.currentIndex % num_of_samples
         else:
             self.isNewEpoch = False
-        return np.expand_dims(image[0], axis=0), np.expand_dims(image[1], axis=1)
+        # Pad around the edges of the image
+        if make_divisible_to is not None:
+
+
+
+        return np.expand_dims(image[0], axis=0), np.expand_dims(image[1], axis=0)
