@@ -76,45 +76,49 @@ class EggDataset:
                   for train_img_name, abs_path in image_names.items()}
         return images
 
-    def get_cropped_images(self, image, mask):
+    @staticmethod
+    def get_cropped_images(image, mask, window_size, stride):
         # Generate top-left coordinate pairs
-        right_boundary = self.windowSize
-        bottom_boundary = self.windowSize
+        right_boundary = window_size
+        bottom_boundary = window_size
         top_coords = []
         left_coords = []
         while True:
-            left_coords.append(right_boundary - self.windowSize)
+            left_coords.append(right_boundary - window_size)
             if right_boundary >= image.shape[1]:
                 break
-            right_boundary += self.stride
+            right_boundary += stride
         while True:
-            top_coords.append(bottom_boundary - self.windowSize)
+            top_coords.append(bottom_boundary - window_size)
             if bottom_boundary >= image.shape[0]:
                 break
-            bottom_boundary += self.stride
+            bottom_boundary += stride
         top_left_coords = list(itertools.product(*[top_coords, left_coords]))
         # Enlarge image with mirroring
         padded_image = np.pad(image, ((0, bottom_boundary - image.shape[0]), (0, right_boundary - image.shape[1]),
                                       (0, 0)), 'symmetric')
-        padded_mask = np.pad(mask, ((0, bottom_boundary - mask.shape[0]), (0, right_boundary - image.shape[1]),
-                                    (0, 0)), 'symmetric')
+        if mask is not None:
+            padded_mask = np.pad(mask, ((0, bottom_boundary - mask.shape[0]), (0, right_boundary - image.shape[1]),
+                                        (0, 0)), 'symmetric')
         # Crop images
         cropped_imgs = None  # np.zeros(shape=(0, self.windowSize, self.windowSize, 3), dtype=padded_image.dtype)
         cropped_msks = None  # np.zeros(shape=(0, self.windowSize, self.windowSize, 1), dtype=padded_mask.dtype)
         for yx in top_left_coords:
-            cropped_img = np.expand_dims(padded_image[yx[0]:yx[0] + self.windowSize, yx[1]:yx[1] + self.windowSize, :],
-                                         axis=0)
-            cropped_msk = np.expand_dims(padded_mask[yx[0]:yx[0] + self.windowSize, yx[1]:yx[1] + self.windowSize, :],
+            cropped_img = np.expand_dims(padded_image[yx[0]:yx[0] + window_size, yx[1]:yx[1] + window_size, :],
                                          axis=0)
             cropped_imgs = cropped_img if cropped_imgs is None else np.concatenate((cropped_imgs, cropped_img), axis=0)
-            cropped_msks = cropped_msk if cropped_msks is None else np.concatenate((cropped_msks, cropped_msk), axis=0)
-        return cropped_imgs, cropped_msks
+            if mask is not None:
+                cropped_msk = np.expand_dims(padded_mask[yx[0]:yx[0] + window_size, yx[1]:yx[1] + window_size, :],
+                                             axis=0)
+                cropped_msks = cropped_msk if cropped_msks is None else np.concatenate((cropped_msks, cropped_msk), axis=0)
+        return cropped_imgs, cropped_msks, top_left_coords
 
     def get_cropped_dataset(self, raw_images):
         dataset = None
         for idx, tpl in enumerate(raw_images):
             print(tpl[0].shape)
-            cropped_imgs, cropped_msks = self.get_cropped_images(image=tpl[0], mask=tpl[1])
+            cropped_imgs, cropped_msks, _ = EggDataset.get_cropped_images(image=tpl[0], mask=tpl[1],
+                                                                       window_size=self.windowSize, stride=self.stride)
             cropped_data = np.concatenate((cropped_imgs, cropped_msks), axis=3)
             dataset = cropped_data if dataset is None else np.concatenate((dataset, cropped_data), axis=0)
             print(idx)
@@ -199,10 +203,10 @@ class EggDataset:
 
     def reset(self):
         self.currentIndex = 0
-        indices = np.arange(len(self.currentDataset))
-        np.random.shuffle(indices)
+        self.currentIndices = np.arange(len(self.currentDataset))
+        np.random.shuffle(self.currentIndices)
         # self.currentImages = self.currentImages[indices]
-        self.currentDataset = self.currentDataset[indices]
+        self.currentDataset = self.currentDataset[self.currentIndices]
         self.isNewEpoch = False
         print("X")
 
@@ -257,12 +261,12 @@ class EggDataset:
         elif self.currentIndex < num_of_samples <= curr_end_index:
             indices_list = self.currentIndices[self.currentIndex:num_of_samples]
             curr_end_index = curr_end_index % num_of_samples
-            indices_list.extend(self.currentIndices[0:curr_end_index + 1])
+            indices_list = np.concatenate((indices_list, self.currentIndices[0:curr_end_index + 1]), axis=-1)
         else:
             raise Exception("Invalid index positions: self.currentIndex={0} - curr_end_index={1}"
                             .format(self.currentIndex, curr_end_index))
-        images = self.currentDataset[indices_list][0]
-        masks = self.currentDataset[indices_list][1]
+        images = self.currentDataset[indices_list][:, :, :, 0:3]
+        masks = self.currentDataset[indices_list][:, :, :, 3]
         self.currentIndex = self.currentIndex + batch_size
         if num_of_samples <= self.currentIndex:
             self.isNewEpoch = True
@@ -273,13 +277,14 @@ class EggDataset:
         # Weight array
         weight_img = np.zeros(shape=masks.shape, dtype=np.float32)
         weight_img[:] = self.weightDict[0]
-        weight_img[masks == 127] = self.weightDict[127]
+        weight_img[masks == 128] = self.weightDict[128]
         weight_img[masks == 255] = self.weightDict[255]
         # Convert mask array s.t. it contains labels
         temp_mask = np.zeros(shape=masks.shape, dtype=masks.dtype)
-        temp_mask[masks == 127] = 1
+        temp_mask[masks == 128] = 1
         temp_mask[masks == 255] = 2
         final_mask = temp_mask.astype(np.int32)
+        return images, final_mask, weight_img
 
     def get_label_count(self):
         return 3

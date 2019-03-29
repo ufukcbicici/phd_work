@@ -12,9 +12,11 @@ class UNet:
     EPOCH_COUNT = 100
     WINDOW_SIZE = 256
     STRIDE = 32
+    BATCH_SIZE = 64
 
     def __init__(self, dataset):
         self.dataset = dataset
+        self.batchSize = tf.placeholder(name="batchSize", dtype=tf.int32)
         self.isTrain = tf.placeholder(name="isTrain", dtype=tf.bool)
         self.imageInput = tf.placeholder(name="imageInput", dtype=tf.float32)
         self.maskInput = tf.placeholder(name="maskInput", dtype=tf.int32)
@@ -22,6 +24,7 @@ class UNet:
         self.imageWidth = tf.placeholder(name="imageWidth", dtype=tf.int32)
         self.imageHeight = tf.placeholder(name="imageHeight", dtype=tf.int32)
         self.l2Coefficient = tf.placeholder(name="l2Coefficient", dtype=tf.float32)
+        self.logits = None
         self.loss = None
         self.optimizer = None
         self.globalCounter = None
@@ -30,9 +33,9 @@ class UNet:
 
     # Data augmentation if we are doing training
     def get_input(self):
-        self.imageInput = tf.reshape(self.imageInput, [1, self.imageHeight, self.imageWidth, 3])
-        self.maskInput = tf.reshape(self.maskInput, [1, self.imageHeight, self.imageWidth, 1])
-        self.weightInput = tf.reshape(self.weightInput, [1, self.imageHeight, self.imageWidth, 1])
+        self.imageInput = tf.reshape(self.imageInput, [self.batchSize, UNet.WINDOW_SIZE, UNet.WINDOW_SIZE, 3])
+        self.maskInput = tf.reshape(self.maskInput, [self.batchSize, UNet.WINDOW_SIZE, UNet.WINDOW_SIZE])
+        self.weightInput = tf.reshape(self.weightInput, [self.batchSize, UNet.WINDOW_SIZE, UNet.WINDOW_SIZE])
         # Augmented Training Input
         # concat_image = tf.concat([self.imageInput, self.maskInput], axis=-1)
         # maybe_flipped = tf.image.random_flip_left_right(concat_image)
@@ -114,18 +117,37 @@ class UNet:
         up9 = self.upconv_concat(conv8, conv1, 8, name=9)
         conv9 = self.conv_conv_pool(up9, [8, 8], name=9, pool=False)
         # Logits
-        logits = tf.layers.conv2d(conv9, self.dataset.get_label_count(), (1, 1), name='final', activation=tf.nn.relu,
-                                  padding='same')
+        self.logits = tf.layers.conv2d(conv9, self.dataset.get_label_count(), (1, 1), name='final',
+                                       activation=tf.nn.relu,
+                                       padding='same')
         # Loss Function
-        flat_logits = tf.reshape(logits, [-1, self.dataset.get_label_count()])
-        flat_labels = tf.reshape(tf_msk, [-1])
-        flat_weights = tf.reshape(tf_weights, [-1])
-        cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=flat_labels,
-                                                                                   logits=flat_logits)
-        weighted_ce_loss_tensor = tf.multiply(cross_entropy_loss_tensor, flat_weights)
+        # flat_logits = tf.reshape(logits, [-1, self.dataset.get_label_count()])
+        # flat_labels = tf.reshape(tf_msk, [-1])
+        # flat_weights = tf.reshape(tf_weights, [-1])
+        cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf_msk,
+                                                                                   logits=self.logits)
+        weighted_ce_loss_tensor = tf.multiply(cross_entropy_loss_tensor, tf_weights)
         self.loss = tf.reduce_mean(weighted_ce_loss_tensor)
-        # return logits, flat_logits, flat_labels, flat_weights, cross_entropy_loss_tensor, weighted_ce_loss_tensor, \
-        #        tf_msk, self.loss
+        # return logits, cross_entropy_loss_tensor, weighted_ce_loss_tensor, tf_msk, self.loss
+
+        def apply_segmentation(self):
+            # Training Images
+            for idx, tpl in enumerate(self.dataset.trainImages):
+                print(tpl[0].shape)
+                cropped_imgs, _, top_left_coords = EggDataset.get_cropped_images(image=tpl[0], mask=None,
+                                                                                 window_size=UNet.WINDOW_SIZE,
+                                                                                 stride=UNet.WINDOW_SIZE)
+                res = sess.run([self.logits],
+                               feed_dict={self.batchSize: cropped_imgs.shape[0],
+                                          self.isTrain: False,
+                                          self.imageInput: cropped_imgs})
+                # Patch the logit image together
+                # learned_mask = np.zeros_like(tpl[0])
+                patched_mask = np.zeros(shape=(tpl[0].shape[0], tpl[0].shape[1]), dtype=np.int32)
+                for i, yx in enumerate(top_left_coords):
+                    cropped_argmax = np.argmax(res[i], axis=2)
+                    patched_mask[yx[0]:yx[0]+UNet.WINDOW_SIZE, yx[1]:yx[1]+UNet.WINDOW_SIZE][:] = cropped_argmax
+                print(idx)
 
     def build_optimizer(self):
         # Build optimizer
@@ -136,8 +158,9 @@ class UNet:
         self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
         self.extraUpdateOps = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(self.extraUpdateOps):
-            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.99).minimize(self.loss,
-                                                                                          global_step=self.globalCounter)
+            # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.loss,
+            #                                                                              global_step=self.globalCounter)
+            self.optimizer = tf.train.AdamOptimizer().minimize(self.loss, global_step=self.globalCounter)
 
 
 dataset = EggDataset(window_size=UNet.WINDOW_SIZE, stride=UNet.STRIDE)
@@ -157,20 +180,22 @@ unet.build_optimizer()
 sess = tf.Session()
 init = tf.global_variables_initializer()
 sess.run(init)
+# [unet.optimizer, unet.loss, unet.learningRate]
 
 for epoch_id in range(UNet.EPOCH_COUNT):
-    np_img, np_msk, np_weights = dataset.get_next_image(make_divisible_to=16)
-    res = sess.run([unet.optimizer, unet.loss, unet.learningRate],
-                   feed_dict={unet.isTrain: True,
-                              unet.imageInput: np_img,
-                              unet.maskInput: np_msk,
-                              unet.weightInput: np_weights,
-                              unet.imageHeight: np_img.shape[0],
-                              unet.imageWidth: np_img.shape[1]})
-    print("loss:{0} lr:{1}".format(res[1], res[2]))
-    if dataset.isNewEpoch:
-        dataset.reset()
-
+    while True:
+        np_img, np_msk, np_weights = dataset.get_next_batch(batch_size=UNet.BATCH_SIZE)
+        res = sess.run([unet.optimizer, unet.loss, unet.learningRate],
+                       feed_dict={unet.batchSize: UNet.BATCH_SIZE,
+                                  unet.isTrain: True,
+                                  unet.imageInput: np_img,
+                                  unet.maskInput: np_msk,
+                                  unet.weightInput: np_weights})
+        print("loss:{0} lr:{1}".format(res[1], res[2]))
+        if dataset.isNewEpoch:
+            unet.apply_segmentation()
+            dataset.reset()
+            break
 
 # res = sess.run([conv_net],
 #                feed_dict={unet.isTrain: True,
