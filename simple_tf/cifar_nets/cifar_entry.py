@@ -105,9 +105,10 @@ def get_explanation_string(network):
 
 
 def cifar100_training():
-    classification_wd = [0.00005 * i for i in range(21)] * 3
-    classification_wd = sorted(classification_wd)
-    decision_wd = [0.0]
+    # classification_wd = [0.00005 * i for i in range(21)] * 3
+    # classification_wd = sorted(classification_wd)
+    classification_wd = [0.0005] * 2
+    decision_wd = [0.0005]
     info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]
     classification_dropout_probs = [0.0]
@@ -143,8 +144,8 @@ def cifar100_training():
 
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(40000, 0.01),
-                                                                               (70000, 0.001),
+                                                                     schedule=[(40000,  0.01),
+                                                                               (70000,  0.001),
                                                                                (100000, 0.0001)])
         network.build_network()
         # Init
@@ -160,7 +161,7 @@ def cifar100_training():
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
-        series_id = int(run_id / 3)
+        series_id = int(run_id / 4)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)
@@ -200,7 +201,9 @@ def cifar100_training():
                     iteration_counter += 1
                 if dataset.isNewEpoch:
                     # moving_results_1 = sess.run(moving_stat_vars)
-                    if (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0:
+                    if (epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT-30 and
+                            (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0) \
+                            or epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT-30:
                         print("Epoch Time={0}".format(total_time))
                         if not network.modeTracker.isCompressed:
                             training_accuracy, training_confusion = \
@@ -282,5 +285,5 @@ def cifar100_training():
 # main()
 # main_fast_tree()
 # ensemble_training()
-cifar100_training()
+# cifar100_training()
 # xxx
