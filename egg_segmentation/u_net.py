@@ -15,7 +15,7 @@ class UNet:
     STRIDE = 32
     BATCH_SIZE = 64
     LAYER_DEPTH = 2
-    LAYER_WIDTH = 1
+    LAYER_WIDTH = 2
 
     def __init__(self, dataset):
         self.dataset = dataset
@@ -133,9 +133,9 @@ class UNet:
         self.loss = tf.reduce_mean(weighted_ce_loss_tensor)
         # return logits, cross_entropy_loss_tensor, weighted_ce_loss_tensor, tf_msk, self.loss
 
-    def apply_segmentation(self, epoch):
+    def apply_segmentation(self, dataset_name, images, epoch):
         # Training Images
-        for idx, tpl in enumerate(self.dataset.trainImages):
+        for idx, tpl in enumerate(images):
             print(tpl[0].shape)
             cropped_imgs, _, top_left_coords, bounds = EggDataset.get_cropped_images(image=tpl[0], mask=None,
                                                                                      window_size=UNet.WINDOW_SIZE,
@@ -163,7 +163,7 @@ class UNet:
                     dest_img[it.multi_index][:] = 0.5*source_img[it.multi_index] + 0.5*np.array([0, 255, 0])
                 it.iternext()
             dest_img = cv2.cvtColor(dest_img, cv2.COLOR_RGB2BGR)
-            cv2.imwrite("Epoch{0}_Image{1}.png".format(epoch, idx), dest_img)
+            cv2.imwrite("{0}_Epoch{1}_Image{2}.png".format(dataset_name, epoch, idx), dest_img)
             print(idx)
 
     def build_optimizer(self):
@@ -199,7 +199,7 @@ init = tf.global_variables_initializer()
 sess.run(init)
 # [unet.optimizer, unet.loss, unet.learningRate]
 
-for epoch_id in range(UNet.EPOCH_COUNT):
+for epoch_id in range(UNet.EPOCH_COUNT + 1):
     while True:
         np_img, np_msk, np_weights = dataset.get_next_batch(batch_size=UNet.BATCH_SIZE)
         res = sess.run([unet.optimizer, unet.loss, unet.learningRate],
@@ -211,7 +211,8 @@ for epoch_id in range(UNet.EPOCH_COUNT):
         print("loss:{0} lr:{1}".format(res[1], res[2]))
         if dataset.isNewEpoch:
             if epoch_id % 5 == 0:
-                unet.apply_segmentation(epoch=epoch_id)
+                unet.apply_segmentation(dataset_name="Training", epoch=epoch_id, images=dataset.trainImages)
+                unet.apply_segmentation(dataset_name="Test", epoch=epoch_id, images=dataset.testImages)
             dataset.reset()
             break
 
