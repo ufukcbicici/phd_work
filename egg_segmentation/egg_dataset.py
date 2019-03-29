@@ -111,13 +111,13 @@ class EggDataset:
                 cropped_msk = np.expand_dims(padded_mask[yx[0]:yx[0] + window_size, yx[1]:yx[1] + window_size, :],
                                              axis=0)
                 cropped_msks = cropped_msk if cropped_msks is None else np.concatenate((cropped_msks, cropped_msk), axis=0)
-        return cropped_imgs, cropped_msks, top_left_coords
+        return cropped_imgs, cropped_msks, top_left_coords, (bottom_boundary, right_boundary)
 
     def get_cropped_dataset(self, raw_images):
         dataset = None
         for idx, tpl in enumerate(raw_images):
             print(tpl[0].shape)
-            cropped_imgs, cropped_msks, _ = EggDataset.get_cropped_images(image=tpl[0], mask=tpl[1],
+            cropped_imgs, cropped_msks, _, _ = EggDataset.get_cropped_images(image=tpl[0], mask=tpl[1],
                                                                        window_size=self.windowSize, stride=self.stride)
             cropped_data = np.concatenate((cropped_imgs, cropped_msks), axis=3)
             dataset = cropped_data if dataset is None else np.concatenate((dataset, cropped_data), axis=0)

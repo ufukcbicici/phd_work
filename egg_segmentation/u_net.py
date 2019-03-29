@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import cv2
 import matplotlib.pyplot as plt
 
 from egg_segmentation.egg_dataset import EggDataset
@@ -13,6 +14,8 @@ class UNet:
     WINDOW_SIZE = 256
     STRIDE = 32
     BATCH_SIZE = 64
+    LAYER_DEPTH = 2
+    LAYER_WIDTH = 1
 
     def __init__(self, dataset):
         self.dataset = dataset
@@ -101,21 +104,21 @@ class UNet:
         # Entry
         net = tf_img / 127.5 - 1
         # Contracting Part
-        conv1, pool1 = self.conv_conv_pool(net, [8, 8], name=1)
-        conv2, pool2 = self.conv_conv_pool(pool1, [16, 16], name=2)
-        conv3, pool3 = self.conv_conv_pool(pool2, [32, 32], name=3)
-        conv4, pool4 = self.conv_conv_pool(pool3, [64, 64], name=4)
-        conv5 = self.conv_conv_pool(pool4, [128, 128], name=5, pool=False)
+        conv1, pool1 = self.conv_conv_pool(net, [8*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=1)
+        conv2, pool2 = self.conv_conv_pool(pool1, [16*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=2)
+        conv3, pool3 = self.conv_conv_pool(pool2, [32*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=3)
+        conv4, pool4 = self.conv_conv_pool(pool3, [64*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=4)
+        conv5 = self.conv_conv_pool(pool4, [128*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=5, pool=False)
         # up_conv = self.upconv_2D(conv5, 64, name=10)
         # Expanding Part
-        up6 = self.upconv_concat(conv5, conv4, 64, name=6)
-        conv6 = self.conv_conv_pool(up6, [64, 64], name=6, pool=False)
-        up7 = self.upconv_concat(conv6, conv3, 32, name=7)
-        conv7 = self.conv_conv_pool(up7, [32, 32], name=7, pool=False)
-        up8 = self.upconv_concat(conv7, conv2, 16, name=8)
-        conv8 = self.conv_conv_pool(up8, [16, 16], name=8, pool=False)
-        up9 = self.upconv_concat(conv8, conv1, 8, name=9)
-        conv9 = self.conv_conv_pool(up9, [8, 8], name=9, pool=False)
+        up6 = self.upconv_concat(conv5, conv4, 64*UNet.LAYER_WIDTH, name=6)
+        conv6 = self.conv_conv_pool(up6, [64*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=6, pool=False)
+        up7 = self.upconv_concat(conv6, conv3, 32*UNet.LAYER_WIDTH, name=7)
+        conv7 = self.conv_conv_pool(up7, [32*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=7, pool=False)
+        up8 = self.upconv_concat(conv7, conv2, 16*UNet.LAYER_WIDTH, name=8)
+        conv8 = self.conv_conv_pool(up8, [16*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=8, pool=False)
+        up9 = self.upconv_concat(conv8, conv1, 8*UNet.LAYER_WIDTH, name=9)
+        conv9 = self.conv_conv_pool(up9, [8*UNet.LAYER_WIDTH] * UNet.LAYER_DEPTH, name=9, pool=False)
         # Logits
         self.logits = tf.layers.conv2d(conv9, self.dataset.get_label_count(), (1, 1), name='final',
                                        activation=tf.nn.relu,
@@ -130,24 +133,38 @@ class UNet:
         self.loss = tf.reduce_mean(weighted_ce_loss_tensor)
         # return logits, cross_entropy_loss_tensor, weighted_ce_loss_tensor, tf_msk, self.loss
 
-        def apply_segmentation(self):
-            # Training Images
-            for idx, tpl in enumerate(self.dataset.trainImages):
-                print(tpl[0].shape)
-                cropped_imgs, _, top_left_coords = EggDataset.get_cropped_images(image=tpl[0], mask=None,
-                                                                                 window_size=UNet.WINDOW_SIZE,
-                                                                                 stride=UNet.WINDOW_SIZE)
-                res = sess.run([self.logits],
-                               feed_dict={self.batchSize: cropped_imgs.shape[0],
-                                          self.isTrain: False,
-                                          self.imageInput: cropped_imgs})
-                # Patch the logit image together
-                # learned_mask = np.zeros_like(tpl[0])
-                patched_mask = np.zeros(shape=(tpl[0].shape[0], tpl[0].shape[1]), dtype=np.int32)
-                for i, yx in enumerate(top_left_coords):
-                    cropped_argmax = np.argmax(res[i], axis=2)
-                    patched_mask[yx[0]:yx[0]+UNet.WINDOW_SIZE, yx[1]:yx[1]+UNet.WINDOW_SIZE][:] = cropped_argmax
-                print(idx)
+    def apply_segmentation(self, epoch):
+        # Training Images
+        for idx, tpl in enumerate(self.dataset.trainImages):
+            print(tpl[0].shape)
+            cropped_imgs, _, top_left_coords, bounds = EggDataset.get_cropped_images(image=tpl[0], mask=None,
+                                                                                     window_size=UNet.WINDOW_SIZE,
+                                                                                     stride=UNet.WINDOW_SIZE)
+            logits = sess.run([self.logits],
+                              feed_dict={self.batchSize: cropped_imgs.shape[0],
+                                         self.isTrain: False,
+                                         self.imageInput: cropped_imgs})[0]
+            # Stitch the logit images together
+            patched_mask = np.zeros(shape=bounds, dtype=np.int32)
+            for i, yx in enumerate(top_left_coords):
+                cropped_argmax = np.argmax(logits[i], axis=2)
+                patched_mask[yx[0]:yx[0] + UNet.WINDOW_SIZE, yx[1]:yx[1] + UNet.WINDOW_SIZE][:] = cropped_argmax
+            final_mask = patched_mask[0:tpl[0].shape[0], 0:tpl[0].shape[1]]
+            source_img = tpl[0]
+            dest_img = np.zeros_like(source_img)
+            assert final_mask.shape[0] == source_img.shape[0] and final_mask.shape[1] == source_img.shape[1]
+            it = np.nditer(final_mask, flags=["multi_index"])
+            while not it.finished:
+                if final_mask[it.multi_index] == 0:
+                    dest_img[it.multi_index][:] = source_img[it.multi_index]
+                elif final_mask[it.multi_index] == 1:
+                    dest_img[it.multi_index][:] = 0.5*source_img[it.multi_index] + 0.5*np.array([255, 0, 0])
+                elif final_mask[it.multi_index] == 2:
+                    dest_img[it.multi_index][:] = 0.5*source_img[it.multi_index] + 0.5*np.array([0, 255, 0])
+                it.iternext()
+            dest_img = cv2.cvtColor(dest_img, cv2.COLOR_RGB2BGR)
+            cv2.imwrite("Epoch{0}_Image{1}.png".format(epoch, idx), dest_img)
+            print(idx)
 
     def build_optimizer(self):
         # Build optimizer
@@ -193,7 +210,8 @@ for epoch_id in range(UNet.EPOCH_COUNT):
                                   unet.weightInput: np_weights})
         print("loss:{0} lr:{1}".format(res[1], res[2]))
         if dataset.isNewEpoch:
-            unet.apply_segmentation()
+            if epoch_id % 5 == 0:
+                unet.apply_segmentation(epoch=epoch_id)
             dataset.reset()
             break
 
