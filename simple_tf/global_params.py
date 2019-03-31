@@ -46,6 +46,7 @@ class GlobalConstants:
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
+    USE_SAMPLING_CIGN = True
     USE_FAST_TREE_MODE = True
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20

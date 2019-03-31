@@ -10,6 +10,7 @@ from auxillary.parameters import FixedParameter, DiscreteParameter
 from data_handling.cifar_dataset import CifarDataSet
 from simple_tf.cifar_nets import cifar100_resnet_baseline, cign_resnet
 from simple_tf.cign.fast_tree import FastTreeNetwork
+from simple_tf.cign_with_sampling.cign_with_sampling import CignWithSampling
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 
@@ -101,7 +102,30 @@ def get_explanation_string(network):
         format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
     explanation += "***** ResNet Parameters *****\n"
     explanation += str(GlobalConstants.RESNET_HYPERPARAMS)
+    explanation += "Use Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
     return explanation
+
+
+def get_network(dataset):
+    if GlobalConstants.USE_SAMPLING_CIGN:
+        network = CignWithSampling(
+            node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
+            grad_func=cign_resnet.grad_func,
+            threshold_func=cign_resnet.threshold_calculator_func_sampling,
+            residue_func=cign_resnet.residue_network_func,
+            summary_func=cign_resnet.tensorboard_func,
+            degree_list=GlobalConstants.RESNET_TREE_DEGREES,
+            dataset=dataset)
+    else:
+        network = FastTreeNetwork(
+            node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
+            grad_func=cign_resnet.grad_func,
+            threshold_func=cign_resnet.threshold_calculator_func,
+            residue_func=cign_resnet.residue_network_func,
+            summary_func=cign_resnet.tensorboard_func,
+            degree_list=GlobalConstants.RESNET_TREE_DEGREES,
+            dataset=dataset)
+    return network
 
 
 def cifar100_training():
@@ -133,15 +157,7 @@ def cifar100_training():
         dataset.set_curr_session(sess=sess)
         # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
-        network = FastTreeNetwork(
-            node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
-            grad_func=cign_resnet.grad_func,
-            threshold_func=cign_resnet.threshold_calculator_func,
-            residue_func=cign_resnet.residue_network_func,
-            summary_func=cign_resnet.tensorboard_func,
-            degree_list=GlobalConstants.RESNET_TREE_DEGREES,
-            dataset=dataset)
-
+        network = get_network(dataset=dataset)
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
                                                                      schedule=[(40000,  0.01),
@@ -281,9 +297,8 @@ def cifar100_training():
     # dataset.visualize_sample(sample_index=150)
     print("X")
 
-
 # main()
 # main_fast_tree()
 # ensemble_training()
-cifar100_training()
+# cifar100_training()
 # xxx

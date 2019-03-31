@@ -172,3 +172,34 @@ def threshold_calculator_func(network):
                                                         decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
                                                         decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
                                                         min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
+
+
+def threshold_calculator_func_sampling(network):
+    # Noise Coefficient
+    network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
+                                                           decay=0.0,
+                                                           decay_period=1,
+                                                           min_limit=0.0)
+    # Decision Loss Coefficient
+    # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
+    #                                                               value=0.0,
+    #                                                               schedule=[(12000, 1.0)])
+    network.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator", value=1.0)
+    for node in network.topologicalSortedNodes:
+        if node.isLeaf:
+            continue
+        # Probability Threshold
+        node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
+        initial_value = 1.0 / float(node_degree)
+        threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
+        # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
+        #                                                  decay_period=70000,
+        #                                                  min_limit=0.4)
+        node.probThresholdCalculator = FixedParameter(name=threshold_name, value=0.0)
+        # Softmax Decay
+        decay_name = network.get_variable_name(name="softmax_decay", node=node)
+        node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
+                                                        value=GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL,
+                                                        decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
+                                                        decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
+                                                        min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
