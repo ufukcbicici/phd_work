@@ -108,6 +108,7 @@ def get_explanation_string(network):
 
 def get_network(dataset):
     if GlobalConstants.USE_SAMPLING_CIGN:
+        GlobalConstants.USE_UNIFIED_BATCH_NORM = False
         network = CignWithSampling(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
             grad_func=cign_resnet.grad_func,
@@ -131,7 +132,7 @@ def get_network(dataset):
 def cifar100_training():
     # classification_wd = [0.00005 * i for i in range(21)] * 3
     # classification_wd = sorted(classification_wd)
-    classification_wd = [0.00015, 0.0002] * 4
+    classification_wd = [0.00005] * 4
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]

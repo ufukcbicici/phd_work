@@ -74,7 +74,7 @@ class CignWithSampling(FastTreeNetwork):
         for index in range(len(child_nodes)):
             child_node = child_nodes[index]
             child_index = child_node.index
-            mask_tensor = tf.reshape(tf.equal(x=selected_indices_tensor, y=tf.constant(index, tf.int64),
+            mask_tensor = tf.reshape(tf.equal(x=selected_indices_tensor, y=tf.constant(index, tf.int32),
                                               name="Mask_without_threshold_{0}".format(child_index)), [-1])
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
