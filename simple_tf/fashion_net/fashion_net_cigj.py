@@ -65,9 +65,7 @@ class FashionNetCigj:
         return ig_feature
 
     @staticmethod
-    def f_conv_layer_func(node, network, use_masking=True):
-        if use_masking:
-            network.mask_input_nodes(node=node)
+    def f_conv_layer_func(node, network):
         filter_size = GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES[node.depth]
         num_of_input_channels = 1 if node.depth == 0 else GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth-1]
         num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth]
@@ -78,9 +76,7 @@ class FashionNetCigj:
                                                         num_of_output_channels=num_of_output_channels)
 
     @staticmethod
-    def f_fc_layer_func(node, network, use_masking=True):
-        if use_masking:
-            network.mask_input_nodes(node=node)
+    def f_fc_layer_func(node, network):
         net = tf.contrib.layers.flatten(node.F_input)
         # net = UtilityFuncs.tf_safe_flatten(input_tensor=node.F_input)
         flattened_F_feature_size = net.get_shape().as_list()[-1]
@@ -95,9 +91,7 @@ class FashionNetCigj:
         node.F_output = net
 
     @staticmethod
-    def f_leaf_func(node, network, use_masking=True):
-        if use_masking:
-            network.mask_input_nodes(node=node)
+    def f_leaf_func(node, network):
         final_feature = node.F_input
         network.apply_loss_jungle(node=node, final_feature=final_feature)
 
