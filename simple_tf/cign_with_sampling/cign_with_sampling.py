@@ -62,8 +62,12 @@ class CignWithSampling(FastTreeNetwork):
         # Step 3: Sample Z from p(F|x) using Gumbel-Max trick
         assert self.get_variable_name(name="sample_count", node=node) in node.evalDict
         batch_size = node.evalDict[self.get_variable_name(name="sample_count", node=node)]
-        selected_indices_tensor = self.sample_from_categorical(probs=p_n_given_x, batch_size=batch_size,
-                                                               category_count=tf.constant(node_degree))
+        # During training, sample from F ~ p(F|x)
+        sampled_indices = self.sample_from_categorical(probs=p_n_given_x, batch_size=batch_size,
+                                                       category_count=tf.constant(node_degree))
+        # During testing, pick F = argmax_F p(F|x)
+        arg_max_indices = tf.argmax(p_n_given_x, axis=1)
+        chosen_indices = tf.where(self.isTrain > 0, sampled_indices, arg_max_indices)
         node.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
         node.evalDict[self.get_variable_name(name="activations", node=node)] = activations
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
@@ -76,8 +80,7 @@ class CignWithSampling(FastTreeNetwork):
         for index in range(len(child_nodes)):
             child_node = child_nodes[index]
             child_index = child_node.index
-            mask_tensor = tf.reshape(tf.equal(x=selected_indices_tensor, y=tf.constant(index, tf.int32),
+            mask_tensor = tf.reshape(tf.equal(x=chosen_indices, y=tf.constant(index, tf.int32),
                                               name="Mask_without_threshold_{0}".format(child_index)), [-1])
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
-
