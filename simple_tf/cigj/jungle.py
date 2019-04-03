@@ -160,6 +160,8 @@ class Jungle(FastTreeNetwork):
             control_dependencies = []
             control_dependencies.extend(parent_h_node.H_output)
             control_dependencies.extend(f_inputs)
+            control_dependencies.extend(f_index_inputs)
+            control_dependencies.extend(f_label_inputs)
             dbg_list = []
             with tf.control_dependencies(control_dependencies):
                 # input_shapes = [tf.shape(x) for x in f_inputs]
