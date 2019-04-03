@@ -22,6 +22,8 @@ class CignWithSampling(FastTreeNetwork):
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
             mask_tensor = parent_node.maskTensors[node.index]
+            mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
+                                   tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
             node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
