@@ -66,7 +66,7 @@ class CignWithSampling(FastTreeNetwork):
         sampled_indices = self.sample_from_categorical(probs=p_n_given_x, batch_size=batch_size,
                                                        category_count=tf.constant(node_degree))
         # During testing, pick F = argmax_F p(F|x)
-        arg_max_indices = tf.argmax(p_n_given_x, axis=1)
+        arg_max_indices = tf.argmax(p_n_given_x, axis=1, output_type=tf.int32)
         chosen_indices = tf.where(self.isTrain > 0, sampled_indices, arg_max_indices)
         node.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
         node.evalDict[self.get_variable_name(name="activations", node=node)] = activations
