@@ -180,6 +180,7 @@ class AccuracyCalculator:
         final_features_dict = {}
         info_gain_dict = {}
         branch_probs_dict = {}
+        chosen_indices_dict = {}
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
             if results is not None:
@@ -188,6 +189,10 @@ class AccuracyCalculator:
                     if not node.isLeaf:
                         info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
                         branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        if GlobalConstants.USE_SAMPLING_CIGN:
+                            chosen_indices = results[self.network.get_variable_name(name="chosen_indices", node=node)]
+                            UtilityFuncs.concat_to_np_array_dict(dct=chosen_indices_dict, key=node.index,
+                                                                 array=chosen_indices)
                         UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index, array=branch_prob)
                         if node.index not in info_gain_dict:
                             info_gain_dict[node.index] = []
@@ -212,6 +217,11 @@ class AccuracyCalculator:
             if dataset.isNewEpoch:
                 break
         print("****************Dataset:{0}****************".format(dataset_type))
+        if GlobalConstants.USE_SAMPLING_CIGN:
+            for node_id in branch_probs_dict.keys():
+                _p = np.argmax(branch_probs_dict[node_id], axis=1)
+                _q = chosen_indices_dict[node_id]
+                assert np.array_equal(_p, _q)
         kv_rows = []
         # Measure final feature statistics
         for k, v in final_features_dict.items():
