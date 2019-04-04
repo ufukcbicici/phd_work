@@ -132,6 +132,14 @@ class Jungle(FastTreeNetwork):
                 decision_losses.append(node.infoGainLoss)
         self.decisionLoss = self.decisionLossCoefficient * tf.add_n(decision_losses)
 
+    def build_main_loss(self):
+        primary_losses = []
+        for node in self.topologicalSortedNodes:
+            if node.nodeType != NodeType.leaf_node:
+                continue
+            primary_losses.extend(node.lossList)
+        self.mainLoss = tf.add_n(primary_losses)
+
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
         parents = self.dagObject.parents(node=node)
@@ -272,6 +280,7 @@ class Jungle(FastTreeNetwork):
         final_feature, logits = self.apply_loss(node=node, final_feature=final_feature,
                                                 softmax_weights=fc_softmax_weights,
                                                 softmax_biases=fc_softmax_biases)
+        node.evalDict[self.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
         assert len(node.lossList) == 1
         node.F_output = logits
 
@@ -350,7 +359,6 @@ class Jungle(FastTreeNetwork):
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
             if not self.isBaseline:
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
-                self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
                 feed_dict[self.decisionDropoutKeepProb] = GlobalConstants.DECISION_DROPOUT_PROB
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
         else:
@@ -373,9 +381,9 @@ class Jungle(FastTreeNetwork):
         run_ops = self.get_run_ops()
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
-        print("Before Update Iteration:{0}".format(iteration))
+        # print("Before Update Iteration:{0}".format(iteration))
         results = sess.run(run_ops, feed_dict=feed_dict)
-        print("After Update Iteration:{0}".format(iteration))
+        # print("After Update Iteration:{0}".format(iteration))
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]
