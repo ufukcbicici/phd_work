@@ -109,6 +109,7 @@ def get_explanation_string(network):
 def get_network(dataset):
     if GlobalConstants.USE_SAMPLING_CIGN:
         GlobalConstants.USE_UNIFIED_BATCH_NORM = False
+        print("USING SAMPLING CIGN!!!")
         network = CignWithSampling(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
             grad_func=cign_resnet.grad_func,

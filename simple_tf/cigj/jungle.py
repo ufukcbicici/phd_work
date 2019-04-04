@@ -224,9 +224,13 @@ class Jungle(FastTreeNetwork):
             p_c_given_x = self.oneHotLabelTensor
             node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
                                                       balance_coefficient=self.informationGainBalancingCoefficient)
-            # Step 3: Sample Z from p(F|x) using Gumbel-Max trick
-            indices_tensor = self.sample_from_categorical(probs=p_F_given_x, batch_size=self.batchSize,
-                                                          category_count=tf.constant(node_degree))
+            # Step 3:
+            # If training: Sample Z from p(F|x) using Gumbel-Max trick
+            # If testing: Pick Z = argmax_F p(F|x)
+            sampled_indices = self.sample_from_categorical(probs=p_F_given_x, batch_size=self.batchSize,
+                                                           category_count=tf.constant(node_degree))
+            arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
+            indices_tensor = tf.where(self.isTrain > 0, sampled_indices, arg_max_indices)
             # Step 4: Apply partitioning for corresponding F nodes in the same layer.
             node.conditionIndices = tf.dynamic_partition(data=self.batchIndices,
                                                          partitions=indices_tensor,
@@ -265,8 +269,9 @@ class Jungle(FastTreeNetwork):
         fc_softmax_biases = tf.Variable(tf.constant(0.1, shape=[self.labelCount],
                                                     dtype=GlobalConstants.DATA_TYPE),
                                         name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node))
-        final_feature, logits = self.apply_loss(node=node, final_feature=final_feature, softmax_weights=fc_softmax_weights,
-                        softmax_biases=fc_softmax_biases)
+        final_feature, logits = self.apply_loss(node=node, final_feature=final_feature,
+                                                softmax_weights=fc_softmax_weights,
+                                                softmax_biases=fc_softmax_biases)
         assert len(node.lossList) == 1
         node.F_output = logits
 
@@ -301,7 +306,7 @@ class Jungle(FastTreeNetwork):
             sibling_order_index = self.get_node_sibling_index(node=node)
             with tf.control_dependencies([
                 parent_node.F_output[sibling_order_index], parent_node.H_output[sibling_order_index],
-                    parent_node.labelTensor[sibling_order_index], parent_node.conditionIndices[sibling_order_index]]):
+                parent_node.labelTensor[sibling_order_index], parent_node.conditionIndices[sibling_order_index]]):
                 node.F_input = tf.identity(parent_node.F_output[sibling_order_index])
                 node.H_input = tf.identity(parent_node.H_output[sibling_order_index])
                 node.labelTensor = tf.identity(parent_node.labelTensor[sibling_order_index])

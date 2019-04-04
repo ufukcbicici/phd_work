@@ -74,6 +74,7 @@ class CignWithSampling(FastTreeNetwork):
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
+        node.evalDict[self.get_variable_name(name="chosen_indices", node=node)] = chosen_indices
         # Step 4: Apply partitioning for corresponding F nodes in the same layer.
         child_nodes = self.dagObject.children(node=node)
         child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
