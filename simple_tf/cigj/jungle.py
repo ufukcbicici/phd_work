@@ -48,6 +48,9 @@ class Jungle(FastTreeNetwork):
         # Build network as a DAG
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         self.build_network()
+        self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
+        self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
         self.print_trellis_structure()
 
     def get_session(self):
@@ -324,6 +327,8 @@ class Jungle(FastTreeNetwork):
                 is_used = tf.cast(node.sampleCountTensor, tf.float32) > 0.0
                 node.isOpenIndicatorTensor = tf.where(is_used, 1.0, 0.0)
                 node.conditionIndices = tf.identity(parent_node.conditionIndices[sibling_order_index])
+                node.evalDict[self.get_variable_name(name="sample_count", node=node)] = node.sampleCountTensor
+                node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
                 node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
                 node.evalDict[
                     UtilityFuncs.get_variable_name(name="condition_indices", node=node)] = node.conditionIndices
