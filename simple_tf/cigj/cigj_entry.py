@@ -41,7 +41,8 @@ def get_explanation_string(network):
     explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.SOFTMAX_TEST_TEMPERATURE)
     explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
     explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
-    explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
+    explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_PROB)
+    # explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
     # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
     #     for node in network.topologicalSortedNodes:
     #         if node.isLeaf:
@@ -93,7 +94,8 @@ def cigj_training():
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
-        jungle.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
+        GlobalConstants.DECISION_DROPOUT_PROB = 1.0 - tpl[4]
+        # jungle.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
         jungle.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         jungle.thresholdFunc(network=jungle)
         experiment_id = DbLogger.get_run_id()

@@ -1,7 +1,10 @@
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import numpy as np
 
+from algorithms.accuracy_calculator import AccuracyCalculator
 from auxillary.dag_utilities import Dag
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle_node import JungleNode
 from simple_tf.cigj.jungle_node import NodeType
@@ -240,8 +243,9 @@ class Jungle(FastTreeNetwork):
             # If testing: Pick Z = argmax_F p(F|x)
             sampled_indices = self.sample_from_categorical(probs=p_F_given_x, batch_size=self.batchSize,
                                                            category_count=tf.constant(node_degree))
-            arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
-            indices_tensor = tf.where(self.isTrain > 0, sampled_indices, arg_max_indices)
+            # arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
+            # tf.where(self.isTrain > 0, sampled_indices, arg_max_indices)
+            indices_tensor = sampled_indices
             # Step 4: Apply partitioning for corresponding F nodes in the same layer.
             node.conditionIndices = tf.dynamic_partition(data=self.batchIndices,
                                                          partitions=indices_tensor,
@@ -377,7 +381,7 @@ class Jungle(FastTreeNetwork):
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
-        minibatch = dataset.get_next_batch()
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
         if minibatch is None:
             return None, None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
@@ -397,6 +401,125 @@ class Jungle(FastTreeNetwork):
             self.verbose_update(eval_dict=results[-1])
         # Unit Test for Unified Batch Normalization
         return lr, sample_counts, is_open_indicators
+
+    def label_distribution_analysis(self,
+                                    run_id,
+                                    iteration,
+                                    kv_rows,
+                                    leaf_true_labels_dict,
+                                    dataset,
+                                    dataset_type):
+        label_count = dataset.get_label_count()
+        label_distribution = np.zeros(shape=(label_count,))
+        for node in self.topologicalSortedNodes:
+            if not node.nodeType == NodeType.leaf_node:
+                continue
+            true_labels = leaf_true_labels_dict[node.index]
+            for l in range(label_count):
+                label_distribution[l] = np.sum(true_labels == l)
+                kv_rows.append((run_id, iteration, "{0} Leaf:{1} True Label:{2}".
+                                format(dataset_type, node.index, l), np.asscalar(label_distribution[l])))
+
+    def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        leaf_predicted_labels_dict = {}
+        leaf_true_labels_dict = {}
+        final_features_dict = {}
+        info_gain_dict = {}
+        branch_probs_dict = {}
+        chosen_indices_dict = {}
+        while True:
+            results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
+            if results is not None:
+                batch_sample_count = 0.0
+                for node in self.topologicalSortedNodes:
+                    if node.nodeType == NodeType.h_node:
+                        node_degree = self.degreeList[node.depth + 1]
+                        if node_degree == 1:
+                            continue
+                        info_gain = results[self.get_variable_name(name="info_gain", node=node)]
+                        branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
+                        UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index, array=branch_prob)
+                        if node.index not in info_gain_dict:
+                            info_gain_dict[node.index] = []
+                        info_gain_dict[node.index].append(np.asscalar(info_gain))
+                        continue
+                    elif node.nodeType == NodeType.leaf_node:
+                        posterior_probs = results[self.get_variable_name(name="posterior_probs", node=node)]
+                        true_labels = results[UtilityFuncs.get_variable_name(name="labelTensor", node=node)]
+                        final_features = results[self.get_variable_name(name="final_feature_final", node=node)]
+                        predicted_labels = np.argmax(posterior_probs, axis=1)
+                        batch_sample_count += predicted_labels.shape[0]
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_predicted_labels_dict, key=node.index,
+                                                             array=predicted_labels)
+                        UtilityFuncs.concat_to_np_array_dict(dct=leaf_true_labels_dict, key=node.index,
+                                                             array=true_labels)
+                        UtilityFuncs.concat_to_np_array_dict(dct=final_features_dict, key=node.index,
+                                                             array=final_features)
+                if batch_sample_count != GlobalConstants.EVAL_BATCH_SIZE:
+                    raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
+            if dataset.isNewEpoch:
+                break
+        print("****************Dataset:{0}****************".format(dataset_type))
+        kv_rows = []
+        # Measure Information Gain
+        total_info_gain = 0.0
+        for k, v in info_gain_dict.items():
+            avg_info_gain = sum(v) / float(len(v))
+            print("IG_{0}={1}".format(k, -avg_info_gain))
+            total_info_gain -= avg_info_gain
+            kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
+        kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
+        # Measure Branching Probabilities
+        AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration, dataset_type=dataset_type,
+                                                branch_probs=branch_probs_dict, kv_rows=kv_rows)
+        # Measure The Histogram of Branching Probabilities
+        self.calculate_branch_probability_histograms(branch_probs=branch_probs_dict)
+        # Measure Label Distribution
+        self.label_distribution_analysis(run_id=run_id, iteration=iteration, kv_rows=kv_rows,
+                                         leaf_true_labels_dict=leaf_true_labels_dict,
+                                         dataset=dataset, dataset_type=dataset_type)
+        # # Measure Accuracy
+        overall_count = 0.0
+        overall_correct = 0.0
+        confusion_matrix_db_rows = []
+        for node in self.topologicalSortedNodes:
+            if not node.nodeType == NodeType.leaf_node:
+                continue
+            predicted = leaf_predicted_labels_dict[node.index]
+            true_labels = leaf_true_labels_dict[node.index]
+            if predicted.shape != true_labels.shape:
+                raise Exception("Predicted and true labels counts do not hold.")
+            correct_count = np.sum(predicted == true_labels)
+            # Get the incorrect predictions by preparing a confusion matrix for each leaf
+            sparse_confusion_matrix = {}
+            for i in range(true_labels.shape[0]):
+                true_label = true_labels[i]
+                predicted_label = predicted[i]
+                label_pair = (np.asscalar(true_label), np.asscalar(predicted_label))
+                if label_pair not in sparse_confusion_matrix:
+                    sparse_confusion_matrix[label_pair] = 0
+                sparse_confusion_matrix[label_pair] += 1
+            for k, v in sparse_confusion_matrix.items():
+                confusion_matrix_db_rows.append((run_id, dataset_type.value, node.index, iteration, k[0], k[1], v))
+            # Overall accuracy
+            total_count = true_labels.shape[0]
+            overall_correct += correct_count
+            overall_count += total_count
+            if total_count > 0:
+                print("Leaf {0}: Sample Count:{1} Accuracy:{2}".format(node.index, total_count,
+                                                                       float(correct_count) / float(total_count)))
+            else:
+                print("Leaf {0} is empty.".format(node.index))
+        print("*************Overall {0} samples. Overall Accuracy:{1}*************"
+              .format(overall_count, overall_correct / overall_count))
+        total_accuracy = overall_correct / overall_count
+        # Calculate modes
+        # self.network.modeTracker.calculate_modes(leaf_true_labels_dict=leaf_true_labels_dict,
+        #                                          dataset=dataset, dataset_type=dataset_type, kv_rows=kv_rows,
+        #                                          run_id=run_id, iteration=iteration)
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+        return overall_correct / overall_count, confusion_matrix_db_rows
 
     # For debugging
     def print_trellis_structure(self):

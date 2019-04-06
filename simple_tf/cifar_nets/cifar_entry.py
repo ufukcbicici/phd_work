@@ -102,7 +102,7 @@ def get_explanation_string(network):
         format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
     explanation += "***** ResNet Parameters *****\n"
     explanation += str(GlobalConstants.RESNET_HYPERPARAMS)
-    explanation += "Use Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
+    explanation += "\nUse Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
     return explanation
 
 

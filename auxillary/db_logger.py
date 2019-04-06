@@ -43,6 +43,9 @@ class DbLogger:
     # TRUBA 2
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2.db"
 
+    # TRUBA 3
+    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger3.db"
+
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}
     lock = threading.Lock()
