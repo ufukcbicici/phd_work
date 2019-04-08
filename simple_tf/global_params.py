@@ -40,7 +40,7 @@ class ModeTrackingStrategy(Enum):
 class GlobalConstants:
     TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
-    EPOCH_REPORT_PERIOD = 1
+    EPOCH_REPORT_PERIOD = 5
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 125
     CURR_BATCH_SIZE = None

@@ -54,7 +54,7 @@ class Jungle(FastTreeNetwork):
         self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
-        self.print_trellis_structure()
+        # self.print_trellis_structure()
 
     def get_session(self):
         sess = tf.Session(graph=self.currentGraph)
@@ -194,13 +194,27 @@ class Jungle(FastTreeNetwork):
                 # node.labelTensor = tf.identity(parent_node.labelTensor[sibling_order_index])
                 # node.conditionIndices = tf.identity(parent_node.conditionIndices[sibling_order_index])
                 if parent_node_degree > 1:
-                    node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-                    node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                     data=parent_h_node.H_output)
-                    node.stitchedIndices = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                             data=f_index_inputs)
-                    node.stitchedLabels = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                            data=f_label_inputs)
+                    f_shapes = []
+                    indices_shapes = []
+                    for f_input, condition_indices in zip(f_inputs, parent_h_node.conditionIndices):
+                        f_shape = tf.shape(f_input)
+                        indices_shape = tf.shape(condition_indices)
+                        f_shapes.append(f_shape)
+                        indices_shapes.append(indices_shape)
+                        # f_shape = tf.shape(f_inputs)
+                        # indices_shape = tf.shape(parent_h_node.conditionIndices)
+                        # f_shape_print = tf.print(f_shape)
+                        # indices_shape_print = tf.print(indices_shape)
+                    # assert_op = tf.assert_equal(x=f_shape[0], y=indices_shape[0], data=[f_shape, indices_shape])
+                    with tf.control_dependencies([tf.print("f_shapes:", *f_shapes),
+                                                  tf.print("indices_shapes:", *indices_shapes)]):
+                        node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
+                        node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
+                                                         data=parent_h_node.H_output)
+                        node.stitchedIndices = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
+                                                                 data=f_index_inputs)
+                        node.stitchedLabels = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
+                                                                data=f_label_inputs)
                 else:
                     assert len(f_inputs) == 1
                     node.F_input = f_inputs[0]
@@ -243,9 +257,9 @@ class Jungle(FastTreeNetwork):
             # If testing: Pick Z = argmax_F p(F|x)
             sampled_indices = self.sample_from_categorical(probs=p_F_given_x, batch_size=self.batchSize,
                                                            category_count=tf.constant(node_degree))
-            # arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
-            # tf.where(self.isTrain > 0, sampled_indices, arg_max_indices)
-            indices_tensor = sampled_indices
+            arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
+            indices_tensor = tf.where(self.isTrain > 0, sampled_indices, arg_max_indices)
+            # indices_tensor = sampled_indices
             # Step 4: Apply partitioning for corresponding F nodes in the same layer.
             node.conditionIndices = tf.dynamic_partition(data=self.batchIndices,
                                                          partitions=indices_tensor,

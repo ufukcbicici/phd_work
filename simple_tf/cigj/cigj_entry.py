@@ -135,19 +135,28 @@ def cigj_training():
                 print(indicator_str)
                 iteration_counter += 1
                 if dataset.isNewEpoch:
-                    training_accuracy, training_confusion = \
-                        jungle.calculate_accuracy(sess=sess, dataset=dataset,
-                                                  dataset_type=DatasetTypes.training,
-                                                  run_id=experiment_id, iteration=iteration_counter,
-                                                  calculation_type=AccuracyCalcType.regular)
-                    validation_accuracy, validation_confusion = \
-                        jungle.calculate_accuracy(sess=sess, dataset=dataset,
-                                                  dataset_type=DatasetTypes.test,
-                                                  run_id=experiment_id, iteration=iteration_counter,
-                                                  calculation_type=AccuracyCalcType.regular)
+                    if (epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - 15 and
+                        (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0) \
+                            or epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - 15:
+                        training_accuracy, training_confusion = \
+                            jungle.calculate_accuracy(sess=sess, dataset=dataset,
+                                                      dataset_type=DatasetTypes.training,
+                                                      run_id=experiment_id, iteration=iteration_counter,
+                                                      calculation_type=AccuracyCalcType.regular)
+                        validation_accuracy, validation_confusion = \
+                            jungle.calculate_accuracy(sess=sess, dataset=dataset,
+                                                      dataset_type=DatasetTypes.test,
+                                                      run_id=experiment_id, iteration=iteration_counter,
+                                                      calculation_type=AccuracyCalcType.regular)
+                        DbLogger.write_into_table(
+                            rows=[(experiment_id, iteration_counter,
+                                   epoch_id,
+                                   training_accuracy,
+                                   validation_accuracy, validation_accuracy,
+                                   0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
                     break
         tf.reset_default_graph()
         run_id += 1
 
-cigj_training()
 
+cigj_training()
