@@ -16,7 +16,7 @@ class WeightedBatchNorm:
         assert input_dim == 2 or input_dim == 4
         _p = weights / sum_weights
         if input_dim == 4:
-            _p = _p / (input_dim[1] * input_dim[2])
+            _p = _p / (input_tensor.get_shape().as_list()[1] * input_tensor.get_shape().as_list()[2])
         for _ in range(input_dim - 1):
             _p = tf.expand_dims(_p, axis=-1)
         weighted_tensor = tf.multiply(input_tensor, _p)
@@ -77,4 +77,4 @@ print("X")
 # init = tf.global_variables_initializer()
 # sess.run(init)
 # res = sess.run([wt, mu, var, norm_x, tf_norm_x], feed_dict={_x: x, _weights: w})
-print("X")
+# print("X")
