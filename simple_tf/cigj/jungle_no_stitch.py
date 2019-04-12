@@ -1,15 +1,8 @@
-import matplotlib.pyplot as plt
 import tensorflow as tf
-import numpy as np
 
-from algorithms.accuracy_calculator import AccuracyCalculator
-from auxillary.dag_utilities import Dag
-from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle import Jungle
-from simple_tf.cigj.jungle_node import JungleNode
 from simple_tf.cigj.jungle_node import NodeType
-from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 from simple_tf.info_gain import InfoGainLoss
 
@@ -66,15 +59,11 @@ class JungleNoStitch(Jungle):
                 UtilityFuncs.get_variable_name(name="sampled_one_hot_matrix", node=node)] = sampled_one_hot_matrix
             node.evalDict[
                 UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
-            node.evalDict[
-                UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
         else:
-            node.conditionIndices = [self.batchIndices]
-            node.F_output = [node.F_input]
-            node.H_output = [node.H_output]
-            node.labelTensor = [self.labelTensor]
-            node.evalDict[UtilityFuncs.get_variable_name(name="indices_tensor", node=node)] = \
-                tf.zeros(shape=self.batchSize, dtype=tf.int32)
+            node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
+        node.evalDict[
+            UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
+        node.F_output = node.F_input
 
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
@@ -84,11 +73,8 @@ class JungleNoStitch(Jungle):
             assert parents[0].nodeType == NodeType.root_node and node.depth == 0
             node.F_input = parents[0].F_output
             node.H_input = None
-            node.stitchedIndices = self.batchIndices
-            node.stitchedLabels = self.labelTensor
         # Need stitching
         else:
-            parent_node_degree = self.degreeList[node.depth]
             # Get all F nodes in the same layer
             parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=node)
                               if f_node.nodeType == NodeType.f_node]
@@ -99,60 +85,48 @@ class JungleNoStitch(Jungle):
             parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
             assert all([f_node.H_output is None for f_node in parent_f_nodes])
             f_inputs = [node.F_output for node in parent_f_nodes]
-            f_index_inputs = [node.conditionIndices for node in parent_f_nodes]
-            f_label_inputs = [node.labelTensor for node in parent_f_nodes]
-            control_dependencies = []
-            control_dependencies.extend(parent_h_node.H_output)
-            control_dependencies.extend(f_inputs)
-            control_dependencies.extend(f_index_inputs)
-            control_dependencies.extend(f_label_inputs)
-            dbg_list = []
-            with tf.control_dependencies(control_dependencies):
-                # input_shapes = [tf.shape(x) for x in f_inputs]
-                # shape_prods = [tf.reduce_prod(x) for x in input_shapes]
-                # shape_sum = tf.add_n(shape_prods)
-                # dbg_list.extend(input_shapes)
-                # dbg_list.extend([tf.shape(x) for x in parent_h_node.conditionIndices])
-                # dbg_list.extend([tf.shape(x) for x in parent_h_node.F_output])
-                # dbg_list.extend([tf.shape(x) for x in parent_h_node.H_output])
-                # dbg_list.extend([tf.shape(x) for x in parent_h_node.labelTensor])
-                # assert_op = tf.Assert(tf.greater(shape_sum, 0), dbg_list, 1000)
-                # with tf.control_dependencies([assert_op]):
+            # Get condition probabilities
+            dependencies = []
+            dependencies.extend(f_inputs)
+            dependencies.extend(parent_h_node.conditionProbabilities)
+            with tf.control_dependencies(dependencies):
+                f_weighted_list = []
+                for f_index, f_input in enumerate(f_inputs):
+                    f_weighted_list.append(parent_h_node.conditionProbabilities[f_index, :] * f_input)
+                node.F_input = tf.add_n(f_weighted_list)
+                node.H_input = parent_h_node.H_output
 
-                # node.F_input = tf.identity(parent_node.F_output[sibling_order_index])
-                # node.H_input = tf.identity(parent_node.H_output[sibling_order_index])
-                # node.labelTensor = tf.identity(parent_node.labelTensor[sibling_order_index])
-                # node.conditionIndices = tf.identity(parent_node.conditionIndices[sibling_order_index])
-                if parent_node_degree > 1:
-                    f_shapes = []
-                    indices_shapes = []
-                    for f_input, condition_indices in zip(f_inputs, parent_h_node.conditionIndices):
-                        f_shape = tf.shape(f_input)
-                        indices_shape = tf.shape(condition_indices)
-                        f_shapes.append(f_shape)
-                        indices_shapes.append(indices_shape)
-                        # f_shape = tf.shape(f_inputs)
-                        # indices_shape = tf.shape(parent_h_node.conditionIndices)
-                        # f_shape_print = tf.print(f_shape)
-                        # indices_shape_print = tf.print(indices_shape)
-                    # assert_op = tf.assert_equal(x=f_shape[0], y=indices_shape[0], data=[f_shape, indices_shape])
-                    with tf.control_dependencies([tf.print("f_shapes:", *f_shapes),
-                                                  tf.print("indices_shapes:", *indices_shapes)]):
-                        node.F_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices, data=f_inputs)
-                        node.H_input = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                         data=parent_h_node.H_output)
-                        node.stitchedIndices = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                                 data=f_index_inputs)
-                        node.stitchedLabels = tf.dynamic_stitch(indices=parent_h_node.conditionIndices,
-                                                                data=f_label_inputs)
-                else:
-                    assert len(f_inputs) == 1
-                    node.F_input = f_inputs[0]
-                    assert len(parent_h_node.H_output) == 1
-                    node.H_input = parent_h_node.H_output[0]
-                    assert len(f_index_inputs) == 1
-                    node.stitchedIndices = f_index_inputs[0]
-                    assert len(f_label_inputs) == 1
-                    node.stitchedLabels = f_label_inputs[0]
-        node.evalDict[UtilityFuncs.get_variable_name(name="stitchedIndices", node=node)] = node.stitchedIndices
-        node.evalDict[UtilityFuncs.get_variable_name(name="stitchedLabels", node=node)] = node.stitchedLabels
+    def mask_input_nodes(self, node):
+        if node.nodeType == NodeType.root_node:
+            node.F_input = self.dataTensor
+            node.H_input = None
+            node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
+            node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
+            # For reporting
+            node.sampleCountTensor = tf.reduce_sum(node.conditionProbabilities)
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = node.sampleCountTensor
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            node.evalDict[UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = \
+                node.conditionProbabilities
+        elif node.nodeType == NodeType.f_node or node.nodeType == NodeType.leaf_node:
+            # raise NotImplementedError()
+            parents = self.dagObject.parents(node=node)
+            assert len(parents) == 1 and parents[0].nodeType == NodeType.h_node
+            parent_node = parents[0]
+            sibling_order_index = self.get_node_sibling_index(node=node)
+            with tf.control_dependencies([parent_node.F_output,
+                                          parent_node.H_output,
+                                          parent_node.conditionProbabilities]):
+                node.F_input = tf.identity(parent_node.F_output)
+                node.H_input = tf.identity(parent_node.H_output)
+                node.conditionProbabilities = tf.identity(parent_node.conditionProbabilities[sibling_order_index, :])
+                # For reporting
+                node.sampleCountTensor = tf.reduce_sum(node.conditionProbabilities)
+                is_used = tf.cast(node.sampleCountTensor, tf.float32) > 0.0
+                node.isOpenIndicatorTensor = tf.where(is_used, 1.0, 0.0)
+                node.conditionIndices = tf.identity(parent_node.conditionIndices[sibling_order_index])
+                node.evalDict[self.get_variable_name(name="sample_count", node=node)] = node.sampleCountTensor
+                node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = \
+                    node.conditionProbabilities
