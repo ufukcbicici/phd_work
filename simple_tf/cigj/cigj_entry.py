@@ -8,6 +8,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import FixedParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cigj.jungle import Jungle
+from simple_tf.cigj.jungle_no_stitch import JungleNoStitch
 from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
@@ -77,7 +78,7 @@ def cigj_training():
             sess = tf.Session()
         dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
-        jungle = Jungle(
+        jungle = JungleNoStitch(
             node_build_funcs=[FashionNetCigj.f_conv_layer_func,
                               FashionNetCigj.f_conv_layer_func,
                               FashionNetCigj.f_conv_layer_func,
