@@ -57,9 +57,10 @@ def get_explanation_string(network):
 def cigj_training():
     classification_wd = [0.0]
     decision_wd = [0.0]
-    info_gain_balance_coeffs = [1.0]
+    info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
     # classification_dropout_probs = [0.15]
-    classification_dropout_probs = [0.0]
+    classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
+                                          GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
     decision_dropout_probs = [0.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
@@ -101,7 +102,7 @@ def cigj_training():
         jungle.thresholdFunc(network=jungle)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=jungle)
-        series_id = int(run_id / 6)
+        series_id = int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)

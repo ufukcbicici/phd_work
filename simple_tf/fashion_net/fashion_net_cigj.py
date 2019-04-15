@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-from auxillary.constants import DatasetTypes
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter
 from simple_tf.cigj.jungle_node import NodeType

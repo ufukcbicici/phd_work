@@ -48,6 +48,7 @@ class GlobalConstants:
     NUM_CHANNELS = 1
     USE_SAMPLING_CIGN = False
     USE_FAST_TREE_MODE = True
+    EXPERIMENT_MULTIPLICATION_FACTOR = 5
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
