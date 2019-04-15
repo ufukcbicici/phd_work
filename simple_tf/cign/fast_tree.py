@@ -274,10 +274,10 @@ class FastTreeNetwork(TreeNetwork):
         return final_feature, logits
 
     def get_run_ops(self):
-        # run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
-        #            self.infoGainDicts]
-        run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
                    self.infoGainDicts]
+        # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        #            self.infoGainDicts]
         return run_ops
 
     def verbose_update(self, eval_dict):

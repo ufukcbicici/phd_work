@@ -11,6 +11,7 @@ class CignWithSampling(FastTreeNetwork):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
 
     def mask_input_nodes(self, node):
+        print("Masking Node:{0}".format(node.index))
         if node.isRoot:
             node.labelTensor = self.labelTensor
             node.indicesTensor = self.indicesTensor

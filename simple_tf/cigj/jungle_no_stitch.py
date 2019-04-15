@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle import Jungle
@@ -12,6 +13,7 @@ class JungleNoStitch(Jungle):
                  dataset):
         super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                          dataset)
+        self.unitTestList = [self.test_stitching]
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -102,6 +104,7 @@ class JungleNoStitch(Jungle):
                             tensor=f_input))
                 node.F_input = tf.add_n(f_weighted_list)
                 node.H_input = parent_h_node.H_output
+        node.evalDict[UtilityFuncs.get_variable_name(name="F_input", node=node)] = node.F_input
 
     @staticmethod
     def multiply_tensor_with_branch_weights(weights, tensor):
@@ -152,3 +155,54 @@ class JungleNoStitch(Jungle):
                 node.evalDict[
                     UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = \
                     node.conditionProbabilities
+
+    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
+        if minibatch is None:
+            return None, None, None
+        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
+                                           is_train=True, use_masking=True)
+        # Prepare result tensors to collect
+        run_ops = self.get_run_ops()
+        if GlobalConstants.USE_VERBOSE:
+            run_ops.append(self.evalDict)
+        # print("Before Update Iteration:{0}".format(iteration))
+        results = sess.run(run_ops, feed_dict=feed_dict)
+        # print("After Update Iteration:{0}".format(iteration))
+        lr = results[1]
+        sample_counts = results[2]
+        is_open_indicators = results[3]
+        # Unit Tests
+        if GlobalConstants.USE_VERBOSE:
+            for test in self.unitTestList:
+                test(results[-1])
+        return lr, sample_counts, is_open_indicators
+
+    # Unit test methods
+    def test_stitching(self, eval_dict):
+        h_nodes = [node for node in self.topologicalSortedNodes if node.nodeType == NodeType.h_node]
+        for h_node in h_nodes:
+            if len(self.dagObject.parents(node=h_node)) == 1:
+                continue
+            parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=h_node)
+                              if f_node.nodeType == NodeType.f_node]
+            parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
+            parent_h_nodes = [h_node for h_node in self.dagObject.parents(node=h_node)
+                              if h_node.nodeType == NodeType.h_node]
+            assert len(parent_h_nodes) == 1
+            f_input = eval_dict[UtilityFuncs.get_variable_name(name="F_input", node=h_node)]
+            condition_probabilities = eval_dict[UtilityFuncs.get_variable_name(name="conditionProbabilities",
+                                                                               node=parent_h_nodes[0])]
+            f_outputs_prev_layer = [eval_dict[UtilityFuncs.get_variable_name(name="F_output", node=node)]
+                                    for node in parent_f_nodes]
+            f_input_manual = np.zeros_like(f_input)
+            for r in range(condition_probabilities.shape[0]):
+                selected_node_idx = np.asscalar(np.argmax(condition_probabilities[r, :]))
+                f_input_manual[r, :] = f_outputs_prev_layer[selected_node_idx][r, :]
+            assert np.allclose(f_input, f_input_manual)
+
+
+
+
