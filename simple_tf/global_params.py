@@ -38,8 +38,8 @@ class ModeTrackingStrategy(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 600
-    EPOCH_COUNT = 600
+    TOTAL_EPOCH_COUNT = 200
+    EPOCH_COUNT = 200
     EPOCH_REPORT_PERIOD = 5
     BATCH_SIZE = 250
     EVAL_BATCH_SIZE = 250
@@ -131,7 +131,8 @@ class GlobalConstants:
 
     DATA_TYPE = tf.float32
     SEED = None
-    USE_VERBOSE = True
+    USE_VERBOSE = False
+    USE_UNIT_TESTS = False
     USE_SAMPLE_HASHING = False
     USE_SOFTMAX_DISTILLATION_VERBOSE = True
     USE_CPU = False

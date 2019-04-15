@@ -99,6 +99,7 @@ class Jungle(FastTreeNetwork):
                 self.nodeBuildFuncs[node.depth](node=node, network=self)
                 assert node.F_output is not None and node.H_output is None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
+                node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = self.labelTensor
             elif node.nodeType == NodeType.h_node:
                 self.hFuncs[node.depth](node=node, network=self)
                 # assert node.F_output is not None and node.H_output is not None

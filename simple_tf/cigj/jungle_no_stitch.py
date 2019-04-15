@@ -175,7 +175,7 @@ class JungleNoStitch(Jungle):
         sample_counts = results[2]
         is_open_indicators = results[3]
         # Unit Tests
-        if GlobalConstants.USE_VERBOSE:
+        if GlobalConstants.USE_UNIT_TESTS:
             for test in self.unitTestList:
                 test(results[-1])
         return lr, sample_counts, is_open_indicators
