@@ -56,6 +56,10 @@ class JungleNoStitch(Jungle):
             node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
             node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
             node.evalDict[
+                UtilityFuncs.get_variable_name(name="sampled_indices", node=node)] = sampled_indices
+            node.evalDict[
+                UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)] = arg_max_indices
+            node.evalDict[
                 UtilityFuncs.get_variable_name(name="sampled_one_hot_matrix", node=node)] = sampled_one_hot_matrix
             node.evalDict[
                 UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
@@ -88,15 +92,29 @@ class JungleNoStitch(Jungle):
             # Get condition probabilities
             dependencies = []
             dependencies.extend(f_inputs)
-            dependencies.extend(parent_h_node.conditionProbabilities)
+            dependencies.append(parent_h_node.conditionProbabilities)
             with tf.control_dependencies(dependencies):
                 f_weighted_list = []
                 for f_index, f_input in enumerate(f_inputs):
-                    f_weighted_list.append(parent_h_node.conditionProbabilities[f_index, :] * f_input)
+                    f_weighted_list.append(
+                        JungleNoStitch.multiply_tensor_with_branch_weights(
+                            weights=parent_h_node.conditionProbabilities[:, f_index],
+                            tensor=f_input))
                 node.F_input = tf.add_n(f_weighted_list)
                 node.H_input = parent_h_node.H_output
 
+    @staticmethod
+    def multiply_tensor_with_branch_weights(weights, tensor):
+        _w = tf.identity(weights)
+        input_dim = len(tensor.get_shape().as_list())
+        assert input_dim == 2 or input_dim == 4
+        for _ in range(input_dim - 1):
+            _w = tf.expand_dims(_w, axis=-1)
+        weighted_tensor = tf.multiply(tensor, _w)
+        return weighted_tensor
+
     def mask_input_nodes(self, node):
+        node.labelTensor = self.labelTensor
         if node.nodeType == NodeType.root_node:
             node.F_input = self.dataTensor
             node.H_input = None
@@ -119,12 +137,16 @@ class JungleNoStitch(Jungle):
                                           parent_node.conditionProbabilities]):
                 node.F_input = tf.identity(parent_node.F_output)
                 node.H_input = tf.identity(parent_node.H_output)
-                node.conditionProbabilities = tf.identity(parent_node.conditionProbabilities[sibling_order_index, :])
+                if len(parent_node.conditionProbabilities.get_shape().as_list()) > 1:
+                    node.conditionProbabilities = tf.identity(parent_node.conditionProbabilities[:,
+                                                              sibling_order_index])
+                else:
+                    node.conditionProbabilities = tf.identity(parent_node.conditionProbabilities)
                 # For reporting
                 node.sampleCountTensor = tf.reduce_sum(node.conditionProbabilities)
                 is_used = tf.cast(node.sampleCountTensor, tf.float32) > 0.0
                 node.isOpenIndicatorTensor = tf.where(is_used, 1.0, 0.0)
-                node.conditionIndices = tf.identity(parent_node.conditionIndices[sibling_order_index])
+                # node.conditionIndices = tf.identity(parent_node.conditionIndices[sibling_order_index])
                 node.evalDict[self.get_variable_name(name="sample_count", node=node)] = node.sampleCountTensor
                 node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
                 node.evalDict[

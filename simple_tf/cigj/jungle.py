@@ -411,8 +411,8 @@ class Jungle(FastTreeNetwork):
         sample_counts = results[2]
         is_open_indicators = results[3]
         # Unit Test for Unified Batch Normalization
-        if GlobalConstants.USE_VERBOSE:
-            self.verbose_update(eval_dict=results[-1])
+        # if GlobalConstants.USE_VERBOSE:
+        #     self.verbose_update(eval_dict=results[-1])
         # Unit Test for Unified Batch Normalization
         return lr, sample_counts, is_open_indicators
 
