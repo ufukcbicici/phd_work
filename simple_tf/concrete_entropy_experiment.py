@@ -1,10 +1,12 @@
-import tensorflow as tf
-import tensorflow_probability as tfp
-import numpy as np
 import warnings
+from auxillary.constants import DatasetTypes
+# import tensorflow_probability as tfp
+import numpy as np
+import tensorflow as tf
+
+from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.global_params import GlobalConstants
-from simple_tf.info_gain import InfoGainLoss
 
 
 def calculate_entropy(prob_distribution):
@@ -20,21 +22,23 @@ def calculate_entropy(prob_distribution):
 def gumbel_softmax_density(z, probs, temperature):
     n = z.shape[0]
     a = np.math.factorial(n)
-    b = np.power(temperature, n-1)
+    b = np.power(temperature, n - 1)
     z_pow_minus_lambda = np.power(z, -temperature)
-    z_pow_minus_lambda_minus_one = np.power(z, -temperature-1.0)
+    z_pow_minus_lambda_minus_one = np.power(z, -temperature - 1.0)
     numerator_vec = np.multiply(probs, z_pow_minus_lambda_minus_one)
     denominator_vec = np.multiply(probs, z_pow_minus_lambda)
     denominator_sum = np.sum(denominator_vec)
     numerator_vec = numerator_vec / denominator_sum
     c = np.prod(numerator_vec)
-    density = a*b*c
+    density = a * b * c
     return density
+
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     child_count = 3
     dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
+    dataset.set_current_data_set_type(dataset_type=DatasetTypes.training)
     sample_count = dataset.get_current_sample_count()
     x = dataset.get_next_batch(batch_size=sample_count)
 
@@ -58,7 +62,6 @@ with warnings.catch_warnings():
     # Entropy calculation; the hard way
     p_z_given_x_log_p_z = np.multiply(p_z_given_x, log_p_z)
     entropy_p_z_v2 = -1.0 * np.mean(np.sum(p_z_given_x_log_p_z, axis=1))
-
 
     print("p_z={0}".format(p_z))
     print("entropy_p_z={0}".format(entropy_p_z))
@@ -95,4 +98,32 @@ with warnings.catch_warnings():
                                   temperature_tensor: temperature})
     p_z = np.mean(results[2], axis=0)
     print("p_z={0}".format(p_z))
+    print("X")
+
+    naive_samples = results[-3]
+    stable_samples = results[-1]
+
+    assert naive_samples.shape == stable_samples.shape
+
+    coords = UtilityFuncs.get_cartesian_product(list_of_lists=[[i for i in range(naive_samples.shape[0])],
+                                                               [j for j in range(naive_samples.shape[1])]])
+    max_diff = 0.0
+    max_diff_naive_sample = None
+    max_diff_stable_sample = None
+    iteration = 0
+    for coord in coords:
+        naive_sample = naive_samples[coord]
+        stable_sample = stable_samples[coord]
+        if any(np.isnan(naive_sample)):
+            continue
+        if not np.allclose(np.sum(naive_sample), 1.0):
+            continue
+        mdiff = np.max(np.abs(naive_sample - stable_sample))
+        if mdiff > max_diff:
+            max_diff = mdiff
+            max_diff_naive_sample = naive_sample
+            max_diff_stable_sample = stable_sample
+        iteration += 1
+        if iteration % 10000 == 0:
+            print(iteration)
     print("X")
