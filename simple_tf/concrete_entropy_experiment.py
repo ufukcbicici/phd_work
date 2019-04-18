@@ -1,6 +1,6 @@
 import warnings
 from auxillary.constants import DatasetTypes
-# import tensorflow_probability as tfp
+import scipy as sp
 import numpy as np
 import tensorflow as tf
 
@@ -114,16 +114,35 @@ with warnings.catch_warnings():
     for coord in coords:
         naive_sample = naive_samples[coord]
         stable_sample = stable_samples[coord]
+        iteration += 1
+        if iteration % 10000 == 0:
+            print(iteration)
         if any(np.isnan(naive_sample)):
-            continue
-        if not np.allclose(np.sum(naive_sample), 1.0):
             continue
         mdiff = np.max(np.abs(naive_sample - stable_sample))
         if mdiff > max_diff:
             max_diff = mdiff
             max_diff_naive_sample = naive_sample
             max_diff_stable_sample = stable_sample
-        iteration += 1
-        if iteration % 10000 == 0:
-            print(iteration)
+        if np.allclose(naive_sample, stable_sample):
+            continue
+        logit = results[5][coord]
+        lse = sp.special.logsumexp(logit)
+        manual_sample = np.exp(logit - lse)
+        assert np.allclose(manual_sample, stable_sample)
+        # exps = np.exp(logit)
+        # nom = np.sum(exps)
+        # manual_sample = exps / nom
+
+
+
+
+
+        # sp.special.logsumexp(logit)
+        #
+        # exp_numpy = np.exp(logit)
+        # exp_naive = results[6][coord]
+        # exp_numpy = np.exp(logit)
+        # assert not np.allclose(exp_naive, exp_numpy)
+
     print("X")
