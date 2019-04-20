@@ -40,7 +40,7 @@ class ModeTrackingStrategy(Enum):
 class GlobalConstants:
     TOTAL_EPOCH_COUNT = 200
     EPOCH_COUNT = 200
-    EPOCH_REPORT_PERIOD = 5
+    EPOCH_REPORT_PERIOD = 10
     BATCH_SIZE = 250
     EVAL_BATCH_SIZE = 250
     CURR_BATCH_SIZE = None
@@ -60,7 +60,8 @@ class GlobalConstants:
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
-    INITIAL_LR = 0.1
+    INITIAL_LR = 0.01
+    LR_COEFF = 2.0
     DECAY_STEP = 15000
     DECAY_RATE = 0.5  # INITIAL_LR/EPOCH_COUNT
     # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
@@ -68,10 +69,10 @@ class GlobalConstants:
     # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
     #                                              decay_period=DECAY_STEP)
     LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
-                                                 value=INITIAL_LR,
-                                                 schedule=[(15000, 0.005),
-                                                           (30000, 0.0025),
-                                                           (40000, 0.00025)])
+                                                 value=LR_COEFF * INITIAL_LR,
+                                                 schedule=[(15000, LR_COEFF * 0.005),
+                                                           (30000, LR_COEFF * 0.0025),
+                                                           (40000, LR_COEFF * 0.00025)])
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
@@ -263,3 +264,5 @@ class GlobalConstants:
 
     CIGJ_FASHION_NET_H_FEATURES = [32, 32, 32]
     CIGJ_FASHION_NET_H_POOL_SIZES = [7, 3, 2]
+
+    CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT = 100

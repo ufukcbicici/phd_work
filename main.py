@@ -13,9 +13,12 @@ import simple_tf.cifar_nets.cifar_entry as cifar_entry
 
 import tensorflow as tf
 
+from simple_tf.cigj import cigj_entry
+
 if __name__ == "__main__":
     print("Main - Hello World. With Import.")
     print(tf.__version__)
-    cifar_entry.cifar100_training()
+    # cifar_entry.cifar100_training()
+    cigj_entry.cigj_training()
 
 
