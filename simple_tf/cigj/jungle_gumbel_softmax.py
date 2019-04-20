@@ -12,7 +12,6 @@ class JungleGumbelSoftmax(JungleNoStitch):
                  dataset):
         super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                          dataset)
-        self.gumbelSoftmaxTemperature = tf.placeholder(name="gumbelSoftmaxTemperature", dtype=tf.float32)
         self.zSampleCount = tf.placeholder(name="zSampleCount", dtype=tf.int32)
         # self.unitTestList = [self.test_stitching]
 
@@ -77,7 +76,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
             # If testing: Pick Z = argmax_F p(F|x)
             category_count = tf.constant(node_degree)
             z_samples = JungleGumbelSoftmax.sample_from_gumbel_softmax(probs=p_F_given_x,
-                                                                       temperature=self.gumbelSoftmaxTemperature,
+                                                                       temperature=node.gumbelSoftmaxTemperature,
                                                                        z_sample_count=self.zSampleCount,
                                                                        batch_size=self.batchSize,
                                                                        child_count=node_degree)
@@ -105,3 +104,23 @@ class JungleGumbelSoftmax(JungleNoStitch):
         node.evalDict[
             UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
         node.F_output = node.F_input
+
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
+        feed_dict = super().prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
+                                              is_train=is_train, use_masking=use_masking)
+        # Set Gumbel Softmax Sample Count
+        feed_dict[self.zSampleCount] = GlobalConstants.CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT
+        # Set Gumbel Softmax Temperatures at each h_nodes.
+        if not self.isBaseline:
+            for node in self.topologicalSortedNodes:
+                if not node.nodeType == NodeType.h_node:
+                    continue
+                if is_train:
+                    temperature = node.gumbelSoftmaxTemperatureCalculator.value
+                    feed_dict[node.gumbelSoftmaxTemperature] = temperature
+                    UtilityFuncs.print("{0} value={1}".format(node.gumbelSoftmaxTemperatureCalculator.name,
+                                                              temperature))
+                    node.gumbelSoftmaxTemperatureCalculator.update(iteration=iteration + 1)
+                else:
+                    feed_dict[node.gumbelSoftmaxTemperature] = GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE
+        return feed_dict

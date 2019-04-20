@@ -35,11 +35,28 @@ def get_explanation_string(network):
     explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
     explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
     explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
-    explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
-    explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
-    explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
-    explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
-    explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.SOFTMAX_TEST_TEMPERATURE)
+    # explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
+    # explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
+    # explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
+    # explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+    # explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.SOFTMAX_TEST_TEMPERATURE)
+
+    explanation += "********Softmax Decay Settings********\n"
+    for node in network.topologicalSortedNodes:
+        if node.nodeType == NodeType.h_node:
+            explanation += "********Node{0} Softmax Decay********\n".format(node.index)
+            explanation += node.softmaxDecayCalculator.get_explanation()
+            explanation += "********Node{0} Softmax Decay********\n".format(node.index)
+    explanation += "********Softmax Decay Settings********\n"
+
+    explanation += "********Gumbel Softmax Temperature Settings********\n"
+    for node in network.topologicalSortedNodes:
+        if node.nodeType == NodeType.h_node:
+            explanation += "********Node{0} Gumbel Softmax Temperature********\n".format(node.index)
+            explanation += node.gumbelSoftmaxTemperatureCalculator.get_explanation()
+            explanation += "********Node{0} Gumbel Softmax Temperature********\n".format(node.index)
+    explanation += "********Gumbel Softmax Temperature Settings********\n"
+
     explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
     explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
     explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_PROB)

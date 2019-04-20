@@ -26,6 +26,7 @@ class JungleNode(Node):
         self.conditionIndices = None
         self.conditionProbabilities = None
         self.sampleCountTensor = None
+        self.gumbelSoftmaxTemperatureCalculator = None
         # This is for debugging purposes
         self.stitchedIndices = None
         self.stitchedLabels = None
@@ -33,6 +34,9 @@ class JungleNode(Node):
         if self.nodeType == NodeType.h_node:
             self.softmaxDecay = tf.placeholder(name=UtilityFuncs.get_variable_name(name="softmax_decay", node=self),
                                                dtype=tf.float32)
+            self.gumbelSoftmaxTemperature = tf.placeholder(
+                name=UtilityFuncs.get_variable_name(name="gumbelSoftmaxTemperature", node=self),
+                dtype=tf.float32)
             self.partitioned_F_outputs = []
             self.partitioned_H_outputs = []
             self.conditionIndices = []

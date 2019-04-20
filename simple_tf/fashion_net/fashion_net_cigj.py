@@ -67,7 +67,7 @@ class FashionNetCigj:
     def f_conv_layer_func(node, network):
         network.mask_input_nodes(node=node)
         filter_size = GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES[node.depth]
-        num_of_input_channels = 1 if node.depth == 0 else GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth-1]
+        num_of_input_channels = 1 if node.depth == 0 else GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth - 1]
         num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth]
         node.F_output = FashionNetCigj.build_conv_layer(input=node.F_input,
                                                         node=node,
@@ -124,3 +124,20 @@ class FashionNetCigj:
                                                                 decay=GlobalConstants.SOFTMAX_DECAY_COEFFICIENT,
                                                                 decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
                                                                 min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+
+    @staticmethod
+    def threshold_calculator_gumbel_softmax_func(network):
+        network.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
+                                                                   value=1.0)
+        for node in network.topologicalSortedNodes:
+            if node.nodeType == NodeType.h_node:
+                # Softmax Decay
+                decay_name = network.get_variable_name(name="softmax_decay", node=node)
+                node.softmaxDecayCalculator = FixedParameter(name=decay_name, value=1.0)
+                temperature_name = network.get_variable_name(name="gm_temperature", node=node)
+                node.gumbelSoftmaxTemperatureCalculator = \
+                    DecayingParameter(name=temperature_name,
+                                      value=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL,
+                                      decay=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT,
+                                      decay_period=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD,
+                                      min_limit=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT)
