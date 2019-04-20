@@ -8,7 +8,9 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import FixedParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cigj.jungle import Jungle
+from simple_tf.cigj.jungle_gumbel_softmax import JungleGumbelSoftmax
 from simple_tf.cigj.jungle_no_stitch import JungleNoStitch
+from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
@@ -96,7 +98,7 @@ def cigj_training():
             sess = tf.Session()
         dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
-        jungle = JungleNoStitch(
+        jungle = JungleGumbelSoftmax(
             node_build_funcs=[FashionNetCigj.f_conv_layer_func,
                               FashionNetCigj.f_conv_layer_func,
                               FashionNetCigj.f_conv_layer_func,
@@ -104,7 +106,7 @@ def cigj_training():
                               FashionNetCigj.f_leaf_func],
             h_funcs=[FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func],
             grad_func=None,
-            threshold_func=FashionNetCigj.threshold_calculator_func,
+            threshold_func=FashionNetCigj.threshold_calculator_gumbel_softmax_func,
             residue_func=None, summary_func=None,
             degree_list=GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST, dataset=dataset)
         sess = jungle.get_session()

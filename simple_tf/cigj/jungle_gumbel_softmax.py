@@ -10,9 +10,9 @@ from simple_tf.info_gain import InfoGainLoss
 class JungleGumbelSoftmax(JungleNoStitch):
     def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                  dataset):
+        self.zSampleCount = tf.placeholder(name="zSampleCount", dtype=tf.int32)
         super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                          dataset)
-        self.zSampleCount = tf.placeholder(name="zSampleCount", dtype=tf.int32)
         # self.unitTestList = [self.test_stitching]
 
     @staticmethod
@@ -78,7 +78,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
             z_samples = JungleGumbelSoftmax.sample_from_gumbel_softmax(probs=p_F_given_x,
                                                                        temperature=node.gumbelSoftmaxTemperature,
                                                                        z_sample_count=self.zSampleCount,
-                                                                       batch_size=self.batchSize,
+                                                                       batch_size=tf.cast(self.batchSize, tf.int32),
                                                                        child_count=node_degree)
             z_probs_matrix = tf.reduce_mean(z_samples, axis=1)
             arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
