@@ -102,4 +102,6 @@ class JungleGumbelSoftmax(JungleNoStitch):
                 UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
         else:
             node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
+        node.evalDict[
+            UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
         node.F_output = node.F_input
