@@ -12,7 +12,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
     def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                  dataset):
         self.zSampleCount = tf.placeholder(name="zSampleCount", dtype=tf.int32)
-        self.unitTestList = [] # [self.test_nan_sample_counts]
+        self.unitTestList = [self.test_nan_sample_counts]
         self.prevEvalDict = {}
         self.gradAndVarsDict = {}
         self.decisionGradsDict = {}
@@ -21,6 +21,9 @@ class JungleGumbelSoftmax(JungleNoStitch):
         self.decisionGradsOp = None
         self.classificationGradsOp = None
         self.trainOp = None
+        self.activationGrads = None
+        self.activationGradsDecision = None
+        self.activationGradsClassification = None
         super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                          dataset)
 
@@ -85,6 +88,15 @@ class JungleGumbelSoftmax(JungleNoStitch):
             self.classificationGradsOp = self.optimizer.compute_gradients(self.mainLoss)
             self.gradAndVarsOp = self.optimizer.compute_gradients(self.finalLoss)
             self.trainOp = self.optimizer.apply_gradients(self.gradAndVarsOp, global_step=self.globalCounter)
+            activations_list = []
+            for node in self.topologicalSortedNodes:
+                if node.nodeType == NodeType.h_node:
+                    if UtilityFuncs.get_variable_name(name="activations", node=node) in node.evalDict:
+                        activation = node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)]
+                        activations_list.append(activation)
+            self.activationGrads = tf.gradients(ys=self.finalLoss, xs=activations_list)
+            self.activationGradsDecision = tf.gradients(ys=self.decisionLoss, xs=activations_list)
+            self.activationGradsClassification = tf.gradients(ys=self.mainLoss, xs=activations_list)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -167,7 +179,9 @@ class JungleGumbelSoftmax(JungleNoStitch):
 
     def get_run_ops(self):
         run_ops = [self.gradAndVarsOp, self.trainOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
-                   self.infoGainDicts, self.decisionGradsOp, self.classificationGradsOp]
+                   self.infoGainDicts,
+                   self.activationGrads, self.activationGradsDecision, self.activationGradsClassification,
+                   self.decisionGradsOp, self.classificationGradsOp]
         # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
         #            self.infoGainDicts]
         return run_ops
@@ -194,11 +208,15 @@ class JungleGumbelSoftmax(JungleNoStitch):
         self.gradAndVarsDict = results[0]
         self.decisionGradsDict = results[-3]
         self.classificationGradsDict = results[-2]
+        activation_grads = results[-6]
+        activation_grads_decision = results[-5]
+        activation_grads_classification = results[-4]
         # for i in range(len(self.decisionGradsDict)):
         #     a = self.decisionGradsDict[i][0]
         #     b = self.classificationGradsDict[i][0]
         #     c = self.gradAndVarsDict[i][0]
         #     assert np.allclose(c, a + b)
+
         for grads_vars in self.gradAndVarsDict:
             if np.any(np.isnan(grads_vars[0])):
                 print("Gradient contains nan!")
@@ -216,6 +234,10 @@ class JungleGumbelSoftmax(JungleNoStitch):
         print("mainLoss:{0}".format(eval_dict["mainLoss"]))
         print("regularizationLoss:{0}".format(eval_dict["regularizationLoss"]))
         print("decisionLoss:{0}".format(eval_dict["decisionLoss"]))
+        # Check activations
+        activations_dict = {k: v for k, v in eval_dict.items() if "_activations" in k}
+        for k, v in activations_dict.items():
+            print("{0} max:{1} min:{2}".format(k, np.max(v), np.min(v)))
         # Check for nan gradients
         for grad_var_tpl in self.gradAndVarsDict:
             if np.any(np.isnan(grad_var_tpl[0])):
