@@ -51,6 +51,7 @@ class Jungle(FastTreeNetwork):
         # Build network as a DAG
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         self.build_network()
+        self.build_optimizer()
         self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
@@ -111,6 +112,8 @@ class Jungle(FastTreeNetwork):
             for k, v in node.evalDict.items():
                 assert k not in self.evalDict
                 self.evalDict[k] = v
+
+    def build_optimizer(self):
         # Build main classification loss
         self.build_main_loss()
         # Build information gain loss

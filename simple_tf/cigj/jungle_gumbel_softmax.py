@@ -12,9 +12,17 @@ class JungleGumbelSoftmax(JungleNoStitch):
     def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                  dataset):
         self.zSampleCount = tf.placeholder(name="zSampleCount", dtype=tf.int32)
+        self.unitTestList = [] # [self.test_nan_sample_counts]
+        self.prevEvalDict = {}
+        self.gradAndVarsDict = {}
+        self.decisionGradsDict = {}
+        self.classificationGradsDict = {}
+        self.gradAndVarsOp = None
+        self.decisionGradsOp = None
+        self.classificationGradsOp = None
+        self.trainOp = None
         super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                          dataset)
-        self.unitTestList = [self.test_nan_sample_counts]
 
     @staticmethod
     def sample_from_gumbel_softmax(probs, temperature, z_sample_count, batch_size, child_count):
@@ -46,6 +54,37 @@ class JungleGumbelSoftmax(JungleNoStitch):
         #                               z_sample_count_tensor: z_sample_count,
         #                               temperature_tensor: temperature})
         # p_z = np.mean(results[2], axis=0)
+
+    def build_optimizer(self):
+        # Build main classification loss
+        self.build_main_loss()
+        # Build information gain loss
+        self.build_decision_loss()
+        # Build regularization loss
+        self.build_regularization_loss()
+        # Final Loss
+        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
+        self.evalDict["mainLoss"] = self.mainLoss
+        self.evalDict["regularizationLoss"] = self.regularizationLoss
+        self.evalDict["decisionLoss"] = self.decisionLoss
+        # Build optimizer
+        self.globalCounter = tf.Variable(0, trainable=False)
+        boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
+        values = [GlobalConstants.INITIAL_LR]
+        values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
+        self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
+        self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
+        # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
+        with tf.control_dependencies(self.extra_update_ops):
+            # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+            #                                                                              global_step=self.globalCounter)
+            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
+            self.decisionGradsOp = self.optimizer.compute_gradients(self.decisionLoss)
+            self.decisionGradsOp = [tpl for tpl in self.decisionGradsOp if tpl[0] is not None]
+            self.classificationGradsOp = self.optimizer.compute_gradients(self.mainLoss)
+            self.gradAndVarsOp = self.optimizer.compute_gradients(self.finalLoss)
+            self.trainOp = self.optimizer.apply_gradients(self.gradAndVarsOp, global_step=self.globalCounter)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -126,26 +165,90 @@ class JungleGumbelSoftmax(JungleNoStitch):
                     feed_dict[node.gumbelSoftmaxTemperature] = GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE
         return feed_dict
 
+    def get_run_ops(self):
+        run_ops = [self.gradAndVarsOp, self.trainOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+                   self.infoGainDicts, self.decisionGradsOp, self.classificationGradsOp]
+        # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        #            self.infoGainDicts]
+        return run_ops
+
+    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
+        if minibatch is None:
+            return None, None, None
+        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
+                                           is_train=True, use_masking=True)
+        # Prepare result tensors to collect
+        # grads_vars = sess.run([self.gradAndVarsOp], feed_dict=feed_dict)
+        # for grads_vars in grads_vars:
+        #     if np.any(np.isnan(grads_vars[0])):
+        #         print("Gradient contains nan!")
+        run_ops = self.get_run_ops()
+        if GlobalConstants.USE_VERBOSE:
+            run_ops.append(self.evalDict)
+        # print("Before Update Iteration:{0}".format(iteration))
+        results = sess.run(run_ops, feed_dict=feed_dict)
+        # print("After Update Iteration:{0}".format(iteration))
+        self.gradAndVarsDict = results[0]
+        self.decisionGradsDict = results[-3]
+        self.classificationGradsDict = results[-2]
+        # for i in range(len(self.decisionGradsDict)):
+        #     a = self.decisionGradsDict[i][0]
+        #     b = self.classificationGradsDict[i][0]
+        #     c = self.gradAndVarsDict[i][0]
+        #     assert np.allclose(c, a + b)
+        for grads_vars in self.gradAndVarsDict:
+            if np.any(np.isnan(grads_vars[0])):
+                print("Gradient contains nan!")
+        lr = results[2]
+        sample_counts = results[3]
+        is_open_indicators = results[4]
+        # Unit Tests
+        if GlobalConstants.USE_UNIT_TESTS:
+            for test in self.unitTestList:
+                test(results[-1])
+        return lr, sample_counts, is_open_indicators
+
     # Unit test methods
     def test_nan_sample_counts(self, eval_dict):
+        print("mainLoss:{0}".format(eval_dict["mainLoss"]))
+        print("regularizationLoss:{0}".format(eval_dict["regularizationLoss"]))
+        print("decisionLoss:{0}".format(eval_dict["decisionLoss"]))
+        # Check for nan gradients
+        for grad_var_tpl in self.gradAndVarsDict:
+            if np.any(np.isnan(grad_var_tpl[0])):
+                print("Gradient contains nan!")
+        # Check for Gumbel-Softmax samples.
+        z_samples_dict = {k: v for k, v in eval_dict.items() if "z_samples" in k}
+        for k, v in z_samples_dict.items():
+            nan_arr = np.isnan(v)
+            if np.any(nan_arr):
+                print("{0} contains nan!".format(k))
         # Check all-close inputs
         tuples = [(12, 100), (12, 95), (12, 2)]
         for tpl in tuples:
             print("np.allclose(eval_dict[\"Node1_F_input\"][{0}], eval_dict[\"Node1_F_input\"][{1}])={2}".format(
                 tpl[0], tpl[1],
                 np.allclose(eval_dict["Node1_F_input"][tpl[0]], eval_dict["Node1_F_input"][tpl[1]])))
+            if np.allclose(eval_dict["Node1_F_input"][tpl[0]], eval_dict["Node1_F_input"][tpl[1]]):
+                print("All Close.")
         # Check node1 loss weights
-        node1_params =
-
+        node1_params = {k: v for k, v in eval_dict.items() if "l2_" in k and "Node1" in k}
+        print(node1_params)
         # Check sample count arrays
         sample_count_arrays = {k: v for k, v in eval_dict.items() if "sample_count" in k}
         for k, v in sample_count_arrays.items():
             if np.isnan(v):
                 print("NAN!")
+        for k in eval_dict.keys():
+            self.prevEvalDict[k] = eval_dict[k]
 
         # h_nodes = [node for node in self.topologicalSortedNodes if node.nodeType == NodeType.h_node]
         # for h_node in h_nodes:
-        #     if len(self.dagObject.parents(node=h_node)) == 1:
+        #     if len(self.dagObject.parent
+        #     s(node=h_node)) == 1:
         #         continue
         #     parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=h_node)
         #                       if f_node.nodeType == NodeType.f_node]
