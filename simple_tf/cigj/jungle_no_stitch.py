@@ -13,7 +13,7 @@ class JungleNoStitch(Jungle):
                  dataset):
         super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                          dataset)
-        self.unitTestList = [self.test_stitching]
+        # self.unitTestList = [self.test_stitching]
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node

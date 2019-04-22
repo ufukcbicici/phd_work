@@ -145,6 +145,8 @@ def cigj_training():
                 # Print sample counts (classification)
                 sample_count_str = "Classification:   "
                 for k, v in sample_counts.items():
+                    if np.isnan(v):
+                        print("NAN!!!")
                     sample_count_str += "[{0}={1}]".format(k, v)
                     node_index = jungle.get_node_from_variable_name(name=k).index
                     leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))

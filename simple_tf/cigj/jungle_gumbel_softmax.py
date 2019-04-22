@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle_no_stitch import JungleNoStitch
@@ -13,7 +14,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
         self.zSampleCount = tf.placeholder(name="zSampleCount", dtype=tf.int32)
         super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                          dataset)
-        # self.unitTestList = [self.test_stitching]
+        self.unitTestList = [self.test_nan_sample_counts]
 
     @staticmethod
     def sample_from_gumbel_softmax(probs, temperature, z_sample_count, batch_size, child_count):
@@ -124,3 +125,41 @@ class JungleGumbelSoftmax(JungleNoStitch):
                 else:
                     feed_dict[node.gumbelSoftmaxTemperature] = GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE
         return feed_dict
+
+    # Unit test methods
+    def test_nan_sample_counts(self, eval_dict):
+        # Check all-close inputs
+        tuples = [(12, 100), (12, 95), (12, 2)]
+        for tpl in tuples:
+            print("np.allclose(eval_dict[\"Node1_F_input\"][{0}], eval_dict[\"Node1_F_input\"][{1}])={2}".format(
+                tpl[0], tpl[1],
+                np.allclose(eval_dict["Node1_F_input"][tpl[0]], eval_dict["Node1_F_input"][tpl[1]])))
+        # Check node1 loss weights
+        node1_params =
+
+        # Check sample count arrays
+        sample_count_arrays = {k: v for k, v in eval_dict.items() if "sample_count" in k}
+        for k, v in sample_count_arrays.items():
+            if np.isnan(v):
+                print("NAN!")
+
+        # h_nodes = [node for node in self.topologicalSortedNodes if node.nodeType == NodeType.h_node]
+        # for h_node in h_nodes:
+        #     if len(self.dagObject.parents(node=h_node)) == 1:
+        #         continue
+        #     parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=h_node)
+        #                       if f_node.nodeType == NodeType.f_node]
+        #     parent_f_nodes = sorted(parent_f_nodes, key=lambda f_node: f_node.index)
+        #     parent_h_nodes = [h_node for h_node in self.dagObject.parents(node=h_node)
+        #                       if h_node.nodeType == NodeType.h_node]
+        #     assert len(parent_h_nodes) == 1
+        #     f_input = eval_dict[UtilityFuncs.get_variable_name(name="F_input", node=h_node)]
+        #     condition_probabilities = eval_dict[UtilityFuncs.get_variable_name(name="conditionProbabilities",
+        #                                                                        node=parent_h_nodes[0])]
+        #     f_outputs_prev_layer = [eval_dict[UtilityFuncs.get_variable_name(name="F_output", node=node)]
+        #                             for node in parent_f_nodes]
+        #     f_input_manual = np.zeros_like(f_input)
+        #     for r in range(condition_probabilities.shape[0]):
+        #         selected_node_idx = np.asscalar(np.argmax(condition_probabilities[r, :]))
+        #         f_input_manual[r, :] = f_outputs_prev_layer[selected_node_idx][r, :]
+        #     assert np.allclose(f_input, f_input_manual)
