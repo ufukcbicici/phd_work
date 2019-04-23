@@ -26,6 +26,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
         self.activationGradsClassification = None
         super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
                          dataset)
+        self.evalDict["oneHotLabelTensor"] = self.oneHotLabelTensor
 
     @staticmethod
     def sample_from_gumbel_softmax(probs, temperature, z_sample_count, batch_size, child_count):
@@ -211,6 +212,12 @@ class JungleGumbelSoftmax(JungleNoStitch):
         activation_grads = results[-6]
         activation_grads_decision = results[-5]
         activation_grads_classification = results[-4]
+        for grads in activation_grads_decision:
+            if np.any(np.isnan(grads)):
+                print("Gradient contains nan!")
+        for grads in activation_grads_classification:
+            if np.any(np.isnan(grads)):
+                print("Gradient contains nan!")
         # for i in range(len(self.decisionGradsDict)):
         #     a = self.decisionGradsDict[i][0]
         #     b = self.classificationGradsDict[i][0]
