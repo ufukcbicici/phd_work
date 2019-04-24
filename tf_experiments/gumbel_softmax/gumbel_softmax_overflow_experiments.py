@@ -21,12 +21,14 @@ z_samples = JungleGumbelSoftmax.sample_from_gumbel_softmax(probs=probs_tf,
                                                            z_sample_count=100,
                                                            batch_size=probs.shape[0],
                                                            child_count=probs.shape[1])
-grads = tf.gradients(ig, probs_tf)
+sample_sum = tf.reduce_sum(z_samples)
+grads_ig = tf.gradients(ig, probs_tf)
+grads_samples = tf.gradients(sample_sum, probs_tf)
 sess = tf.Session()
 
 # x = np.array([-38.396988, -19.412645, 51.50944]).reshape((1, 3))
 # l = np.zeros(10)
 # l[3] = 1.0
 # l = l.reshape((1, 10))
-results = sess.run([ig, probs_tf, z_samples], feed_dict={probs_tf: probs, labels_tf: oneHotLabelTensor})
+results = sess.run([ig, probs_tf, z_samples, grads_samples], feed_dict={probs_tf: probs, labels_tf: oneHotLabelTensor})
 print("X")
