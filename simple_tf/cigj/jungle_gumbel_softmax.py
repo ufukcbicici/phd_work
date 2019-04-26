@@ -147,6 +147,11 @@ class JungleGumbelSoftmax(JungleNoStitch):
             # Step 3:
             # If training: Sample Z from Gumbel-Softmax distribution, based on p(F|x).
             # If testing: Pick Z = argmax_F p(F|x)
+            # Prevent exactly zero probabilities by adding a constant.
+            equal_mask = tf.cast(tf.equal(p_F_given_x, 0.0), tf.float32)
+            mask_prob = GlobalConstants.INFO_GAIN_LOG_EPSILON * equal_mask
+            p_F_given_x = p_F_given_x + mask_prob
+
             category_count = tf.constant(node_degree)
             z_samples = JungleGumbelSoftmax.sample_from_gumbel_softmax(probs=p_F_given_x,
                                                                        temperature=node.gumbelSoftmaxTemperature,
