@@ -87,37 +87,37 @@ class JungleGumbelSoftmax(JungleNoStitch):
         with tf.control_dependencies(self.extra_update_ops):
             # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
             #                                                                              global_step=self.globalCounter)
-            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
-            self.decisionGradsOp = self.optimizer.compute_gradients(self.decisionLoss)
-            self.decisionGradsOp = [tpl for tpl in self.decisionGradsOp if tpl[0] is not None]
-            self.classificationGradsOp = self.optimizer.compute_gradients(self.mainLoss)
+            # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
+            # self.decisionGradsOp = self.optimizer.compute_gradients(self.decisionLoss)
+            # self.decisionGradsOp = [tpl for tpl in self.decisionGradsOp if tpl[0] is not None]
+            # self.classificationGradsOp = self.optimizer.compute_gradients(self.mainLoss)
             self.gradAndVarsOp = self.optimizer.compute_gradients(self.finalLoss)
             self.trainOp = self.optimizer.apply_gradients(self.gradAndVarsOp, global_step=self.globalCounter)
-            activations_list = []
-            probs_list = []
-            z_probs_list = []
-            z_samples_list = []
-            for node in self.topologicalSortedNodes:
-                if node.nodeType == NodeType.h_node:
-                    if UtilityFuncs.get_variable_name(name="activations", node=node) in node.evalDict:
-                        activation = node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)]
-                        activations_list.append(activation)
-                    if UtilityFuncs.get_variable_name(name="p(n|x)", node=node) in node.evalDict:
-                        prob = node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)]
-                        probs_list.append(prob)
-                    if UtilityFuncs.get_variable_name(name="z_samples", node=node) in node.evalDict:
-                        z_samples = node.evalDict[UtilityFuncs.get_variable_name(name="z_samples", node=node)]
-                        z_samples_list.append(z_samples)
-                    if UtilityFuncs.get_variable_name(name="z_probs_matrix", node=node) in node.evalDict:
-                        z_probs_matrix = node.evalDict[UtilityFuncs.get_variable_name(name="z_probs_matrix", node=node)]
-                        z_probs_list.append(z_probs_matrix)
-            self.activationGrads = tf.gradients(ys=self.finalLoss, xs=activations_list)
-            self.activationGradsDecision = tf.gradients(ys=self.decisionLoss, xs=activations_list)
-            self.activationGradsClassification = tf.gradients(ys=self.mainLoss, xs=activations_list)
-            self.probGradsDecision = tf.gradients(ys=self.decisionLoss, xs=probs_list)
-            self.probGradsClassification = tf.gradients(ys=self.mainLoss, xs=probs_list)
-            self.zProbsGrads = tf.gradients(ys=self.finalLoss, xs=z_probs_list)
-            self.zSamplesGrads = tf.gradients(ys=self.finalLoss, xs=z_samples_list)
+            # activations_list = []
+            # probs_list = []
+            # z_probs_list = []
+            # z_samples_list = []
+            # for node in self.topologicalSortedNodes:
+            #     if node.nodeType == NodeType.h_node:
+            #         if UtilityFuncs.get_variable_name(name="activations", node=node) in node.evalDict:
+            #             activation = node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)]
+            #             activations_list.append(activation)
+            #         if UtilityFuncs.get_variable_name(name="p(n|x)", node=node) in node.evalDict:
+            #             prob = node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)]
+            #             probs_list.append(prob)
+            #         if UtilityFuncs.get_variable_name(name="z_samples", node=node) in node.evalDict:
+            #             z_samples = node.evalDict[UtilityFuncs.get_variable_name(name="z_samples", node=node)]
+            #             z_samples_list.append(z_samples)
+            #         if UtilityFuncs.get_variable_name(name="z_probs_matrix", node=node) in node.evalDict:
+            #             z_probs_matrix = node.evalDict[UtilityFuncs.get_variable_name(name="z_probs_matrix", node=node)]
+            #             z_probs_list.append(z_probs_matrix)
+            # self.activationGrads = tf.gradients(ys=self.finalLoss, xs=activations_list)
+            # self.activationGradsDecision = tf.gradients(ys=self.decisionLoss, xs=activations_list)
+            # self.activationGradsClassification = tf.gradients(ys=self.mainLoss, xs=activations_list)
+            # self.probGradsDecision = tf.gradients(ys=self.decisionLoss, xs=probs_list)
+            # self.probGradsClassification = tf.gradients(ys=self.mainLoss, xs=probs_list)
+            # self.zProbsGrads = tf.gradients(ys=self.finalLoss, xs=z_probs_list)
+            # self.zSamplesGrads = tf.gradients(ys=self.finalLoss, xs=z_samples_list)
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
@@ -150,16 +150,16 @@ class JungleGumbelSoftmax(JungleNoStitch):
             # Prevent exactly zero probabilities by adding a constant.
             equal_mask = tf.cast(tf.equal(p_F_given_x, 0.0), tf.float32)
             mask_prob = GlobalConstants.INFO_GAIN_LOG_EPSILON * equal_mask
-            p_F_given_x = p_F_given_x + mask_prob
+            p_F_given_x_corrected = p_F_given_x + mask_prob
 
             category_count = tf.constant(node_degree)
-            z_samples = JungleGumbelSoftmax.sample_from_gumbel_softmax(probs=p_F_given_x,
+            z_samples = JungleGumbelSoftmax.sample_from_gumbel_softmax(probs=p_F_given_x_corrected,
                                                                        temperature=node.gumbelSoftmaxTemperature,
                                                                        z_sample_count=self.zSampleCount,
                                                                        batch_size=tf.cast(self.batchSize, tf.int32),
                                                                        child_count=node_degree)
             z_probs_matrix = tf.reduce_mean(z_samples, axis=1)
-            arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
+            arg_max_indices = tf.argmax(p_F_given_x_corrected, axis=1, output_type=tf.int32)
             arg_max_one_hot_matrix = tf.one_hot(arg_max_indices, category_count)
             node.conditionProbabilities = tf.where(self.isTrain > 0, z_probs_matrix, arg_max_one_hot_matrix)
             # Reporting
@@ -169,6 +169,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
             node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
             node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
             node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
+            node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)_corrected", node=node)] = p_F_given_x_corrected
             node.evalDict[
                 UtilityFuncs.get_variable_name(name="z_samples", node=node)] = z_samples
             node.evalDict[
@@ -204,14 +205,14 @@ class JungleGumbelSoftmax(JungleNoStitch):
         return feed_dict
 
     def get_run_ops(self):
+        # run_ops = [self.gradAndVarsOp, self.trainOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        #            self.infoGainDicts,
+        #            self.zSamplesGrads, self.zProbsGrads,
+        #            self.probGradsDecision, self.probGradsClassification,
+        #            self.activationGrads, self.activationGradsDecision, self.activationGradsClassification,
+        #            self.decisionGradsOp, self.classificationGradsOp]
         run_ops = [self.gradAndVarsOp, self.trainOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
-                   self.infoGainDicts,
-                   self.zSamplesGrads, self.zProbsGrads,
-                   self.probGradsDecision, self.probGradsClassification,
-                   self.activationGrads, self.activationGradsDecision, self.activationGradsClassification,
-                   self.decisionGradsOp, self.classificationGradsOp]
-        # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
-        #            self.infoGainDicts]
+                   self.infoGainDicts]
         return run_ops
 
     def update_params_with_momentum(self, sess, dataset, epoch, iteration):
@@ -232,33 +233,35 @@ class JungleGumbelSoftmax(JungleNoStitch):
             run_ops.append(self.evalDict)
         # print("Before Update Iteration:{0}".format(iteration))
         results = sess.run(run_ops, feed_dict=feed_dict)
-        # print("After Update Iteration:{0}".format(iteration))
-        self.gradAndVarsDict = results[0]
-        self.decisionGradsDict = results[-3]
-        self.classificationGradsDict = results[-2]
-        prob_grads_decision = results[-8]
-        prob_grads_classification = results[-7]
-        activation_grads = results[-6]
-        activation_grads_decision = results[-5]
-        activation_grads_classification = results[-4]
-        zero_count = np.sum(results[-1]["Node1_p(n|x)"] == 0.0)
-        if zero_count > 0:
-            print("We have zero!!!")
-        for grads in activation_grads_decision:
-            if np.any(np.isnan(grads)):
-                print("Gradient contains nan!")
-        for grads in activation_grads_classification:
-            if np.any(np.isnan(grads)):
-                print("Gradient contains nan!")
-        # for i in range(len(self.decisionGradsDict)):
-        #     a = self.decisionGradsDict[i][0]
-        #     b = self.classificationGradsDict[i][0]
-        #     c = self.gradAndVarsDict[i][0]
-        #     assert np.allclose(c, a + b)
 
-        for grads_vars in self.gradAndVarsDict:
-            if np.any(np.isnan(grads_vars[0])):
-                print("Gradient contains nan!")
+        # The following is for debug
+        # # print("After Update Iteration:{0}".format(iteration))
+        # self.gradAndVarsDict = results[0]
+        # self.decisionGradsDict = results[-3]
+        # self.classificationGradsDict = results[-2]
+        # prob_grads_decision = results[-8]
+        # prob_grads_classification = results[-7]
+        # activation_grads = results[-6]
+        # activation_grads_decision = results[-5]
+        # activation_grads_classification = results[-4]
+        # zero_count = np.sum(results[-1]["Node1_p(n|x)"] == 0.0)
+        # if zero_count > 0:
+        #     print("We have zero!!!")
+        # for grads in activation_grads_decision:
+        #     if np.any(np.isnan(grads)):
+        #         print("Gradient contains nan!")
+        # for grads in activation_grads_classification:
+        #     if np.any(np.isnan(grads)):
+        #         print("Gradient contains nan!")
+        # # for i in range(len(self.decisionGradsDict)):
+        # #     a = self.decisionGradsDict[i][0]
+        # #     b = self.classificationGradsDict[i][0]
+        # #     c = self.gradAndVarsDict[i][0]
+        # #     assert np.allclose(c, a + b)
+        #
+        # for grads_vars in self.gradAndVarsDict:
+        #     if np.any(np.isnan(grads_vars[0])):
+        #         print("Gradient contains nan!")
         lr = results[2]
         sample_counts = results[3]
         is_open_indicators = results[4]
