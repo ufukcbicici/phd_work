@@ -182,24 +182,24 @@ class EggDataset:
         self.reset()
 
     def calculate_weighted_map(self):
-        pixel_count = 0
-        freq_dict = {0: 0, 128: 0, 255: 0}
-        for idx, tpl in enumerate(self.trainImages):
-            mask = tpl[1]
-            # background_count = np.sum(mask == 0)
-            egg_count = np.sum(mask == 128)
-            pane_count = np.sum(mask == 255)
-            background_count = (mask.shape[0] * mask.shape[1]) - (egg_count + pane_count)
-            freq_dict[0] += background_count
-            freq_dict[128] += egg_count
-            freq_dict[255] += pane_count
-            # if (background_count + egg_count + pane_count) != mask.shape[0] * mask.shape[1]:
-            #     print(self.trainImageNames[idx])
-            pixel_count += (background_count + egg_count + pane_count)
-        inv_freqs = {k: 1.0 / v for k, v in freq_dict.items()}
-        min_weight = min(inv_freqs.values())
-        self.weightDict = {k: v / min_weight for k, v in inv_freqs.items()}
-        # self.weightDict = {0: 1.0, 128: 1.0, 255: 1.0}
+        # pixel_count = 0
+        # freq_dict = {0: 0, 128: 0, 255: 0}
+        # for idx, tpl in enumerate(self.trainImages):
+        #     mask = tpl[1]
+        #     # background_count = np.sum(mask == 0)
+        #     egg_count = np.sum(mask == 128)
+        #     pane_count = np.sum(mask == 255)
+        #     background_count = (mask.shape[0] * mask.shape[1]) - (egg_count + pane_count)
+        #     freq_dict[0] += background_count
+        #     freq_dict[128] += egg_count
+        #     freq_dict[255] += pane_count
+        #     # if (background_count + egg_count + pane_count) != mask.shape[0] * mask.shape[1]:
+        #     #     print(self.trainImageNames[idx])
+        #     pixel_count += (background_count + egg_count + pane_count)
+        # inv_freqs = {k: 1.0 / v for k, v in freq_dict.items()}
+        # min_weight = min(inv_freqs.values())
+        # self.weightDict = {k: v / min_weight for k, v in inv_freqs.items()}
+        self.weightDict = {0: 1.0, 128: 5.0, 255: 5.0}
 
     def reset(self):
         self.currentIndex = 0

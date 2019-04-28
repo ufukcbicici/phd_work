@@ -20,7 +20,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Resnet-50 CIGN Tests\n"
+    explanation = "Resnet-50 Sampling CIGN Tests\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -51,11 +51,11 @@ def get_explanation_string(network):
         GlobalConstants.USE_TRAINABLE_PARAMS_WITH_BATCH_NORM)
     explanation += "Hyperplane bias at 0.0\n"
     explanation += "Using Convolutional Routing Networks:{0}\n".format(GlobalConstants.USE_CONVOLUTIONAL_H_PIPELINE)
-    explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
-    explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
-    explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
-    explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
-    explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.SOFTMAX_TEST_TEMPERATURE)
+    explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL)
+    explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT)
+    explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD)
+    explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
+    explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.RESNET_SOFTMAX_TEST_TEMPERATURE)
     explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
     # for node in network.topologicalSortedNodes:
     #     if node.isLeaf:
@@ -102,7 +102,7 @@ def get_explanation_string(network):
         format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
     explanation += "***** ResNet Parameters *****\n"
     explanation += str(GlobalConstants.RESNET_HYPERPARAMS)
-    explanation += "\nUse Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
+    explanation += "Use Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
     return explanation
 
 
@@ -119,7 +119,6 @@ def get_network(dataset):
             degree_list=GlobalConstants.RESNET_TREE_DEGREES,
             dataset=dataset)
     else:
-        print("USING STANDARD CIGN!!!")
         network = FastTreeNetwork(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
             grad_func=cign_resnet.grad_func,
@@ -134,7 +133,7 @@ def get_network(dataset):
 def cifar100_training():
     # classification_wd = [0.00005 * i for i in range(21)] * 3
     # classification_wd = sorted(classification_wd)
-    classification_wd = [0.00035] * 4
+    classification_wd = [0.00015] * 4
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]
