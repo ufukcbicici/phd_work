@@ -20,7 +20,7 @@ def get_explanation_string(network):
     for v in tf.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
     # Tree
-    explanation = "CIGJ Fashion MNIST Tests\n"
+    explanation = "CIGJ Fashion MNIST Gumbel-Softmax Tests\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Jungle Degree Degree:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
