@@ -38,11 +38,11 @@ class ModeTrackingStrategy(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 100
-    EPOCH_COUNT = 100
-    EPOCH_REPORT_PERIOD = 10
-    BATCH_SIZE = 125
-    EVAL_BATCH_SIZE = 125
+    TOTAL_EPOCH_COUNT = 200
+    EPOCH_COUNT = 200
+    EPOCH_REPORT_PERIOD = 2
+    BATCH_SIZE = 250
+    EVAL_BATCH_SIZE = 1000
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
@@ -61,7 +61,7 @@ class GlobalConstants:
     WEIGHT_DECAY_COEFFICIENT = 0.0
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.01
-    LR_COEFF = 1.0
+    LR_COEFF = 2.0
     DECAY_STEP = 15000
     DECAY_RATE = 0.5  # INITIAL_LR/EPOCH_COUNT
     # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
