@@ -85,14 +85,14 @@ class JungleGumbelSoftmax(JungleNoStitch):
         # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
         with tf.control_dependencies(self.extra_update_ops):
-            # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-            #                                                                              global_step=self.globalCounter)
+            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+                                                                                         global_step=self.globalCounter)
             # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
             # self.decisionGradsOp = self.optimizer.compute_gradients(self.decisionLoss)
             # self.decisionGradsOp = [tpl for tpl in self.decisionGradsOp if tpl[0] is not None]
             # self.classificationGradsOp = self.optimizer.compute_gradients(self.mainLoss)
-            self.gradAndVarsOp = self.optimizer.compute_gradients(self.finalLoss)
-            self.trainOp = self.optimizer.apply_gradients(self.gradAndVarsOp, global_step=self.globalCounter)
+            # self.gradAndVarsOp = self.optimizer.compute_gradients(self.finalLoss)
+            # self.trainOp = self.optimizer.apply_gradients(self.gradAndVarsOp, global_step=self.globalCounter)
             # activations_list = []
             # probs_list = []
             # z_probs_list = []
@@ -211,7 +211,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
         #            self.probGradsDecision, self.probGradsClassification,
         #            self.activationGrads, self.activationGradsDecision, self.activationGradsClassification,
         #            self.decisionGradsOp, self.classificationGradsOp]
-        run_ops = [self.gradAndVarsOp, self.trainOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
                    self.infoGainDicts]
         return run_ops
 
@@ -262,9 +262,9 @@ class JungleGumbelSoftmax(JungleNoStitch):
         # for grads_vars in self.gradAndVarsDict:
         #     if np.any(np.isnan(grads_vars[0])):
         #         print("Gradient contains nan!")
-        lr = results[2]
-        sample_counts = results[3]
-        is_open_indicators = results[4]
+        lr = results[1]
+        sample_counts = results[2]
+        is_open_indicators = results[3]
         # Unit Tests
         if GlobalConstants.USE_UNIT_TESTS:
             for test in self.unitTestList:
