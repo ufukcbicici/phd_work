@@ -20,7 +20,7 @@ def get_explanation_string(network):
     for v in tf.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
     # Tree
-    explanation = "CIGJ Fashion MNIST Gumbel-Softmax Tests\n"
+    explanation = "CIGJ Fashion MNIST Approximate Training Tests\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Jungle Degree Degree:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
@@ -76,14 +76,14 @@ def get_explanation_string(network):
 def cigj_training():
     classification_wd = [0.0]
     decision_wd = [0.0]
-    info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
-    # classification_dropout_probs = [0.15]
-    classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
-                                          GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
-    # info_gain_balance_coeffs = [1.0]
+    # info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
     # # classification_dropout_probs = [0.15]
-    # classification_dropout_probs = [0.0]
-    decision_dropout_probs = [0.0]
+    # classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
+    #                                       GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
+    info_gain_balance_coeffs = [1.0]
+    # classification_dropout_probs = [0.15]
+    classification_dropout_probs = [0.15]
+    decision_dropout_probs = [0.35]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
@@ -101,7 +101,7 @@ def cigj_training():
             sess = tf.Session()
         dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
-        jungle = JungleGumbelSoftmax(
+        jungle = JungleNoStitch(
             node_build_funcs=[FashionNetCigj.f_conv_layer_func,
                               FashionNetCigj.f_conv_layer_func,
                               FashionNetCigj.f_conv_layer_func,
@@ -109,7 +109,7 @@ def cigj_training():
                               FashionNetCigj.f_leaf_func],
             h_funcs=[FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func],
             grad_func=None,
-            threshold_func=FashionNetCigj.threshold_calculator_gumbel_softmax_func,
+            threshold_func=FashionNetCigj.threshold_calculator_func,
             residue_func=None, summary_func=None,
             degree_list=GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST, dataset=dataset)
         sess = jungle.get_session()

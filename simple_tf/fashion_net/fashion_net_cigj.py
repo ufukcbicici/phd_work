@@ -124,6 +124,14 @@ class FashionNetCigj:
                                                                 decay=GlobalConstants.SOFTMAX_DECAY_COEFFICIENT,
                                                                 decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
                                                                 min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+                # Gm Temperature
+                temperature_name = network.get_variable_name(name="gm_temperature", node=node)
+                node.gumbelSoftmaxTemperatureCalculator = \
+                    DecayingParameter(name=temperature_name,
+                                      value=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL,
+                                      decay=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT,
+                                      decay_period=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD,
+                                      min_limit=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT)
 
     @staticmethod
     def threshold_calculator_gumbel_softmax_func(network):
@@ -134,6 +142,7 @@ class FashionNetCigj:
                 # Softmax Decay
                 decay_name = network.get_variable_name(name="softmax_decay", node=node)
                 node.softmaxDecayCalculator = FixedParameter(name=decay_name, value=1.0)
+                # Gm Temperature
                 temperature_name = network.get_variable_name(name="gm_temperature", node=node)
                 node.gumbelSoftmaxTemperatureCalculator = \
                     DecayingParameter(name=temperature_name,
