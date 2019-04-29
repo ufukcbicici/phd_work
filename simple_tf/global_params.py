@@ -37,6 +37,11 @@ class ModeTrackingStrategy(Enum):
     wait_for_fixed_epochs = 1
 
 
+class Optimizer(Enum):
+    Momentum = 0
+    Adam = 1
+
+
 class GlobalConstants:
     TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
@@ -49,6 +54,7 @@ class GlobalConstants:
     USE_SAMPLING_CIGN = False
     USE_FAST_TREE_MODE = True
     EXPERIMENT_MULTIPLICATION_FACTOR = 5
+    OPTIMIZER_TYPE = Optimizer.Adam
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10

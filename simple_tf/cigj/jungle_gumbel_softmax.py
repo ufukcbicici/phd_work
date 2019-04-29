@@ -85,8 +85,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
         # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
         with tf.control_dependencies(self.extra_update_ops):
-            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-                                                                                         global_step=self.globalCounter)
+            self.optimizer = self.get_solver()
             # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
             # self.decisionGradsOp = self.optimizer.compute_gradients(self.decisionLoss)
             # self.decisionGradsOp = [tpl for tpl in self.decisionGradsOp if tpl[0] is not None]

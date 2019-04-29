@@ -24,6 +24,7 @@ def get_explanation_string(network):
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Jungle Degree Degree:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
+    explanation += "Optimizer:{0}\n".format(GlobalConstants.OPTIMIZER_TYPE)
     explanation += "********Lr Settings********\n"
     explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
     explanation += "********Lr Settings********\n"

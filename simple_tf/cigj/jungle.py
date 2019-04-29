@@ -134,7 +134,14 @@ class Jungle(FastTreeNetwork):
         with tf.control_dependencies(self.extra_update_ops):
             # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
             #                                                                              global_step=self.globalCounter)
-            self.optimizer = tf.train.AdamOptimizer().minimize(self.finalLoss, global_step=self.globalCounter)
+            self.optimizer = self.get_solver()
+
+    def get_solver(self):
+        if GlobalConstants.OPTIMIZER_TYPE == Optimizer.Adam:
+            return tf.train.AdamOptimizer().minimize(self.finalLoss, global_step=self.globalCounter)
+        elif GlobalConstants.OPTIMIZER_TYPE == Optimizer.Momentum:
+            return tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+                                                                               global_step=self.globalCounter)
 
     def build_decision_loss(self):
         decision_losses = []
