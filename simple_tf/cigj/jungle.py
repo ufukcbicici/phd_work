@@ -11,6 +11,7 @@ from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 from simple_tf.info_gain import InfoGainLoss
+from simple_tf.global_params import Optimizer
 
 
 class Jungle(FastTreeNetwork):
