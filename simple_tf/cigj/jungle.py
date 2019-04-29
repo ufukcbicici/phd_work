@@ -132,8 +132,9 @@ class Jungle(FastTreeNetwork):
         # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
         with tf.control_dependencies(self.extra_update_ops):
-            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-                                                                                         global_step=self.globalCounter)
+            # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+            #                                                                              global_step=self.globalCounter)
+            self.optimizer = tf.train.AdamOptimizer().minimize(self.finalLoss, global_step=self.globalCounter)
 
     def build_decision_loss(self):
         decision_losses = []

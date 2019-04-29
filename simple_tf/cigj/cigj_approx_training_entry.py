@@ -20,7 +20,7 @@ def get_explanation_string(network):
     for v in tf.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
     # Tree
-    explanation = "CIGJ Fashion MNIST Approximate Training Tests\n"
+    explanation = "CIGJ Fashion MNIST Approximate Training Tests (Adam Optimizer)\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Jungle Degree Degree:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
@@ -82,8 +82,8 @@ def cigj_training():
     #                                       GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
     info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]
-    classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2])
-    decision_dropout_probs = [0.35]
+    classification_dropout_probs = sorted([0.0])
+    decision_dropout_probs = [0.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
