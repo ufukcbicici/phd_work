@@ -1,0 +1,88 @@
+-- EXPERIMENT 1:  
+
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Dropout Probability:") + LENGTH("Classification Dropout Probability:"), 4) AS Dropout,
+SUBSTR(Explanation, INSTR(Explanation,"Info Gain Balance Coefficient:") + LENGTH("Info Gain Balance Coefficient:"), 4) AS IG_Lambda
+
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 190
+	AND
+	Explanation LIKE "%Optimizer:Optimizer.Momentum%"
+	AND
+	Explanation LIKE "%Batch Size:250%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+CIGJ Fashion MNIST Gumbel-Softmax Tests
+Batch Size:250
+Jungle Degree Degree:[1, 3, 3, 3, 1]
+Optimizer:Optimizer.Momentum
+********Lr Settings********
+Iteration:0 Value:0.01
+Iteration:15000 Value:0.005
+Iteration:30000 Value:0.0025
+Iteration:40000 Value:0.00025
+********Lr Settings********
+********Decision Loss Weight Settings********
+Fixed Value:1.0
+********Decision Loss Weight Settings********
+Batch Norm Decay:0.9
+Param Count:349779
+Classification Wd:0.0
+Decision Wd:0.0
+Info Gain Loss Lambda:1.0
+Use Batch Norm Before Decisions:True
+********Softmax Decay Settings********
+********Node1 Softmax Decay********
+Fixed Value:1.0
+********Node1 Softmax Decay********
+********Node5 Softmax Decay********
+Fixed Value:1.0
+********Node5 Softmax Decay********
+********Node9 Softmax Decay********
+Fixed Value:1.0
+********Node9 Softmax Decay********
+********Node13 Softmax Decay********
+Fixed Value:1.0
+********Node13 Softmax Decay********
+********Softmax Decay Settings********
+********Gumbel Softmax Temperature Settings********
+********Node1 Gumbel Softmax Temperature********
+Initial Value:25.0
+Decay Step:1
+Decay Ratio:0.9998
+********Node1 Gumbel Softmax Temperature********
+********Node5 Gumbel Softmax Temperature********
+Initial Value:25.0
+Decay Step:1
+Decay Ratio:0.9998
+********Node5 Gumbel Softmax Temperature********
+********Node9 Gumbel Softmax Temperature********
+Initial Value:25.0
+Decay Step:1
+Decay Ratio:0.9998
+********Node9 Gumbel Softmax Temperature********
+********Node13 Gumbel Softmax Temperature********
+Initial Value:25.0
+Decay Step:1
+Decay Ratio:0.9998
+********Node13 Gumbel Softmax Temperature********
+********Gumbel Softmax Temperature Settings********
+Info Gain Balance Coefficient:1.0
+Classification Dropout Probability:0.95
+Decision Dropout Probability:1.0
+
+ Series:1

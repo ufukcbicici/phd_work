@@ -43,10 +43,10 @@ class Optimizer(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 100
-    EPOCH_COUNT = 100
+    TOTAL_EPOCH_COUNT = 200
+    EPOCH_COUNT = 200
     EPOCH_REPORT_PERIOD = 10
-    BATCH_SIZE = 125
+    BATCH_SIZE = 250
     EVAL_BATCH_SIZE = 1000
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
@@ -54,7 +54,7 @@ class GlobalConstants:
     USE_SAMPLING_CIGN = False
     USE_FAST_TREE_MODE = True
     EXPERIMENT_MULTIPLICATION_FACTOR = 5
-    OPTIMIZER_TYPE = Optimizer.Adam
+    OPTIMIZER_TYPE = Optimizer.Momentum
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
@@ -67,7 +67,7 @@ class GlobalConstants:
     WEIGHT_DECAY_COEFFICIENT = 0.0
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0
     INITIAL_LR = 0.01
-    LR_COEFF = 1.0
+    LR_COEFF = 1.1
     DECAY_STEP = 15000
     DECAY_RATE = 0.5  # INITIAL_LR/EPOCH_COUNT
     # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,

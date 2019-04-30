@@ -187,4 +187,4 @@ def cigj_training():
         run_id += 1
 
 
-cigj_training()
+# cigj_training()

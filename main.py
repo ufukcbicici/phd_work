@@ -13,7 +13,7 @@ import simple_tf.cifar_nets.cifar_entry as cifar_entry
 
 import tensorflow as tf
 
-from simple_tf.cigj import cigj_full_training_entry
+from simple_tf.cigj import cigj_full_training_entry, cigj_approx_training_entry
 
 if __name__ == "__main__":
     print("Main - Hello World. With Import.")

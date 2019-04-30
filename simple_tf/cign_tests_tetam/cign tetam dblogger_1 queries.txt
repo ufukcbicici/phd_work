@@ -1,0 +1,188 @@
+-- EXPERIMENT 1: Routing by sampling. --
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Resnet-50 Sampling CIGN Tests%"
+	AND 
+	Explanation LIKE "%Fixed Value:0.0%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+-- EXPERIMENT 2: Routing by argmax. No threshold is used. Decision Wd:0.0 --
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Resnet-50 CIGN Tests%"
+	AND 
+	Explanation LIKE "%Fixed Value:0.0%"
+	AND 
+	Explanation LIKE "%Decision Wd:0.0%"
+	AND 
+	Explanation NOT LIKE "%Use Sampling CIGN:True%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+-- EXPERIMENT 3: Resnet-50, Thick baseline tests.
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 290
+	AND
+	Explanation LIKE "%Resnet-50 Thick Baseline Tests%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Resnet-50 CIGN Tests%" AND 
+	Explanation LIKE "%Decay Step:70000%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+
+
+
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Dropout Probability:") + LENGTH("Classification Dropout Probability:"), 4) AS Dropout,
+SUBSTR(Explanation, INSTR(Explanation,"Info Gain Balance Coefficient:") + LENGTH("Info Gain Balance Coefficient:"), 4) AS IG_Lambda
+
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 90
+	AND
+	Explanation LIKE "%Optimizer:Optimizer.Momentum%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+
+
+
+
+
+
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Resnet-50 Sampling CIGN Tests%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+
+
+
+
+
+
+
+
+
+
+
+Resnet-50 Sampling CIGN Tests
