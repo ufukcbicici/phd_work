@@ -7,6 +7,7 @@ import itertools
 
 from auxillary.parameters import DecayingParameter, FixedParameter
 from simple_tf.global_params import GlobalConstants
+from tensorflow.python.client import device_lib
 
 
 class UtilityFuncs:
@@ -114,6 +115,11 @@ class UtilityFuncs:
     @staticmethod
     def save_npz(file_name, arr_dict):
         np.savez(file_name, **arr_dict)
+
+    @staticmethod
+    def get_available_devices():
+        local_device_protos = device_lib.list_local_devices()
+        return [x.name for x in local_device_protos if x.device_type == 'GPU' or x.device_type == 'CPU']
 
     @staticmethod
     def concat_to_np_array_dict(dct, key, array):
