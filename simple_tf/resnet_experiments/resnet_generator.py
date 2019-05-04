@@ -24,14 +24,7 @@ class ResnetGenerator:
                 kernel = TreeNetwork.variable_on_cpu(name="conv_kernel", shape=shape, type=tf.float32,
                                                      initializer=initializer)
             else:
-                tf.get_variable(
-                    "conv_kernel", [filter_size, filter_size, in_filters, out_filters],
-                    tf.float32, initializer=tf.random_normal_initializer(
-                        stddev=np.sqrt(2.0 / n)))
-                # kernel = tf.get_variable(
-                #     "conv_kernel", [filter_size, filter_size, in_filters, out_filters],
-                #     tf.float32, initializer=tf.random_normal_initializer(
-                #         stddev=np.sqrt(2.0 / n)))
+                kernel = tf.get_variable("conv_kernel", shape, tf.float32, initializer=initializer)
             return tf.nn.conv2d(x, kernel, strides, padding='SAME')
 
     @staticmethod
