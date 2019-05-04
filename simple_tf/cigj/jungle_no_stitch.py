@@ -300,6 +300,7 @@ class JungleNoStitch(Jungle):
                                           dataset, dataset_type, kv_rows, run_id, iteration):
         label_count = dataset.get_label_count()
         for node_index, arg_max_indices in arg_max_dict.items():
+            print("**************************After Node {0} distributions**************************".format(node_index))
             decisions = sorted(list(set(arg_max_indices)))
             for child_index in decisions:
                 child_labels = labels_arr[arg_max_indices == child_index]
@@ -309,6 +310,14 @@ class JungleNoStitch(Jungle):
                     kv_rows.append(
                         (run_id, iteration, "{0} Leaf:{1} True Label:{2}".format(dataset_type, node_index, l),
                          np.asscalar(label_distribution[l])))
+                label_distribution = label_distribution / float(len(child_labels))
+                distribution_str = "Node {0} Child {1} ".format(node_index, child_index)
+                for label_id, prob in enumerate(label_distribution):
+                    distribution_str += "{0}:".format(label_id)
+                    distribution_str += "%.4f" % prob
+                    distribution_str += " "
+                print("Node {0} weight:{1}".format(node_index, float(len(child_labels)) / float(len(labels_arr))))
+                print(distribution_str)
             print("X")
 
     # Unit test methods
