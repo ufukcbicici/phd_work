@@ -237,13 +237,13 @@ class JungleNoStitch(Jungle):
         kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
         # Measure h node label distribution
         assert len(leaf_true_labels_dict) == 1
-        self.measure_h_node_label_distribution(arg_max_dict=arg_max_indices_dict,
-                                               labels_arr=list(leaf_true_labels_dict.values())[0],
-                                               dataset=dataset,
-                                               dataset_type=dataset_type,
-                                               run_id=run_id,
-                                               iteration=iteration,
-                                               kv_rows=kv_rows)
+        JungleNoStitch.measure_h_node_label_distribution(arg_max_dict=arg_max_indices_dict,
+                                                         labels_arr=list(leaf_true_labels_dict.values())[0],
+                                                         dataset=dataset,
+                                                         dataset_type=dataset_type,
+                                                         run_id=run_id,
+                                                         iteration=iteration,
+                                                         kv_rows=kv_rows)
         # Measure Branching Probabilities
         AccuracyCalculator.measure_branch_probs(run_id=run_id, iteration=iteration, dataset_type=dataset_type,
                                                 branch_probs=branch_probs_dict, kv_rows=kv_rows)
@@ -295,7 +295,8 @@ class JungleNoStitch(Jungle):
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return overall_correct / overall_count, confusion_matrix_db_rows
 
-    def measure_h_node_label_distribution(self, arg_max_dict, labels_arr,
+    @staticmethod
+    def measure_h_node_label_distribution(arg_max_dict, labels_arr,
                                           dataset, dataset_type, kv_rows, run_id, iteration):
         label_count = dataset.get_label_count()
         for node_index, arg_max_indices in arg_max_dict.items():
