@@ -50,6 +50,7 @@ class FashionNetCigj:
             h_net = tf.contrib.layers.flatten(h_net)
 
         feature_size = h_net.get_shape().as_list()[-1]
+        print("h pre input size:{0}".format(feature_size))
         fc_h_weights = tf.Variable(tf.truncated_normal(
             [feature_size, h_feature_size],
             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),

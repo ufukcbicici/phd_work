@@ -2,6 +2,9 @@ import tensorflow as tf
 import numpy as np
 from collections import namedtuple
 
+from simple_tf.global_params import GlobalConstants
+from simple_tf.cign.tree import TreeNetwork
+
 
 class ResnetGenerator:
     # BottleneckGroup = namedtuple('BottleneckGroup', ['num_blocks', 'num_filters', 'bottleneck_size', 'down_sample'])
@@ -15,10 +18,20 @@ class ResnetGenerator:
         """Convolution."""
         with tf.variable_scope(name):
             n = filter_size * filter_size * out_filters
-            kernel = tf.get_variable(
-                "conv_kernel", [filter_size, filter_size, in_filters, out_filters],
-                tf.float32, initializer=tf.random_normal_initializer(
-                    stddev=np.sqrt(2.0 / n)))
+            shape = [filter_size, filter_size, in_filters, out_filters]
+            initializer = tf.random_normal_initializer(stddev=np.sqrt(2.0 / n))
+            if GlobalConstants.USE_MULTI_GPU:
+                kernel = TreeNetwork.variable_on_cpu(name="conv_kernel", shape=shape, type=tf.float32,
+                                                     initializer=initializer)
+            else:
+                tf.get_variable(
+                    "conv_kernel", [filter_size, filter_size, in_filters, out_filters],
+                    tf.float32, initializer=tf.random_normal_initializer(
+                        stddev=np.sqrt(2.0 / n)))
+                # kernel = tf.get_variable(
+                #     "conv_kernel", [filter_size, filter_size, in_filters, out_filters],
+                #     tf.float32, initializer=tf.random_normal_initializer(
+                #         stddev=np.sqrt(2.0 / n)))
             return tf.nn.conv2d(x, kernel, strides, padding='SAME')
 
     @staticmethod

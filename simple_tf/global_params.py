@@ -43,14 +43,15 @@ class Optimizer(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 100
-    EPOCH_COUNT = 100
-    EPOCH_REPORT_PERIOD = 1
-    BATCH_SIZE = 125
+    TOTAL_EPOCH_COUNT = 60
+    EPOCH_COUNT = 60
+    EPOCH_REPORT_PERIOD = 5
+    BATCH_SIZE = 60
     EVAL_BATCH_SIZE = 1000
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
+    USE_MULTI_GPU = True
     USE_SAMPLING_CIGN = False
     USE_FAST_TREE_MODE = True
     EXPERIMENT_MULTIPLICATION_FACTOR = 5
@@ -74,11 +75,16 @@ class GlobalConstants:
     #                                                decay=DECAY_RATE)
     # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
     #                                              decay_period=DECAY_STEP)
+    # LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+    #                                              value=LR_COEFF * INITIAL_LR,
+    #                                              schedule=[(15000, LR_COEFF * 0.005),
+    #                                                        (30000, LR_COEFF * 0.0025),
+    #                                                        (40000, LR_COEFF * 0.00025)])
     LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                  value=LR_COEFF * INITIAL_LR,
-                                                 schedule=[(15000, LR_COEFF * 0.005),
-                                                           (30000, LR_COEFF * 0.0025),
-                                                           (40000, LR_COEFF * 0.00025)])
+                                                 schedule=[(18750, LR_COEFF * 0.005),
+                                                           (37500, LR_COEFF * 0.0025),
+                                                           (50000, LR_COEFF * 0.00025)])
 
     TREE_DEGREE = 2
     MOMENTUM_DECAY = 0.9
@@ -269,7 +275,7 @@ class GlobalConstants:
     # Fourth FC Layer Output (Single Sample): 128x1 -> H Transform (128)x32
 
     CIGJ_FASHION_NET_H_FEATURES = [32, 32, 32]
-    CIGJ_FASHION_NET_H_POOL_SIZES = [7, 3, 2]
+    CIGJ_FASHION_NET_H_POOL_SIZES = [2, 2, 2]
 
     CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT = 100
     CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL = 25.0

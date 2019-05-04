@@ -318,6 +318,9 @@ class JungleNoStitch(Jungle):
                     distribution_str += " "
                 print("Node {0} weight:{1}".format(node_index, float(len(child_labels)) / float(len(labels_arr))))
                 print(distribution_str)
+                kv_rows.append(
+                    (run_id, iteration, "Node {0} Child {1} Label Distribution".format(node_index, child_index),
+                     distribution_str))
             print("X")
 
     # Unit test methods

@@ -20,7 +20,8 @@ def get_explanation_string(network):
     for v in tf.trainable_variables():
         total_param_count += np.prod(v.get_shape().as_list())
     # Tree
-    explanation = "CIGJ Fashion MNIST Gumbel-Softmax Tests\n"
+    explanation = "CIGJ Fashion MNIST Gumbel-Softmax Tests: 128 Sized H Features\n"
+    explanation += "Network Type:{0}\n".format(network.__class__)
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Jungle Degree Degree:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
@@ -63,6 +64,8 @@ def get_explanation_string(network):
     explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
     explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
     explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_PROB)
+    explanation += "H Feature Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_FEATURES)
+    explanation += "H Pooling Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES)
     # explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
     # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
     #     for node in network.topologicalSortedNodes:
@@ -77,15 +80,15 @@ def get_explanation_string(network):
 def cigj_training():
     classification_wd = [0.0]
     decision_wd = [0.0]
-    # info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
+    info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
     # # classification_dropout_probs = [0.15]
-    # classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
-    #                                       GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
-    info_gain_balance_coeffs = [1.0]
+    classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
+                                          GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
+    # info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]
     # classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
     #                                       * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
-    classification_dropout_probs = [0.0]
+    # classification_dropout_probs = [0.0]
     decision_dropout_probs = [0.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
