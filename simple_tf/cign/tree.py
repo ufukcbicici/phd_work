@@ -920,9 +920,3 @@ class TreeNetwork:
         all_labels = tf.concat(values=labels, axis=0)
         all_indices = tf.concat(values=indices, axis=0)
         return all_residue_features, all_labels, all_indices
-
-    @staticmethod
-    def variable_on_cpu(name, shape, type, initializer):
-        with tf.device('/cpu:0'):
-            var = tf.get_variable(name, shape, initializer=initializer, dtype=type)
-        return var

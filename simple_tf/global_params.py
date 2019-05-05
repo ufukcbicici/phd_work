@@ -1,10 +1,10 @@
+from collections import namedtuple
 from enum import Enum
 
 import tensorflow as tf
 
 from auxillary.constants import DatasetTypes
-from auxillary.parameters import DecayingParameter, DiscreteParameter, DecayingParameterV2
-from simple_tf.resnet_experiments.resnet_generator import ResnetGenerator
+from auxillary.parameters import DiscreteParameter
 
 
 class GradientType(Enum):
@@ -114,6 +114,11 @@ class GlobalConstants:
     SOFTMAX_DISTILLATION_DECAY = 0.5
     SOFTMAX_DISTILLATION_BATCH_SIZE = 1000
 
+    ResnetHParams = namedtuple('ResnetHParams',
+                               'num_residual_units, use_bottleneck, '
+                               'num_of_features_per_block, relu_leakiness, first_conv_filter_size, strides, '
+                               'activate_before_residual')
+
     # SOFTMAX_DISTILLATION_BATCH_SIZE_RATIO = 1.0
     # SOFTMAX_DISTILLATION_STEP_COUNT = 500
     # SOFTMAX_DISTILLATION_EPOCH_COUNT = 2000
@@ -213,10 +218,10 @@ class GlobalConstants:
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
     # Resnet Params
-    RESNET_HYPERPARAMS = ResnetGenerator.ResnetHParams(num_residual_units=16, use_bottleneck=True,
-                                                       num_of_features_per_block=[16, 64, 64, 64],
-                                                       first_conv_filter_size=3, relu_leakiness=0.1,
-                                                       strides=[1, 2, 2], activate_before_residual=[True, False, False])
+    RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=16, use_bottleneck=True,
+                                       num_of_features_per_block=[16, 64, 64, 64],
+                                       first_conv_filter_size=3, relu_leakiness=0.1,
+                                       strides=[1, 2, 2], activate_before_residual=[True, False, False])
     RESNET_TREE_DEGREES = [2, 2]
     RESNET_DECISION_DIMENSION = 128
 

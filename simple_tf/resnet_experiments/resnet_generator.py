@@ -1,18 +1,15 @@
-import tensorflow as tf
-import numpy as np
 from collections import namedtuple
 
-from simple_tf.global_params import GlobalConstants
+import numpy as np
+import tensorflow as tf
+
+from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.tree import TreeNetwork
 
 
 class ResnetGenerator:
     # BottleneckGroup = namedtuple('BottleneckGroup', ['num_blocks', 'num_filters', 'bottleneck_size', 'down_sample'])
-    ResnetHParams = namedtuple('ResnetHParams',
-                               'num_residual_units, use_bottleneck, '
-                               'num_of_features_per_block, relu_leakiness, first_conv_filter_size, strides, '
-                               'activate_before_residual')
-
+    # OK
     @staticmethod
     def conv(name, x, filter_size, in_filters, out_filters, strides):
         """Convolution."""
@@ -20,24 +17,24 @@ class ResnetGenerator:
             n = filter_size * filter_size * out_filters
             shape = [filter_size, filter_size, in_filters, out_filters]
             initializer = tf.random_normal_initializer(stddev=np.sqrt(2.0 / n))
-            if GlobalConstants.USE_MULTI_GPU:
-                kernel = TreeNetwork.variable_on_cpu(name="conv_kernel", shape=shape, type=tf.float32,
-                                                     initializer=initializer)
-            else:
-                kernel = tf.get_variable("conv_kernel", shape, tf.float32, initializer=initializer)
+            kernel = UtilityFuncs.create_variable(name="conv_kernel", shape=shape, type=tf.float32,
+                                                  initializer=initializer)
             return tf.nn.conv2d(x, kernel, strides, padding='SAME')
 
+    # TODO: MultiGpu
     @staticmethod
     def batch_norm(name, x, is_train, momentum):
         normalized_x = tf.layers.batch_normalization(inputs=x, name=name, momentum=momentum,
                                                      training=tf.cast(is_train, tf.bool))
         return normalized_x
 
+    # OK
     @staticmethod
     def stride_arr(stride):
         """Map a stride scalar to the stride array for tf.nn.conv2d."""
         return [1, stride, stride, 1]
 
+    # OK
     @staticmethod
     def relu(x, leakiness=0.0):
         """Relu, with optional leaky support."""
@@ -46,11 +43,13 @@ class ResnetGenerator:
         else:
             return tf.nn.leaky_relu(features=x, alpha=leakiness, name="leaky_relu")
 
+    # OK
     @staticmethod
     def global_avg_pool(x):
         assert x.get_shape().ndims == 4
         return tf.reduce_mean(x, [1, 2])
 
+    # TODO: MultiGpu
     @staticmethod
     def bottleneck_residual(x, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual,
                             bn_momentum):
@@ -85,6 +84,7 @@ class ResnetGenerator:
             x += orig_x
         return x
 
+    # OK
     @staticmethod
     def get_input(input, out_filters, first_conv_filter_size):
         assert input.get_shape().ndims == 4
@@ -93,6 +93,7 @@ class ResnetGenerator:
                                  ResnetGenerator.stride_arr(1))
         return x
 
+    # OK
     @staticmethod
     def get_output(x, is_train, leakiness, bn_momentum):
         x = ResnetGenerator.batch_norm("final_bn", x, is_train, bn_momentum)

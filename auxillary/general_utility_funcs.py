@@ -175,4 +175,12 @@ class UtilityFuncs:
         entropy = -1.0 * np.sum(prob_log_prob)
         return entropy
 
-
+    @staticmethod
+    def create_variable(name, shape, type, initializer, trainable=True):
+        if GlobalConstants.USE_MULTI_GPU:
+            with tf.device('/cpu:0'):
+                var = tf.get_variable(name, shape, initializer=initializer, dtype=type, trainable=trainable)
+            return var
+        else:
+            var = tf.get_variable(name, shape, initializer=initializer, dtype=type, trainable=trainable)
+            return var
