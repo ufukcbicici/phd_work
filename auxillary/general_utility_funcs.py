@@ -33,7 +33,7 @@ class UtilityFuncs:
     @staticmethod
     def get_absolute_path(script_file, relative_path):
         script_dir = os.path.dirname(script_file)
-        absolute_path = script_dir + "/" + relative_path # os.path.join(script_dir, relative_path)
+        absolute_path = script_dir + "/" + relative_path  # os.path.join(script_dir, relative_path)
         absolute_path = absolute_path.replace("\\", "/")
         return absolute_path
 
@@ -87,8 +87,8 @@ class UtilityFuncs:
                 label_dict[label] = 0
             label_dict[label] += 1
         entropy = 0.0
-        for label,quantity in label_dict.items():
-            probability = float(quantity)/float(sample_count)
+        for label, quantity in label_dict.items():
+            probability = float(quantity) / float(sample_count)
             entropy -= probability * np.log2(probability)
         return entropy
 
@@ -179,8 +179,21 @@ class UtilityFuncs:
     def create_variable(name, shape, type, initializer, trainable=True):
         if GlobalConstants.USE_MULTI_GPU:
             with tf.device('/cpu:0'):
-                var = tf.get_variable(name, shape, initializer=initializer, dtype=type, trainable=trainable)
-            return var
+                try:
+                    var = tf.get_variable(name, shape, initializer=initializer, dtype=type, trainable=trainable)
+                except ValueError as e:
+                    if str(e) == "If initializer is a constant, do not specify shape.":
+                        if GlobalConstants.USE_MULTI_GPU:
+                            var = tf.get_variable(name, initializer=initializer, dtype=type, trainable=trainable)
+                except:
+                    raise NotImplementedError()
+                return var
         else:
-            var = tf.get_variable(name, shape, initializer=initializer, dtype=type, trainable=trainable)
+            try:
+                var = tf.get_variable(name, shape, initializer=initializer, dtype=type, trainable=trainable)
+            except ValueError as e:
+                if str(e) == "If initializer is a constant, do not specify shape.":
+                    var = tf.get_variable(name, initializer=initializer, dtype=type, trainable=trainable)
+            except:
+                raise NotImplementedError()
             return var

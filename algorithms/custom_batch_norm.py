@@ -75,7 +75,7 @@ width = 16
 height = 16
 channels = 64
 _x = tf.placeholder(name="input", dtype=tf.float32, shape=(batch_size, width, height, channels))
-is_train = tf.placeholder(name="is_train", dtype=tf.bool)
+is_train = tf.placeholder(name="is_train", dtype=tf.int32)
 
 mu, sigma, normalized_x = CustomBatchNorm.batch_norm(input_tensor=_x,
                                                      momentum=GlobalConstants.BATCH_NORM_DECAY,
@@ -84,7 +84,7 @@ mu, sigma, normalized_x = CustomBatchNorm.batch_norm(input_tensor=_x,
 tf_normalized_x = tf.layers.batch_normalization(inputs=_x,
                                                 momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                 epsilon=1e-3,
-                                                training=is_train)
+                                                training=tf.cast(is_train, tf.bool))
 
 sess = tf.Session()
 init = tf.global_variables_initializer()
@@ -92,5 +92,5 @@ sess.run(init)
 
 x = np.random.uniform(size=(batch_size, width, height, channels))
 
-res = sess.run([mu, sigma, normalized_x, tf_normalized_x], feed_dict={_x: x, is_train: True})
+res = sess.run([mu, sigma, normalized_x, tf_normalized_x], feed_dict={_x: x, is_train: 1})
 print("X")

@@ -51,7 +51,7 @@ class GlobalConstants:
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
-    USE_MULTI_GPU = True
+    USE_MULTI_GPU = False
     USE_SAMPLING_CIGN = False
     USE_FAST_TREE_MODE = True
     EXPERIMENT_MULTIPLICATION_FACTOR = 5
