@@ -44,30 +44,6 @@ class CustomBatchNorm:
             with tf.control_dependencies([final_mean, final_var, final_x]):
                 return final_mean, final_var, final_x
 
-            # new_pop_mean = momentum * pop_mean + (1.0 - momentum) * final_mean
-            # new_pop_var = momentum * pop_var + (1.0 - momentum) * final_var
-
-            # pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean)
-            # pop_var_assign_op = tf.assign(pop_var, new_pop_var)
-            # tf.add_to_collection(name=tf.GraphKeys.UPDATE_OPS, value=pop_mean_assign_op)
-            # tf.add_to_collection(name=tf.GraphKeys.UPDATE_OPS, value=pop_var_assign_op)
-            # tf_normalized_x = tf.layers.batch_normalization(inputs=tf_x,
-            #                                                 momentum=momentum,
-            #                                                 epsilon=epsilon,
-            #                                                 training=True)
-            # with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            #     final_x = tf.identity(final_x)
-            #     tf_normalized_x = tf.identity(tf_normalized_x)
-            #     return final_x, tf_normalized_x
-
-        # pop_mean = tf.Variable(name="pop_mean", initial_value=tf.constant(0.0, shape=[tf_x.get_shape()[-1]]),
-        #                        trainable=False)
-        # pop_var = tf.Variable(name="pop_variance", initial_value=tf.constant(1.0, shape=[tf_x.get_shape()[-1]]),
-        #                       trainable=False)
-
-        # gamma = tf.Variable(name="gamma", initial_value=tf.ones([tf_x.get_shape()[-1]]))
-        # beta = tf.Variable(name="beta", initial_value=tf.zeros([tf_x.get_shape()[-1]]))
-
 
 # Conv layer
 batch_size = 250
