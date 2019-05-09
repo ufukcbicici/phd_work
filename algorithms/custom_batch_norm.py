@@ -63,16 +63,16 @@ relu_leakiness = GlobalConstants.RESNET_HYPERPARAMS.relu_leakiness
 first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_size
 
 for tower_id in range(tower_count):
-    with tf.device("/cpu:0"):
+    with tf.device("/gpu:0"):
         with tf.name_scope("tower_{0}".format(tower_id)):
             net = ResnetGenerator.get_input(input=_x, out_filters=filters[0],
                                             first_conv_filter_size=first_conv_filter_size)
             with tf.variable_scope("block_1_0"):
-                x = ResnetGenerator.bottleneck_residual(x=net, in_filter=filters[0], out_filter=filters[1],
-                                                        stride=ResnetGenerator.stride_arr(strides[0]),
-                                                        activate_before_residual=activate_before_residual[0],
-                                                        relu_leakiness=relu_leakiness, is_train=is_train,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+                net = ResnetGenerator.bottleneck_residual(x=net, in_filter=filters[0], out_filter=filters[1],
+                                                          stride=ResnetGenerator.stride_arr(strides[0]),
+                                                          activate_before_residual=activate_before_residual[0],
+                                                          relu_leakiness=relu_leakiness, is_train=is_train,
+                                                          bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
             for i in range(num_of_units_per_block - 1):
                 with tf.variable_scope("block_1_{0}".format(i + 1)):
                     net = ResnetGenerator.bottleneck_residual(x=net, in_filter=filters[1],
