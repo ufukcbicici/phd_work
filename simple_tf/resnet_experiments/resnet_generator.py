@@ -1,10 +1,9 @@
-from collections import namedtuple
-
 import numpy as np
 import tensorflow as tf
 
+from algorithms.custom_batch_norm import CustomBatchNorm
 from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.cign.tree import TreeNetwork
+from simple_tf.global_params import GlobalConstants
 
 
 class ResnetGenerator:
@@ -24,8 +23,12 @@ class ResnetGenerator:
     # TODO: MultiGpu
     @staticmethod
     def batch_norm(name, x, is_train, momentum):
-        normalized_x = tf.layers.batch_normalization(inputs=x, name=name, momentum=momentum,
-                                                     training=tf.cast(is_train, tf.bool))
+        if GlobalConstants.USE_MULTI_GPU:
+            normalized_x = CustomBatchNorm.batch_norm(input_tensor=x, is_training=tf.cast(is_train, tf.bool),
+                                                      momentum=momentum)
+        else:
+            normalized_x = tf.layers.batch_normalization(inputs=x, name=name, momentum=momentum,
+                                                         training=tf.cast(is_train, tf.bool))
         return normalized_x
 
     # OK
