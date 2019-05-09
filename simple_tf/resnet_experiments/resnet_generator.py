@@ -24,7 +24,7 @@ class ResnetGenerator:
     @staticmethod
     def batch_norm(name, x, is_train, momentum):
         if GlobalConstants.USE_MULTI_GPU:
-            normalized_x = CustomBatchNorm.batch_norm(input_tensor=x, is_training=tf.cast(is_train, tf.bool),
+            normalized_x = CustomBatchNorm.batch_norm(input_tensor=x, is_training=is_train,
                                                       momentum=momentum)
         else:
             normalized_x = tf.layers.batch_normalization(inputs=x, name=name, momentum=momentum,
