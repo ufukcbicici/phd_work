@@ -63,7 +63,7 @@ relu_leakiness = GlobalConstants.RESNET_HYPERPARAMS.relu_leakiness
 first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_size
 
 for tower_id in range(tower_count):
-    with tf.device("/gpu:0"):
+    with tf.device("/cpu:0"):
         with tf.name_scope("tower_{0}".format(tower_id)):
             net = ResnetGenerator.get_input(input=_x, out_filters=filters[0],
                                             first_conv_filter_size=first_conv_filter_size)
@@ -81,6 +81,7 @@ for tower_id in range(tower_count):
                                                               activate_before_residual=False,
                                                               relu_leakiness=relu_leakiness, is_train=is_train,
                                                               bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+            tf.get_variable_scope().reuse_variables()
 print("X")
 # mu, sigma, normalized_x = CustomBatchNorm.batch_norm(input_tensor=_x,
 #                                                      momentum=GlobalConstants.BATCH_NORM_DECAY,

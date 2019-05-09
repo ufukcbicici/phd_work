@@ -185,6 +185,8 @@ class UtilityFuncs:
                     if str(e) == "If initializer is a constant, do not specify shape.":
                         if GlobalConstants.USE_MULTI_GPU:
                             var = tf.get_variable(name, initializer=initializer, dtype=type, trainable=trainable)
+                    else:
+                        raise e
                 except:
                     raise NotImplementedError()
                 return var
