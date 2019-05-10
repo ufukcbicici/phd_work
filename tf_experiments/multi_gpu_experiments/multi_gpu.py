@@ -3,6 +3,7 @@ import numpy as np
 from tensorflow.python.client import device_lib
 from tensorflow.contrib.nccl.ops import gen_nccl_ops
 
+from algorithms.custom_batch_norm import CustomBatchNorm
 from auxillary.general_utility_funcs import UtilityFuncs
 #
 # def experiment():
@@ -57,6 +58,7 @@ def experiment_with_towers():
     channels = 64
     _x = tf.placeholder(name="input", dtype=tf.float32, shape=(batch_size, width, height, channels))
     is_train = tf.placeholder(name="is_train", dtype=tf.int32)
+    np_x = np.random.uniform(0, 1.0, (batch_size, width, height, channels))
 
     tower_count = 4
     strides = GlobalConstants.RESNET_HYPERPARAMS.strides
@@ -87,10 +89,20 @@ def experiment_with_towers():
                                                                   bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
                 tf.get_variable_scope().reuse_variables()
 
+    batch_norm_ops = tf.get_collection(key=CustomBatchNorm.BATCH_NORM_OPS)
+    op_name = "block_1_0/sub2/pop_var:0"
+    selected_ops = [tpl[0] for tpl in batch_norm_ops if tpl[0].name == op_name]
+    temp = tf.placeholder(name="temp", dtype=tf.float32, shape=selected_ops[0].get_shape())
+    assign_op = tf.assign(selected_ops[0], temp)
+
+    sess = tf.Session()
+    init = tf.global_variables_initializer()
+    sess.run(init)
+
+    res = sess.run(selected_ops, feed_dict={_x: np_x, is_train: 1})
+    res2 = sess.run([assign_op], feed_dict={temp: 5 * np.ones(shape=selected_ops[0].get_shape())})
+    res3 = sess.run(selected_ops, feed_dict={_x: np_x, is_train: 1})
     print("X")
-
-
-
 
 # mu, sigma, normalized_x = CustomBatchNorm.batch_norm(input_tensor=_x,
 #                                                      momentum=GlobalConstants.BATCH_NORM_DECAY,
