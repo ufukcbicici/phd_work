@@ -5,6 +5,8 @@ from simple_tf.global_params import GlobalConstants
 
 
 class CustomBatchNorm:
+    BATCH_NORM_OPS = "MultiGPUBatchNormOps"
+
     @staticmethod
     def batch_norm(input_tensor, is_training, momentum=GlobalConstants.BATCH_NORM_DECAY, epsilon=1e-3):
         with tf.name_scope("custom_batch_norm"):
@@ -36,8 +38,8 @@ class CustomBatchNorm:
             variance = tf.reduce_mean(tf.square(input_tensor - mean), axis=[ax for ax in range(input_dim - 1)])
             final_mean = tf.where(is_training > 0, mean, pop_mean)
             final_var = tf.where(is_training > 0, variance, pop_var)
-            tf.add_to_collection("MultiGPUBatchNormOps", (pop_mean, final_mean))
-            tf.add_to_collection("MultiGPUBatchNormOps", (pop_var, final_var))
+            tf.add_to_collection(CustomBatchNorm.BATCH_NORM_OPS, (pop_mean, final_mean))
+            tf.add_to_collection(CustomBatchNorm.BATCH_NORM_OPS, (pop_var, final_var))
             x_minus_mean = input_tensor - final_mean
             normalized_x = x_minus_mean / tf.sqrt(final_var + epsilon)
             final_x = gamma * normalized_x + beta

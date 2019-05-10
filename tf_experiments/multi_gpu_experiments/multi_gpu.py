@@ -86,6 +86,7 @@ def experiment_with_towers():
                                                                   relu_leakiness=relu_leakiness, is_train=is_train,
                                                                   bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
                 tf.get_variable_scope().reuse_variables()
+
     print("X")
 
 
