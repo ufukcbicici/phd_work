@@ -101,7 +101,7 @@ def experiment_with_towers():
 
     res = sess.run(selected_ops, feed_dict={_x: np_x, is_train: 1})
     res2 = sess.run([assign_op], feed_dict={temp: 5 * np.ones(shape=selected_ops[0].get_shape())})
-    res3 = sess.run(selected_ops, feed_dict={_x: np_x, is_train: 1})
+    res3 = sess.run(selected_ops, feed_dict={})
     print("X")
 
 # mu, sigma, normalized_x = CustomBatchNorm.batch_norm(input_tensor=_x,
