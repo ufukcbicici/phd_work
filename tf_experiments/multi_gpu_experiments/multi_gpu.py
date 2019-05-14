@@ -52,7 +52,7 @@ from simple_tf.resnet_experiments.resnet_generator import ResnetGenerator
 
 def experiment_with_towers():
     # Conv layer
-    batch_size = 250
+    batch_size = 500
     width = 16
     height = 16
     channels = 64
@@ -60,18 +60,21 @@ def experiment_with_towers():
     is_train = tf.placeholder(name="is_train", dtype=tf.int32)
     np_x = np.random.uniform(0, 1.0, (batch_size, width, height, channels))
 
-    tower_count = 4
+    gpu_names = UtilityFuncs.get_available_devices(only_gpu=False)
+    tower_count = len(gpu_names)
     strides = GlobalConstants.RESNET_HYPERPARAMS.strides
     activate_before_residual = GlobalConstants.RESNET_HYPERPARAMS.activate_before_residual
     filters = GlobalConstants.RESNET_HYPERPARAMS.num_of_features_per_block
     num_of_units_per_block = GlobalConstants.RESNET_HYPERPARAMS.num_residual_units
     relu_leakiness = GlobalConstants.RESNET_HYPERPARAMS.relu_leakiness
     first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_size
-
+    print("Tower Count:{0}".format(tower_count))
+    net_outputs = []
     for tower_id in range(tower_count):
-        with tf.device("/cpu:0"):
+        with tf.device('/cpu:%d' % tower_id):
             with tf.name_scope("tower_{0}".format(tower_id)):
-                net = ResnetGenerator.get_input(input=_x, out_filters=filters[0],
+                input_slice = _x[int(tower_id*batch_size/tower_count):int((tower_id+1)*batch_size/tower_count)]
+                net = ResnetGenerator.get_input(input=input_slice, out_filters=filters[0],
                                                 first_conv_filter_size=first_conv_filter_size)
                 with tf.variable_scope("block_1_0"):
                     net = ResnetGenerator.bottleneck_residual(x=net, in_filter=filters[0], out_filter=filters[1],
@@ -87,22 +90,32 @@ def experiment_with_towers():
                                                                   activate_before_residual=False,
                                                                   relu_leakiness=relu_leakiness, is_train=is_train,
                                                                   bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+                net_outputs.append(net)
                 tf.get_variable_scope().reuse_variables()
-
-    batch_norm_ops = tf.get_collection(key=CustomBatchNorm.BATCH_NORM_OPS)
-    op_name = "block_1_0/sub2/pop_var:0"
-    selected_ops = [tpl[0] for tpl in batch_norm_ops if tpl[0].name == op_name]
-    temp = tf.placeholder(name="temp", dtype=tf.float32, shape=selected_ops[0].get_shape())
-    assign_op = tf.assign(selected_ops[0], temp)
-
     sess = tf.Session()
     init = tf.global_variables_initializer()
     sess.run(init)
 
-    res = sess.run(selected_ops, feed_dict={_x: np_x, is_train: 1})
-    res2 = sess.run([assign_op], feed_dict={temp: 5 * np.ones(shape=selected_ops[0].get_shape())})
-    res3 = sess.run(selected_ops, feed_dict={})
-    print("X")
+    res = sess.run(net_outputs, feed_dict={_x: np_x, is_train: 1})
+    for idx, net_output in enumerate(res):
+        print("Tower:{0}".format(idx))
+        print("net_output.shape:{0}".format(net_output.shape))
+        print("net_output:{0}".format(net_output))
+
+    # batch_norm_ops = tf.get_collection(key=CustomBatchNorm.BATCH_NORM_OPS)
+    # op_name = "block_1_0/sub2/pop_var:0"
+    # selected_ops = [tpl[0] for tpl in batch_norm_ops if tpl[0].name == op_name]
+    # temp = tf.placeholder(name="temp", dtype=tf.float32, shape=selected_ops[0].get_shape())
+    # assign_op = tf.assign(selected_ops[0], temp)
+    #
+    # sess = tf.Session()
+    # init = tf.global_variables_initializer()
+    # sess.run(init)
+    #
+    # res = sess.run(selected_ops, feed_dict={_x: np_x, is_train: 1})
+    # res2 = sess.run([assign_op], feed_dict={temp: 5 * np.ones(shape=selected_ops[0].get_shape())})
+    # res3 = sess.run(selected_ops, feed_dict={})
+    # print("X")
 
 # mu, sigma, normalized_x = CustomBatchNorm.batch_norm(input_tensor=_x,
 #                                                      momentum=GlobalConstants.BATCH_NORM_DECAY,

@@ -117,8 +117,10 @@ class UtilityFuncs:
         np.savez(file_name, **arr_dict)
 
     @staticmethod
-    def get_available_devices():
+    def get_available_devices(only_gpu=True):
         local_device_protos = device_lib.list_local_devices()
+        if only_gpu:
+            return [x.name for x in local_device_protos if x.device_type == 'GPU']
         return [x.name for x in local_device_protos if x.device_type == 'GPU' or x.device_type == 'CPU']
 
     @staticmethod

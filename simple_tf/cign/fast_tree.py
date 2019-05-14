@@ -74,7 +74,7 @@ class FastTreeNetwork(TreeNetwork):
             GlobalConstants.USE_INFO_GAIN_DECISION = False
             GlobalConstants.USE_CONCAT_TRICK = False
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
-        # Build all symbolic networks in each node, using multi gpu support
+        # Build all symbolic networks in each node
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
         # Build the residue loss
