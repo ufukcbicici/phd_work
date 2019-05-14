@@ -77,34 +77,30 @@ class FastTreeNetwork(TreeNetwork):
         # Build all symbolic networks in each node, using multi gpu support
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
-
-
-
-
-        # # Build the residue loss
-        # self.build_residue_loss()
-        # # Record all variables into the variable manager (For backwards compatibility)
-        # # self.variableManager.get_all_node_variables()
-        # # Build main classification loss
-        # self.build_main_loss()
-        # # Build information gain loss
-        # self.build_decision_loss()
-        # # Build regularization loss
-        # self.build_regularization_loss()
-        # # Final Loss
-        # self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss + self.residueLoss
-        # # Build optimizer
-        # self.globalCounter = tf.Variable(0, trainable=False)
-        # boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
-        # values = [GlobalConstants.INITIAL_LR]
-        # values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
-        # self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
-        # self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        # # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
-        # # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
-        # with tf.control_dependencies(self.extra_update_ops):
-        #     self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-        #                                                                                  global_step=self.globalCounter)
+        # Build the residue loss
+        self.build_residue_loss()
+        # Record all variables into the variable manager (For backwards compatibility)
+        # self.variableManager.get_all_node_variables()
+        # Build main classification loss
+        self.build_main_loss()
+        # Build information gain loss
+        self.build_decision_loss()
+        # Build regularization loss
+        self.build_regularization_loss()
+        # Final Loss
+        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss + self.residueLoss
+        # Build optimizer
+        self.globalCounter = tf.Variable(0, trainable=False)
+        boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
+        values = [GlobalConstants.INITIAL_LR]
+        values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
+        self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
+        self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
+        # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
+        with tf.control_dependencies(self.extra_update_ops):
+            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+                                                                                         global_step=self.globalCounter)
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
