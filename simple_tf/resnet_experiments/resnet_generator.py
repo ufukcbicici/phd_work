@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from algorithms.custom_batch_norm import CustomBatchNorm
+from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
 
@@ -24,8 +24,8 @@ class ResnetGenerator:
     @staticmethod
     def batch_norm(name, x, is_train, momentum):
         if GlobalConstants.USE_MULTI_GPU:
-            normalized_x = CustomBatchNorm.batch_norm(input_tensor=x, is_training=is_train,
-                                                      momentum=momentum)
+            normalized_x = CustomBatchNormAlgorithms.batch_norm(input_tensor=x, is_training=is_train,
+                                                                momentum=momentum)
         else:
             normalized_x = tf.layers.batch_normalization(inputs=x, name=name, momentum=momentum,
                                                          training=tf.cast(is_train, tf.bool))

@@ -3,7 +3,7 @@ import numpy as np
 from tensorflow.python.client import device_lib
 from tensorflow.contrib.nccl.ops import gen_nccl_ops
 
-from algorithms.custom_batch_norm import CustomBatchNorm
+from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from auxillary.general_utility_funcs import UtilityFuncs
 #
 # def experiment():
@@ -73,7 +73,8 @@ def experiment_with_towers():
     for tower_id in range(tower_count):
         with tf.device('/cpu:%d' % tower_id):
             with tf.name_scope("tower_{0}".format(tower_id)):
-                input_slice = _x[int(tower_id*batch_size/tower_count):int((tower_id+1)*batch_size/tower_count)]
+                input_slice = _x[
+                              int(tower_id * batch_size / tower_count):int((tower_id + 1) * batch_size / tower_count)]
                 net = ResnetGenerator.get_input(input=input_slice, out_filters=filters[0],
                                                 first_conv_filter_size=first_conv_filter_size)
                 with tf.variable_scope("block_1_0"):
@@ -117,20 +118,38 @@ def experiment_with_towers():
     # res3 = sess.run(selected_ops, feed_dict={})
     # print("X")
 
-# mu, sigma, normalized_x = CustomBatchNorm.batch_norm(input_tensor=_x,
-#                                                      momentum=GlobalConstants.BATCH_NORM_DECAY,
-#                                                      epsilon=1e-3,
-#                                                      is_training=is_train)
-# tf_normalized_x = tf.layers.batch_normalization(inputs=_x,
-#                                                 momentum=GlobalConstants.BATCH_NORM_DECAY,
-#                                                 epsilon=1e-3,
-#                                                 training=tf.cast(is_train, tf.bool))
-#
-# sess = tf.Session()
-# init = tf.global_variables_initializer()
-# sess.run(init)
-#
-# x = np.random.uniform(size=(batch_size, width, height, channels))
-#
-# res = sess.run([mu, sigma, normalized_x, tf_normalized_x], feed_dict={_x: x, is_train: 1})
-# print("X")
+
+def experiment_with_custom_batch_norms():
+    batch_size = 500
+    width = 16
+    height = 16
+    channels = 64
+    _x = tf.placeholder(name="input", dtype=tf.float32, shape=(batch_size, width, height, channels))
+    is_train = tf.placeholder(name="is_train", dtype=tf.int32)
+    np_x = np.random.uniform(0, 1.0, (batch_size, width, height, channels))
+
+    with tf.variable_scope("gpu_1"):
+        mu, sigma, normalized_x = CustomBatchNormAlgorithms. \
+            batch_norm_multi_gpu(input_tensor=_x,
+                                 momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                 epsilon=1e-5,
+                                 is_training=is_train)
+    with tf.variable_scope("gpu_2"):
+        mu2, sigma2, normalized_x2 = CustomBatchNormAlgorithms. \
+            batch_norm_multi_gpu_v2(input_tensor=_x,
+                                    momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                    epsilon=1e-5,
+                                    is_training=is_train)
+
+    tf_normalized_x = tf.layers.batch_normalization(inputs=_x,
+                                                    momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                    epsilon=1e-5,
+                                                    training=tf.cast(is_train, tf.bool))
+
+    sess = tf.Session()
+    init = tf.global_variables_initializer()
+    sess.run(init)
+
+    res = sess.run([mu, sigma, normalized_x, mu2, sigma2, normalized_x2, tf_normalized_x],
+                   feed_dict={_x: np_x, is_train: 1})
+    print("X")

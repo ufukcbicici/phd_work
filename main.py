@@ -22,7 +22,8 @@ if __name__ == "__main__":
     # cifar_entry.cifar100_training()
     # cigj_full_training_entry.cigj_training()
     # multi_gpu.experiment()
-    multi_gpu.experiment_with_towers()
+    # multi_gpu.experiment_with_towers()
+    multi_gpu.experiment_with_custom_batch_norms()
 
 
 
