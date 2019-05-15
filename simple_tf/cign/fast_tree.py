@@ -3,9 +3,8 @@ from collections import deque
 import numpy as np
 import tensorflow as tf
 
+from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from auxillary.general_utility_funcs import UtilityFuncs
-from data_handling.data_set import DataSet
-from simple_tf.batch_norm import fast_tree_batch_norm
 from simple_tf.cign.tree import TreeNetwork
 from simple_tf.global_params import GlobalConstants
 from simple_tf.info_gain import InfoGainLoss
@@ -180,11 +179,11 @@ class FastTreeNetwork(TreeNetwork):
 
     def apply_decision_with_unified_batch_norm(self, node, branching_feature):
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
-        normed_x = fast_tree_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
-                                        network=self, node=node,
-                                        decay=GlobalConstants.BATCH_NORM_DECAY,
-                                        iteration=self.iterationHolder,
-                                        is_training_phase=self.isTrain)
+        normed_x = CustomBatchNormAlgorithms.masked_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
+                                                               network=self, node=node,
+                                                               decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                               iteration=self.iterationHolder,
+                                                               is_training_phase=self.isTrain)
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
         hyperplane_weights = tf.Variable(

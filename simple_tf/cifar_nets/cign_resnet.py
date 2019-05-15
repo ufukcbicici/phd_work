@@ -20,13 +20,17 @@ def apply_router_transformation(net, node, network, decision_feature_size):
     net_shape = h_net.get_shape().as_list()
     h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
     feature_size = h_net.get_shape().as_list()[-1]
-    fc_h_weights = tf.Variable(tf.truncated_normal(
-        [feature_size, decision_feature_size],
-        stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_decision_weights", node=node))
-    fc_h_bias = tf.Variable(
-        tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_decision_bias", node=node))
+    fc_h_weights = UtilityFuncs.create_variable(
+        name=network.get_variable_name(name="fc_decision_weights", node=node),
+        shape=None,
+        type=GlobalConstants.DATA_TYPE,
+        initializer=tf.truncated_normal(
+        [feature_size, decision_feature_size], stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
+    fc_h_bias = UtilityFuncs.create_variable(
+        name=network.get_variable_name(name="fc_decision_bias", node=node),
+        shape=None,
+        type=GlobalConstants.DATA_TYPE,
+        initializer=tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE))
     h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
     h_net = tf.nn.relu(h_net)
     h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
