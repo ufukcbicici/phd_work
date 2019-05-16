@@ -19,6 +19,7 @@ class FastTreeNetwork(TreeNetwork):
         self.infoGainDicts = None
         self.extra_update_ops = None
 
+    # OK for MultiGPU
     def build_tree(self):
         # Create itself
         curr_index = 0

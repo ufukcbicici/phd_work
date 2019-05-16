@@ -60,7 +60,7 @@ def experiment_with_towers():
     is_train = tf.placeholder(name="is_train", dtype=tf.int32)
     np_x = np.random.uniform(0, 1.0, (batch_size, width, height, channels))
 
-    gpu_names = UtilityFuncs.get_available_devices(only_gpu=False)
+    gpu_names = UtilityFuncs.get_available_devices(only_gpu=True)
     tower_count = len(gpu_names)
     strides = GlobalConstants.RESNET_HYPERPARAMS.strides
     activate_before_residual = GlobalConstants.RESNET_HYPERPARAMS.activate_before_residual
@@ -71,7 +71,7 @@ def experiment_with_towers():
     print("Tower Count:{0}".format(tower_count))
     net_outputs = []
     for tower_id in range(tower_count):
-        with tf.device('/cpu:%d' % tower_id):
+        with tf.device('/gpu:%d' % tower_id):
             with tf.name_scope("tower_{0}".format(tower_id)):
                 input_slice = _x[
                               int(tower_id * batch_size / tower_count):int((tower_id + 1) * batch_size / tower_count)]
