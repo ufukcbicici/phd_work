@@ -3,18 +3,29 @@ import numpy as np
 
 from collections import deque
 
+from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
+from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
 
 
-class CignMultiGpu(FastTreeNetwork):
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
+class FastTreeMultiGpu(FastTreeNetwork):
+    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset,
+                 container_network, tower_id, tower_batch_size, device_str):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
-        self.currentTowerId = None
-        self.towerCount = None
-        self.towerBatchSize = None
+        self.towerId = tower_id
+        self.deviceStr = device_str
+        self.towerBatchSize = tower_batch_size
+        lower_bound = int(self.towerId * self.towerBatchSize)
+        upper_bound = int((self.towerId + 1) * self.towerBatchSize)
+        self.dataTensor = container_network.dataTensor[lower_bound:upper_bound]
+        self.labelTensor = container_network.labelTensor[lower_bound:upper_bound]
+        self.indicesTensor = container_network.indicesTensor[lower_bound:upper_bound]
+        self.oneHotLabelTensor = container_network.oneHotLabelTensor[lower_bound:upper_bound]
+        self.filteredMask = container_network.filteredMask[lower_bound:upper_bound]
+        self.isTrain = container_network.isTrain
 
     def build_network(self):
         # Build the tree topologically and create the Tensorflow placeholders
@@ -27,22 +38,26 @@ class CignMultiGpu(FastTreeNetwork):
             GlobalConstants.USE_INFO_GAIN_DECISION = False
             GlobalConstants.USE_CONCAT_TRICK = False
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
-        # Build all symbolic networks in each node, using multi gpu support
-        gpu_names = UtilityFuncs.get_available_devices()
-        self.towerCount = len(gpu_names)
-        assert GlobalConstants.BATCH_SIZE % self.towerCount == 0
-        self.towerBatchSize = GlobalConstants.BATCH_SIZE / self.towerCount
-        for tower_id in range(self.towerCount):
-            self.currentTowerId = tower_id
-            with tf.device('/gpu:%d' % tower_id):
-                with tf.name_scope("tower_{0}".format(tower_id)):
-                    # Build all symbolic networks in each node
-                    for node in self.topologicalSortedNodes:
-                        self.nodeBuildFuncs[node.depth](node=node, network=self)
-        # Build main classification loss
-        self.build_main_loss()
+        # Build the symbolic network using the given variable scope and the provided device
+        with tf.device(self.deviceStr):
+            with tf.name_scope("tower_{0}".format(self.towerId)):
+                # Build all symbolic networks in each node
+                for node in self.topologicalSortedNodes:
+                    self.nodeBuildFuncs[node.depth](node=node, network=self)
 
-
+        # gpu_names = UtilityFuncs.get_available_devices()
+        # self.towerCount = len(gpu_names)
+        # assert GlobalConstants.BATCH_SIZE % self.towerCount == 0
+        # self.towerBatchSize = GlobalConstants.BATCH_SIZE / self.towerCount
+        # for tower_id in range(self.towerCount):
+        #     self.currentTowerId = tower_id
+        #     with tf.device('/gpu:%d' % tower_id):
+        #         with tf.name_scope("tower_{0}".format(tower_id)):
+        #             # Build all symbolic networks in each node
+        #             for node in self.topologicalSortedNodes:
+        #                 self.nodeBuildFuncs[node.depth](node=node, network=self)
+        # # Build main classification loss
+        # self.build_main_loss()
 
     # # Build information gain loss
     # self.build_decision_loss()
@@ -98,57 +113,31 @@ class CignMultiGpu(FastTreeNetwork):
     # self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
     # MultiGPU OK
-    def mask_input_nodes(self, node):
-        if node.isRoot:
-            lower_bound = int(self.currentTowerId*self.towerBatchSize)
-            upper_bound = int((self.currentTowerId+1)*self.towerBatchSize)
-            node.labelTensor = self.labelTensor[lower_bound:upper_bound]
-            node.indicesTensor = self.indicesTensor[lower_bound:upper_bound]
-            node.oneHotLabelTensor = self.oneHotLabelTensor[lower_bound:upper_bound]
-            # node.filteredMask = tf.constant(value=True, dtype=tf.bool, shape=(GlobalConstants.BATCH_SIZE, ))
-            node.filteredMask = self.filteredMask[lower_bound:upper_bound]
-            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
-            node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
-            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
-        else:
-            # Obtain the mask vector, sample counts and determine if this node receives samples.
-            parent_node = self.dagObject.parents(node=node)[0]
-            mask_tensor = parent_node.maskTensors[node.index]
-            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
-                mask_without_threshold = parent_node.masksWithoutThreshold[node.index]
-            mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
-                                   tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
-            sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
-            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
-            node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
-            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
-            # Mask all inputs: F channel, H  channel, activations from ancestors, labels
-            parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-            parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
-            for k, v in parent_node.activationsDict.items():
-                node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
-            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
-                node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
-            return parent_F, parent_H
-
     def apply_decision_with_unified_batch_norm(self, node, branching_feature):
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
-        normed_x = CustomBatchNormAlgorithms.masked_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
-                                                               network=self, node=node,
-                                                               decay=GlobalConstants.BATCH_NORM_DECAY,
-                                                               iteration=self.iterationHolder,
-                                                               is_training_phase=self.isTrain)
+        # MultiGPU OK
+        normed_x = CustomBatchNormAlgorithms.masked_batch_norm_multi_gpu(
+            input_tensor=branching_feature,
+            masked_input_tensor=masked_branching_feature,
+            is_training=self.isTrain,
+            momentum=GlobalConstants.BATCH_NORM_DECAY,
+            network=self, node=node
+        )
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
-        hyperplane_weights = tf.Variable(
-            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE),
-            name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
-        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                        name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
+        # MultiGPU OK
+        hyperplane_weights = UtilityFuncs.create_variable(
+            name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node),
+            shape=[ig_feature_size, node_degree],
+            type=GlobalConstants.DATA_TYPE,
+            initializer=tf.truncated_normal(
+                [ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
+        # MultiGPU OK
+        hyperplane_biases = UtilityFuncs.create_variable(
+            name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node),
+            shape=[node_degree],
+            type=GlobalConstants.DATA_TYPE,
+            initializer=tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE))
         activations = tf.matmul(normed_x, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay

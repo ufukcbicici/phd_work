@@ -8,7 +8,8 @@ from simple_tf.global_params import GlobalConstants
 
 class ResnetGenerator:
     # BottleneckGroup = namedtuple('BottleneckGroup', ['num_blocks', 'num_filters', 'bottleneck_size', 'down_sample'])
-    # OK
+
+    # MultiGpu OK
     @staticmethod
     def conv(name, x, filter_size, in_filters, out_filters, strides):
         """Convolution."""
@@ -20,7 +21,7 @@ class ResnetGenerator:
                                                   initializer=initializer)
             return tf.nn.conv2d(x, kernel, strides, padding='SAME')
 
-    # TODO: MultiGpu
+    # MultiGpu OK
     @staticmethod
     def batch_norm(name, x, is_train, momentum):
         if GlobalConstants.USE_MULTI_GPU:
@@ -31,13 +32,13 @@ class ResnetGenerator:
                                                          training=tf.cast(is_train, tf.bool))
         return normalized_x
 
-    # OK
+    # MultiGpu OK
     @staticmethod
     def stride_arr(stride):
         """Map a stride scalar to the stride array for tf.nn.conv2d."""
         return [1, stride, stride, 1]
 
-    # OK
+    # MultiGpu OK
     @staticmethod
     def relu(x, leakiness=0.0):
         """Relu, with optional leaky support."""
@@ -46,13 +47,13 @@ class ResnetGenerator:
         else:
             return tf.nn.leaky_relu(features=x, alpha=leakiness, name="leaky_relu")
 
-    # OK
+    # MultiGpu OK
     @staticmethod
     def global_avg_pool(x):
         assert x.get_shape().ndims == 4
         return tf.reduce_mean(x, [1, 2])
 
-    # TODO: MultiGpu
+    # MultiGpu OK
     @staticmethod
     def bottleneck_residual(x, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual,
                             bn_momentum):
@@ -87,7 +88,7 @@ class ResnetGenerator:
             x += orig_x
         return x
 
-    # OK
+    # MultiGpu OK
     @staticmethod
     def get_input(input, out_filters, first_conv_filter_size):
         assert input.get_shape().ndims == 4
@@ -96,7 +97,7 @@ class ResnetGenerator:
                                  ResnetGenerator.stride_arr(1))
         return x
 
-    # OK
+    # MultiGpu OK
     @staticmethod
     def get_output(x, is_train, leakiness, bn_momentum):
         x = ResnetGenerator.batch_norm("final_bn", x, is_train, bn_momentum)

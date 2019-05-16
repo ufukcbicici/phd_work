@@ -20,15 +20,17 @@ def apply_router_transformation(net, node, network, decision_feature_size):
     net_shape = h_net.get_shape().as_list()
     h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
     feature_size = h_net.get_shape().as_list()[-1]
+    # MultiGPU OK
     fc_h_weights = UtilityFuncs.create_variable(
         name=network.get_variable_name(name="fc_decision_weights", node=node),
-        shape=None,
+        shape=[feature_size, decision_feature_size],
         type=GlobalConstants.DATA_TYPE,
         initializer=tf.truncated_normal(
         [feature_size, decision_feature_size], stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
+    # MultiGPU OK
     fc_h_bias = UtilityFuncs.create_variable(
         name=network.get_variable_name(name="fc_decision_bias", node=node),
-        shape=None,
+        shape=[decision_feature_size],
         type=GlobalConstants.DATA_TYPE,
         initializer=tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE))
     h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
@@ -36,7 +38,6 @@ def apply_router_transformation(net, node, network, decision_feature_size):
     h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
     ig_feature = h_net
     node.hOpsList.extend([ig_feature])
-    ig_feature_size = ig_feature.get_shape().as_list()[-1]
     # Decisions
     if GlobalConstants.USE_UNIFIED_BATCH_NORM:
         network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature)
@@ -47,15 +48,18 @@ def apply_router_transformation(net, node, network, decision_feature_size):
 def root_func(node, network):
     network.mask_input_nodes(node=node)
     # Input layer
+    # MultiGPU OK
     x = ResnetGenerator.get_input(input=network.dataTensor, out_filters=filters[0],
                                   first_conv_filter_size=first_conv_filter_size)
     # Block 1
+    # MultiGPU OK
     with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_0", node=node)):
         x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[0], out_filter=filters[1],
                                                 stride=ResnetGenerator.stride_arr(strides[0]),
                                                 activate_before_residual=activate_before_residual[0],
                                                 relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                 bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+    # MultiGPU OK
     for i in range(num_of_units_per_block-1):
         with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_{0}".format(i + 1), node=node)):
             x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1],

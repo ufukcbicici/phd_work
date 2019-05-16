@@ -182,7 +182,7 @@ class FastTreeNetwork(TreeNetwork):
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
         normed_x = CustomBatchNormAlgorithms.masked_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
                                                                network=self, node=node,
-                                                               decay=GlobalConstants.BATCH_NORM_DECAY,
+                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                                iteration=self.iterationHolder,
                                                                is_training_phase=self.isTrain)
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
@@ -229,6 +229,7 @@ class FastTreeNetwork(TreeNetwork):
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
             node.evalDict[self.get_variable_name(name="masksWithoutThreshold", node=node)] = node.masksWithoutThreshold
 
+    # MultiGPU OK
     def mask_input_nodes(self, node):
         if node.isRoot:
             node.labelTensor = self.labelTensor

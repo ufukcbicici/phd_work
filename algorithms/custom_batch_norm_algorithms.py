@@ -198,7 +198,7 @@ class CustomBatchNormAlgorithms:
     # 2) is_training_phase = 0 ise: (Evaluation)
     #
     @staticmethod
-    def masked_batch_norm(x, masked_x, network, node, decay, iteration, is_training_phase):
+    def masked_batch_norm(x, masked_x, network, node, momentum, iteration, is_training_phase):
         gamma_name = network.get_variable_name(node=node, name="gamma") if network is not None else "gamma"
         beta_name = network.get_variable_name(node=node, name="beta") if network is not None else "beta"
         pop_mean_name = network.get_variable_name(node=node, name="pop_mean") if network is not None else "pop_mean"
@@ -222,8 +222,8 @@ class CustomBatchNormAlgorithms:
         normed_x = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
                                              variance_epsilon=1e-5)
         with tf.control_dependencies([normed_x]):
-            new_pop_mean = tf.where(iteration > 0, (decay * pop_mean + (1.0 - decay) * mu), mu)
-            new_pop_var = tf.where(iteration > 0, (decay * pop_var + (1.0 - decay) * sigma), sigma)
+            new_pop_mean = tf.where(iteration > 0, (momentum * pop_mean + (1.0 - momentum) * mu), mu)
+            new_pop_var = tf.where(iteration > 0, (momentum * pop_var + (1.0 - momentum) * sigma), sigma)
             pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean)
             pop_var_assign_op = tf.assign(pop_var, new_pop_var)
             tf.add_to_collection(name=tf.GraphKeys.UPDATE_OPS, value=pop_mean_assign_op)
