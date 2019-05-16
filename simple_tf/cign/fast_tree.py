@@ -94,7 +94,6 @@ class FastTreeNetwork(TreeNetwork):
                 self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
             if node.filteredMask is not None:
                 self.evalDict["Node{0}_filteredMask".format(node.index)] = node.filteredMask
-
         self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}

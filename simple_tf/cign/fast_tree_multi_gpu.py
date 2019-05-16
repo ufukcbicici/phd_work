@@ -13,10 +13,9 @@ from simple_tf.node import Node
 
 class FastTreeMultiGpu(FastTreeNetwork):
     def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset,
-                 container_network, tower_id, tower_batch_size, device_str):
+                 container_network, tower_id, tower_batch_size):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
         self.towerId = tower_id
-        self.deviceStr = device_str
         self.towerBatchSize = tower_batch_size
         lower_bound = int(self.towerId * self.towerBatchSize)
         upper_bound = int((self.towerId + 1) * self.towerBatchSize)
@@ -41,11 +40,11 @@ class FastTreeMultiGpu(FastTreeNetwork):
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
         # Build the symbolic network using the given variable scope and the provided device
         # MultiGPU OK
-        with tf.device(self.deviceStr):
-            with tf.name_scope("tower_{0}".format(self.towerId)):
-                # Build all symbolic networks in each node
-                for node in self.topologicalSortedNodes:
-                    self.nodeBuildFuncs[node.depth](node=node, network=self)
+        # with tf.device(self.deviceStr):
+        with tf.name_scope("tower_{0}".format(self.towerId)):
+            # Build all symbolic networks in each node
+            for node in self.topologicalSortedNodes:
+                self.nodeBuildFuncs[node.depth](node=node, network=self)
         # Build main classification loss
         # MultiGPU OK
         self.build_main_loss()
@@ -60,55 +59,6 @@ class FastTreeMultiGpu(FastTreeNetwork):
         self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
         # MultiGPU OK
         self.prepare_evaluation_dictionary()
-
-    # # Build optimizer
-    # self.globalCounter = tf.Variable(0, trainable=False)
-    # boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
-    # values = [GlobalConstants.INITIAL_LR]
-    # values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
-    # self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
-    # self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    # # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
-    # # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
-    # with tf.control_dependencies(self.extra_update_ops):
-    #     self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-    #                                                                                  global_step=self.globalCounter)
-    # # Prepare tensors to evaluate
-    # for node in self.topologicalSortedNodes:
-    #     # if node.isLeaf:
-    #     #     continue
-    #     # F
-    #     f_output = node.fOpsList[-1]
-    #     self.evalDict["Node{0}_F".format(node.index)] = f_output
-    #     # H
-    #     if len(node.hOpsList) > 0:
-    #         h_output = node.hOpsList[-1]
-    #         self.evalDict["Node{0}_H".format(node.index)] = h_output
-    #     # Activations
-    #     for k, v in node.activationsDict.items():
-    #         self.evalDict["Node{0}_activation_from_{1}".format(node.index, k)] = v
-    #     # Decision masks
-    #     for k, v in node.maskTensors.items():
-    #         self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
-    #     # Evaluation outputs
-    #     for k, v in node.evalDict.items():
-    #         self.evalDict[k] = v
-    #     # Label outputs
-    #     if node.labelTensor is not None:
-    #         self.evalDict["Node{0}_label_tensor".format(node.index)] = node.labelTensor
-    #         # Sample indices
-    #         self.evalDict["Node{0}_indices_tensor".format(node.index)] = node.indicesTensor
-    #     # One Hot Label outputs
-    #     if node.oneHotLabelTensor is not None:
-    #         self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
-    #     if node.filteredMask is not None:
-    #         self.evalDict["Node{0}_filteredMask".format(node.index)] = node.filteredMask
-    #
-    # self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
-    # self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
-    # self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
-
-    # MultiGPU OK
 
     # MultiGPU OK
     def apply_decision_with_unified_batch_norm(self, node, branching_feature):

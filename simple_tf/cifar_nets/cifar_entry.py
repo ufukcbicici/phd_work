@@ -9,6 +9,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import FixedParameter, DiscreteParameter
 from data_handling.cifar_dataset import CifarDataSet
 from simple_tf.cifar_nets import cifar100_resnet_baseline, cign_resnet
+from simple_tf.cign.cign_multi_gpu import CignMultiGpu
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.cign_with_sampling.cign_with_sampling import CignWithSampling
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
@@ -298,6 +299,52 @@ def cifar100_training():
 
     # dataset.visualize_sample(sample_index=150)
     print("X")
+
+
+def cifar100_multi_gpu_training():
+    classification_wd = [0.0]
+    decision_wd = [0.0]
+    info_gain_balance_coeffs = [1.0]
+    classification_dropout_probs = [0.0]
+    decision_dropout_probs = [0.0]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
+                                                                          decision_wd,
+                                                                          info_gain_balance_coeffs,
+                                                                          classification_dropout_probs,
+                                                                          decision_dropout_probs])
+    run_id = 0
+    for tpl in cartesian_product:
+        # try:
+        # Session initialization
+        if GlobalConstants.USE_CPU:
+            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+            config = tf.ConfigProto(device_count={'GPU': 0})
+            sess = tf.Session(config=config)
+        else:
+            sess = tf.Session()
+        dataset = CifarDataSet(session=sess,
+                               validation_sample_count=0, load_validation_from=None)
+        dataset.set_curr_session(sess=sess)
+        # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
+        dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
+        network = get_network(dataset=dataset)
+        network = CignMultiGpu(
+            node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
+            grad_func=cign_resnet.grad_func,
+            threshold_func=cign_resnet.threshold_calculator_func,
+            residue_func=cign_resnet.residue_network_func,
+            summary_func=cign_resnet.tensorboard_func,
+            degree_list=GlobalConstants.RESNET_TREE_DEGREES,
+            dataset=dataset)
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.INITIAL_LR,
+                                                                     schedule=[(40000,  0.01),
+                                                                               (70000,  0.001),
+                                                                               (100000, 0.0001)])
+        network.build_network()
+        print("X")
+
+
 
 # main()
 # main_fast_tree()
