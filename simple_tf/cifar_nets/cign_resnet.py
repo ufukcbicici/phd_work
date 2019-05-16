@@ -45,6 +45,7 @@ def apply_router_transformation(net, node, network, decision_feature_size):
         network.apply_decision(node=node, branching_feature=ig_feature)
 
 
+# MultiGPU OK
 def root_func(node, network):
     network.mask_input_nodes(node=node)
     # Input layer
@@ -69,21 +70,27 @@ def root_func(node, network):
                                                     relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                     bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
     node.fOpsList.extend([x])
+    # MultiGPU OK
     # ***************** H: Connected to F *****************
-    apply_router_transformation(net=x, network=network, node=node,
-                                decision_feature_size=GlobalConstants.RESNET_DECISION_DIMENSION)
+    with tf.variable_scope(UtilityFuncs.get_variable_name(name="decision_variables", node=node)):
+        apply_router_transformation(net=x, network=network, node=node,
+                                    decision_feature_size=GlobalConstants.RESNET_DECISION_DIMENSION)
     # ***************** H: Connected to F *****************
 
 
+# MultiGPU OK
 def l1_func(node, network):
+    # MultiGPU OK
     parent_F, parent_H = network.mask_input_nodes(node=node)
     x = parent_F
+    # MultiGPU OK
     with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_2_0", node=node)):
         x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1], out_filter=filters[2],
                                                 stride=ResnetGenerator.stride_arr(strides[1]),
                                                 activate_before_residual=activate_before_residual[1],
                                                 relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                 bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+    # MultiGPU OK
     for i in range(num_of_units_per_block-1):
         with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_2_{0}".format(i + 1), node=node)):
             x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[2],
@@ -93,21 +100,27 @@ def l1_func(node, network):
                                                     relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                     bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
     node.fOpsList.extend([x])
+    # MultiGPU OK
     # ***************** H: Connected to F *****************
-    apply_router_transformation(net=x, network=network, node=node,
-                                decision_feature_size=GlobalConstants.RESNET_DECISION_DIMENSION)
+    with tf.variable_scope(UtilityFuncs.get_variable_name(name="decision_variables", node=node)):
+        apply_router_transformation(net=x, network=network, node=node,
+                                    decision_feature_size=GlobalConstants.RESNET_DECISION_DIMENSION)
     # ***************** H: Connected to F *****************
 
 
+# MultiGPU OK
 def leaf_func(node, network):
+    # MultiGPU OK
     parent_F, parent_H = network.mask_input_nodes(node=node)
     x = parent_F
+    # MultiGPU OK
     with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_3_0", node=node)):
         x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[2], out_filter=filters[3],
                                                 stride=ResnetGenerator.stride_arr(strides[2]),
                                                 activate_before_residual=activate_before_residual[2],
                                                 relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                 bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+    # MultiGPU OK
     for i in range(num_of_units_per_block-1):
         with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_3_{0}".format(i + 1), node=node)):
             x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[3],
@@ -120,18 +133,24 @@ def leaf_func(node, network):
     with tf.variable_scope(UtilityFuncs.get_variable_name(name="unit_last", node=node)):
         x = ResnetGenerator.get_output(x=x, is_train=network.isTrain, leakiness=relu_leakiness,
                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-    net_shape = x.get_shape().as_list()
     # assert len(net_shape) == 4
     # x = tf.reshape(x, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
     output = x
     out_dim = network.labelCount
-    weight = tf.get_variable(
-        name=network.get_variable_name(name="fc_softmax_weights", node=node),
-        shape=[x.get_shape()[1], out_dim],
+    # MultiGPU OK
+    weight = UtilityFuncs.create_variable(
+        name=UtilityFuncs.get_variable_name(name="fc_softmax_weights", node=node),
+        shape=[output.get_shape()[1], out_dim],
+        type=GlobalConstants.DATA_TYPE,
         initializer=tf.uniform_unit_scaling_initializer(factor=1.0))
-    bias = tf.get_variable(network.get_variable_name(name="fc_softmax_biases", node=node), [out_dim],
-                           initializer=tf.constant_initializer())
+    # MultiGPU OK
+    bias = UtilityFuncs.create_variable(
+        name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node),
+        shape=[out_dim],
+        type=GlobalConstants.DATA_TYPE,
+        initializer=tf.constant_initializer())
     # Loss
+    # MultiGPU OK
     final_feature, logits = network.apply_loss(node=node, final_feature=output,
                                                softmax_weights=weight, softmax_biases=bias)
     # Evaluation

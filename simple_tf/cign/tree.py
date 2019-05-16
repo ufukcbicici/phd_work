@@ -258,6 +258,7 @@ class TreeNetwork:
 
     def build_regularization_loss(self):
         vars = tf.trainable_variables()
+        print("Num of trainable variables:{0}".format(len(vars)))
         l2_loss_list = []
         decayed_variables = []
         non_decayed_variables = []
