@@ -20,21 +20,21 @@ class CustomBatchNormAlgorithms:
             gamma = UtilityFuncs.create_variable(name=gamma_name,
                                                  shape=[tf_x.get_shape()[-1]],
                                                  initializer=tf.ones([tf_x.get_shape()[-1]]),
-                                                 type=tf.float32)
+                                                 dtype=tf.float32)
             beta = UtilityFuncs.create_variable(name=beta_name,
                                                 shape=[tf_x.get_shape()[-1]],
                                                 initializer=tf.zeros([tf_x.get_shape()[-1]]),
-                                                type=tf.float32)
+                                                dtype=tf.float32)
             # Moving mean and variance
             pop_mean = UtilityFuncs.create_variable(name=pop_mean_name,
                                                     shape=[tf_x.get_shape()[-1]],
                                                     initializer=tf.constant(0.0, shape=[tf_x.get_shape()[-1]]),
-                                                    type=tf.float32,
+                                                    dtype=tf.float32,
                                                     trainable=False)
             pop_var = UtilityFuncs.create_variable(name=pop_var_name,
                                                    shape=[tf_x.get_shape()[-1]],
                                                    initializer=tf.constant(1.0, shape=[tf_x.get_shape()[-1]]),
-                                                   type=tf.float32,
+                                                   dtype=tf.float32,
                                                    trainable=False)
             # Calculate mean and variance
             input_dim = len(input_tensor.get_shape().as_list())
@@ -66,21 +66,21 @@ class CustomBatchNormAlgorithms:
             gamma = UtilityFuncs.create_variable(name=gamma_name,
                                                  shape=[tf_x.get_shape()[-1]],
                                                  initializer=tf.ones([tf_x.get_shape()[-1]]),
-                                                 type=tf.float32)
+                                                 dtype=tf.float32)
             beta = UtilityFuncs.create_variable(name=beta_name,
                                                 shape=[tf_x.get_shape()[-1]],
                                                 initializer=tf.zeros([tf_x.get_shape()[-1]]),
-                                                type=tf.float32)
+                                                dtype=tf.float32)
             # Moving mean and variance
             pop_mean = UtilityFuncs.create_variable(name=pop_mean_name,
                                                     shape=[tf_x.get_shape()[-1]],
                                                     initializer=tf.constant(0.0, shape=[tf_x.get_shape()[-1]]),
-                                                    type=tf.float32,
+                                                    dtype=tf.float32,
                                                     trainable=False)
             pop_var = UtilityFuncs.create_variable(name=pop_var_name,
                                                    shape=[tf_x.get_shape()[-1]],
                                                    initializer=tf.constant(1.0, shape=[tf_x.get_shape()[-1]]),
-                                                   type=tf.float32,
+                                                   dtype=tf.float32,
                                                    trainable=False)
             # Calculate mean and variance
             input_dim = len(input_tensor.get_shape().as_list())
@@ -111,21 +111,21 @@ class CustomBatchNormAlgorithms:
             gamma = UtilityFuncs.create_variable(name=gamma_name,
                                                  shape=[tf_x.get_shape()[-1]],
                                                  initializer=tf.ones([tf_x.get_shape()[-1]]),
-                                                 type=tf.float32)
+                                                 dtype=tf.float32)
             beta = UtilityFuncs.create_variable(name=beta_name,
                                                 shape=[tf_x.get_shape()[-1]],
                                                 initializer=tf.zeros([tf_x.get_shape()[-1]]),
-                                                type=tf.float32)
+                                                dtype=tf.float32)
             # Moving mean and variance
             pop_mean = UtilityFuncs.create_variable(name=pop_mean_name,
                                                     shape=[tf_x.get_shape()[-1]],
                                                     initializer=tf.constant(0.0, shape=[tf_x.get_shape()[-1]]),
-                                                    type=tf.float32,
+                                                    dtype=tf.float32,
                                                     trainable=False)
             pop_var = UtilityFuncs.create_variable(name=pop_var_name,
                                                    shape=[tf_x.get_shape()[-1]],
                                                    initializer=tf.constant(1.0, shape=[tf_x.get_shape()[-1]]),
-                                                   type=tf.float32,
+                                                   dtype=tf.float32,
                                                    trainable=False)
             # Calculate mean and variance
             input_dim = len(input_tensor.get_shape().as_list())

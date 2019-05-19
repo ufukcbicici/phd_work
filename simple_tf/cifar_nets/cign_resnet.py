@@ -24,14 +24,14 @@ def apply_router_transformation(net, node, network, decision_feature_size):
     fc_h_weights = UtilityFuncs.create_variable(
         name=network.get_variable_name(name="fc_decision_weights", node=node),
         shape=[feature_size, decision_feature_size],
-        type=GlobalConstants.DATA_TYPE,
+        dtype=GlobalConstants.DATA_TYPE,
         initializer=tf.truncated_normal(
         [feature_size, decision_feature_size], stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
     # MultiGPU OK
     fc_h_bias = UtilityFuncs.create_variable(
         name=network.get_variable_name(name="fc_decision_bias", node=node),
         shape=[decision_feature_size],
-        type=GlobalConstants.DATA_TYPE,
+        dtype=GlobalConstants.DATA_TYPE,
         initializer=tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE))
     h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
     h_net = tf.nn.relu(h_net)
@@ -141,13 +141,13 @@ def leaf_func(node, network):
     weight = UtilityFuncs.create_variable(
         name=UtilityFuncs.get_variable_name(name="fc_softmax_weights", node=node),
         shape=[output.get_shape()[1], out_dim],
-        type=GlobalConstants.DATA_TYPE,
+        dtype=GlobalConstants.DATA_TYPE,
         initializer=tf.uniform_unit_scaling_initializer(factor=1.0))
     # MultiGPU OK
     bias = UtilityFuncs.create_variable(
         name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node),
         shape=[out_dim],
-        type=GlobalConstants.DATA_TYPE,
+        dtype=GlobalConstants.DATA_TYPE,
         initializer=tf.constant_initializer())
     # Loss
     # MultiGPU OK

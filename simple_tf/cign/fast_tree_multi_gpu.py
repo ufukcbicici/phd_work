@@ -77,14 +77,14 @@ class FastTreeMultiGpu(FastTreeNetwork):
         hyperplane_weights = UtilityFuncs.create_variable(
             name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node),
             shape=[ig_feature_size, node_degree],
-            type=GlobalConstants.DATA_TYPE,
+            dtype=GlobalConstants.DATA_TYPE,
             initializer=tf.truncated_normal(
                 [ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
         # MultiGPU OK
         hyperplane_biases = UtilityFuncs.create_variable(
             name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node),
             shape=[node_degree],
-            type=GlobalConstants.DATA_TYPE,
+            dtype=GlobalConstants.DATA_TYPE,
             initializer=tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE))
         activations = tf.matmul(normed_x, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
@@ -137,14 +137,14 @@ class FastTreeMultiGpu(FastTreeNetwork):
         hyperplane_weights = UtilityFuncs.create_variable(
             name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node),
             shape=[ig_feature_size, node_degree],
-            type=GlobalConstants.DATA_TYPE,
+            dtype=GlobalConstants.DATA_TYPE,
             initializer=tf.truncated_normal(
                 [ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
         # MultiGPU OK
         hyperplane_biases = UtilityFuncs.create_variable(
             name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node),
             shape=[node_degree],
-            type=GlobalConstants.DATA_TYPE,
+            dtype=GlobalConstants.DATA_TYPE,
             initializer=tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE))
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations

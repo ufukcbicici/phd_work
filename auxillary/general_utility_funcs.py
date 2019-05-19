@@ -178,15 +178,15 @@ class UtilityFuncs:
         return entropy
 
     @staticmethod
-    def create_variable(name, shape, type, initializer, trainable=True):
+    def create_variable(name, shape, dtype, initializer, trainable=True):
         if GlobalConstants.USE_MULTI_GPU:
             with tf.device('/cpu:0'):
                 try:
-                    var = tf.get_variable(name, shape, initializer=initializer, dtype=type, trainable=trainable)
+                    var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype, trainable=trainable)
                 except ValueError as e:
                     if str(e) == "If initializer is a constant, do not specify shape.":
                         if GlobalConstants.USE_MULTI_GPU:
-                            var = tf.get_variable(name, initializer=initializer, dtype=type, trainable=trainable)
+                            var = tf.get_variable(name, initializer=initializer, dtype=dtype, trainable=trainable)
                     else:
                         raise e
                 except:
@@ -194,10 +194,10 @@ class UtilityFuncs:
                 return var
         else:
             try:
-                var = tf.get_variable(name, shape, initializer=initializer, dtype=type, trainable=trainable)
+                var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype, trainable=trainable)
             except ValueError as e:
                 if str(e) == "If initializer is a constant, do not specify shape.":
-                    var = tf.get_variable(name, initializer=initializer, dtype=type, trainable=trainable)
+                    var = tf.get_variable(name, initializer=initializer, dtype=dtype, trainable=trainable)
             except:
                 raise NotImplementedError()
             return var

@@ -17,7 +17,7 @@ class ResnetGenerator:
             n = filter_size * filter_size * out_filters
             shape = [filter_size, filter_size, in_filters, out_filters]
             initializer = tf.random_normal_initializer(stddev=np.sqrt(2.0 / n))
-            kernel = UtilityFuncs.create_variable(name="conv_kernel", shape=shape, type=tf.float32,
+            kernel = UtilityFuncs.create_variable(name="conv_kernel", shape=shape, dtype=tf.float32,
                                                   initializer=initializer)
             return tf.nn.conv2d(x, kernel, strides, padding='SAME')
 
