@@ -14,7 +14,7 @@ class CustomBatchNormAlgorithms:
         beta_name = network.get_variable_name(node=node, name="beta") if network is not None else "beta"
         pop_mean_name = network.get_variable_name(node=node, name="pop_mean") if network is not None else "pop_mean"
         pop_var_name = network.get_variable_name(node=node, name="pop_var") if network is not None else "pop_var"
-        with tf.name_scope("batch_norm"):
+        with tf.variable_scope("batch_norm"):
             tf_x = tf.identity(input_tensor)
             # Trainable parameters
             gamma = UtilityFuncs.create_variable(name=gamma_name,
@@ -51,7 +51,7 @@ class CustomBatchNormAlgorithms:
             # Update moving mean and variance
             with tf.control_dependencies([final_mean, final_var, final_x]):
                 # return final_mean, final_var, final_x
-                return final_mean, final_var, final_x
+                return final_x
 
     @staticmethod
     def batch_norm_multi_gpu_v2(input_tensor, is_training, momentum=GlobalConstants.BATCH_NORM_DECAY,
@@ -60,7 +60,7 @@ class CustomBatchNormAlgorithms:
         beta_name = network.get_variable_name(node=node, name="beta") if network is not None else "beta"
         pop_mean_name = network.get_variable_name(node=node, name="pop_mean") if network is not None else "pop_mean"
         pop_var_name = network.get_variable_name(node=node, name="pop_var") if network is not None else "pop_var"
-        with tf.name_scope("batch_norm"):
+        with tf.variable_scope("batch_norm"):
             tf_x = tf.identity(input_tensor)
             # Trainable parameters
             gamma = UtilityFuncs.create_variable(name=gamma_name,
@@ -94,7 +94,8 @@ class CustomBatchNormAlgorithms:
             final_x = tf.nn.batch_normalization(x=tf_x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
                                                 variance_epsilon=epsilon)
         with tf.control_dependencies([final_mean, final_var, final_x]):
-            return final_mean, final_var, final_x
+            # return final_mean, final_var, final_x
+            return final_x
 
     @staticmethod
     def masked_batch_norm_multi_gpu(input_tensor, masked_input_tensor, is_training,
@@ -103,7 +104,7 @@ class CustomBatchNormAlgorithms:
         beta_name = network.get_variable_name(node=node, name="beta") if network is not None else "beta"
         pop_mean_name = network.get_variable_name(node=node, name="pop_mean") if network is not None else "pop_mean"
         pop_var_name = network.get_variable_name(node=node, name="pop_var") if network is not None else "pop_var"
-        with tf.name_scope("batch_norm"):
+        with tf.variable_scope("batch_norm"):
             tf_x = tf.identity(input_tensor)
             tf_masked_x = tf.identity(masked_input_tensor)
             # Trainable parameters
@@ -138,6 +139,7 @@ class CustomBatchNormAlgorithms:
             final_x = tf.nn.batch_normalization(x=tf_x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
                                                 variance_epsilon=epsilon)
         with tf.control_dependencies([final_mean, final_var, final_x]):
+            # return final_mean, final_var, final_x
             return final_x
 
     @staticmethod

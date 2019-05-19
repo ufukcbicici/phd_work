@@ -327,7 +327,7 @@ def cifar100_multi_gpu_training():
         dataset.set_curr_session(sess=sess)
         # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
-        network = get_network(dataset=dataset)
+        # network = get_network(dataset=dataset)
         network = CignMultiGpu(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
             grad_func=cign_resnet.grad_func,
