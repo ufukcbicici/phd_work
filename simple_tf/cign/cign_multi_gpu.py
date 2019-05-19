@@ -39,7 +39,7 @@ class CignMultiGpu(FastTreeNetwork):
             tf.get_variable_scope().reuse_variables()
         all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
-        assert all(["CPU" in var.name and "GPU" not in var.name for var in all_vars])
+        assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
 
     def build_towers(self):
         for device_str, tower_cign in self.towerNetworks:
