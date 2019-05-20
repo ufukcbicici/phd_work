@@ -158,7 +158,7 @@ class JungleNoStitch(Jungle):
                     UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = \
                     node.conditionProbabilities
 
-    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+    def update_params(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)

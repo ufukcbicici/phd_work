@@ -615,7 +615,7 @@ class TreeNetwork:
             d_grads[k] = d
         return d_grads, info_gain_results, sample_counts
 
-    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+    def update_params(self, sess, dataset, epoch, iteration):
         vars = self.variableManager.trainable_variables()
         minibatch = dataset.get_next_batch()
         samples = minibatch.samples

@@ -143,10 +143,10 @@ def cigj_training():
             leaf_info_rows = []
             while True:
                 start_time = time.time()
-                lr, sample_counts, is_open_indicators = jungle.update_params_with_momentum(sess=sess,
-                                                                                           dataset=dataset,
-                                                                                           epoch=epoch_id,
-                                                                                           iteration=iteration_counter)
+                lr, sample_counts, is_open_indicators = jungle.update_params(sess=sess,
+                                                                             dataset=dataset,
+                                                                             epoch=epoch_id,
+                                                                             iteration=iteration_counter)
                 elapsed_time = time.time() - start_time
                 total_time += elapsed_time
                 print("Iteration:{0}".format(iteration_counter))

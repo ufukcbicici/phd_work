@@ -91,7 +91,7 @@ class ClassWeightedTree(FastTreeNetwork):
                     new_weight = np.log(leaf_sample_count / float(label_count))
                     self.classWeightsDict[node.index][label] = alpha * curr_weight + (1.0 - alpha) * new_weight
 
-    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+    def update_params(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         minibatch = dataset.get_next_batch()
         if minibatch is None:

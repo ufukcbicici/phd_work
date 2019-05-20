@@ -73,6 +73,8 @@ class CignMultiGpu(FastTreeNetwork):
                 assert all([tpl[1] is not None for tpl in tower_grads])
                 self.grads.append(tower_grads)
             tf.get_variable_scope().reuse_variables()
+        # Calculate the mean of the moving average updates for batch normalization operations, across each tower.
+        self.prepare_batch_norm_moving_avg_ops()
         # We must calculate the mean of each gradient. Note that this is the synchronization point across all towers.
         grads = self.average_gradients()
         # Apply the gradients to adjust the shared variables.

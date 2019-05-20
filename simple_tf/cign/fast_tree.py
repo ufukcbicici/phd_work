@@ -305,7 +305,7 @@ class FastTreeNetwork(TreeNetwork):
                     print("ERR")
                 assert sum_of_samples == GlobalConstants.BATCH_SIZE
 
-    def update_params_with_momentum(self, sess, dataset, epoch, iteration):
+    def update_params(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch()

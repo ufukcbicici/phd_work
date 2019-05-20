@@ -324,9 +324,9 @@ def main():
             while True:
                 start_time = time.time()
                 sample_counts, decision_sample_counts, lr, is_open_indicators = \
-                    network.update_params_with_momentum(sess=sess, dataset=dataset,
-                                                        epoch=epoch_id,
-                                                        iteration=iteration_counter)
+                    network.update_params(sess=sess, dataset=dataset,
+                                          epoch=epoch_id,
+                                          iteration=iteration_counter)
                 elapsed_time = time.time() - start_time
                 total_time += elapsed_time
                 print("Iteration:{0}".format(iteration_counter))
@@ -617,10 +617,10 @@ def main_fast_tree():
             leaf_info_rows = []
             while True:
                 start_time = time.time()
-                lr, sample_counts, is_open_indicators = network.update_params_with_momentum(sess=sess,
-                                                                                            dataset=dataset,
-                                                                                            epoch=epoch_id,
-                                                                                            iteration=iteration_counter)
+                lr, sample_counts, is_open_indicators = network.update_params(sess=sess,
+                                                                              dataset=dataset,
+                                                                              epoch=epoch_id,
+                                                                              iteration=iteration_counter)
                 elapsed_time = time.time() - start_time
                 total_time += elapsed_time
                 print("Iteration:{0}".format(iteration_counter))

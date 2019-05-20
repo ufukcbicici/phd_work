@@ -196,10 +196,10 @@ def cifar100_training():
             leaf_info_rows = []
             while True:
                 start_time = time.time()
-                lr, sample_counts, is_open_indicators = network.update_params_with_momentum(sess=sess,
-                                                                                            dataset=dataset,
-                                                                                            epoch=epoch_id,
-                                                                                            iteration=iteration_counter)
+                lr, sample_counts, is_open_indicators = network.update_params(sess=sess,
+                                                                              dataset=dataset,
+                                                                              epoch=epoch_id,
+                                                                              iteration=iteration_counter)
                 if all([lr, sample_counts, is_open_indicators]):
                     elapsed_time = time.time() - start_time
                     total_time += elapsed_time
