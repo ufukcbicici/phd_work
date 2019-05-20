@@ -106,6 +106,17 @@ class CignMultiGpu(FastTreeNetwork):
             average_grads.append(grad_and_var)
         return average_grads
 
+    def update_batch_norm_moving_averages(self):
+        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
+        # Assert that for every (moving_average, new_average) tuple, we have exactly #tower_count tuples with a specific
+        # moving_average entry.
+        batch_norm_ops_dict = {}
+        for moving_average, new_average in batch_norm_moving_averages:
+            if moving_average not in batch_norm_ops_dict:
+                batch_norm_ops_dict[moving_average] = []
+            batch_norm_ops_dict[moving_average].append(new_average)
+        assert all([len(v) == len(self.towerNetworks) for k, v in batch_norm_ops_dict.items()])
+
 
 
 
