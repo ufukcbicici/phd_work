@@ -19,6 +19,7 @@ class CignMultiGpu(FastTreeNetwork):
         self.towerNetworks = []
         self.grads = []
         self.dataset = dataset
+        self.applyGradientsOp = None
 
     # def build_towers(self):
     #     for device_str, tower_cign in self.towerNetworks:
@@ -62,6 +63,7 @@ class CignMultiGpu(FastTreeNetwork):
                     tower_id=tower_id,
                     tower_batch_size=tower_batch_size)
                 tower_cign.build_network()
+                print("Built network for tower {0}".format(tower_id))
                 self.towerNetworks.append((device_str, tower_cign))
                 # Calculate gradients
                 tower_grads = self.optimizer.compute_gradients(loss=tower_cign.finalLoss)
@@ -70,7 +72,41 @@ class CignMultiGpu(FastTreeNetwork):
                 assert all([tpl[1] is not None for tpl in tower_grads])
                 self.grads.append(tower_grads)
             tf.get_variable_scope().reuse_variables()
+        # We must calculate the mean of each gradient. Note that this is the synchronization point across all towers.
+        grads = self.average_gradients()
+        # Apply the gradients to adjust the shared variables.
+        self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
         all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
         assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
         self.dataset = None
+
+    def average_gradients(self):
+        average_grads = []
+        for grad_and_vars in zip(*self.grads):
+            # Each grad_and_vars is of the form: ((grad0_gpu0, var0_gpu0), ..., (grad0_gpuN, var0_gpuN))
+            grads = []
+            _vars = []
+            for g, v in grad_and_vars:
+                # Add 0 dimension to the gradients to represent the tower.
+                expanded_g = tf.expand_dims(g, 0)
+                # Append on a 'tower' dimension which we will average over below.
+                grads.append(expanded_g)
+                _vars.append(v)
+            # Average over the 'tower' dimension.
+            grad = tf.concat(axis=0, values=grads)
+            grad = tf.reduce_mean(grad, 0)
+            # Assert that all variables are the same, verify variable sharing behavior over towers.
+            _var = _vars[0]
+            assert all([v == _var for v in vars])
+            # Keep in mind that the Variables are redundant because they are shared
+            # across towers. So .. we will just return the first tower's pointer to
+            # the Variable.
+            grad_and_var = (grad, _var)
+            average_grads.append(grad_and_var)
+        return average_grads
+
+
+
+
+
