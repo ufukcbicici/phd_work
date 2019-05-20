@@ -41,11 +41,10 @@ class FastTreeMultiGpu(FastTreeNetwork):
         # Build the symbolic network using the given variable scope and the provided device
         # MultiGPU OK
         # with tf.device(self.deviceStr):
-        with tf.name_scope("tower_{0}".format(self.towerId)):
-            # Build all symbolic networks in each node
-            for node in self.topologicalSortedNodes:
-                print("Building Node {0}".format(node.index))
-                self.nodeBuildFuncs[node.depth](node=node, network=self)
+        # Build all symbolic networks in each node
+        for node in self.topologicalSortedNodes:
+            print("Building Node {0}".format(node.index))
+            self.nodeBuildFuncs[node.depth](node=node, network=self)
         # Build main classification loss
         # MultiGPU OK
         self.build_main_loss()

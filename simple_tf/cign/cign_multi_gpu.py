@@ -51,27 +51,28 @@ class CignMultiGpu(FastTreeNetwork):
         self.build_optimizer()
         for tower_id, device_str in enumerate(devices):
             with tf.device(device_str):
-                # Build a Multi GPU supporting CIGN
-                tower_cign = FastTreeMultiGpu(
-                    node_build_funcs=self.nodeBuildFuncs,
-                    grad_func=self.gradFunc,
-                    threshold_func=self.thresholdFunc,
-                    residue_func=self.residueFunc,
-                    summary_func=self.summaryFunc,
-                    degree_list=self.degreeList,
-                    dataset=self.dataset,
-                    container_network=self,
-                    tower_id=tower_id,
-                    tower_batch_size=tower_batch_size)
-                tower_cign.build_network()
-                print("Built network for tower {0}".format(tower_id))
-                self.towerNetworks.append((device_str, tower_cign))
-                # Calculate gradients
-                tower_grads = self.optimizer.compute_gradients(loss=tower_cign.finalLoss)
-                # Assert that all gradients are correctly calculated.
-                assert all([tpl[0] is not None for tpl in tower_grads])
-                assert all([tpl[1] is not None for tpl in tower_grads])
-                self.grads.append(tower_grads)
+                with tf.name_scope("tower_{0}".format(tower_id)):
+                    # Build a Multi GPU supporting CIGN
+                    tower_cign = FastTreeMultiGpu(
+                        node_build_funcs=self.nodeBuildFuncs,
+                        grad_func=self.gradFunc,
+                        threshold_func=self.thresholdFunc,
+                        residue_func=self.residueFunc,
+                        summary_func=self.summaryFunc,
+                        degree_list=self.degreeList,
+                        dataset=self.dataset,
+                        container_network=self,
+                        tower_id=tower_id,
+                        tower_batch_size=tower_batch_size)
+                    tower_cign.build_network()
+                    print("Built network for tower {0}".format(tower_id))
+                    self.towerNetworks.append((device_str, tower_cign))
+                    # Calculate gradients
+                    tower_grads = self.optimizer.compute_gradients(loss=tower_cign.finalLoss)
+                    # Assert that all gradients are correctly calculated.
+                    assert all([tpl[0] is not None for tpl in tower_grads])
+                    assert all([tpl[1] is not None for tpl in tower_grads])
+                    self.grads.append(tower_grads)
             tf.get_variable_scope().reuse_variables()
         # Calculate the mean of the moving average updates for batch normalization operations, across each tower.
         self.prepare_batch_norm_moving_avg_ops()
