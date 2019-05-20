@@ -98,7 +98,7 @@ class CignMultiGpu(FastTreeNetwork):
             grad = tf.reduce_mean(grad, 0)
             # Assert that all variables are the same, verify variable sharing behavior over towers.
             _var = _vars[0]
-            assert all([v == _var for v in vars])
+            assert all([v == _var for v in _vars])
             # Keep in mind that the Variables are redundant because they are shared
             # across towers. So .. we will just return the first tower's pointer to
             # the Variable.
