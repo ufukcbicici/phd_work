@@ -49,37 +49,41 @@ class CignMultiGpu(FastTreeNetwork):
         assert GlobalConstants.BATCH_SIZE % device_count == 0
         tower_batch_size = GlobalConstants.BATCH_SIZE / len(devices)
         self.build_optimizer()
-        for tower_id, device_str in enumerate(devices):
-            with tf.device(device_str):
-                with tf.name_scope("tower_{0}".format(tower_id)):
-                    # Build a Multi GPU supporting CIGN
-                    tower_cign = FastTreeMultiGpu(
-                        node_build_funcs=self.nodeBuildFuncs,
-                        grad_func=self.gradFunc,
-                        threshold_func=self.thresholdFunc,
-                        residue_func=self.residueFunc,
-                        summary_func=self.summaryFunc,
-                        degree_list=self.degreeList,
-                        dataset=self.dataset,
-                        container_network=self,
-                        tower_id=tower_id,
-                        tower_batch_size=tower_batch_size)
-                    tower_cign.build_network()
-                    print("Built network for tower {0}".format(tower_id))
-                    self.towerNetworks.append((device_str, tower_cign))
-                    # Calculate gradients
-                    tower_grads = self.optimizer.compute_gradients(loss=tower_cign.finalLoss)
-                    # Assert that all gradients are correctly calculated.
-                    assert all([tpl[0] is not None for tpl in tower_grads])
-                    assert all([tpl[1] is not None for tpl in tower_grads])
-                    self.grads.append(tower_grads)
-            tf.get_variable_scope().reuse_variables()
-        # Calculate the mean of the moving average updates for batch normalization operations, across each tower.
-        self.prepare_batch_norm_moving_avg_ops()
-        # We must calculate the mean of each gradient. Note that this is the synchronization point across all towers.
-        grads = self.average_gradients()
-        # Apply the gradients to adjust the shared variables.
-        self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
+        with tf.variable_scope("multiple_networks"):
+            for tower_id, device_str in enumerate(devices):
+                with tf.device(device_str):
+                    with tf.name_scope("tower_{0}".format(tower_id)):
+                        # Build a Multi GPU supporting CIGN
+                        tower_cign = FastTreeMultiGpu(
+                            node_build_funcs=self.nodeBuildFuncs,
+                            grad_func=self.gradFunc,
+                            threshold_func=self.thresholdFunc,
+                            residue_func=self.residueFunc,
+                            summary_func=self.summaryFunc,
+                            degree_list=self.degreeList,
+                            dataset=self.dataset,
+                            container_network=self,
+                            tower_id=tower_id,
+                            tower_batch_size=tower_batch_size)
+                        tower_cign.build_network()
+                        print("Built network for tower {0}".format(tower_id))
+                        self.towerNetworks.append((device_str, tower_cign))
+                        # Calculate gradients
+                        tower_grads = self.optimizer.compute_gradients(loss=tower_cign.finalLoss)
+                        # Assert that all gradients are correctly calculated.
+                        assert all([tpl[0] is not None for tpl in tower_grads])
+                        assert all([tpl[1] is not None for tpl in tower_grads])
+                        self.grads.append(tower_grads)
+                var_scope = tf.get_variable_scope()
+                var_scope.reuse_variables()
+        with tf.variable_scope("optimizer"):
+            # Calculate the mean of the moving average updates for batch normalization operations, across each tower.
+            self.prepare_batch_norm_moving_avg_ops()
+            # We must calculate the mean of each gradient.
+            # Note that this is the synchronization point across all towers.
+            grads = self.average_gradients()
+            # Apply the gradients to adjust the shared variables.
+            self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
         all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
         assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
