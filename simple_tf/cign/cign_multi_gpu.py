@@ -14,13 +14,15 @@ from simple_tf.node import Node
 
 class CignMultiGpu(FastTreeNetwork):
     def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
-        super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
-        # Each element contains a (device_str, network) pair.
-        self.towerNetworks = []
-        self.grads = []
-        self.dataset = dataset
-        self.applyGradientsOp = None
-        self.batchNormMovingAvgAssignOps = []
+        # placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
+        with tf.name_scope("main_network"):
+            super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
+            # Each element contains a (device_str, network) pair.
+            self.towerNetworks = []
+            self.grads = []
+            self.dataset = dataset
+            self.applyGradientsOp = None
+            self.batchNormMovingAvgAssignOps = []
 
     # def build_towers(self):
     #     for device_str, tower_cign in self.towerNetworks:
@@ -86,6 +88,7 @@ class CignMultiGpu(FastTreeNetwork):
                 grads = self.average_gradients()
                 # Apply the gradients to adjust the shared variables.
                 self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
+        placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
         all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
         assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
@@ -137,3 +140,70 @@ class CignMultiGpu(FastTreeNetwork):
                                                 mean_new_value)
             new_moving_average_value_assign_op = tf.assign(moving_average, new_moving_average_value)
             self.batchNormMovingAvgAssignOps.append(new_moving_average_value_assign_op)
+
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
+        # Load the placeholders in each tower separately
+        feed_dict = {}
+
+        for device_str, network in self.towerNetworks:
+            self.towerId = tower_id
+            self.towerBatchSize = tower_batch_size
+
+
+
+
+        feed_dict = {self.dataTensor: minibatch.samples,
+                     self.labelTensor: minibatch.labels,
+                     self.indicesTensor: minibatch.indices,
+                     self.oneHotLabelTensor: minibatch.one_hot_labels,
+                     # self.globalCounter: iteration,
+                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
+                     self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
+                     self.useThresholding: int(use_threshold),
+                     # self.isDecisionPhase: int(is_decision_phase),
+                     self.isTrain: int(is_train),
+                     self.useMasking: int(use_masking),
+                     self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
+                     self.iterationHolder: iteration,
+                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
+        if is_train:
+            feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
+            if not self.isBaseline:
+                self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
+                self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
+                self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
+                self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
+            if self.modeTracker.isCompressed:
+                self.get_label_mappings(feed_dict=feed_dict)
+        else:
+            feed_dict[self.classificationDropoutKeepProb] = 1.0
+            if not self.isBaseline:
+                self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
+                self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
+                self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
+                feed_dict[self.decisionDropoutKeepProb] = 1.0
+        return feed_dict
+
+    def update_params(self, sess, dataset, epoch, iteration):
+        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
+        minibatch = dataset.get_next_batch()
+        if minibatch is None:
+            return None, None, None
+        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
+                                           is_train=True, use_masking=True)
+        # # Prepare result tensors to collect
+        # run_ops = self.get_run_ops()
+        # if GlobalConstants.USE_VERBOSE:
+        #     run_ops.append(self.evalDict)
+        # print("Before Update Iteration:{0}".format(iteration))
+        # results = sess.run(run_ops, feed_dict=feed_dict)
+        # print("After Update Iteration:{0}".format(iteration))
+        # lr = results[1]
+        # sample_counts = results[2]
+        # is_open_indicators = results[3]
+        # # Unit Test for Unified Batch Normalization
+        # if GlobalConstants.USE_VERBOSE:
+        #     self.verbose_update(eval_dict=results[-1])
+        # # Unit Test for Unified Batch Normalization
+        # return lr, sample_counts, is_open_indicators

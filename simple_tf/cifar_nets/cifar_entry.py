@@ -343,6 +343,55 @@ def cifar100_multi_gpu_training():
                                                                                (100000, 0.0001)])
         network.build_network()
         print("X")
+        # Init
+        init = tf.global_variables_initializer()
+        print("********************NEW RUN:{0}********************".format(run_id))
+        # Restart the network; including all annealed parameters.
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
+        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
+        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
+        network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
+        network.thresholdFunc(network=network)
+        experiment_id = DbLogger.get_run_id()
+        explanation = get_explanation_string(network=network)
+        series_id = int(run_id / 4)
+        explanation += "\n Series:{0}".format(series_id)
+        DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
+        sess.run(init)
+        network.reset_network(dataset=dataset, run_id=experiment_id)
+        iteration_counter = 0
+        for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
+            # An epoch is a complete pass on the whole dataset.
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
+            print("*************Epoch {0}*************".format(epoch_id))
+            total_time = 0.0
+            leaf_info_rows = []
+            while True:
+                start_time = time.time()
+                lr, sample_counts, is_open_indicators = network.update_params(sess=sess,
+                                                                              dataset=dataset,
+                                                                              epoch=epoch_id,
+                                                                              iteration=iteration_counter)
+                if all([lr, sample_counts, is_open_indicators]):
+                    elapsed_time = time.time() - start_time
+                    total_time += elapsed_time
+                    print("Iteration:{0}".format(iteration_counter))
+                    print("Lr:{0}".format(lr))
+                    # Print sample counts (classification)
+                    sample_count_str = "Classification:   "
+                    for k, v in sample_counts.items():
+                        sample_count_str += "[{0}={1}]".format(k, v)
+                        node_index = network.get_node_from_variable_name(name=k).index
+                        leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
+                    print(sample_count_str)
+                    # Print node open indicators
+                    indicator_str = ""
+                    for k, v in is_open_indicators.items():
+                        indicator_str += "[{0}={1}]".format(k, v)
+                    print(indicator_str)
+                    iteration_counter += 1
 
 
 

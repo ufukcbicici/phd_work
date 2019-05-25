@@ -15,16 +15,6 @@ class FastTreeMultiGpu(FastTreeNetwork):
     def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset,
                  container_network, tower_id, tower_batch_size):
         super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
-        self.towerId = tower_id
-        self.towerBatchSize = tower_batch_size
-        lower_bound = int(self.towerId * self.towerBatchSize)
-        upper_bound = int((self.towerId + 1) * self.towerBatchSize)
-        self.dataTensor = container_network.dataTensor[lower_bound:upper_bound]
-        self.labelTensor = container_network.labelTensor[lower_bound:upper_bound]
-        self.indicesTensor = container_network.indicesTensor[lower_bound:upper_bound]
-        self.oneHotLabelTensor = container_network.oneHotLabelTensor[lower_bound:upper_bound]
-        self.filteredMask = container_network.filteredMask[lower_bound:upper_bound]
-        self.isTrain = container_network.isTrain
 
     def build_network(self):
         # Build the tree topologically and create the Tensorflow placeholders

@@ -260,10 +260,12 @@ class GlobalConstants:
     # Home
     SUMMARY_DIR = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf"
     # TRAIN
-    TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(None, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
-    TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,))
-    TRAIN_INDEX_TENSOR = tf.placeholder(tf.int64, shape=(None,))
-    TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(None, NUM_LABELS))
+    with tf.name_scope("Global_Ops"):
+        TRAIN_DATA_TENSOR = tf.placeholder(DATA_TYPE, shape=(None, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS),
+                                           name="TRAIN_DATA_TENSOR")
+        TRAIN_LABEL_TENSOR = tf.placeholder(tf.int64, shape=(None,), name="TRAIN_LABEL_TENSOR")
+        TRAIN_INDEX_TENSOR = tf.placeholder(tf.int64, shape=(None,), name="TRAIN_INDEX_TENSOR")
+        TRAIN_ONE_HOT_LABELS = tf.placeholder(dtype=DATA_TYPE, shape=(None, NUM_LABELS), name="TRAIN_ONE_HOT_LABELS")
 
     BATCH_SIZES_DICT = {DatasetTypes.training: BATCH_SIZE,
                         DatasetTypes.test: EVAL_BATCH_SIZE,
