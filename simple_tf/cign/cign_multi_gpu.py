@@ -144,7 +144,6 @@ class CignMultiGpu(FastTreeNetwork):
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         # Load the placeholders in each tower separately
         feed_dict = {}
-
         for device_str, network in self.towerNetworks:
             self.towerId = tower_id
             self.towerBatchSize = tower_batch_size
