@@ -254,8 +254,9 @@ class CignMultiGpu(FastTreeNetwork):
         return feed_dict
 
     def get_run_ops(self):
-        run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        run_ops = [self.applyGradientsOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
                    self.infoGainDicts]
+        run_ops.extend(self.batchNormMovingAvgAssignOps)
         # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
         #            self.infoGainDicts]
         return run_ops
