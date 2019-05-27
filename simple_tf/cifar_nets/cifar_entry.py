@@ -392,70 +392,70 @@ def cifar100_multi_gpu_training():
                         indicator_str += "[{0}={1}]".format(k, v)
                     print(indicator_str)
                     iteration_counter += 1
-                if dataset.isNewEpoch:
-                    # moving_results_1 = sess.run(moving_stat_vars)
-                    if (epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT-30 and
-                            (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0) \
-                            or epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT-30:
-                        print("Epoch Time={0}".format(total_time))
-                        if not network.modeTracker.isCompressed:
-                            training_accuracy, training_confusion = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.training,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy, validation_confusion = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.test,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
-                            if not network.isBaseline:
-                                validation_accuracy_corrected, validation_marginal_corrected = \
-                                    network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                               dataset_type=DatasetTypes.test,
-                                                               run_id=experiment_id,
-                                                               iteration=iteration_counter,
-                                                               calculation_type=
-                                                               AccuracyCalcType.route_correction)
-                                if epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - 10:
-                                    network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                               dataset_type=DatasetTypes.test,
-                                                               run_id=experiment_id,
-                                                               iteration=iteration_counter,
-                                                               calculation_type=
-                                                               AccuracyCalcType.multi_path)
-                            else:
-                                validation_accuracy_corrected = 0.0
-                                validation_marginal_corrected = 0.0
-                            DbLogger.write_into_table(
-                                rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
-                                       validation_accuracy, validation_accuracy_corrected,
-                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
-                            # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
-                            if GlobalConstants.SAVE_CONFUSION_MATRICES:
-                                DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
-                                                          col_count=7)
-                                DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
-                                                          col_count=7)
-                        else:
-                            training_accuracy_best_leaf, training_confusion_residue = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.training,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy_best_leaf, validation_confusion_residue = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.test,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
-                            DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id,
-                                                             training_accuracy_best_leaf,
-                                                             validation_accuracy_best_leaf,
-                                                             validation_confusion_residue,
-                                                             0.0, 0.0, "XXX")], table=DbLogger.logsTable,
-                                                      col_count=9)
-                        leaf_info_rows = []
-                    break
+                # if dataset.isNewEpoch:
+                #     # moving_results_1 = sess.run(moving_stat_vars)
+                #     if (epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT-30 and
+                #             (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0) \
+                #             or epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT-30:
+                #         print("Epoch Time={0}".format(total_time))
+                #         if not network.modeTracker.isCompressed:
+                #             training_accuracy, training_confusion = \
+                #                 network.calculate_accuracy(sess=sess, dataset=dataset,
+                #                                            dataset_type=DatasetTypes.training,
+                #                                            run_id=experiment_id, iteration=iteration_counter,
+                #                                            calculation_type=AccuracyCalcType.regular)
+                #             validation_accuracy, validation_confusion = \
+                #                 network.calculate_accuracy(sess=sess, dataset=dataset,
+                #                                            dataset_type=DatasetTypes.test,
+                #                                            run_id=experiment_id, iteration=iteration_counter,
+                #                                            calculation_type=AccuracyCalcType.regular)
+                #             if not network.isBaseline:
+                #                 validation_accuracy_corrected, validation_marginal_corrected = \
+                #                     network.calculate_accuracy(sess=sess, dataset=dataset,
+                #                                                dataset_type=DatasetTypes.test,
+                #                                                run_id=experiment_id,
+                #                                                iteration=iteration_counter,
+                #                                                calculation_type=
+                #                                                AccuracyCalcType.route_correction)
+                #                 if epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - 10:
+                #                     network.calculate_accuracy(sess=sess, dataset=dataset,
+                #                                                dataset_type=DatasetTypes.test,
+                #                                                run_id=experiment_id,
+                #                                                iteration=iteration_counter,
+                #                                                calculation_type=
+                #                                                AccuracyCalcType.multi_path)
+                #             else:
+                #                 validation_accuracy_corrected = 0.0
+                #                 validation_marginal_corrected = 0.0
+                #             DbLogger.write_into_table(
+                #                 rows=[(experiment_id, iteration_counter, epoch_id, training_accuracy,
+                #                        validation_accuracy, validation_accuracy_corrected,
+                #                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                #             # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
+                #             if GlobalConstants.SAVE_CONFUSION_MATRICES:
+                #                 DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
+                #                                           col_count=7)
+                #                 DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
+                #                                           col_count=7)
+                #         else:
+                #             training_accuracy_best_leaf, training_confusion_residue = \
+                #                 network.calculate_accuracy(sess=sess, dataset=dataset,
+                #                                            dataset_type=DatasetTypes.training,
+                #                                            run_id=experiment_id, iteration=iteration_counter,
+                #                                            calculation_type=AccuracyCalcType.regular)
+                #             validation_accuracy_best_leaf, validation_confusion_residue = \
+                #                 network.calculate_accuracy(sess=sess, dataset=dataset,
+                #                                            dataset_type=DatasetTypes.test,
+                #                                            run_id=experiment_id, iteration=iteration_counter,
+                #                                            calculation_type=AccuracyCalcType.regular)
+                #             DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id,
+                #                                              training_accuracy_best_leaf,
+                #                                              validation_accuracy_best_leaf,
+                #                                              validation_confusion_residue,
+                #                                              0.0, 0.0, "XXX")], table=DbLogger.logsTable,
+                #                                       col_count=9)
+                #         leaf_info_rows = []
+                #     break
 
 
 # main()

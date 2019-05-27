@@ -104,6 +104,10 @@ class CignMultiGpu(FastTreeNetwork):
             for k, v in network.evalDict.items():
                 new_key = "tower_{0}_{1}".format(tower_id, k)
                 self.evalDict[new_key] = v
+        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
+        for tpl in batch_norm_moving_averages:
+            moving_average = tpl[0]
+            self.evalDict[moving_average.name] = moving_average
         self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
