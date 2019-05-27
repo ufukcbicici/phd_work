@@ -270,21 +270,10 @@ class CignMultiGpu(FastTreeNetwork):
                                            is_train=True, use_masking=True)
         # Prepare result tensors to collect
         run_ops = self.get_run_ops()
-
-
-
-        # # Prepare result tensors to collect
-        # run_ops = self.get_run_ops()
-        # if GlobalConstants.USE_VERBOSE:
-        #     run_ops.append(self.evalDict)
-        # print("Before Update Iteration:{0}".format(iteration))
-        # results = sess.run(run_ops, feed_dict=feed_dict)
-        # print("After Update Iteration:{0}".format(iteration))
-        # lr = results[1]
-        # sample_counts = results[2]
-        # is_open_indicators = results[3]
-        # # Unit Test for Unified Batch Normalization
-        # if GlobalConstants.USE_VERBOSE:
-        #     self.verbose_update(eval_dict=results[-1])
-        # # Unit Test for Unified Batch Normalization
-        # return lr, sample_counts, is_open_indicators
+        if GlobalConstants.USE_VERBOSE:
+            run_ops.append(self.evalDict)
+        results = sess.run(run_ops, feed_dict=feed_dict)
+        lr = results[1]
+        sample_counts = results[2]
+        is_open_indicators = results[3]
+        return lr, sample_counts, is_open_indicators
