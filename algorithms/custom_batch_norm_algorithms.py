@@ -186,7 +186,7 @@ class CustomBatchNormAlgorithms:
                                                             momentum=momentum,
                                                             epsilon=epsilon,
                                                             training=True)
-            with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+            with tf.control_dependencies([pop_mean_assign_op, pop_var_assign_op]):
                 final_x = tf.identity(final_x)
                 tf_normalized_x = tf.identity(tf_normalized_x)
                 return final_x, tf_normalized_x

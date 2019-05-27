@@ -18,11 +18,12 @@ class CignMultiGpu(FastTreeNetwork):
         with tf.name_scope("main_network"):
             super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
             # Each element contains a (device_str, network) pair.
-            self.towerNetworks = []
-            self.grads = []
-            self.dataset = dataset
-            self.applyGradientsOp = None
-            self.batchNormMovingAvgAssignOps = []
+        self.towerNetworks = []
+        self.grads = []
+        self.dataset = dataset
+        self.applyGradientsOp = None
+        self.batchNormMovingAvgAssignOps = []
+        self.towerBatchSize = None
 
     # def build_towers(self):
     #     for device_str, tower_cign in self.towerNetworks:
@@ -49,7 +50,7 @@ class CignMultiGpu(FastTreeNetwork):
         devices = UtilityFuncs.get_available_devices(only_gpu=False)
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
-        tower_batch_size = GlobalConstants.BATCH_SIZE / len(devices)
+        self.towerBatchSize = GlobalConstants.BATCH_SIZE / len(devices)
         with tf.device('/CPU:0'):
             self.build_optimizer()
             with tf.variable_scope("multiple_networks"):
@@ -68,7 +69,7 @@ class CignMultiGpu(FastTreeNetwork):
                                 dataset=self.dataset,
                                 container_network=self,
                                 tower_id=tower_id,
-                                tower_batch_size=tower_batch_size)
+                                tower_batch_size=self.towerBatchSize)
                             tower_cign.build_network()
                             print("Built network for tower {0}".format(tower_id))
                             self.towerNetworks.append((device_str, tower_cign))
@@ -88,11 +89,24 @@ class CignMultiGpu(FastTreeNetwork):
                 grads = self.average_gradients()
                 # Apply the gradients to adjust the shared variables.
                 self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
+        # Unify all evaluation tensors across towers
+        self.prepare_evaluation_dictionary()
         placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
         all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
         assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
         self.dataset = None
+
+    def prepare_evaluation_dictionary(self):
+        self.evalDict = {}
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            network = tpl[1]
+            for k, v in network.evalDict.items():
+                new_key = "tower_{0}_{1}".format(tower_id, k)
+                self.evalDict[new_key] = v
+        self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
+        self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
     def average_gradients(self):
         average_grads = []
@@ -141,47 +155,110 @@ class CignMultiGpu(FastTreeNetwork):
             new_moving_average_value_assign_op = tf.assign(moving_average, new_moving_average_value)
             self.batchNormMovingAvgAssignOps.append(new_moving_average_value_assign_op)
 
+    # OK
+    def get_probability_thresholds(self, feed_dict, iteration, update):
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            network = tpl[1]
+            for node in network.topologicalSortedNodes:
+                if node.isLeaf:
+                    continue
+                if update:
+                    # Probability Threshold
+                    node_degree = network.degreeList[node.depth]
+                    uniform_prob = 1.0 / float(node_degree)
+                    threshold = uniform_prob - node.probThresholdCalculator.value
+                    feed_dict[node.probabilityThreshold] = threshold
+                    print("{0} value={1}".format(node.probThresholdCalculator.name, threshold))
+                    # Update the threshold calculator
+                    node.probThresholdCalculator.update(iteration=iteration + 1)
+                else:
+                    feed_dict[node.probabilityThreshold] = 0.0
+
+    # OK
+    def get_softmax_decays(self, feed_dict, iteration, update):
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            network = tpl[1]
+            for node in network.topologicalSortedNodes:
+                if node.isLeaf:
+                    continue
+                # Decay for Softmax
+                decay = node.softmaxDecayCalculator.value
+                if update:
+                    feed_dict[node.softmaxDecay] = decay
+                    print("{0} value={1}".format(node.softmaxDecayCalculator.name, decay))
+                    # Update the Softmax Decay
+                    node.softmaxDecayCalculator.update(iteration=iteration + 1)
+                else:
+                    feed_dict[node.softmaxDecay] = GlobalConstants.SOFTMAX_TEST_TEMPERATURE
+
+    # OK
+    def get_decision_dropout_prob(self, feed_dict, iteration, update):
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            network = tpl[1]
+            assert network.decisionDropoutKeepProbCalculator is None
+            if update:
+                prob = self.decisionDropoutKeepProbCalculator.value
+                feed_dict[network.decisionDropoutKeepProb] = prob
+                print("{0} value={1}".format(self.decisionDropoutKeepProbCalculator.name, prob))
+                self.decisionDropoutKeepProbCalculator.update(iteration=iteration + 1)
+            else:
+                feed_dict[network.decisionDropoutKeepProb] = 1.0
+
+    # OK
+    def get_decision_weight(self, feed_dict, iteration, update):
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            network = tpl[1]
+            weight = network.decisionLossCoefficientCalculator.value
+            feed_dict[network.decisionLossCoefficient] = weight
+            # print("self.decisionLossCoefficient={0}".format(weight))
+            if update:
+                network.decisionLossCoefficientCalculator.update(iteration=iteration + 1)
+
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         # Load the placeholders in each tower separately
         feed_dict = {}
-        for device_str, network in self.towerNetworks:
-            self.towerId = tower_id
-            self.towerBatchSize = tower_batch_size
-
-
-
-
-        feed_dict = {self.dataTensor: minibatch.samples,
-                     self.labelTensor: minibatch.labels,
-                     self.indicesTensor: minibatch.indices,
-                     self.oneHotLabelTensor: minibatch.one_hot_labels,
-                     # self.globalCounter: iteration,
-                     self.weightDecayCoeff: GlobalConstants.WEIGHT_DECAY_COEFFICIENT,
-                     self.decisionWeightDecayCoeff: GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT,
-                     self.useThresholding: int(use_threshold),
-                     # self.isDecisionPhase: int(is_decision_phase),
-                     self.isTrain: int(is_train),
-                     self.useMasking: int(use_masking),
-                     self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
-                     self.iterationHolder: iteration,
-                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
-        if is_train:
-            feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
-            if not self.isBaseline:
+        # Global parameters
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            device_str = tpl[0]
+            network = tpl[1]
+            lower_bound = int(tower_id * self.towerBatchSize)
+            upper_bound = int((tower_id + 1) * self.towerBatchSize)
+            feed_dict[network.dataTensor] = minibatch.samples[lower_bound:upper_bound]
+            feed_dict[network.labelTensor] = minibatch.labels[lower_bound:upper_bound]
+            feed_dict[network.indicesTensor] = minibatch.indices[lower_bound:upper_bound]
+            feed_dict[network.oneHotLabelTensor] = minibatch.one_hot_labels[lower_bound:upper_bound]
+            feed_dict[network.weightDecayCoeff] = GlobalConstants.WEIGHT_DECAY_COEFFICIENT
+            feed_dict[network.decisionWeightDecayCoeff] = GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT
+            feed_dict[network.useThresholding] = int(use_threshold)
+            feed_dict[network.isTrain] = int(is_train)
+            feed_dict[network.useMasking] = int(use_masking)
+            feed_dict[network.informationGainBalancingCoefficient] = GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT
+            feed_dict[network.iterationHolder] = iteration
+            feed_dict[network.filteredMask] = np.ones((self.towerBatchSize,), dtype=bool)
+            if is_train:
+                feed_dict[network.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
+            else:
+                feed_dict[network.classificationDropoutKeepProb] = 1.0
+        # Per network parameters
+        if not self.isBaseline:
+            if is_train:
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
-            if self.modeTracker.isCompressed:
-                self.get_label_mappings(feed_dict=feed_dict)
-        else:
-            feed_dict[self.classificationDropoutKeepProb] = 1.0
-            if not self.isBaseline:
+            else:
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=1000000, update=False)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=1000000, update=False)
-                self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
-                feed_dict[self.decisionDropoutKeepProb] = 1.0
+                self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=1000000, update=False)
+                self.get_decision_weight(feed_dict=feed_dict, iteration=1000000, update=False)
         return feed_dict
+
+    def get_run_ops(self):
+        run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+                   self.infoGainDicts]
+        # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        #            self.infoGainDicts]
+        return run_ops
 
     def update_params(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
@@ -191,6 +268,11 @@ class CignMultiGpu(FastTreeNetwork):
             return None, None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
                                            is_train=True, use_masking=True)
+        # Prepare result tensors to collect
+        run_ops = self.get_run_ops()
+
+
+
         # # Prepare result tensors to collect
         # run_ops = self.get_run_ops()
         # if GlobalConstants.USE_VERBOSE:
