@@ -15,10 +15,10 @@ from simple_tf.global_params import Optimizer
 
 
 class Jungle(FastTreeNetwork):
-    def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
+    def __init__(self, node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                  dataset):
         assert len(node_build_funcs) == len(h_funcs) + 1
-        super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
+        super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset)
         curr_index = 0
         self.batchSize = tf.placeholder(name="batch_size", dtype=tf.int64)
         self.depthToNodesDict = {}
@@ -89,7 +89,7 @@ class Jungle(FastTreeNetwork):
                     self.dagObject.add_edge(parent=parent_node, child=node)
         self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         # Build auxillary variables
-        self.thresholdFunc(network=self)
+        self.hyperparameterFunc(network=self)
         # Build node computational graphs
         for node in self.topologicalSortedNodes:
             # if node.depth > 3 or (node.depth == 3 and node.nodeType == NodeType.h_node):

@@ -115,7 +115,7 @@ def cigj_training():
                               FashionNetCigj.f_leaf_func],
             h_funcs=[FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func],
             grad_func=None,
-            threshold_func=FashionNetCigj.threshold_calculator_gumbel_softmax_func,
+            hyperparameter_func=FashionNetCigj.threshold_calculator_gumbel_softmax_func,
             residue_func=None, summary_func=None,
             degree_list=GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST, dataset=dataset)
         sess = jungle.get_session()
@@ -127,7 +127,7 @@ def cigj_training():
         GlobalConstants.DECISION_DROPOUT_KEEP_PROB = 1.0 - tpl[4]
         # jungle.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
         jungle.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
-        jungle.thresholdFunc(network=jungle)
+        jungle.hyperparameterFunc(network=jungle)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=jungle)
         series_id = int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)

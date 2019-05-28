@@ -12,9 +12,9 @@ from simple_tf.node import Node
 
 
 class FastTreeMultiGpu(FastTreeNetwork):
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset,
+    def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset,
                  container_network, tower_id, tower_batch_size):
-        super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
+        super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset)
 
     def build_network(self):
         # Build the tree topologically and create the Tensorflow placeholders

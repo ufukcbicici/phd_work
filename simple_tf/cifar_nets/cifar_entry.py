@@ -114,7 +114,7 @@ def get_network(dataset):
         network = CignWithSampling(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
             grad_func=cign_resnet.grad_func,
-            threshold_func=cign_resnet.threshold_calculator_func_sampling,
+            hyperparameter_func=cign_resnet.hyperparameter_func_sampling,
             residue_func=cign_resnet.residue_network_func,
             summary_func=cign_resnet.tensorboard_func,
             degree_list=GlobalConstants.RESNET_TREE_DEGREES,
@@ -123,7 +123,7 @@ def get_network(dataset):
         network = FastTreeNetwork(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
             grad_func=cign_resnet.grad_func,
-            threshold_func=cign_resnet.threshold_calculator_func,
+            hyperparameter_func=cign_resnet.hyperparameter_func,
             residue_func=cign_resnet.residue_network_func,
             summary_func=cign_resnet.tensorboard_func,
             degree_list=GlobalConstants.RESNET_TREE_DEGREES,
@@ -158,34 +158,23 @@ def cifar100_training():
         dataset = CifarDataSet(session=sess,
                                validation_sample_count=0, load_validation_from=None)
         dataset.set_curr_session(sess=sess)
-        # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
         network = get_network(dataset=dataset)
-        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
-                                                                     value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(40000, 0.01),
-                                                                               (70000, 0.001),
-                                                                               (100000, 0.0001)])
         network.build_network()
         # Init
         init = tf.global_variables_initializer()
         print("********************NEW RUN:{0}********************".format(run_id))
-        # Restart the network; including all annealed parameters.
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
-        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
-        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
-        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - tpl[3]
-        network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
-        network.thresholdFunc(network=network)
+        network.set_hyperparameters(weight_decay_coefficient=tpl[0],
+                                    decision_weight_decay_coefficient=tpl[1],
+                                    info_gain_balance_coefficient=tpl[2],
+                                    classification_keep_probability=1.0 - tpl[3],
+                                    decision_keep_probability=1.0 - tpl[4])
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
         series_id = int(run_id / 4)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)
-        network.reset_network(dataset=dataset, run_id=experiment_id)
-        # moving_stat_vars = [var for var in ops.get_collection(ops.GraphKeys.GLOBAL_VARIABLES) if "moving" in var.name]
-        # moving_results_0 = sess.run(moving_stat_vars)
         iteration_counter = 0
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -330,7 +319,7 @@ def cifar100_multi_gpu_training():
         network = CignMultiGpu(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
             grad_func=cign_resnet.grad_func,
-            threshold_func=cign_resnet.threshold_calculator_func,
+            hyperparameter_func=cign_resnet.hyperparameter_func,
             residue_func=cign_resnet.residue_network_func,
             summary_func=cign_resnet.tensorboard_func,
             degree_list=GlobalConstants.RESNET_TREE_DEGREES,
@@ -345,13 +334,11 @@ def cifar100_multi_gpu_training():
         # Init
         init = tf.global_variables_initializer()
         print("********************NEW RUN:{0}********************".format(run_id))
-        # Restart the network; including all annealed parameters.
-        network.get_hyperparameter_calculators(weight_decay_coefficient=tpl[0],
-                                               decision_weight_decay_coefficient=tpl[1],
-                                               info_gain_balance_coefficient=tpl[2],
-                                               classification_keep_probability=1.0 - tpl[3],
-                                               decision_keep_probability=1.0 - tpl[4])
-        network.thresholdFunc(network=network)
+        network.set_hyperparameters(weight_decay_coefficient=tpl[0],
+                                    decision_weight_decay_coefficient=tpl[1],
+                                    info_gain_balance_coefficient=tpl[2],
+                                    classification_keep_probability=1.0 - tpl[3],
+                                    decision_keep_probability=1.0 - tpl[4])
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
         series_id = int(run_id / 4)

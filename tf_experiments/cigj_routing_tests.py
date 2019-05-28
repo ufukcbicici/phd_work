@@ -85,7 +85,7 @@ class CigjTesting:
                 node_build_funcs=node_build_funcs,
                 h_funcs=[FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func],
                 grad_func=None,
-                threshold_func=FashionNetCigj.threshold_calculator_func,
+                hyperparameter_func=FashionNetCigj.threshold_calculator_func,
                 residue_func=None, summary_func=None,
                 degree_list=GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST, dataset=dataset)
         jungle_parameters = set(tf.trainable_variables())
@@ -95,7 +95,7 @@ class CigjTesting:
                 node_build_funcs=node_build_funcs,
                 h_funcs=[FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func, FashionNetCigj.h_func],
                 grad_func=None,
-                threshold_func=FashionNetCigj.threshold_calculator_func,
+                hyperparameter_func=FashionNetCigj.threshold_calculator_func,
                 residue_func=None, summary_func=None,
                 degree_list=[1] * len(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST), dataset=dataset)
         single_path_parameters = set([var for var in tf.trainable_variables() if var not in jungle_parameters])

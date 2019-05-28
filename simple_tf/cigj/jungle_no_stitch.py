@@ -11,9 +11,9 @@ from simple_tf.info_gain import InfoGainLoss
 
 
 class JungleNoStitch(Jungle):
-    def __init__(self, node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
+    def __init__(self, node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                  dataset):
-        super().__init__(node_build_funcs, h_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list,
+        super().__init__(node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                          dataset)
         # self.unitTestList = [self.test_stitching]
 

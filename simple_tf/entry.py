@@ -256,7 +256,7 @@ def main():
                               fashion_net_decision_connected_to_f.l1_func,
                               fashion_net_decision_connected_to_f.leaf_func],
             grad_func=fashion_net_decision_connected_to_f.grad_func,
-            threshold_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
+            hyperparameter_func=fashion_net_decision_connected_to_f.threshold_calculator_func,
             residue_func=fashion_net_decision_connected_to_f.residue_network_func,
             summary_func=fashion_net_decision_connected_to_f.tensorboard_func,
             degree_list=GlobalConstants.TREE_DEGREE_LIST)
@@ -303,7 +303,7 @@ def main():
         #                                                                value=GlobalConstants.INITIAL_LR,
         #                                                                decay=GlobalConstants.DECAY_RATE)
         # GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = tpl[2]
-        network.thresholdFunc(network=network)
+        network.hyperparameterFunc(network=network)
         network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
                                                                    value=1.0 - tpl[4])
         experiment_id = DbLogger.get_run_id()
@@ -568,7 +568,7 @@ def main_fast_tree():
                               fashion_cign_connected_v2.l1_func,
                               fashion_cign_connected_v2.leaf_func],
             grad_func=fashion_cign_connected_v2.grad_func,
-            threshold_func=fashion_cign_connected_v2.threshold_calculator_func,
+            hyperparameter_func=fashion_cign_connected_v2.threshold_calculator_func,
             residue_func=fashion_cign_connected_v2.residue_network_func,
             summary_func=fashion_cign_connected_v2.tensorboard_func,
             degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
@@ -597,7 +597,7 @@ def main_fast_tree():
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - tpl[3]
         network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
-        network.thresholdFunc(network=network)
+        network.hyperparameterFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
         series_id = int(run_id / 15)
@@ -930,7 +930,7 @@ def ensemble_training():
         networks = [FastTreeNetwork(
             node_build_funcs=[fashion_net_baseline.baseline],
             grad_func=fashion_net_baseline.grad_func,
-            threshold_func=fashion_net_baseline.threshold_calculator_func,
+            hyperparameter_func=fashion_net_baseline.threshold_calculator_func,
             residue_func=fashion_net_baseline.residue_network_func,
             summary_func=fashion_net_baseline.tensorboard_func,
             degree_list=[1]) for i in range(GlobalConstants.BASELINE_ENSEMBLE_COUNT)]

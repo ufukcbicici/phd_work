@@ -170,38 +170,60 @@ def tensorboard_func(network):
     pass
 
 
-def threshold_calculator_func(network):
-    # Noise Coefficient
-    network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
-                                                           decay=0.0,
-                                                           decay_period=1,
-                                                           min_limit=0.0)
-    # Decision Loss Coefficient
-    # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
-    #                                                               value=0.0,
-    #                                                               schedule=[(12000, 1.0)])
-    network.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator", value=1.0)
-    for node in network.topologicalSortedNodes:
-        if node.isLeaf:
-            continue
-        # Probability Threshold
-        node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
-        initial_value = 1.0 / float(node_degree)
-        threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
-        # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-        #                                                  decay_period=70000,
-        #                                                  min_limit=0.4)
-        node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
-        # Softmax Decay
-        decay_name = network.get_variable_name(name="softmax_decay", node=node)
-        node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
-                                                        value=GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL,
-                                                        decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
-                                                        decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
-                                                        min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
+def hyperparameter_func(network, **kwargs):
+    GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
+    GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
+
+    if not network.isBaseline:
 
 
-def threshold_calculator_func_sampling(network):
+
+
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
+        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            network = tpl[1]
+            network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                                       value=kwargs["decision_keep_probability"])
+
+
+
+
+
+
+
+        # Noise Coefficient
+        network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
+                                                               decay=0.0,
+                                                               decay_period=1,
+                                                               min_limit=0.0)
+        # Decision Loss Coefficient
+        # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
+        #                                                               value=0.0,
+        #                                                               schedule=[(12000, 1.0)])
+        network.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator", value=1.0)
+        for node in network.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            # Probability Threshold
+            node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
+            initial_value = 1.0 / float(node_degree)
+            threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
+            # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
+            #                                                  decay_period=70000,
+            #                                                  min_limit=0.4)
+            node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
+            # Softmax Decay
+            decay_name = network.get_variable_name(name="softmax_decay", node=node)
+            node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
+                                                            value=GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL,
+                                                            decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
+                                                            decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
+                                                            min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
+
+
+def hyperparameter_func_sampling(network, hyperparameter_func):
     # Noise Coefficient
     network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
                                                            decay=0.0,

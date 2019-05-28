@@ -8,16 +8,18 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.cign.fast_tree_multi_gpu import FastTreeMultiGpu
 from simple_tf.global_params import GlobalConstants
-from auxillary.parameters import FixedParameter, DiscreteParameter
+from auxillary.parameters import FixedParameter, DiscreteParameter, DecayingParameter
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
 
 
 class CignMultiGpu(FastTreeNetwork):
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
+    def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
+                 dataset):
         # placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
         with tf.name_scope("main_network"):
-            super().__init__(node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset)
+            super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
+                             dataset)
             # Each element contains a (device_str, network) pair.
         self.towerNetworks = []
         self.grads = []
@@ -63,7 +65,7 @@ class CignMultiGpu(FastTreeNetwork):
                             tower_cign = FastTreeMultiGpu(
                                 node_build_funcs=self.nodeBuildFuncs,
                                 grad_func=self.gradFunc,
-                                threshold_func=self.thresholdFunc,
+                                hyperparameter_func=self.hyperparameterFunc,
                                 residue_func=self.residueFunc,
                                 summary_func=self.summaryFunc,
                                 degree_list=self.degreeList,
@@ -219,15 +221,51 @@ class CignMultiGpu(FastTreeNetwork):
             if update:
                 network.decisionLossCoefficientCalculator.update(iteration=iteration + 1)
 
-    def get_hyperparameter_calculators(self, **kwargs):
+    def set_hyperparameters(self, **kwargs):
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
-        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
-        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
-        for tower_id, tpl in enumerate(self.towerNetworks):
-            network = tpl[1]
-            network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
-                                                                       value=kwargs["decision_keep_probability"])
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.INITIAL_LR,
+                                                                     schedule=[(40000, 0.01),
+                                                                               (70000, 0.001),
+                                                                               (100000, 0.0001)])
+        if not self.isBaseline:
+            GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
+            GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
+            for tower_id, tpl in enumerate(self.towerNetworks):
+                network = tpl[1]
+                network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                                           value=kwargs["decision_keep_probability"])
+
+                # Noise Coefficient
+                network.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
+                                                                       decay=0.0,
+                                                                       decay_period=1,
+                                                                       min_limit=0.0)
+                # Decision Loss Coefficient
+                # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
+                #                                                               value=0.0,
+                #                                                               schedule=[(12000, 1.0)])
+                network.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
+                                                                        value=1.0)
+                for node in network.topologicalSortedNodes:
+                    if node.isLeaf:
+                        continue
+                    # Probability Threshold
+                    node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
+                    initial_value = 1.0 / float(node_degree)
+                    threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
+                    # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
+                    #                                                  decay_period=70000,
+                    #                                                  min_limit=0.4)
+                    node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
+                    # Softmax Decay
+                    decay_name = self.get_variable_name(name="softmax_decay", node=node)
+                    node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
+                                                                    value=GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL,
+                                                                    decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
+                                                                    decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
+                                                                    min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         # Load the placeholders in each tower separately

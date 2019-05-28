@@ -17,14 +17,14 @@ from simple_tf import batch_norm
 
 
 class TreeNetwork:
-    def __init__(self, node_build_funcs, grad_func, threshold_func, residue_func, summary_func, degree_list, dataset):
+    def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset):
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
         self.depth = len(self.nodeBuildFuncs)
         self.nodes = {}
         self.topologicalSortedNodes = []
         self.gradFunc = grad_func
-        self.thresholdFunc = threshold_func
+        self.hyperparameterFunc = hyperparameter_func
         self.residueFunc = residue_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
@@ -168,9 +168,8 @@ class TreeNetwork:
         self.isBaseline = len(self.topologicalSortedNodes) == 1
         if not GlobalConstants.USE_RANDOM_PARAMETERS:
             self.paramsDict = UtilityFuncs.load_npz(file_name="parameters")
-        # Set up mechanism for probability thresholding
-        if not self.isBaseline:
-            self.thresholdFunc(network=self)
+        # Set up mechanism hyperparameters
+        self.hyperparameterFunc(network=self)
         # Build all symbolic networks in each node
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
