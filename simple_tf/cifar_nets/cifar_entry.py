@@ -176,7 +176,6 @@ def cifar100_training():
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - tpl[3]
         network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
-        network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
@@ -351,11 +350,7 @@ def cifar100_multi_gpu_training():
                                                decision_weight_decay_coefficient=tpl[1],
                                                info_gain_balance_coefficient=tpl[2],
                                                classification_keep_probability=1.0 - tpl[3],
-                                               decision_drop_probability=1.0 - tpl[4])
-        network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
-
-
-
+                                               decision_keep_probability=1.0 - tpl[4])
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
