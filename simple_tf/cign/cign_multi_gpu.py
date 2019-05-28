@@ -8,6 +8,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.cign.fast_tree_multi_gpu import FastTreeMultiGpu
 from simple_tf.global_params import GlobalConstants
+from auxillary.parameters import FixedParameter, DiscreteParameter
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
 
@@ -201,10 +202,10 @@ class CignMultiGpu(FastTreeNetwork):
             network = tpl[1]
             assert network.decisionDropoutKeepProbCalculator is None
             if update:
-                prob = self.decisionDropoutKeepProbCalculator.value
+                prob = network.decisionDropoutKeepProbCalculator.value
                 feed_dict[network.decisionDropoutKeepProb] = prob
-                print("{0} value={1}".format(self.decisionDropoutKeepProbCalculator.name, prob))
-                self.decisionDropoutKeepProbCalculator.update(iteration=iteration + 1)
+                print("{0} value={1}".format(network.decisionDropoutKeepProbCalculator.name, prob))
+                network.decisionDropoutKeepProbCalculator.update(iteration=iteration + 1)
             else:
                 feed_dict[network.decisionDropoutKeepProb] = 1.0
 
@@ -217,6 +218,16 @@ class CignMultiGpu(FastTreeNetwork):
             # print("self.decisionLossCoefficient={0}".format(weight))
             if update:
                 network.decisionLossCoefficientCalculator.update(iteration=iteration + 1)
+
+    def get_hyperparameter_calculators(self, **kwargs):
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
+        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            network = tpl[1]
+            network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                                       value=kwargs["decision_keep_probability"])
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         # Load the placeholders in each tower separately
@@ -240,7 +251,7 @@ class CignMultiGpu(FastTreeNetwork):
             feed_dict[network.iterationHolder] = iteration
             feed_dict[network.filteredMask] = np.ones((self.towerBatchSize,), dtype=bool)
             if is_train:
-                feed_dict[network.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
+                feed_dict[network.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             else:
                 feed_dict[network.classificationDropoutKeepProb] = 1.0
         # Per network parameters

@@ -358,7 +358,7 @@ class FastTreeNetwork(TreeNetwork):
                      self.iterationHolder: iteration,
                      self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
         if is_train:
-            feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
+            feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             if not self.isBaseline:
                 self.get_probability_thresholds(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)

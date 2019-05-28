@@ -80,7 +80,7 @@ def get_explanation_string(network):
             explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
         explanation += "********Decision Dropout Schedule********\n"
     explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
-    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
+    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
     explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
@@ -163,8 +163,8 @@ def cifar100_training():
         network = get_network(dataset=dataset)
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(40000,  0.01),
-                                                                               (70000,  0.001),
+                                                                     schedule=[(40000, 0.01),
+                                                                               (70000, 0.001),
                                                                                (100000, 0.0001)])
         network.build_network()
         # Init
@@ -174,7 +174,7 @@ def cifar100_training():
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
-        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - tpl[3]
         network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         network.thresholdFunc(network=network)
@@ -220,9 +220,9 @@ def cifar100_training():
                     iteration_counter += 1
                 if dataset.isNewEpoch:
                     # moving_results_1 = sess.run(moving_stat_vars)
-                    if (epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT-30 and
-                            (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0) \
-                            or epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT-30:
+                    if (epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - 30 and
+                        (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0) \
+                            or epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - 30:
                         print("Epoch Time={0}".format(total_time))
                         if not network.modeTracker.isCompressed:
                             training_accuracy, training_confusion = \
@@ -338,8 +338,8 @@ def cifar100_multi_gpu_training():
             dataset=dataset)
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(40000,  0.01),
-                                                                               (70000,  0.001),
+                                                                     schedule=[(40000, 0.01),
+                                                                               (70000, 0.001),
                                                                                (100000, 0.0001)])
         network.build_network()
         print("X")
@@ -347,12 +347,15 @@ def cifar100_multi_gpu_training():
         init = tf.global_variables_initializer()
         print("********************NEW RUN:{0}********************".format(run_id))
         # Restart the network; including all annealed parameters.
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
-        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
-        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
-        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
-        network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
+        network.get_hyperparameter_calculators(weight_decay_coefficient=tpl[0],
+                                               decision_weight_decay_coefficient=tpl[1],
+                                               info_gain_balance_coefficient=tpl[2],
+                                               classification_keep_probability=1.0 - tpl[3],
+                                               decision_drop_probability=1.0 - tpl[4])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
+
+
+
         network.thresholdFunc(network=network)
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
@@ -456,7 +459,6 @@ def cifar100_multi_gpu_training():
                 #                                       col_count=9)
                 #         leaf_info_rows = []
                 #     break
-
 
 # main()
 # main_fast_tree()

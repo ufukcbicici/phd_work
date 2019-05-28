@@ -62,8 +62,8 @@ def get_explanation_string(network):
     explanation += "********Gumbel Softmax Temperature Settings********\n"
 
     explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
-    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
-    explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_PROB)
+    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
+    explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_KEEP_PROB)
     explanation += "H Feature Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_FEATURES)
     explanation += "H Pooling Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES)
     # explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
@@ -123,8 +123,8 @@ def cigj_training():
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
-        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
-        GlobalConstants.DECISION_DROPOUT_PROB = 1.0 - tpl[4]
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - tpl[3]
+        GlobalConstants.DECISION_DROPOUT_KEEP_PROB = 1.0 - tpl[4]
         # jungle.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
         jungle.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         jungle.thresholdFunc(network=jungle)

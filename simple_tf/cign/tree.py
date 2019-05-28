@@ -450,7 +450,7 @@ class TreeNetwork:
                      self.isDecisionPhase: is_decision_phase,
                      self.isTrain: 1,
                      self.useMasking: 1,
-                     self.classificationDropoutKeepProb: GlobalConstants.CLASSIFICATION_DROPOUT_PROB,
+                     self.classificationDropoutKeepProb: GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB,
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration}
         # Add probability thresholds into the feed dict

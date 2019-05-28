@@ -94,7 +94,7 @@ def get_explanation_string(network):
             explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
         explanation += "********Decision Dropout Schedule********\n"
     explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
-    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
+    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
     explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in network.topologicalSortedNodes:
@@ -150,7 +150,7 @@ def get_explanation_string(network):
     #     format(GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
     #            GlobalConstants.FASHION_FILTERS_3_SIZE)
     # explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
-    # explanation += "Dropout Prob:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
+    # explanation += "Dropout Prob:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
     return explanation
 
 
@@ -282,7 +282,7 @@ def main():
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
-        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - tpl[3]
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator",
         #                                                              value=GlobalConstants.INITIAL_LR,
         #                                                              decay=GlobalConstants.DECAY_RATE,
@@ -302,7 +302,7 @@ def main():
         # GlobalConstants.LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator",
         #                                                                value=GlobalConstants.INITIAL_LR,
         #                                                                decay=GlobalConstants.DECAY_RATE)
-        # GlobalConstants.CLASSIFICATION_DROPOUT_PROB = tpl[2]
+        # GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = tpl[2]
         network.thresholdFunc(network=network)
         network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
                                                                    value=1.0 - tpl[4])
@@ -594,7 +594,7 @@ def main_fast_tree():
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = tpl[0]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = tpl[1]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = tpl[2]
-        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - tpl[3]
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - tpl[3]
         network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
         network.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         network.thresholdFunc(network=network)

@@ -73,7 +73,7 @@ def get_explanation_string(networks):
             explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
         explanation += "********Decision Dropout Schedule********\n"
     explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
-    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_PROB)
+    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
     explanation += "Decision Dropout Probability:{0}\n".format(networks[0].decisionDropoutKeepProbCalculator.value)
     if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         for node in networks[0].topologicalSortedNodes:
@@ -174,7 +174,7 @@ class Ensemble:
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = weight_decay_coeff
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = decision_weight_decay_coeff
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = info_gain_balance_coeff
-        GlobalConstants.CLASSIFICATION_DROPOUT_PROB = 1.0 - classification_dropout_prob
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - classification_dropout_prob
         for network in self.networks:
             network.build_network()
             network.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",

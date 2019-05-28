@@ -392,10 +392,10 @@ class Jungle(FastTreeNetwork):
                      self.iterationHolder: iteration,
                      self.batchSize: GlobalConstants.CURR_BATCH_SIZE}
         if is_train:
-            feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_PROB
+            feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             if not self.isBaseline:
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
-                feed_dict[self.decisionDropoutKeepProb] = GlobalConstants.DECISION_DROPOUT_PROB
+                feed_dict[self.decisionDropoutKeepProb] = GlobalConstants.DECISION_DROPOUT_KEEP_PROB
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
         else:
             feed_dict[self.classificationDropoutKeepProb] = 1.0
