@@ -159,6 +159,11 @@ def cifar100_training():
                                validation_sample_count=0, load_validation_from=None)
         dataset.set_curr_session(sess=sess)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.INITIAL_LR,
+                                                                     schedule=[(40000, 0.01),
+                                                                               (70000, 0.001),
+                                                                               (100000, 0.0001)])
         network = get_network(dataset=dataset)
         network.build_network()
         # Init
@@ -315,6 +320,11 @@ def cifar100_multi_gpu_training():
         dataset.set_curr_session(sess=sess)
         # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.INITIAL_LR,
+                                                                     schedule=[(40000, 0.01),
+                                                                               (70000, 0.001),
+                                                                               (100000, 0.0001)])
         # network = get_network(dataset=dataset)
         network = CignMultiGpu(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
@@ -324,11 +334,6 @@ def cifar100_multi_gpu_training():
             summary_func=cign_resnet.tensorboard_func,
             degree_list=GlobalConstants.RESNET_TREE_DEGREES,
             dataset=dataset)
-        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
-                                                                     value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(40000, 0.01),
-                                                                               (70000, 0.001),
-                                                                               (100000, 0.0001)])
         network.build_network()
         print("X")
         # Init

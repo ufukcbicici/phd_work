@@ -381,11 +381,6 @@ class FastTreeNetwork(TreeNetwork):
     def set_hyperparameters(self, **kwargs):
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
-        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
-                                                                     value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(40000, 0.01),
-                                                                               (70000, 0.001),
-                                                                               (100000, 0.0001)])
         if not self.isBaseline:
             GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
             GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]

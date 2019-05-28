@@ -55,7 +55,6 @@ class CignMultiGpu(FastTreeNetwork):
         assert GlobalConstants.BATCH_SIZE % device_count == 0
         self.towerBatchSize = GlobalConstants.BATCH_SIZE / len(devices)
         with tf.device('/CPU:0'):
-            self.build_optimizer()
             with tf.variable_scope("multiple_networks"):
                 for tower_id, device_str in enumerate(devices):
                     with tf.device(device_str):
@@ -85,6 +84,7 @@ class CignMultiGpu(FastTreeNetwork):
                     var_scope = tf.get_variable_scope()
                     var_scope.reuse_variables()
             with tf.variable_scope("optimizer"):
+                self.build_optimizer()
                 # Calculate the mean of the moving average updates for batch normalization operations, across each tower.
                 self.prepare_batch_norm_moving_avg_ops()
                 # We must calculate the mean of each gradient.
@@ -224,11 +224,6 @@ class CignMultiGpu(FastTreeNetwork):
     def set_hyperparameters(self, **kwargs):
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
-        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
-                                                                     value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(40000, 0.01),
-                                                                               (70000, 0.001),
-                                                                               (100000, 0.0001)])
         if not self.isBaseline:
             GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
             GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
