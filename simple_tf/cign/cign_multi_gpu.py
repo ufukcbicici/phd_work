@@ -56,6 +56,7 @@ class CignMultiGpu(FastTreeNetwork):
         self.towerBatchSize = GlobalConstants.BATCH_SIZE / len(devices)
         with tf.device('/CPU:0'):
             with tf.variable_scope("multiple_networks"):
+                self.build_optimizer()
                 for tower_id, device_str in enumerate(devices):
                     with tf.device(device_str):
                         with tf.name_scope("tower_{0}".format(tower_id)):
@@ -84,7 +85,6 @@ class CignMultiGpu(FastTreeNetwork):
                     var_scope = tf.get_variable_scope()
                     var_scope.reuse_variables()
             with tf.variable_scope("optimizer"):
-                self.build_optimizer()
                 # Calculate the mean of the moving average updates for batch normalization operations, across each tower.
                 self.prepare_batch_norm_moving_avg_ops()
                 # We must calculate the mean of each gradient.
