@@ -243,7 +243,7 @@ class CignMultiGpu(FastTreeNetwork):
                 #                                                               value=0.0,
                 #                                                               schedule=[(12000, 1.0)])
                 network.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
-                                                                        value=1.0)
+                                                                           value=1.0)
                 for node in network.topologicalSortedNodes:
                     if node.isLeaf:
                         continue
@@ -262,6 +262,9 @@ class CignMultiGpu(FastTreeNetwork):
                                                                     decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
                                                                     decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
                                                                     min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
+            self.decisionDropoutKeepProbCalculator = self.towerNetworks[0][1].decisionDropoutKeepProbCalculator
+            self.noiseCoefficientCalculator = self.towerNetworks[0][1].noiseCoefficientCalculator
+            self.decisionLossCoefficientCalculator = self.towerNetworks[0][1].decisionLossCoefficientCalculator
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         # Load the placeholders in each tower separately
