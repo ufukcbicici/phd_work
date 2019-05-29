@@ -99,6 +99,7 @@ class CignMultiGpu(FastTreeNetwork):
         # Assert that all variables are created on the CPU memory.
         assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
         self.dataset = None
+        self.topologicalSortedNodes = self.towerNetworks[0][1].topologicalSortedNodes
 
     def prepare_evaluation_dictionary(self):
         self.evalDict = {}
