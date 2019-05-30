@@ -106,7 +106,8 @@ class FastTreeMultiGpu(FastTreeNetwork):
             mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                                          name="Mask_without_threshold_{0}".format(child_index)), [-1])
             mask_without_threshold = tf.logical_and(mask_without_threshold, node.filteredMask)
-            mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            with tf.device("/device:CPU:0"):
+                mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
             node.maskTensors[child_index] = mask_tensor
             node.masksWithoutThreshold[child_index] = mask_without_threshold
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
@@ -160,6 +161,44 @@ class FastTreeMultiGpu(FastTreeNetwork):
                                                               name="Mask_with_threshold_{0}".format(child_index)), [-1])
             mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                                          name="Mask_without_threshold_{0}".format(child_index)), [-1])
-            mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            with tf.device("/device:CPU:0"):
+                mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
+
+    def mask_input_nodes(self, node):
+        if node.isRoot:
+            node.labelTensor = self.labelTensor
+            node.indicesTensor = self.indicesTensor
+            node.oneHotLabelTensor = self.oneHotLabelTensor
+            # node.filteredMask = tf.constant(value=True, dtype=tf.bool, shape=(GlobalConstants.BATCH_SIZE, ))
+            node.filteredMask = self.filteredMask
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
+            node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+        else:
+            # Obtain the mask vector, sample counts and determine if this node receives samples.
+            parent_node = self.dagObject.parents(node=node)[0]
+            mask_tensor = parent_node.maskTensors[node.index]
+            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                mask_without_threshold = parent_node.masksWithoutThreshold[node.index]
+            with tf.device("/device:CPU:0"):
+                mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
+                                       tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
+            sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
+            with tf.device("/device:CPU:0"):
+                node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            # Mask all inputs: F channel, H  channel, activations from ancestors, labels
+            parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
+            parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
+            for k, v in parent_node.activationsDict.items():
+                node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
+            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
+            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
+            with tf.device("/device:CPU:0"):
+                if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                    node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
+            return parent_F, parent_H

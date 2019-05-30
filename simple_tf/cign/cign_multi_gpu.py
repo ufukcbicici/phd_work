@@ -20,13 +20,15 @@ class CignMultiGpu(FastTreeNetwork):
         with tf.name_scope("main_network"):
             super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                              dataset)
-            # Each element contains a (device_str, network) pair.
+        # Each element contains a (device_str, network) pair.
         self.towerNetworks = []
         self.grads = []
         self.dataset = dataset
         self.applyGradientsOp = None
         self.batchNormMovingAvgAssignOps = []
         self.towerBatchSize = None
+        # Unit test variables
+        self.batchNormMovingAverageValues = {}
 
     # def build_towers(self):
     #     for device_str, tower_cign in self.towerNetworks:
@@ -110,8 +112,9 @@ class CignMultiGpu(FastTreeNetwork):
                 self.evalDict[new_key] = v
         batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
         for tpl in batch_norm_moving_averages:
-            moving_average = tpl[0]
-            self.evalDict[moving_average.name] = moving_average
+            if tpl[0].name not in self.evalDict:
+                self.evalDict[tpl[0].name] = []
+            self.evalDict[tpl[0].name].append(tpl)
         self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
@@ -203,7 +206,6 @@ class CignMultiGpu(FastTreeNetwork):
     def get_decision_dropout_prob(self, feed_dict, iteration, update):
         for tower_id, tpl in enumerate(self.towerNetworks):
             network = tpl[1]
-            assert network.decisionDropoutKeepProbCalculator is None
             if update:
                 prob = network.decisionDropoutKeepProbCalculator.value
                 feed_dict[network.decisionDropoutKeepProb] = prob
@@ -268,7 +270,7 @@ class CignMultiGpu(FastTreeNetwork):
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         # Load the placeholders in each tower separately
-        feed_dict = {}
+        feed_dict = {self.iterationHolder: iteration}
         # Global parameters
         for tower_id, tpl in enumerate(self.towerNetworks):
             device_str = tpl[0]
@@ -286,7 +288,7 @@ class CignMultiGpu(FastTreeNetwork):
             feed_dict[network.useMasking] = int(use_masking)
             feed_dict[network.informationGainBalancingCoefficient] = GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT
             feed_dict[network.iterationHolder] = iteration
-            feed_dict[network.filteredMask] = np.ones((self.towerBatchSize,), dtype=bool)
+            feed_dict[network.filteredMask] = np.ones((int(self.towerBatchSize),), dtype=bool)
             if is_train:
                 feed_dict[network.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             else:
@@ -326,7 +328,25 @@ class CignMultiGpu(FastTreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
+        self.unit_test_batch_norm_ops(eval_dict=results[-1])
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]
         return lr, sample_counts, is_open_indicators
+
+    def unit_test_batch_norm_ops(self, eval_dict):
+        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
+        momentum = GlobalConstants.BATCH_NORM_DECAY
+        for tpl in batch_norm_moving_averages:
+            tf_variable = tpl[0]
+            values = eval_dict[tf_variable.name]
+            tf_moving_average_value = values[0][0]
+            new_value_arrays = [np.expand_dims(v[1], axis=0) for v in values]
+            unified_arr = np.concatenate(new_value_arrays, axis=0)
+            mean_arr = np.mean(unified_arr, axis=0)
+            if tf_variable.name not in self.batchNormMovingAverageValues:
+                self.batchNormMovingAverageValues[tf_variable.name] = mean_arr
+            else:
+                curr_value = self.batchNormMovingAverageValues[tf_variable.name]
+                self.batchNormMovingAverageValues[tf_variable.name] = momentum * curr_value + (1.0 - momentum) * mean_arr
+            assert np.allclose(self.batchNormMovingAverageValues[tf_variable.name], tf_moving_average_value)

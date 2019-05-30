@@ -6,6 +6,7 @@ from simple_tf.global_params import GlobalConstants
 
 class CustomBatchNormAlgorithms:
     BATCH_NORM_OPS = "BatchNormOps"
+    BATCH_NORM_OPS_DEBUG = "BatchNormOpsDebug"
 
     @staticmethod
     def batch_norm_multi_gpu(input_tensor, is_training, momentum=GlobalConstants.BATCH_NORM_DECAY,
