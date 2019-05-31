@@ -360,6 +360,8 @@ class CignMultiGpu(FastTreeNetwork):
             if not np.allclose(self.batchNormMovingAverageValues[var_name], tf_moving_average_value):
                 print("X")
 
+    # TODO: At sometime in the future, we should implement multi gpu accuracy calculation as well.
+    #  But not now (31.05.2019)
     def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
         network = self.towerNetworks[0][0]
         if not network.modeTracker.isCompressed:
