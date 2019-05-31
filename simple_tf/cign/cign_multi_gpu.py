@@ -93,7 +93,8 @@ class CignMultiGpu(FastTreeNetwork):
                 # Note that this is the synchronization point across all towers.
                 grads = self.average_gradients()
                 # Apply the gradients to adjust the shared variables.
-                self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
+                with tf.control_dependencies(self.batchNormMovingAvgAssignOps):
+                    self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
         # Unify all evaluation tensors across towers
         self.prepare_evaluation_dictionary()
         placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
@@ -310,7 +311,7 @@ class CignMultiGpu(FastTreeNetwork):
     def get_run_ops(self):
         run_ops = [self.applyGradientsOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
                    self.infoGainDicts]
-        run_ops.extend(self.batchNormMovingAvgAssignOps)
+        # run_ops.extend(self.batchNormMovingAvgAssignOps)
         # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
         #            self.infoGainDicts]
         return run_ops
@@ -328,25 +329,33 @@ class CignMultiGpu(FastTreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
-        self.unit_test_batch_norm_ops(eval_dict=results[-1])
+        self.unit_test_batch_norm_ops(sess=sess, eval_results=results[-1])
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]
         return lr, sample_counts, is_open_indicators
 
-    def unit_test_batch_norm_ops(self, eval_dict):
+    def unit_test_batch_norm_ops(self, sess, eval_results):
         batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
-        momentum = GlobalConstants.BATCH_NORM_DECAY
+        moving_average_curr_value_tensors = {}
         for tpl in batch_norm_moving_averages:
-            tf_variable = tpl[0]
-            values = eval_dict[tf_variable.name]
-            tf_moving_average_value = values[0][0]
+            moving_average_variable = tpl[0]
+            if moving_average_variable.name not in moving_average_curr_value_tensors:
+                moving_average_curr_value_tensors[moving_average_variable.name] = moving_average_variable
+            else:
+                assert moving_average_variable == moving_average_curr_value_tensors[moving_average_variable.name]
+        momentum = GlobalConstants.BATCH_NORM_DECAY
+        res = sess.run(moving_average_curr_value_tensors)
+        for var_name in moving_average_curr_value_tensors.keys():
+            values = eval_results[var_name]
+            tf_moving_average_value = res[var_name]
             new_value_arrays = [np.expand_dims(v[1], axis=0) for v in values]
             unified_arr = np.concatenate(new_value_arrays, axis=0)
             mean_arr = np.mean(unified_arr, axis=0)
-            if tf_variable.name not in self.batchNormMovingAverageValues:
-                self.batchNormMovingAverageValues[tf_variable.name] = mean_arr
+            if var_name not in self.batchNormMovingAverageValues:
+                self.batchNormMovingAverageValues[var_name] = mean_arr
             else:
-                curr_value = self.batchNormMovingAverageValues[tf_variable.name]
-                self.batchNormMovingAverageValues[tf_variable.name] = momentum * curr_value + (1.0 - momentum) * mean_arr
-            assert np.allclose(self.batchNormMovingAverageValues[tf_variable.name], tf_moving_average_value)
+                curr_value = self.batchNormMovingAverageValues[var_name]
+                self.batchNormMovingAverageValues[var_name] = momentum * curr_value + (1.0 - momentum) * mean_arr
+            if not np.allclose(self.batchNormMovingAverageValues[var_name], tf_moving_average_value):
+                print("X")
