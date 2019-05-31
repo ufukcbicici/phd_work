@@ -7,7 +7,7 @@ from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.cign.fast_tree_multi_gpu import FastTreeMultiGpu
-from simple_tf.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from auxillary.parameters import FixedParameter, DiscreteParameter, DecayingParameter
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
@@ -359,3 +359,34 @@ class CignMultiGpu(FastTreeNetwork):
                 self.batchNormMovingAverageValues[var_name] = momentum * curr_value + (1.0 - momentum) * mean_arr
             if not np.allclose(self.batchNormMovingAverageValues[var_name], tf_moving_average_value):
                 print("X")
+
+    def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
+        network = self.towerNetworks[0][0]
+        if not network.modeTracker.isCompressed:
+            if calculation_type == AccuracyCalcType.regular:
+                accuracy, confusion = network.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
+                                                                                    dataset_type=dataset_type,
+                                                                                    run_id=run_id,
+                                                                                    iteration=iteration)
+                return accuracy, confusion
+            elif calculation_type == AccuracyCalcType.route_correction:
+                accuracy_corrected, marginal_corrected = \
+                    network.accuracyCalculator.calculate_accuracy_with_route_correction(
+                        sess=sess, dataset=dataset,
+                        dataset_type=dataset_type)
+                return accuracy_corrected, marginal_corrected
+            elif calculation_type == AccuracyCalcType.with_residue_network:
+                network.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+                                                                                   dataset_type=dataset_type)
+            elif calculation_type == AccuracyCalcType.multi_path:
+                network.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
+                                                                        dataset_type=dataset_type, run_id=run_id,
+                                                                        iteration=iteration)
+            else:
+                raise NotImplementedError()
+        else:
+            best_leaf_accuracy, residue_corrected_accuracy = \
+                network.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
+                                                                                dataset_type=dataset_type,
+                                                                                run_id=run_id, iteration=iteration)
+            return best_leaf_accuracy, residue_corrected_accuracy
