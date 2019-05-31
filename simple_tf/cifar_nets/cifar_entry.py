@@ -6,12 +6,12 @@ import time
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import FixedParameter, DiscreteParameter
+from auxillary.parameters import DiscreteParameter
 from data_handling.cifar_dataset import CifarDataSet
-from simple_tf.cifar_nets import cifar100_resnet_baseline, cign_resnet
+from simple_tf.cifar_nets import cign_resnet
 from simple_tf.cign.cign_multi_gpu import CignMultiGpu
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.cign_with_sampling.cign_with_sampling import CignWithSampling
+from simple_tf.cign.cign_with_sampling import CignWithSampling
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 
