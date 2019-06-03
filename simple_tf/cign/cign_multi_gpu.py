@@ -363,7 +363,7 @@ class CignMultiGpu(FastTreeNetwork):
     # TODO: At sometime in the future, we should implement multi gpu accuracy calculation as well.
     #  But not now (31.05.2019)
     def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
-        network = self.towerNetworks[0][0]
+        network = self.towerNetworks[0][1]
         if not network.modeTracker.isCompressed:
             if calculation_type == AccuracyCalcType.regular:
                 accuracy, confusion = network.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
