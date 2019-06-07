@@ -43,11 +43,11 @@ class Optimizer(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 600
-    EPOCH_COUNT = 600
+    TOTAL_EPOCH_COUNT = 240
+    EPOCH_COUNT = 240
     EPOCH_REPORT_PERIOD = 1
-    BATCH_SIZE = 250
-    EVAL_BATCH_SIZE = 250
+    BATCH_SIZE = 100
+    EVAL_BATCH_SIZE = 100
     CURR_BATCH_SIZE = None
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
