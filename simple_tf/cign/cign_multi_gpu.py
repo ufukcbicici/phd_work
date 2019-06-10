@@ -38,9 +38,10 @@ class CignMultiGpu(FastTreeNetwork):
     def build_optimizer(self):
         # Build optimizer
         # self.globalCounter = tf.Variable(0, trainable=False)
-        self.globalCounter = UtilityFuncs.create_variable(name="global_counter",
-                                                          shape=[], initializer=0,
-                                                          trainable=False, dtype=tf.int32)
+        with tf.device("/CPU:0"):
+            self.globalCounter = UtilityFuncs.create_variable(name="global_counter",
+                                                              shape=[], initializer=0,
+                                                              trainable=False, dtype=tf.int32)
         boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
         values = [GlobalConstants.INITIAL_LR]
         values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
