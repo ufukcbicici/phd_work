@@ -43,8 +43,8 @@ class Optimizer(Enum):
 
 
 class GlobalConstants:
-    TOTAL_EPOCH_COUNT = 240
-    EPOCH_COUNT = 240
+    TOTAL_EPOCH_COUNT = 10 # 240
+    EPOCH_COUNT = 10 # 240
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 100
     EVAL_BATCH_SIZE = 100

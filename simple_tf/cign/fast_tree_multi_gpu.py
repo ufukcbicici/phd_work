@@ -61,6 +61,11 @@ class FastTreeMultiGpu(FastTreeNetwork):
             momentum=GlobalConstants.BATCH_NORM_DECAY,
             network=self, node=node
         )
+        # normed_x = CustomBatchNormAlgorithms.masked_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
+        #                                                        network=self, node=node,
+        #                                                        momentum=GlobalConstants.BATCH_NORM_DECAY,
+        #                                                        iteration=self.iterationHolder,
+        #                                                        is_training_phase=self.isTrain)
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
         # MultiGPU OK

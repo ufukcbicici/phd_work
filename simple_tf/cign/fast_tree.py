@@ -403,7 +403,7 @@ class FastTreeNetwork(TreeNetwork):
                     continue
                 # Probability Threshold
                 node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
-                initial_value = 1.0 / float(node_degree)
+                initial_value = 0.0 # 1.0 / float(node_degree)
                 threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
                 # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
                 #                                                  decay_period=70000,

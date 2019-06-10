@@ -29,6 +29,7 @@ class CignMultiGpu(FastTreeNetwork):
         self.towerBatchSize = None
         # Unit test variables
         self.batchNormMovingAverageValues = {}
+        self.optimizer_2 = None
 
     # def build_towers(self):
     #     for device_str, tower_cign in self.towerNetworks:
@@ -38,63 +39,68 @@ class CignMultiGpu(FastTreeNetwork):
         # Build optimizer
         # self.globalCounter = tf.Variable(0, trainable=False)
         self.globalCounter = UtilityFuncs.create_variable(name="global_counter",
-                                                          shape=[], initializer=0, trainable=False, dtype=tf.int32)
+                                                          shape=[], initializer=0,
+                                                          trainable=False, dtype=tf.int32)
         boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
         values = [GlobalConstants.INITIAL_LR]
         values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
         self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
-        self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
-        # self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
+        self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         # # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
-        # with tf.control_dependencies(self.extra_update_ops):
-        #     self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-        #                                                                                  global_step=self.globalCounter)
+        self.finalLoss = self.towerNetworks[0][1].finalLoss
+        with tf.control_dependencies(self.extra_update_ops):
+            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+                                                                                         global_step=self.globalCounter)
 
     def build_network(self):
         devices = UtilityFuncs.get_available_devices(only_gpu=True)
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
         self.towerBatchSize = GlobalConstants.BATCH_SIZE / len(devices)
-        with tf.device('/CPU:0'):
-            with tf.variable_scope("multiple_networks"):
-                self.build_optimizer()
-                for tower_id, device_str in enumerate(devices):
-                    with tf.device(device_str):
-                        with tf.name_scope("tower_{0}".format(tower_id)):
-                            print(device_str)
-                            # Build a Multi GPU supporting CIGN
-                            tower_cign = FastTreeMultiGpu(
-                                node_build_funcs=self.nodeBuildFuncs,
-                                grad_func=self.gradFunc,
-                                hyperparameter_func=self.hyperparameterFunc,
-                                residue_func=self.residueFunc,
-                                summary_func=self.summaryFunc,
-                                degree_list=self.degreeList,
-                                dataset=self.dataset,
-                                container_network=self,
-                                tower_id=tower_id,
-                                tower_batch_size=self.towerBatchSize)
-                            tower_cign.build_network()
-                            print("Built network for tower {0}".format(tower_id))
-                            self.towerNetworks.append((device_str, tower_cign))
-                            # Calculate gradients
-                            tower_grads = self.optimizer.compute_gradients(loss=tower_cign.finalLoss)
-                            # Assert that all gradients are correctly calculated.
-                            assert all([tpl[0] is not None for tpl in tower_grads])
-                            assert all([tpl[1] is not None for tpl in tower_grads])
-                            self.grads.append(tower_grads)
-                    var_scope = tf.get_variable_scope()
-                    var_scope.reuse_variables()
-            with tf.variable_scope("optimizer"):
-                # Calculate the mean of the moving average updates for batch normalization operations, across each tower.
-                self.prepare_batch_norm_moving_avg_ops()
-                # We must calculate the mean of each gradient.
-                # Note that this is the synchronization point across all towers.
-                grads = self.average_gradients()
-                # Apply the gradients to adjust the shared variables.
-                with tf.control_dependencies(self.batchNormMovingAvgAssignOps):
-                    self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
+        # with tf.device('/CPU:0'):
+        with tf.variable_scope("multiple_networks"):
+            # self.build_optimizer()
+            for tower_id, device_str in enumerate(devices):
+                with tf.device(device_str):
+                    with tf.name_scope("tower_{0}".format(tower_id)):
+                        print(device_str)
+                        # Build a Multi GPU supporting CIGN
+                        tower_cign = FastTreeMultiGpu(
+                            node_build_funcs=self.nodeBuildFuncs,
+                            grad_func=self.gradFunc,
+                            hyperparameter_func=self.hyperparameterFunc,
+                            residue_func=self.residueFunc,
+                            summary_func=self.summaryFunc,
+                            degree_list=self.degreeList,
+                            dataset=self.dataset,
+                            container_network=self,
+                            tower_id=tower_id,
+                            tower_batch_size=self.towerBatchSize)
+                        tower_cign.build_network()
+                        print("Built network for tower {0}".format(tower_id))
+                        self.towerNetworks.append((device_str, tower_cign))
+                        # # Calculate gradients
+                        # tower_grads = self.optimizer.compute_gradients(loss=tower_cign.finalLoss)
+                        # # Assert that all gradients are correctly calculated.
+                        # assert all([tpl[0] is not None for tpl in tower_grads])
+                        # assert all([tpl[1] is not None for tpl in tower_grads])
+                        # self.grads.append(tower_grads)
+                var_scope = tf.get_variable_scope()
+                var_scope.reuse_variables()
+        with tf.variable_scope("optimizer"):
+            self.build_optimizer()
+            # # Calculate the mean of the moving average updates for batch normalization operations, across each tower.
+            # self.prepare_batch_norm_moving_avg_ops()
+            # # We must calculate the mean of each gradient.
+            # # Note that this is the synchronization point across all towers.
+            # grads = self.average_gradients()
+            # # Apply the gradients to adjust the shared variables.
+            # with tf.control_dependencies(self.batchNormMovingAvgAssignOps):
+            #     self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
+
+
         # Unify all evaluation tensors across towers
         self.prepare_evaluation_dictionary()
         placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
@@ -252,7 +258,7 @@ class CignMultiGpu(FastTreeNetwork):
                         continue
                     # Probability Threshold
                     node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
-                    initial_value = 1.0 / float(node_degree)
+                    initial_value = 0.0  # 1.0 / float(node_degree)
                     threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
                     # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
                     #                                                  decay_period=70000,
@@ -309,8 +315,10 @@ class CignMultiGpu(FastTreeNetwork):
         return feed_dict
 
     def get_run_ops(self):
-        run_ops = [self.applyGradientsOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
                    self.infoGainDicts]
+        # run_ops = [self.applyGradientsOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
+        #            self.infoGainDicts]
         # run_ops.extend(self.batchNormMovingAvgAssignOps)
         # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
         #            self.infoGainDicts]
@@ -329,7 +337,7 @@ class CignMultiGpu(FastTreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
-        self.unit_test_batch_norm_ops(sess=sess, eval_results=results[-1])
+        # self.unit_test_batch_norm_ops(sess=sess, eval_results=results[-1])
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]
