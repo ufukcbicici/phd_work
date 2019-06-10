@@ -369,6 +369,7 @@ def cifar100_multi_gpu_training():
                     elapsed_time = time.time() - start_time
                     total_time += elapsed_time
                     print("Iteration:{0}".format(iteration_counter))
+                    print("Elapsed Time:{0}".format(elapsed_time))
                     print("Lr:{0}".format(lr))
                     # Print sample counts (classification)
                     sample_count_str = "Classification:   "

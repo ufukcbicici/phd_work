@@ -42,14 +42,14 @@ class CignMultiGpu(FastTreeNetwork):
             self.globalCounter = UtilityFuncs.create_variable(name="global_counter",
                                                               shape=[], initializer=0,
                                                               trainable=False, dtype=tf.int32)
-        boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
-        values = [GlobalConstants.INITIAL_LR]
-        values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
-        self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
-        # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
+            boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
+            values = [GlobalConstants.INITIAL_LR]
+            values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
+            self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
+            # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
         self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        # # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
-        # # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
+            # # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
+            # # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
         self.finalLoss = self.towerNetworks[0][1].finalLoss
         with tf.control_dependencies(self.extra_update_ops):
             self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
@@ -106,8 +106,8 @@ class CignMultiGpu(FastTreeNetwork):
         placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
         all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
-        assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
-        self.dataset = None
+        # assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
+        # self.dataset = None
         self.topologicalSortedNodes = self.towerNetworks[0][1].topologicalSortedNodes
 
     def prepare_evaluation_dictionary(self):
