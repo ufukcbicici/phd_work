@@ -195,6 +195,7 @@ def cifar100_training():
                                                                               iteration=iteration_counter)
                 if all([lr, sample_counts, is_open_indicators]):
                     elapsed_time = time.time() - start_time
+                    print("Elapsed Time:{0}".format(elapsed_time))
                     total_time += elapsed_time
                     print("Iteration:{0}".format(iteration_counter))
                     print("Lr:{0}".format(lr))
