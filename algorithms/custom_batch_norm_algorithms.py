@@ -56,11 +56,15 @@ class CustomBatchNormAlgorithms:
 
     @staticmethod
     def batch_norm_multi_gpu_v2(input_tensor, is_training, momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                epsilon=1e-5, network=None, node=None):
-        gamma_name = network.get_variable_name(node=node, name="gamma") if network is not None else "gamma"
-        beta_name = network.get_variable_name(node=node, name="beta") if network is not None else "beta"
-        pop_mean_name = network.get_variable_name(node=node, name="pop_mean") if network is not None else "pop_mean"
-        pop_var_name = network.get_variable_name(node=node, name="pop_var") if network is not None else "pop_var"
+                                epsilon=1e-5, network=None, node=None, counter=0):
+        gamma_name = network.get_variable_name(node=node, name="gamma") \
+            if network is not None else "gamma_{0}".format(counter)
+        beta_name = network.get_variable_name(node=node, name="beta") \
+            if network is not None else "beta_{0}".format(counter)
+        pop_mean_name = network.get_variable_name(node=node, name="pop_mean") \
+            if network is not None else "pop_mean_{0}".format(counter)
+        pop_var_name = network.get_variable_name(node=node, name="pop_var") \
+            if network is not None else "pop_var_{0}".format(counter)
         with tf.variable_scope("batch_norm"):
             tf_x = tf.identity(input_tensor)
             # Trainable parameters
