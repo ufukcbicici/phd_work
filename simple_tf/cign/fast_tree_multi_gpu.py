@@ -59,20 +59,6 @@ class FastTreeMultiGpu(FastTreeNetwork):
                                                                momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                                iteration=self.iterationHolder,
                                                                is_training_phase=self.isTrain)
-        # if GlobalConstants.USE_MULTI_GPU:
-        #     normed_x = CustomBatchNormAlgorithms.masked_batch_norm_multi_gpu(
-        #         input_tensor=branching_feature,
-        #         masked_input_tensor=masked_branching_feature,
-        #         is_training=self.isTrain,
-        #         momentum=GlobalConstants.BATCH_NORM_DECAY,
-        #         network=self, node=node
-        #     )
-        # else:
-        #     normed_x = CustomBatchNormAlgorithms.masked_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
-        #                                                            network=self, node=node,
-        #                                                            momentum=GlobalConstants.BATCH_NORM_DECAY,
-        #                                                            iteration=self.iterationHolder,
-        #                                                            is_training_phase=self.isTrain)
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
         # MultiGPU OK
@@ -128,12 +114,10 @@ class FastTreeMultiGpu(FastTreeNetwork):
     # MultiGPU OK
     def apply_decision(self, node, branching_feature):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-            branching_feature = CustomBatchNormAlgorithms.batch_norm_multi_gpu_v2(
-                input_tensor=branching_feature,
-                is_training=self.isTrain,
-                momentum=GlobalConstants.BATCH_NORM_DECAY,
-                network=self, node=node
-            )
+            branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
+                                                              momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                              training=tf.cast(self.isTrain,
+                                                                               tf.bool))
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
         # MultiGPU OK
