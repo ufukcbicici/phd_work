@@ -180,7 +180,7 @@ class UtilityFuncs:
     @staticmethod
     def create_variable(name, shape, dtype, initializer, trainable=True):
         if GlobalConstants.USE_MULTI_GPU:
-            with tf.device('/cpu:0'):
+            with tf.device(GlobalConstants.GLOBAL_PINNING_DEVICE):
                 try:
                     var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype, trainable=trainable)
                 except ValueError as e:
