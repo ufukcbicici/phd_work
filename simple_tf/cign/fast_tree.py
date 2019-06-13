@@ -119,7 +119,7 @@ class FastTreeNetwork(TreeNetwork):
         for node in self.topologicalSortedNodes:
             self.nodeBuildFuncs[node.depth](node=node, network=self)
         # Build the residue loss
-        self.build_residue_loss()
+        # self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
         # self.variableManager.get_all_node_variables()
         # Build main classification loss
@@ -171,7 +171,11 @@ class FastTreeNetwork(TreeNetwork):
                                                               name="Mask_with_threshold_{0}".format(child_index)), [-1])
             mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                                          name="Mask_without_threshold_{0}".format(child_index)), [-1])
-            mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            if GlobalConstants.USE_MULTI_GPU:
+                with tf.device("/device:CPU:0"):
+                    mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            else:
+                mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
@@ -220,7 +224,11 @@ class FastTreeNetwork(TreeNetwork):
             mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                                          name="Mask_without_threshold_{0}".format(child_index)), [-1])
             mask_without_threshold = tf.logical_and(mask_without_threshold, node.filteredMask)
-            mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            if GlobalConstants.USE_MULTI_GPU:
+                with tf.device("/device:CPU:0"):
+                    mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            else:
+                mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
             node.maskTensors[child_index] = mask_tensor
             node.masksWithoutThreshold[child_index] = mask_without_threshold
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
@@ -258,7 +266,11 @@ class FastTreeNetwork(TreeNetwork):
             node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
             node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
             if GlobalConstants.USE_UNIFIED_BATCH_NORM:
-                node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
+                if GlobalConstants.USE_MULTI_GPU:
+                    with tf.device("/device:CPU:0"):
+                        node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
+                else:
+                    node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
             return parent_F, parent_H
 
     # MultiGPU OK

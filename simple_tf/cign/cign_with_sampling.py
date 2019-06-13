@@ -8,8 +8,10 @@ from simple_tf.info_gain import InfoGainLoss
 
 
 class CignWithSampling(FastTreeNetwork):
-    def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset):
-        super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset)
+    def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
+                 dataset):
+        super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
+                         dataset)
 
     def mask_input_nodes(self, node):
         print("Masking Node:{0}".format(node.index))
@@ -104,15 +106,15 @@ class CignWithSampling(FastTreeNetwork):
 
             # Noise Coefficient
             self.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
-                                                                   decay=0.0,
-                                                                   decay_period=1,
-                                                                   min_limit=0.0)
+                                                                decay=0.0,
+                                                                decay_period=1,
+                                                                min_limit=0.0)
             # Decision Loss Coefficient
             # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
             #                                                               value=0.0,
             #                                                               schedule=[(12000, 1.0)])
             self.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
-                                                                       value=1.0)
+                                                                    value=1.0)
             for node in self.topologicalSortedNodes:
                 if node.isLeaf:
                     continue

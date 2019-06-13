@@ -56,7 +56,7 @@ class CignMultiGpu(FastTreeNetwork):
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
         self.towerBatchSize = GlobalConstants.BATCH_SIZE / len(devices)
-        with tf.device('/CPU:0'):
+        with tf.device(GlobalConstants.GLOBAL_PINNING_DEVICE):
             with tf.variable_scope("multiple_networks"):
                 self.build_optimizer()
                 for tower_id, device_str in enumerate(devices):
@@ -64,17 +64,14 @@ class CignMultiGpu(FastTreeNetwork):
                         with tf.name_scope("tower_{0}".format(tower_id)):
                             print(device_str)
                             # Build a Multi GPU supporting CIGN
-                            tower_cign = FastTreeMultiGpu(
+                            tower_cign = FastTreeNetwork(
                                 node_build_funcs=self.nodeBuildFuncs,
                                 grad_func=self.gradFunc,
                                 hyperparameter_func=self.hyperparameterFunc,
                                 residue_func=self.residueFunc,
                                 summary_func=self.summaryFunc,
                                 degree_list=self.degreeList,
-                                dataset=self.dataset,
-                                container_network=self,
-                                tower_id=tower_id,
-                                tower_batch_size=self.towerBatchSize)
+                                dataset=self.dataset)
                             tower_cign.build_network()
                             print("Built network for tower {0}".format(tower_id))
                             self.towerNetworks.append((device_str, tower_cign))
