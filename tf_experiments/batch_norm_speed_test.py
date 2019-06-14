@@ -69,7 +69,7 @@ with tf.control_dependencies(update_ops):
 #                             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
 #     conv_biases = tf.Variable(tf.constant(0.1, shape=[num_of_output_channels], dtype=GlobalConstants.DATA_TYPE))
 #     net = tf.nn.conv2d(net, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-# batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
+# batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
 # # Assert that for every (moving_average, new_value) tuple, we have exactly #tower_count tuples with a specific
 # # moving_average entry.
 # batch_norm_ops_dict = {}

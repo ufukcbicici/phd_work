@@ -12,9 +12,10 @@ from simple_tf.node import Node
 
 
 class FastTreeMultiGpu(FastTreeNetwork):
-    def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset,
-                 container_network, tower_id, tower_batch_size):
-        super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset)
+    def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func,
+                 degree_list, dataset):
+        super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func,
+                         degree_list, dataset)
 
     def build_network(self):
         # Build the tree topologically and create the Tensorflow placeholders
@@ -54,11 +55,12 @@ class FastTreeMultiGpu(FastTreeNetwork):
     def apply_decision_with_unified_batch_norm(self, node, branching_feature):
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
         # MultiGPU OK
-        normed_x = CustomBatchNormAlgorithms.masked_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
-                                                               network=self, node=node,
-                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                                               iteration=self.iterationHolder,
-                                                               is_training_phase=self.isTrain)
+        normed_x = CustomBatchNormAlgorithms.masked_batch_norm_multi_gpu(x=branching_feature,
+                                                                         masked_x=masked_branching_feature,
+                                                                         network=self, node=node,
+                                                                         momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                                         iteration=self.iterationHolder,
+                                                                         is_training_phase=self.isTrain)
         # normed_x = CustomBatchNormAlgorithms.masked_batch_norm_multi_gpu(
         #     input_tensor=branching_feature,
         #     masked_input_tensor=masked_branching_feature,
@@ -121,12 +123,16 @@ class FastTreeMultiGpu(FastTreeNetwork):
     # MultiGPU OK
     def apply_decision(self, node, branching_feature):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-            branching_feature = CustomBatchNormAlgorithms.batch_norm_multi_gpu_v2(
-                input_tensor=branching_feature,
-                is_training=self.isTrain,
-                momentum=GlobalConstants.BATCH_NORM_DECAY,
-                network=self, node=node
-            )
+            branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
+                                                              momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                              training=tf.cast(self.isTrain,
+                                                                               tf.bool))
+            # branching_feature = CustomBatchNormAlgorithms.batch_norm_multi_gpu_v2(
+            #     input_tensor=branching_feature,
+            #     is_training=self.isTrain,
+            #     momentum=GlobalConstants.BATCH_NORM_DECAY,
+            #     network=self, node=node
+            # )
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
         # MultiGPU OK

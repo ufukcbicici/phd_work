@@ -30,7 +30,7 @@ net_tf = tf.layers.batch_normalization(inputs=net, name="tf_bn", momentum=moment
 net_cs = CustomBatchNormAlgorithms.batch_norm_multi_gpu_v2(input_tensor=net, epsilon=1e-3,
                                                            is_training=tf.cast(is_train, tf.int32),
                                                            momentum=momentum)
-batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
+batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
 batch_norm_ops_dict = {}
 batchNormMovingAvgAssignOps = []
 for moving_average, new_value in batch_norm_moving_averages:

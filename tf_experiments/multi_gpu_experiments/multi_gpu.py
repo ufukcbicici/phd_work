@@ -103,7 +103,7 @@ def experiment_with_towers():
         print("net_output.shape:{0}".format(net_output.shape))
         print("net_output:{0}".format(net_output))
 
-    # batch_norm_ops = tf.get_collection(key=CustomBatchNorm.BATCH_NORM_OPS)
+    # batch_norm_ops = tf.get_collection(key=CustomBatchNorm.CUSTOM_BATCH_NORM_OPS)
     # op_name = "block_1_0/sub2/pop_var:0"
     # selected_ops = [tpl[0] for tpl in batch_norm_ops if tpl[0].name == op_name]
     # temp = tf.placeholder(name="temp", dtype=tf.float32, shape=selected_ops[0].get_shape())

@@ -5,7 +5,7 @@ from simple_tf.global_params import GlobalConstants
 
 
 class CustomBatchNormAlgorithms:
-    BATCH_NORM_OPS = "BatchNormOps"
+    CUSTOM_BATCH_NORM_OPS = "BatchNormOps"
     BATCH_NORM_OPS_DEBUG = "BatchNormOpsDebug"
 
     @staticmethod
@@ -44,8 +44,8 @@ class CustomBatchNormAlgorithms:
             variance = tf.reduce_mean(tf.square(input_tensor - mean), axis=[ax for ax in range(input_dim - 1)])
             final_mean = tf.where(is_training > 0, mean, pop_mean)
             final_var = tf.where(is_training > 0, variance, pop_var)
-            tf.add_to_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS, (pop_mean, final_mean))
-            tf.add_to_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS, (pop_var, final_var))
+            tf.add_to_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, (pop_mean, final_mean))
+            tf.add_to_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, (pop_var, final_var))
             x_minus_mean = input_tensor - final_mean
             normalized_x = x_minus_mean / tf.sqrt(final_var + epsilon)
             final_x = gamma * normalized_x + beta
@@ -94,8 +94,8 @@ class CustomBatchNormAlgorithms:
             mu, sigma = tf.nn.moments(tf_x, axes)
             final_mean = tf.where(is_training > 0, mu, pop_mean)
             final_var = tf.where(is_training > 0, sigma, pop_var)
-            tf.add_to_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS, (pop_mean, final_mean))
-            tf.add_to_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS, (pop_var, final_var))
+            tf.add_to_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, (pop_mean, final_mean))
+            tf.add_to_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, (pop_var, final_var))
             final_x = tf.nn.batch_normalization(x=tf_x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
                                                 variance_epsilon=epsilon)
         with tf.control_dependencies([final_mean, final_var, final_x]):
@@ -103,15 +103,18 @@ class CustomBatchNormAlgorithms:
             return final_x
 
     @staticmethod
-    def masked_batch_norm_multi_gpu(input_tensor, masked_input_tensor, is_training,
-                                    momentum=GlobalConstants.BATCH_NORM_DECAY, epsilon=1e-5, network=None, node=None):
-        gamma_name = network.get_variable_name(node=node, name="gamma") if network is not None else "gamma"
-        beta_name = network.get_variable_name(node=node, name="beta") if network is not None else "beta"
-        pop_mean_name = network.get_variable_name(node=node, name="pop_mean") if network is not None else "pop_mean"
-        pop_var_name = network.get_variable_name(node=node, name="pop_var") if network is not None else "pop_var"
-        with tf.variable_scope("batch_norm"):
-            tf_x = tf.identity(input_tensor)
-            tf_masked_x = tf.identity(masked_input_tensor)
+    def masked_batch_norm_multi_gpu(x, masked_x, network, node, momentum, iteration, is_training_phase, counter=0):
+        gamma_name = network.get_variable_name(node=node, name="gamma") \
+            if network is not None else "gamma_{0}".format(counter)
+        beta_name = network.get_variable_name(node=node, name="beta") \
+            if network is not None else "beta_{0}".format(counter)
+        pop_mean_name = network.get_variable_name(node=node, name="pop_mean") \
+            if network is not None else "pop_mean_{0}".format(counter)
+        pop_var_name = network.get_variable_name(node=node, name="pop_var") \
+            if network is not None else "pop_var_{0}".format(counter)
+        with tf.variable_scope("masked_batch_norm"):
+            tf_x = tf.identity(x)
+            tf_masked_x = tf.identity(masked_x)
             # Trainable parameters
             gamma = UtilityFuncs.create_variable(name=gamma_name,
                                                  shape=[tf_x.get_shape()[-1]],
@@ -132,20 +135,61 @@ class CustomBatchNormAlgorithms:
                                                    initializer=tf.constant(1.0, shape=[tf_x.get_shape()[-1]]),
                                                    dtype=tf.float32,
                                                    trainable=False)
-            # Calculate mean and variance
-            input_dim = len(input_tensor.get_shape().as_list())
-            assert input_dim == 2 or input_dim == 4
-            axes = [i for i in range(input_dim - 1)]
-            mu, sigma = tf.nn.moments(tf_masked_x, axes)
-            final_mean = tf.where(is_training > 0, mu, pop_mean)
-            final_var = tf.where(is_training > 0, sigma, pop_var)
-            tf.add_to_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS, (pop_mean, final_mean))
-            tf.add_to_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS, (pop_var, final_var))
-            final_x = tf.nn.batch_normalization(x=tf_x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
-                                                variance_epsilon=epsilon)
-        with tf.control_dependencies([final_mean, final_var, final_x]):
-            # return final_mean, final_var, final_x
-            return final_x
+        mu, sigma = tf.nn.moments(tf_masked_x, [i for i in range(len(x.get_shape())-1)])
+        final_mean = tf.where(is_training_phase > 0, mu, pop_mean)
+        final_var = tf.where(is_training_phase > 0, sigma, pop_var)
+        normed_x = tf.nn.batch_normalization(x=tf_x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
+                                             variance_epsilon=1e-5)
+        with tf.control_dependencies([normed_x]):
+            new_pop_mean = tf.where(iteration > 0, (momentum * pop_mean + (1.0 - momentum) * mu), mu)
+            new_pop_var = tf.where(iteration > 0, (momentum * pop_var + (1.0 - momentum) * sigma), sigma)
+            pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean, name="masked_batch_norm_mean_assign")
+            pop_var_assign_op = tf.assign(pop_var, new_pop_var, name="masked_batch_norm_var_assign")
+            tf.add_to_collection(name=CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, value=pop_mean_assign_op)
+            tf.add_to_collection(name=CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, value=pop_var_assign_op)
+            return normed_x
+
+        # gamma_name = network.get_variable_name(node=node, name="gamma") if network is not None else "gamma"
+        # beta_name = network.get_variable_name(node=node, name="beta") if network is not None else "beta"
+        # pop_mean_name = network.get_variable_name(node=node, name="pop_mean") if network is not None else "pop_mean"
+        # pop_var_name = network.get_variable_name(node=node, name="pop_var") if network is not None else "pop_var"
+        # with tf.variable_scope("batch_norm"):
+        #     tf_x = tf.identity(input_tensor)
+        #     tf_masked_x = tf.identity(masked_input_tensor)
+        #     # Trainable parameters
+        #     gamma = UtilityFuncs.create_variable(name=gamma_name,
+        #                                          shape=[tf_x.get_shape()[-1]],
+        #                                          initializer=tf.ones([tf_x.get_shape()[-1]]),
+        #                                          dtype=tf.float32)
+        #     beta = UtilityFuncs.create_variable(name=beta_name,
+        #                                         shape=[tf_x.get_shape()[-1]],
+        #                                         initializer=tf.zeros([tf_x.get_shape()[-1]]),
+        #                                         dtype=tf.float32)
+        #     # Moving mean and variance
+        #     pop_mean = UtilityFuncs.create_variable(name=pop_mean_name,
+        #                                             shape=[tf_x.get_shape()[-1]],
+        #                                             initializer=tf.constant(0.0, shape=[tf_x.get_shape()[-1]]),
+        #                                             dtype=tf.float32,
+        #                                             trainable=False)
+        #     pop_var = UtilityFuncs.create_variable(name=pop_var_name,
+        #                                            shape=[tf_x.get_shape()[-1]],
+        #                                            initializer=tf.constant(1.0, shape=[tf_x.get_shape()[-1]]),
+        #                                            dtype=tf.float32,
+        #                                            trainable=False)
+        #     # Calculate mean and variance
+        #     input_dim = len(input_tensor.get_shape().as_list())
+        #     assert input_dim == 2 or input_dim == 4
+        #     axes = [i for i in range(input_dim - 1)]
+        #     mu, sigma = tf.nn.moments(tf_masked_x, axes)
+        #     final_mean = tf.where(is_training > 0, mu, pop_mean)
+        #     final_var = tf.where(is_training > 0, sigma, pop_var)
+        #     tf.add_to_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, (pop_mean, final_mean))
+        #     tf.add_to_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, (pop_var, final_var))
+        #     final_x = tf.nn.batch_normalization(x=tf_x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
+        #                                         variance_epsilon=epsilon)
+        # with tf.control_dependencies([final_mean, final_var, final_x]):
+        #     # return final_mean, final_var, final_x
+        #     return final_x
 
     @staticmethod
     def weighted_batch_norm(weights, input_tensor, is_training,

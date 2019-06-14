@@ -64,7 +64,7 @@ class CignMultiGpu(FastTreeNetwork):
                         with tf.name_scope("tower_{0}".format(tower_id)):
                             print(device_str)
                             # Build a Multi GPU supporting CIGN
-                            tower_cign = FastTreeNetwork(
+                            tower_cign = FastTreeMultiGpu(
                                 node_build_funcs=self.nodeBuildFuncs,
                                 grad_func=self.gradFunc,
                                 hyperparameter_func=self.hyperparameterFunc,
@@ -108,7 +108,7 @@ class CignMultiGpu(FastTreeNetwork):
             for k, v in network.evalDict.items():
                 new_key = "tower_{0}_{1}".format(tower_id, k)
                 self.evalDict[new_key] = v
-        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
+        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
         for tpl in batch_norm_moving_averages:
             if tpl[0].name not in self.evalDict:
                 self.evalDict[tpl[0].name] = []
@@ -143,7 +143,7 @@ class CignMultiGpu(FastTreeNetwork):
         return average_grads
 
     def prepare_batch_norm_moving_avg_ops(self):
-        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
+        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
         # Assert that for every (moving_average, new_value) tuple, we have exactly #tower_count tuples with a specific
         # moving_average entry.
         batch_norm_ops_dict = {}
@@ -333,7 +333,7 @@ class CignMultiGpu(FastTreeNetwork):
         return lr, sample_counts, is_open_indicators
 
     def unit_test_batch_norm_ops(self, sess, eval_results):
-        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.BATCH_NORM_OPS)
+        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
         moving_average_curr_value_tensors = {}
         for tpl in batch_norm_moving_averages:
             moving_average_variable = tpl[0]
