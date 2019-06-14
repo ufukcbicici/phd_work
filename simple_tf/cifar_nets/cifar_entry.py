@@ -21,7 +21,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Resnet-50 Sampling CIGN Tests\n"
+    explanation = "Resnet-50 CIGN Tests\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -134,7 +134,9 @@ def get_network(dataset):
 def cifar100_training():
     # classification_wd = [0.00005 * i for i in range(21)] * 3
     # classification_wd = sorted(classification_wd)
-    classification_wd = [0.00015] * 4
+    classification_wd = [0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * \
+                        GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+    classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     # classification_dropout_probs = [0.15]
@@ -176,7 +178,7 @@ def cifar100_training():
                                     decision_keep_probability=1.0 - tpl[4])
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
-        series_id = int(run_id / 4)
+        series_id = int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)

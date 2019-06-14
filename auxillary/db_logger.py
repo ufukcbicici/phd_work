@@ -29,7 +29,7 @@ class DbLogger:
     # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger3.db"
 
     # Home
-    log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//dblogger.db"
+    # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//dblogger.db"
 
     # Idea GPU
     # log_db_path = "C://Users//ufuk.bicici.IDEATEKNOLOJI//Desktop//phd_work//simple_tf//dblogger.db"
@@ -38,7 +38,7 @@ class DbLogger:
     # log_db_path = "C://Users//ufuk.bicici//Desktop//PHD//phd_work//simple_tf//bnnlogger.db"
 
     # TRUBA 1
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger_cigj.db"
+    log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger_cign.db"
 
     # TRUBA 2
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2_cigj.db"
