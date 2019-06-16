@@ -42,22 +42,37 @@ for l in range(layer_count):
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 moving_avg_update_pairs = {}
 manuel_update_dict = {}
-with tf.control_dependencies(update_ops):
+# with tf.control_dependencies(update_ops):
+moving_avgs = [(v.name, tf.identity(v)) for v in tf.global_variables() if "moving_" in v.name]
+assign_sub_ops = []
+for tpl in moving_avgs:
+    var_name = tpl[0]
+    moving_avg_var = tpl[1]
+    matched_pairs = [op.inputs for op in update_ops if op.inputs[0].name == var_name]
+    delta_value = matched_pairs[0][1]
+    assert len(matched_pairs) == 1
+    moving_avg_update_pairs[var_name] = (moving_avg_var, delta_value)
+    if "mean" in var_name:
+        manuel_update_dict[var_name] = np.zeros(shape=moving_avg_var.shape)
+    elif "var" in var_name:
+        manuel_update_dict[var_name] = np.ones(shape=moving_avg_var.shape)
+    assign_sub_op = tf.assign_sub(moving_avg_var, delta_value)
+    assign_sub_ops.append(assign_sub_op)
+with tf.control_dependencies(assign_sub_ops):
     network = tf.identity(net)
-    moving_avgs = [(v.name, tf.identity(v)) for v in tf.global_variables() if "moving_" in v.name]
-    for tpl in moving_avgs:
-        var_name = tpl[0]
-        moving_avg_var = tpl[1]
-        matched_pairs = [op.inputs for op in update_ops if op.inputs[0].name == var_name]
-        assert len(matched_pairs) == 1
-        moving_avg_update_pairs[var_name] = (moving_avg_var, matched_pairs[0][1])
-        if "mean" in var_name:
-            manuel_update_dict[var_name] = np.zeros(shape=moving_avg_var.shape)
-        elif "var" in var_name:
-            manuel_update_dict[var_name] = np.ones(shape=moving_avg_var.shape)
-        else:
-            raise NotImplementedError()
-    print("X")
+# for tpl in moving_avgs:
+#     var_name = tpl[0]
+#     moving_avg_var = tpl[1]
+#     matched_pairs = [op.inputs for op in update_ops if op.inputs[0].name == var_name]
+#     assert len(matched_pairs) == 1
+#     moving_avg_update_pairs[var_name] = (moving_avg_var, matched_pairs[0][1])
+#     if "mean" in var_name:
+#         manuel_update_dict[var_name] = np.zeros(shape=moving_avg_var.shape)
+#     elif "var" in var_name:
+#         manuel_update_dict[var_name] = np.ones(shape=moving_avg_var.shape)
+#     else:
+#         raise NotImplementedError()
+# print("X")
 
 # ************************ Layers - Batch Norm with custom op ***********************
 # for l in range(layer_count):

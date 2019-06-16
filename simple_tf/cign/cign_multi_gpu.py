@@ -144,6 +144,7 @@ class CignMultiGpu(FastTreeNetwork):
 
     def prepare_batch_norm_moving_avg_ops(self):
         tensorflow_batch_norm_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
         custom_batch_norm_ops = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
         print("X")
 
