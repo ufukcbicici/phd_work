@@ -43,7 +43,7 @@ update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 moving_avg_update_pairs = {}
 manuel_update_dict = {}
 # with tf.control_dependencies(update_ops):
-moving_avgs = [(v.name, tf.identity(v)) for v in tf.global_variables() if "moving_" in v.name]
+moving_avgs = [(v.name, v) for v in tf.global_variables() if "moving_" in v.name]
 assign_sub_ops = []
 for tpl in moving_avgs:
     var_name = tpl[0]
