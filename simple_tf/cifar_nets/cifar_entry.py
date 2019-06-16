@@ -348,7 +348,7 @@ def cifar100_multi_gpu_training():
                                     decision_keep_probability=1.0 - tpl[4])
         experiment_id = DbLogger.get_run_id()
         explanation = get_explanation_string(network=network)
-        series_id = int(run_id / 4)
+        series_id = int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)

@@ -117,6 +117,7 @@ class FastTreeNetwork(TreeNetwork):
             GlobalConstants.USE_PROBABILITY_THRESHOLD = False
         # Build all symbolic networks in each node
         for node in self.topologicalSortedNodes:
+            print("Building Node {0}".format(node.index))
             self.nodeBuildFuncs[node.depth](node=node, network=self)
         # Build the residue loss
         # self.build_residue_loss()
