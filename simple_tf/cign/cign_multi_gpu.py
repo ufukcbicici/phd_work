@@ -37,12 +37,13 @@ class CignMultiGpu(FastTreeNetwork):
     def build_optimizer(self):
         # Build optimizer
         # self.globalCounter = tf.Variable(0, trainable=False)
-        self.globalCounter = UtilityFuncs.create_variable(name="global_counter",
-                                                          shape=[], initializer=0, trainable=False, dtype=tf.int32)
-        boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
-        values = [GlobalConstants.INITIAL_LR]
-        values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
-        self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
+        with tf.device("/CPU:0"):
+            self.globalCounter = UtilityFuncs.create_variable(name="global_counter",
+                                                              shape=[], initializer=0, trainable=False, dtype=tf.int32)
+            boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
+            values = [GlobalConstants.INITIAL_LR]
+            values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
+            self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
         self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
         # self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         # # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
@@ -52,7 +53,7 @@ class CignMultiGpu(FastTreeNetwork):
         #                                                                                  global_step=self.globalCounter)
 
     def build_network(self):
-        devices = UtilityFuncs.get_available_devices(only_gpu=False)
+        devices = UtilityFuncs.get_available_devices(only_gpu=True)
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
         self.towerBatchSize = GlobalConstants.BATCH_SIZE / len(devices)
@@ -97,7 +98,7 @@ class CignMultiGpu(FastTreeNetwork):
         placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
         all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
-        assert all(["CPU" in var.device and "GPU" not in var.device for var in all_vars])
+        # assert all([GlobalConstants.GLOBAL_PINNING_DEVICE in var.device for var in all_vars])
         self.dataset = None
         self.topologicalSortedNodes = self.towerNetworks[0][1].topologicalSortedNodes
 
