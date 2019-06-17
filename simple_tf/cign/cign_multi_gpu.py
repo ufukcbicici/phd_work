@@ -38,8 +38,10 @@ class CignMultiGpu(FastTreeNetwork):
         # Build optimizer
         # self.globalCounter = tf.Variable(0, trainable=False)
         with tf.device("/CPU:0"):
-            self.globalCounter = UtilityFuncs.create_variable(name="global_counter",
-                                                              shape=[], initializer=0, trainable=False, dtype=tf.int32)
+            self.globalCounter = tf.get_variable("global_counter", initializer=0, dtype=tf.int32, trainable=False)
+            # self.globalCounter =
+            # UtilityFuncs.create_variable(name="global_counter", shape=[], initializer=0,
+            # trainable=False, dtype=tf.int32)
             boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
             values = [GlobalConstants.INITIAL_LR]
             values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
@@ -268,7 +270,7 @@ class CignMultiGpu(FastTreeNetwork):
                         continue
                     # Probability Threshold
                     node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
-                    initial_value = 1.0 / float(node_degree)
+                    initial_value = 0.0 # 1.0 / float(node_degree)
                     threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
                     # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
                     #                                                  decay_period=70000,
