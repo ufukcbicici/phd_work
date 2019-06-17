@@ -143,10 +143,12 @@ class CustomBatchNormAlgorithms:
         with tf.control_dependencies([normed_x]):
             new_pop_mean = tf.where(iteration > 0, (momentum * pop_mean + (1.0 - momentum) * mu), mu)
             new_pop_var = tf.where(iteration > 0, (momentum * pop_var + (1.0 - momentum) * sigma), sigma)
-            pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean, name="masked_batch_norm_mean_assign")
-            pop_var_assign_op = tf.assign(pop_var, new_pop_var, name="masked_batch_norm_var_assign")
-            tf.add_to_collection(name=CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, value=pop_mean_assign_op)
-            tf.add_to_collection(name=CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, value=pop_var_assign_op)
+            # pop_mean_assign_op = tf.assign(pop_mean, new_pop_mean, name="masked_batch_norm_mean_assign")
+            # pop_var_assign_op = tf.assign(pop_var, new_pop_var, name="masked_batch_norm_var_assign")
+            tf.add_to_collection(name=CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, value=(pop_mean, new_pop_mean))
+            tf.add_to_collection(name=CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, value=(pop_var, new_pop_var))
+            # tf.add_to_collection(name=CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, value=pop_mean_assign_op)
+            # tf.add_to_collection(name=CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, value=pop_var_assign_op)
             return normed_x
 
         # gamma_name = network.get_variable_name(node=node, name="gamma") if network is not None else "gamma"

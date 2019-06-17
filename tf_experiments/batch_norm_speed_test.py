@@ -35,11 +35,13 @@ for l in range(layer_count):
                             stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
     conv_biases = tf.Variable(tf.constant(0.1, shape=[num_of_output_channels], dtype=GlobalConstants.DATA_TYPE))
     net = tf.nn.conv2d(net, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-    # net = CustomBatchNormAlgorithms.masked_batch_norm(x=net, masked_x=net, network=None, node=None, momentum=momentum,
-    #                                                   is_training_phase=tf.cast(is_train, tf.int32),
-    #                                                   iteration=iteration_holder, counter=l)
+    net = CustomBatchNormAlgorithms.masked_batch_norm_multi_gpu(x=net, masked_x=net, network=None, node=None,
+                                                                momentum=momentum,
+                                                                is_training_phase=tf.cast(is_train, tf.int32),
+                                                                iteration=iteration_holder, counter=l)
     net = tf.nn.relu(net)
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+custom_batch_norm_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
 moving_avg_update_pairs = {}
 manuel_update_dict = {}
 # with tf.control_dependencies(update_ops):

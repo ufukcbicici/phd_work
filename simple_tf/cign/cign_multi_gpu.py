@@ -143,32 +143,44 @@ class CignMultiGpu(FastTreeNetwork):
         return average_grads
 
     def prepare_batch_norm_moving_avg_ops(self):
+        # Average updates for tensorflow batch normalization operations
         tensorflow_batch_norm_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-
+        moving_avg_variables = [v for v in tf.global_variables() if "moving_" in v.name]
+        self.batchNormMovingAvgAssignOps = []
+        for moving_avg_var in moving_avg_variables:
+            var_name = moving_avg_var.name
+            matched_update_ops = [op.inputs for op in tensorflow_batch_norm_ops if op.inputs[0].name == var_name]
+            assert len(matched_update_ops) == len(self.towerNetworks)
+            assert all([matched_update_ops[i][0] == matched_update_ops[0][0] for i in range(len(matched_update_ops))])
+            updates = []
+            for tpl in matched_update_ops:
+                delta = tpl[1]
+                expanded_delta = tf.expand_dims(delta, 0)
+                updates.append(expanded_delta)
+            update = tf.concat(axis=0, values=updates)
+            update = tf.reduce_mean(update, 0)
+            assign_sub_op = tf.assign_sub(moving_avg_var, update)
+            self.batchNormMovingAvgAssignOps.append(assign_sub_op)
+        # Average updates for custom batch normalization operations
         custom_batch_norm_ops = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
+        batch_norm_ops_dict = {}
+        for moving_average, new_value in custom_batch_norm_ops:
+            if moving_average not in batch_norm_ops_dict:
+                batch_norm_ops_dict[moving_average] = []
+            expanded_new_value = tf.expand_dims(new_value, 0)
+            batch_norm_ops_dict[moving_average].append(expanded_new_value)
+        assert all([len(v) == len(self.towerNetworks) for k, v in batch_norm_ops_dict.items()])
+        # Take the mean of all values for every moving average and update the moving average value.
+        for moving_average, values_list in batch_norm_ops_dict.items():
+            values_concat = tf.concat(axis=0, values=values_list)
+            mean_new_value = tf.reduce_mean(values_concat, 0)
+            momentum = GlobalConstants.BATCH_NORM_DECAY
+            new_moving_average_value = tf.where(self.iterationHolder > 0,
+                                                (momentum * moving_average + (1.0 - momentum) * mean_new_value),
+                                                mean_new_value)
+            new_moving_average_value_assign_op = tf.assign(moving_average, new_moving_average_value)
+            self.batchNormMovingAvgAssignOps.append(new_moving_average_value_assign_op)
         print("X")
-
-
-        # batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
-        # # Assert that for every (moving_average, new_value) tuple, we have exactly #tower_count tuples with a specific
-        # # moving_average entry.
-        # batch_norm_ops_dict = {}
-        # for moving_average, new_value in batch_norm_moving_averages:
-        #     if moving_average not in batch_norm_ops_dict:
-        #         batch_norm_ops_dict[moving_average] = []
-        #     expanded_new_value = tf.expand_dims(new_value, 0)
-        #     batch_norm_ops_dict[moving_average].append(expanded_new_value)
-        # assert all([len(v) == len(self.towerNetworks) for k, v in batch_norm_ops_dict.items()])
-        # # Take the mean of all values for every moving average and update the moving average value.
-        # for moving_average, values_list in batch_norm_ops_dict.items():
-        #     values_concat = tf.concat(axis=0, value s=values_list)
-        #     mean_new_value = tf.reduce_mean(values_concat, 0)
-        #     momentum = GlobalConstants.BATCH_NORM_DECAY
-        #     new_moving_average_value = tf.where(self.iterationHolder > 0,
-        #                                         (momentum * moving_average + (1.0 - momentum) * mean_new_value),
-        #                                         mean_new_value)
-        #     new_moving_average_value_assign_op = tf.assign(moving_average, new_moving_average_value)
-        #     self.batchNormMovingAvgAssignOps.append(new_moving_average_value_assign_op)
 
     # OK
     def get_probability_thresholds(self, feed_dict, iteration, update):
