@@ -329,6 +329,9 @@ class CignMultiGpu(FastTreeNetwork):
     def get_run_ops(self):
         run_ops = [self.applyGradientsOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
                    self.infoGainDicts]
+        custom_batch_norm_ops = [(tpl[0].name, tpl[1])
+                                 for tpl in tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)]
+        run_ops.append(custom_batch_norm_ops)
         # run_ops.extend(self.batchNormMovingAvgAssignOps)
         # run_ops = [self.learningRate, self.sampleCountTensors, self.isOpenTensors,
         #            self.infoGainDicts]
@@ -365,7 +368,8 @@ class CignMultiGpu(FastTreeNetwork):
         momentum = GlobalConstants.BATCH_NORM_DECAY
         res = sess.run(moving_average_curr_value_tensors)
         for var_name in moving_average_curr_value_tensors.keys():
-            values = eval_results[var_name]
+            values = [tpl[1] for tpl in eval_results if tpl[0].name == var_name]
+            # values = eval_results[var_name]
             tf_moving_average_value = res[var_name]
             new_value_arrays = [np.expand_dims(v[1], axis=0) for v in values]
             unified_arr = np.concatenate(new_value_arrays, axis=0)
