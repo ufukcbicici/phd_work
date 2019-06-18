@@ -329,12 +329,14 @@ class CignMultiGpu(FastTreeNetwork):
     def get_run_ops(self):
         run_ops = [self.applyGradientsOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
                    self.infoGainDicts]
-        custom_batch_norm_ops = {}
-        for k, v in tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS):
-            if k.name not in custom_batch_norm_ops:
-                custom_batch_norm_ops[k.name] = []
-            custom_batch_norm_ops[k.name].append(v)
-        run_ops.append(custom_batch_norm_ops)
+
+        # custom_batch_norm_ops = {}
+        # for k, v in tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS):
+        #     if k.name not in custom_batch_norm_ops:
+        #         custom_batch_norm_ops[k.name] = []
+        #     custom_batch_norm_ops[k.name].append(v)
+        # run_ops.append(custom_batch_norm_ops)
+
         # custom_batch_norm_ops = [(tpl[0].name, tpl[1])
         #                          for tpl in tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)]
         # run_ops.append(custom_batch_norm_ops)
@@ -356,7 +358,7 @@ class CignMultiGpu(FastTreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             run_ops.append(self.evalDict)
         results = sess.run(run_ops, feed_dict=feed_dict)
-        self.unit_test_batch_norm_ops(sess=sess, eval_results=results[-1])
+        # self.unit_test_batch_norm_ops(sess=sess, eval_results=results[-1])
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]

@@ -106,6 +106,9 @@ class AccuracyCalculator:
         # Measure Branching Probabilities
         for k, v in branch_probs.items():
             p_n = np.mean(v, axis=0)
+            arg_max_arr = np.argmax(v, axis=1)
+            max_counts = {i: np.sum(arg_max_arr == i) for i in range(p_n.shape[0])}
+            print("Argmax counts:{0}".format(max_counts))
             for branch in range(p_n.shape[0]):
                 print("{0} p_{1}({2})={3}".format(dataset_type, k, branch, p_n[branch]))
                 kv_rows.append((run_id, iteration, "{0} p_{1}({2})".format(dataset_type, k, branch),
