@@ -360,6 +360,7 @@ def cifar100_multi_gpu_training():
             print("*************Epoch {0}*************".format(epoch_id))
             total_time = 0.0
             leaf_info_rows = []
+            sample_count_dict = {}
             while True:
                 start_time = time.time()
                 lr, sample_counts, is_open_indicators = network.update_params(sess=sess,
@@ -375,9 +376,13 @@ def cifar100_multi_gpu_training():
                     sample_count_str = "Classification:   "
                     for k, v in sample_counts.items():
                         sample_count_str += "[{0}={1}]".format(k, v)
+                        if k not in sample_count_dict:
+                            sample_count_dict[k] = 0
+                        sample_count_dict[k] += v
                         # node_index = network.get_node_from_variable_name(name=k).index
                         # leaf_info_rows.append((node_index, np.asscalar(v), iteration_counter, experiment_id))
                     print(sample_count_str)
+                    print(sample_count_dict)
                     # Print node open indicators
                     indicator_str = ""
                     for k, v in is_open_indicators.items():
