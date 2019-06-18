@@ -385,8 +385,9 @@ class CignMultiGpu(FastTreeNetwork):
             else:
                 curr_value = self.batchNormMovingAverageValues[var_name]
                 self.batchNormMovingAverageValues[var_name] = momentum * curr_value + (1.0 - momentum) * mean_arr
-            if not np.allclose(self.batchNormMovingAverageValues[var_name], tf_moving_average_value):
-                print("X")
+            assert np.allclose(self.batchNormMovingAverageValues[var_name], tf_moving_average_value)
+            # if not np.allclose(self.batchNormMovingAverageValues[var_name], tf_moving_average_value):
+            #     print("X")
 
     # TODO: At sometime in the future, we should implement multi gpu accuracy calculation as well.
     #  But not now (31.05.2019)
