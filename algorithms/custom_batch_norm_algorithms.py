@@ -55,8 +55,14 @@ class CustomBatchNormAlgorithms:
                 return final_x
 
     @staticmethod
-    def batch_norm_multi_gpu_v2(input_tensor, is_training, momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                epsilon=1e-5, network=None, node=None, counter=0):
+    def batch_norm_multi_gpu_v2(x,
+                                is_training,
+                                momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                epsilon=1e-5,
+                                masked_x=None,
+                                network=None,
+                                node=None,
+                                counter=0):
         gamma_name = network.get_variable_name(node=node, name="gamma") \
             if network is not None else "gamma_{0}".format(counter)
         beta_name = network.get_variable_name(node=node, name="beta") \
@@ -66,7 +72,7 @@ class CustomBatchNormAlgorithms:
         pop_var_name = network.get_variable_name(node=node, name="pop_var") \
             if network is not None else "pop_var_{0}".format(counter)
         with tf.variable_scope("batch_norm"):
-            tf_x = tf.identity(input_tensor)
+            tf_x = tf.identity(x)
             # Trainable parameters
             gamma = UtilityFuncs.create_variable(name=gamma_name,
                                                  shape=[tf_x.get_shape()[-1]],
@@ -88,10 +94,14 @@ class CustomBatchNormAlgorithms:
                                                    dtype=tf.float32,
                                                    trainable=False)
             # Calculate mean and variance
-            input_dim = len(input_tensor.get_shape().as_list())
+            input_dim = len(tf_x.get_shape().as_list())
             assert input_dim == 2 or input_dim == 4
             axes = [i for i in range(input_dim - 1)]
-            mu, sigma = tf.nn.moments(tf_x, axes)
+            if masked_x is not None:
+                tf_masked_x = tf.identity(masked_x)
+                mu, sigma = tf.nn.moments(tf_masked_x, axes)
+            else:
+                mu, sigma = tf.nn.moments(tf_x, axes)
             final_mean = tf.where(is_training > 0, mu, pop_mean)
             final_var = tf.where(is_training > 0, sigma, pop_var)
             tf.add_to_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS, (pop_mean, final_mean))
@@ -135,7 +145,7 @@ class CustomBatchNormAlgorithms:
                                                    initializer=tf.constant(1.0, shape=[tf_x.get_shape()[-1]]),
                                                    dtype=tf.float32,
                                                    trainable=False)
-        mu, sigma = tf.nn.moments(tf_masked_x, [i for i in range(len(x.get_shape())-1)])
+        mu, sigma = tf.nn.moments(tf_masked_x, [i for i in range(len(x.get_shape()) - 1)])
         final_mean = tf.where(is_training_phase > 0, mu, pop_mean)
         final_var = tf.where(is_training_phase > 0, sigma, pop_var)
         normed_x = tf.nn.batch_normalization(x=tf_x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,
@@ -273,7 +283,7 @@ class CustomBatchNormAlgorithms:
         else:
             gamma = None
             beta = None
-        mu, sigma = tf.nn.moments(masked_x, [i for i in range(len(x.get_shape())-1)])
+        mu, sigma = tf.nn.moments(masked_x, [i for i in range(len(x.get_shape()) - 1)])
         final_mean = tf.where(is_training_phase > 0, mu, pop_mean)
         final_var = tf.where(is_training_phase > 0, sigma, pop_var)
         normed_x = tf.nn.batch_normalization(x=x, mean=final_mean, variance=final_var, offset=beta, scale=gamma,

@@ -54,20 +54,11 @@ class FastTreeMultiGpu(FastTreeNetwork):
     # MultiGPU OK
     def apply_decision_with_unified_batch_norm(self, node, branching_feature):
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
-        # MultiGPU OK
-        normed_x = CustomBatchNormAlgorithms.masked_batch_norm_multi_gpu(x=branching_feature,
-                                                                         masked_x=masked_branching_feature,
-                                                                         network=self, node=node,
-                                                                         momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                                                         iteration=self.iterationHolder,
-                                                                         is_training_phase=self.isTrain)
-        # normed_x = CustomBatchNormAlgorithms.masked_batch_norm_multi_gpu(
-        #     input_tensor=branching_feature,
-        #     masked_input_tensor=masked_branching_feature,
-        #     is_training=self.isTrain,
-        #     momentum=GlobalConstants.BATCH_NORM_DECAY,
-        #     network=self, node=node
-        # )
+        normed_x = CustomBatchNormAlgorithms.batch_norm_multi_gpu_v2(x=branching_feature,
+                                                                     masked_x=masked_branching_feature,
+                                                                     network=self, node=node,
+                                                                     momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                                     is_training=self.isTrain)
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
         # MultiGPU OK
