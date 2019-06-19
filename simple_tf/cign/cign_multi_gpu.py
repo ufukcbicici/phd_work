@@ -23,6 +23,7 @@ class CignMultiGpu(FastTreeNetwork):
         # Each element contains a (device_str, network) pair.
         self.towerNetworks = []
         self.grads = []
+        self.averagedGrads = None
         self.dataset = dataset
         self.applyGradientsOp = None
         self.batchNormMovingAvgAssignOps = []
@@ -55,7 +56,7 @@ class CignMultiGpu(FastTreeNetwork):
         #                                                                                  global_step=self.globalCounter)
 
     def build_network(self):
-        devices = UtilityFuncs.get_available_devices(only_gpu=False)
+        devices = UtilityFuncs.get_available_devices(only_gpu=True)
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
         self.towerBatchSize = GlobalConstants.BATCH_SIZE / len(devices)
@@ -91,10 +92,11 @@ class CignMultiGpu(FastTreeNetwork):
                 self.prepare_batch_norm_moving_avg_ops()
                 # We must calculate the mean of each gradient.
                 # Note that this is the synchronization point across all towers.
-                grads = self.average_gradients()
+                self.averagedGrads = self.average_gradients()
                 # Apply the gradients to adjust the shared variables.
                 with tf.control_dependencies(self.batchNormMovingAvgAssignOps):
-                    self.applyGradientsOp = self.optimizer.apply_gradients(grads, global_step=self.globalCounter)
+                    self.applyGradientsOp = self.optimizer.apply_gradients(self.averagedGrads,
+                                                                           global_step=self.globalCounter)
         # Unify all evaluation tensors across towers
         self.prepare_evaluation_dictionary()
         placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
@@ -327,8 +329,9 @@ class CignMultiGpu(FastTreeNetwork):
         return feed_dict
 
     def get_run_ops(self):
+        network_losses = [tpl[1].finalLoss for tpl in self.towerNetworks]
         run_ops = [self.applyGradientsOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
-                   self.infoGainDicts]
+                   self.infoGainDicts, self.grads, self.averagedGrads, network_losses]
 
         # custom_batch_norm_ops = {}
         # for k, v in tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS):
