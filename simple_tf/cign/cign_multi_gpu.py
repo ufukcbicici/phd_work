@@ -56,7 +56,7 @@ class CignMultiGpu(FastTreeNetwork):
         #                                                                                  global_step=self.globalCounter)
 
     def build_network(self):
-        devices = UtilityFuncs.get_available_devices(only_gpu=True)
+        devices = UtilityFuncs.get_available_devices(only_gpu=False)
         print(devices)
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
@@ -103,7 +103,7 @@ class CignMultiGpu(FastTreeNetwork):
         placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
         all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
-        # assert all(["CPU" in var.device for var in all_vars])
+        assert all(["CPU" in var.device for var in all_vars])
         self.dataset = None
         self.topologicalSortedNodes = self.towerNetworks[0][1].topologicalSortedNodes
 
