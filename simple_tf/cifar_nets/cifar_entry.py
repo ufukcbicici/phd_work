@@ -21,7 +21,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Resnet-50 CIGN GPU+CPU Test\n"
+    explanation = "Resnet-50 CIGN 2 GPUs Parallel Test\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -297,7 +297,7 @@ def cifar100_training():
 
 
 def cifar100_multi_gpu_training():
-    classification_wd = [0.0]
+    classification_wd = [0.0] * 4
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     classification_dropout_probs = [0.0]

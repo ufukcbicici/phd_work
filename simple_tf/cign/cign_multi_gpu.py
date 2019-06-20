@@ -56,7 +56,7 @@ class CignMultiGpu(FastTreeNetwork):
         #                                                                                  global_step=self.globalCounter)
 
     def build_network(self):
-        devices = UtilityFuncs.get_available_devices(only_gpu=False)
+        devices = UtilityFuncs.get_available_devices(only_gpu=True)
         print(devices)
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
