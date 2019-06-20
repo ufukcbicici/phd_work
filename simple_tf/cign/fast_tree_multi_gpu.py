@@ -197,10 +197,10 @@ class FastTreeMultiGpu(FastTreeNetwork):
             parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
             for k, v in parent_node.activationsDict.items():
                 node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
             with tf.device("/device:CPU:0"):
+                node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+                node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
+                node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
                 if GlobalConstants.USE_UNIFIED_BATCH_NORM:
                     node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
             return parent_F, parent_H
