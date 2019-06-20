@@ -294,12 +294,15 @@ class CignMultiGpu(FastTreeNetwork):
                         continue
                     # Probability Threshold
                     node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
-                    initial_value = 0.0 # 1.0 / float(node_degree)
-                    threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
-                    # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                    #                                                  decay_period=70000,
-                    #                                                  min_limit=0.4)
-                    node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
+                    # initial_value = 0.0 # 1.0 / float(node_degree)
+                    # threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
+                    initial_value = 1.0 / float(node_degree)
+                    threshold_name = network.get_variable_name(name="prob_threshold_calculator", node=node)
+                    node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value,
+                                                                     decay=0.8,
+                                                                     decay_period=35000,
+                                                                     min_limit=0.4)
+                    # node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
                     # Softmax Decay
                     decay_name = self.get_variable_name(name="softmax_decay", node=node)
                     node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
