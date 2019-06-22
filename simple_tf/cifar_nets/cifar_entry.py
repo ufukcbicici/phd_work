@@ -297,7 +297,7 @@ def cifar100_training():
 
 
 def cifar100_multi_gpu_training():
-    classification_wd = [0.0] * 4
+    classification_wd = [0.00005] * 3
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     classification_dropout_probs = [0.0]
@@ -453,7 +453,8 @@ def cifar100_multi_gpu_training():
                                                       col_count=9)
                         leaf_info_rows = []
                     break
-
+        tf.reset_default_graph()
+        run_id += 1
 # main()
 # main_fast_tree()
 # ensemble_training()

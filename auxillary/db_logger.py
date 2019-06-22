@@ -17,7 +17,7 @@ class DbLogger:
     sample_wise_table = "sample_wise_results"
 
     # DGX DB 1
-    # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger.db"
+    log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger.db"
 
     # DGX DB 2
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger2.db"
@@ -41,7 +41,7 @@ class DbLogger:
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger_cign.db"
 
     # TRUBA 2
-    log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2_cign.db"
+    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2_cign.db"
 
     # TRUBA 3
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger3_cigj.db"
