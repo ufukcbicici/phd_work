@@ -21,7 +21,7 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Resnet-50 CIGN Sampling\n"
+    explanation = "Resnet-50 CIGN 2 GPUs Parallel Test\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -104,6 +104,7 @@ def get_explanation_string(network):
     explanation += "***** ResNet Parameters *****\n"
     explanation += str(GlobalConstants.RESNET_HYPERPARAMS)
     explanation += "\nUse Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
+    explanation += "\nPinning Device:{0}".format(GlobalConstants.GLOBAL_PINNING_DEVICE)
     return explanation
 
 
