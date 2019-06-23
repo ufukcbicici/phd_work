@@ -103,7 +103,7 @@ def get_explanation_string(network):
         format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
     explanation += "***** ResNet Parameters *****\n"
     explanation += str(GlobalConstants.RESNET_HYPERPARAMS)
-    explanation += "Use Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
+    explanation += "\nUse Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
     return explanation
 
 
@@ -134,7 +134,9 @@ def get_network(dataset):
 def cifar100_training():
     # classification_wd = [0.00005 * i for i in range(21)] * 3
     # classification_wd = sorted(classification_wd)
-    classification_wd = [0.0003] * 3
+    # classification_wd = [0.00005, 0.0001, 0.00015, 0.0002, 0.00025,
+    #                      0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+    classification_wd = [0.00005, 0.0001] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
@@ -454,7 +456,8 @@ def cifar100_multi_gpu_training():
                     break
         tf.reset_default_graph()
         run_id += 1
-# main()
+# main()2
+#
 # main_fast_tree()
 # ensemble_training()
 # cifar100_training()
