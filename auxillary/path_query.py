@@ -22,7 +22,15 @@ def get_query(min_run_id, max_run_id, condition, iteration_lower_limit, add_unio
     return qry
 
 
-def execute_path_query(min_id, max_id, do_print=True):
+def execute_path_query(min_id, max_id, intervals, step_sizes_for_intervals, iteration_lower_limit,
+                       do_print=True):
+    assert len(intervals) == len(step_sizes_for_intervals)
+    for tpl in zip(intervals, step_sizes_for_intervals):
+
+
+
+
+
     step1 = 250
     step2 = 500
     low_limit = 10000
