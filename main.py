@@ -20,12 +20,12 @@ if __name__ == "__main__":
     print("Main - Hello World. With Import.")
     print(tf.__version__)
     # cifar_entry.cifar100_training()
-    # cigj_full_training_entry.cigj_training()
+    cigj_full_training_entry.cigj_training()
     # multi_gpu.experiment()
     # multi_gpu.experiment_with_towers()
     # multi_gpu.experiment_with_custom_batch_norms()
     # cifar_entry.cifar100_multi_gpu_training()
-    cifar_entry.cifar100_training()
+    # cifar_entry.cifar100_training()
 
 
 

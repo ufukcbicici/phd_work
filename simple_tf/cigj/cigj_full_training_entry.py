@@ -5,7 +5,7 @@ import numpy as np
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import FixedParameter
+from auxillary.parameters import FixedParameter, DiscreteParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cigj.jungle import Jungle
 from simple_tf.cigj.jungle_gumbel_softmax import JungleGumbelSoftmax
@@ -126,6 +126,13 @@ def cigj_training():
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = 1.0 - tpl[3]
         GlobalConstants.DECISION_DROPOUT_KEEP_PROB = 1.0 - tpl[4]
         # jungle.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob", value=1.0 - tpl[4])
+        GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+                                                                     value=GlobalConstants.LR_COEFF *
+                                                                           GlobalConstants.INITIAL_LR,
+                                                                     schedule=[
+                                                                         (15000, GlobalConstants.LR_COEFF * 0.005),
+                                                                         (30000, GlobalConstants.LR_COEFF * 0.0025),
+                                                                         (40000, GlobalConstants.LR_COEFF * 0.00025)])
         jungle.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         jungle.hyperparameterFunc(network=jungle)
         experiment_id = DbLogger.get_run_id()
@@ -189,6 +196,5 @@ def cigj_training():
                     break
         tf.reset_default_graph()
         run_id += 1
-
 
 # cigj_training()
