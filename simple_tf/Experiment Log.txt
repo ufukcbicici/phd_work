@@ -1,0 +1,108 @@
+
+DENEYLER:
+
+***************************************************************************************************************
+14.06.2019 - TRUBA dblogger_cign.db
+-Resnet-50 CIGN
+-Probability Threshold:0.0 (Tüm samplelar training boyunca her yere gidecek)
+-Wd: 0.00025 - 0.0005
+-Decision Wd:0.0
+-Batch Size:250
+
+Query:
+
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Resnet-50 CIGN Tests%" AND 
+	Explanation LIKE "%Fixed Value:0.5%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************
+
+***************************************************************************************************************
+20.06.2019 - DGX dblogger1.db
+-Resnet-50 CIGN
+-Probability Threshold:0.5 35000 Iteration after 0.4
+-Wd: 0.0
+-Decision Wd:0.0
+-Batch Size:500
+-Multi GPU
+
+Query:
+
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1190
+	AND
+	Explanation LIKE "%Decay Step:35000%"
+	AND 
+	Explanation LIKE "%Batch Size:500%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************
+
+
+***************************************************************************************************************
+22.06.2019 - DGX dblogger2.db
+
+-Resnet-50 CIGN SAMPLING
+-Wd: 0.0
+-Decision Wd:0.0
+-Batch Size:250
+
+
+
+SELECT 
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy, 
+Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Use Sampling CIGN:True%"
+	AND 
+	Explanation LIKE "%Batch Size:250%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************

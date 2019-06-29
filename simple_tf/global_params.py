@@ -64,7 +64,7 @@ class GlobalConstants:
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
 
-    USE_SAMPLING_CIGN = True
+    USE_SAMPLING_CIGN = False
 
     USE_FAST_TREE_MODE = True
     EXPERIMENT_MULTIPLICATION_FACTOR = 4

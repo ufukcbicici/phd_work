@@ -21,8 +21,9 @@ def get_explanation_string(network):
         total_param_count += np.prod(v.get_shape().as_list())
 
     # Tree
-    explanation = "Resnet-50 CIGN 2 GPUs Parallel Test\n"
+    # explanation = "Resnet-50 CIGN 2 GPUs Parallel Test\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
+    explanation = "Resnet-50 CIGN Tests\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -137,7 +138,8 @@ def cifar100_training():
     # classification_wd = sorted(classification_wd)
     # classification_wd = [0.00005, 0.0001, 0.00015, 0.0002, 0.00025,
     #                      0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    classification_wd = [0.00005, 0.0001] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+    # classification_wd = [0.00005, 0.0001] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+    classification_wd = [0.0003, 0.0003, 0.0003]
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
