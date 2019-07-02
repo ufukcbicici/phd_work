@@ -24,7 +24,8 @@ def get_explanation_string(network):
     # Tree
     # explanation = "Resnet-50 CIGN 2 GPUs Parallel Test\n"
     # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
-    explanation = "Resnet-50 CIGN Tests\n"
+    # explanation = "Resnet-50 CIGN Tests\n"
+    explanation = "Resnet-50 CIGN Random Sampling Routing Tests\n"
     explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
     explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
     explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -125,6 +126,7 @@ def get_network(dataset):
                 degree_list=GlobalConstants.RESNET_TREE_DEGREES,
                 dataset=dataset)
         else:
+            print("USING RANDOM SAMPLING CIGN!!!")
             network = CignRandomSample(
                 node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
                 grad_func=cign_resnet.grad_func,
@@ -152,7 +154,8 @@ def cifar100_training():
     #                      0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00005, 0.0001] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00035, 0.00035, 0.00035, 0.00035, 0.0004, 0.0004, 0.0004, 0.0004]
-    classification_wd = [0.0]
+    classification_wd = [0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * \
+                        GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
