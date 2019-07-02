@@ -60,32 +60,59 @@ class FastTreeNetwork(TreeNetwork):
         for node in self.topologicalSortedNodes:
             # if node.isLeaf:
             #     continue
-            # F
             f_output = node.fOpsList[-1]
-            self.evalDict["Node{0}_F".format(node.index)] = f_output
+            self.evalDict[UtilityFuncs.get_variable_name(name="F", node=node)] = f_output
             # H
             if len(node.hOpsList) > 0:
                 h_output = node.hOpsList[-1]
-                self.evalDict["Node{0}_H".format(node.index)] = h_output
+                self.evalDict[UtilityFuncs.get_variable_name(name="H", node=node)] = h_output
             # Activations
             for k, v in node.activationsDict.items():
-                self.evalDict["Node{0}_activation_from_{1}".format(node.index, k)] = v
+                self.evalDict[UtilityFuncs.get_variable_name(name="activation_from_{0}".format(k), node=node)] = v
             # Decision masks
             for k, v in node.maskTensors.items():
-                self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
+                self.evalDict[UtilityFuncs.get_variable_name(name="{0}".format(v.name), node=node)] = v
             # Evaluation outputs
             for k, v in node.evalDict.items():
                 self.evalDict[k] = v
             # Label outputs
             if node.labelTensor is not None:
-                self.evalDict["Node{0}_label_tensor".format(node.index)] = node.labelTensor
+                self.evalDict[UtilityFuncs.get_variable_name(name="label_tensor", node=node)] = node.labelTensor
                 # Sample indices
-                self.evalDict["Node{0}_indices_tensor".format(node.index)] = node.indicesTensor
+                self.evalDict[UtilityFuncs.get_variable_name(name="indices_tensor", node=node)] = node.indicesTensor
             # One Hot Label outputs
             if node.oneHotLabelTensor is not None:
-                self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
+                self.evalDict[UtilityFuncs.get_variable_name(name="one_hot_label_tensor", node=node)] = \
+                    node.oneHotLabelTensor
             if node.filteredMask is not None:
-                self.evalDict["Node{0}_filteredMask".format(node.index)] = node.filteredMask
+                self.evalDict[UtilityFuncs.get_variable_name(name="filteredMask", node=node)] = node.filteredMask
+
+            # # F
+            # f_output = node.fOpsList[-1]
+            # self.evalDict["Node{0}_F".format(node.index)] = f_output
+            # # H
+            # if len(node.hOpsList) > 0:
+            #     h_output = node.hOpsList[-1]
+            #     self.evalDict["Node{0}_H".format(node.index)] = h_output
+            # # Activations
+            # for k, v in node.activationsDict.items():
+            #     self.evalDict["Node{0}_activation_from_{1}".format(node.index, k)] = v
+            # # Decision masks
+            # for k, v in node.maskTensors.items():
+            #     self.evalDict["Node{0}_{1}".format(node.index, v.name)] = v
+            # # Evaluation outputs
+            # for k, v in node.evalDict.items():
+            #     self.evalDict[k] = v
+            # # Label outputs
+            # if node.labelTensor is not None:
+            #     self.evalDict["Node{0}_label_tensor".format(node.index)] = node.labelTensor
+            #     # Sample indices
+            #     self.evalDict["Node{0}_indices_tensor".format(node.index)] = node.indicesTensor
+            # # One Hot Label outputs
+            # if node.oneHotLabelTensor is not None:
+            #     self.evalDict["Node{0}_one_hot_label_tensor".format(node.index)] = node.oneHotLabelTensor
+            # if node.filteredMask is not None:
+            #     self.evalDict["Node{0}_filteredMask".format(node.index)] = node.filteredMask
         self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
@@ -345,6 +372,43 @@ class FastTreeNetwork(TreeNetwork):
         #     if "final_feature_mag" in k:
         #         print("{0}={1}".format(k, v))
         return results, minibatch
+
+    def collect_outputs_into_collection(self, collection, output_names, node, results):
+        for output_name in output_names:
+            output_arr = results[self.get_variable_name(name=output_name, node=node)]
+            UtilityFuncs.concat_to_np_array_dict(dct=collection[output_name], key=node.index, array=output_arr)
+
+    def collect_eval_results_from_network(self,
+                                          sess,
+                                          dataset,
+                                          dataset_type,
+                                          use_masking,
+                                          leaf_node_collection_names,
+                                          inner_node_collections_names):
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        leaf_node_collections = {}
+        inner_node_collections = {}
+        for output_name in leaf_node_collection_names:
+            leaf_node_collections[output_name] = {}
+        for output_name in inner_node_collections_names:
+            inner_node_collections[output_name] = {}
+        while True:
+            results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=use_masking)
+            if results is not None:
+                for node in self.topologicalSortedNodes:
+                    if not node.isLeaf:
+                        self.collect_outputs_into_collection(collection=inner_node_collections,
+                                                             output_names=inner_node_collections_names,
+                                                             node=node,
+                                                             results=results)
+                    else:
+                        self.collect_outputs_into_collection(collection=leaf_node_collections,
+                                                             output_names=leaf_node_collection_names,
+                                                             node=node,
+                                                             results=results)
+            if dataset.isNewEpoch:
+                break
+        return leaf_node_collections, inner_node_collections
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         feed_dict = {self.dataTensor: minibatch.samples,
