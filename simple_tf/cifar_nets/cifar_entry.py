@@ -10,6 +10,7 @@ from auxillary.parameters import DiscreteParameter
 from data_handling.cifar_dataset import CifarDataSet
 from simple_tf.cifar_nets import cign_resnet
 from simple_tf.cign.cign_multi_gpu import CignMultiGpu
+from simple_tf.cign.cign_random_sampling import CignRandomSample
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.cign.cign_with_sampling import CignWithSampling
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
@@ -105,6 +106,7 @@ def get_explanation_string(network):
     explanation += "***** ResNet Parameters *****\n"
     explanation += str(GlobalConstants.RESNET_HYPERPARAMS)
     explanation += "\nUse Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
+    explanation += "\nUse Random Sampling CIGN:{0}".format(GlobalConstants.USE_RANDOM_SAMPLING)
     explanation += "\nPinning Device:{0}".format(GlobalConstants.GLOBAL_PINNING_DEVICE)
     return explanation
 
@@ -113,14 +115,24 @@ def get_network(dataset):
     if GlobalConstants.USE_SAMPLING_CIGN:
         GlobalConstants.USE_UNIFIED_BATCH_NORM = False
         print("USING SAMPLING CIGN!!!")
-        network = CignWithSampling(
-            node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
-            grad_func=cign_resnet.grad_func,
-            hyperparameter_func=cign_resnet.hyperparameter_func_sampling,
-            residue_func=cign_resnet.residue_network_func,
-            summary_func=cign_resnet.tensorboard_func,
-            degree_list=GlobalConstants.RESNET_TREE_DEGREES,
-            dataset=dataset)
+        if not GlobalConstants.USE_RANDOM_SAMPLING:
+            network = CignWithSampling(
+                node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
+                grad_func=cign_resnet.grad_func,
+                hyperparameter_func=cign_resnet.hyperparameter_func_sampling,
+                residue_func=cign_resnet.residue_network_func,
+                summary_func=cign_resnet.tensorboard_func,
+                degree_list=GlobalConstants.RESNET_TREE_DEGREES,
+                dataset=dataset)
+        else:
+            network = CignRandomSample(
+                node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
+                grad_func=cign_resnet.grad_func,
+                hyperparameter_func=cign_resnet.hyperparameter_func_sampling,
+                residue_func=cign_resnet.residue_network_func,
+                summary_func=cign_resnet.tensorboard_func,
+                degree_list=GlobalConstants.RESNET_TREE_DEGREES,
+                dataset=dataset)
     else:
         network = FastTreeNetwork(
             node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
@@ -139,7 +151,8 @@ def cifar100_training():
     # classification_wd = [0.00005, 0.0001, 0.00015, 0.0002, 0.00025,
     #                      0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00005, 0.0001] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    classification_wd = [0.0003, 0.0003, 0.0003]
+    # classification_wd = [0.00035, 0.00035, 0.00035, 0.00035, 0.0004, 0.0004, 0.0004, 0.0004]
+    classification_wd = [0.0]
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
