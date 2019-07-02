@@ -4,9 +4,10 @@ import numpy as np
 
 class MultipathCalculatorV2(threading.Thread):
     class BranchingInfo:
-        def __init__(self, branching_probs, routing_matrix):
+        def __init__(self, branching_probs, routing_matrix, path_probs):
             self.branchingProbs = branching_probs
             self.routingMatrix = routing_matrix
+            self.pathProbabilities = path_probs
 
     def __init__(self, thread_id, run_id, iteration, thresholds_list,
                  network, sample_count, label_list, branch_probs, posterior_probs):
@@ -35,6 +36,7 @@ class MultipathCalculatorV2(threading.Thread):
             if not curr_node.isLeaf:
                 if curr_node.isRoot:
                     reaches_to_this_node_vector = np.ones(shape=(self.sampleCount,), dtype=np.bool_)
+                    path_probability = np.ones(shape=(self.sampleCount, ))
                 else:
                     parent_node = self.network.parents(node=curr_node)[0]
                     siblings_dict = {sibling_node.index: order_index for order_index, sibling_node in
