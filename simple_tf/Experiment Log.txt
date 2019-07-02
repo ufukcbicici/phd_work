@@ -35,7 +35,7 @@ GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
 
 
-SELECT RunID, Avg(ValidationAccuracy) AS AvgValidationAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (53,54) AND Epoch <= 179 GROUP BY RunID;
+SELECT RunID, Avg(ValidationAccuracy) AS AvgValidationAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (53,54) AND Epoch <= 209 GROUP BY RunID;
 ***************************************************************************************************************
 
 ***************************************************************************************************************
