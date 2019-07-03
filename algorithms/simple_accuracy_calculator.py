@@ -19,13 +19,19 @@ class SimpleAccuracyCalculator:
                                                       leaf_node_collection_names=leaf_node_outputs,
                                                       inner_node_collections_names=inner_node_outputs)
         leaf_true_labels_dict = leaf_node_collections["label_tensor"]
+        branch_probs_dict = inner_node_collections["p(n|x)"]
+        posterior_probs_dict = leaf_node_collections["posterior_probs"]
         thresholds = GlobalConstants.MULTIPATH_SCHEDULES
-        assert all([np.array])
-        label_list =
-        sample_count = list(leaf_true_labels_dict.values())[0].shape[0]
+        assert all([np.array_equal(list(leaf_true_labels_dict.values())[0], list(leaf_true_labels_dict.values())[i])
+                    for i in range(len(leaf_true_labels_dict))])
+        label_list = list(leaf_true_labels_dict.values())[0]
+        sample_count = label_list.shape[0]
         multipath_accuracy_calculator = MultipathCalculatorV2(thread_id=0, run_id=run_id, iteration=iteration,
                                                               thresholds_list=thresholds, network=network,
-                                                              sample_count=sample_count, )
+                                                              sample_count=sample_count, label_list=label_list,
+                                                              branch_probs=branch_probs_dict,
+                                                              posterior_probs=posterior_probs_dict)
+        multipath_accuracy_calculator
 
 
 

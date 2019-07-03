@@ -91,7 +91,21 @@ class MultipathCalculatorV2(threading.Thread):
         leaf_weights = path_probabilities_matrix_with_routing / path_probabilities_with_routing_sum
         posteriors_matrix_with_weights = posteriors_matrix * np.expand_dims(leaf_weights, axis=1)
         posteriors_weighted_averaged = np.sum(posteriors_matrix_with_weights, axis=2)
-
-
-
-
+        # Measure accuracies
+        simple_avg_predicted_labels = np.argmax(posteriors_averaged, axis=1)
+        weighted_avg_predicted_labels = np.argmax(posteriors_weighted_averaged, axis=1)
+        total_leaves_evaluated = np.sum(leaf_counts_vector)
+        accuracy_simple_avg = np.sum((simple_avg_predicted_labels == self.labelList).astype(np.float32)) \
+                              / float(self.sampleCount)
+        accuracy_weighted_avg = np.sum((weighted_avg_predicted_labels == self.labelList).astype(np.float32)) \
+                              / float(self.sampleCount)
+        print(
+            "******* Multipath Threshold:{0} Simple Accuracy:{1} "
+            "Weighted Accuracy:{2} Total Leaves Evaluated:{3}*******"
+                .format(self.thresholdsList, accuracy_simple_avg, accuracy_weighted_avg, total_leaves_evaluated))
+        # Temporary
+        path_threshold = self.thresholdsList[0][0]
+        self.kvRows.append((self.runId, self.iteration, 0, path_threshold, accuracy_simple_avg,
+                            total_leaves_evaluated))
+        self.kvRows.append((self.runId, self.iteration, 1, path_threshold, accuracy_weighted_avg,
+                            total_leaves_evaluated))
