@@ -77,9 +77,20 @@ class MultipathCalculatorV2(threading.Thread):
             routing_decisions_list.append(reaches_to_this_node_vector)
             path_probability_list.append(path_probability)
         posteriors_matrix = np.concatenate(posterior_matrices_list, axis=2)
-        routing_decisions_matrix = np.concatenate(routing_decisions_list, axis=1)
+        routing_decisions_matrix = np.concatenate(routing_decisions_list, axis=1).astype(np.float32)
         path_probabilities_matrix = np.concatenate(path_probability_list, axis=1)
-
+        # Method 1: Directly average all valid posteriors
+        posteriors_matrix_with_routing = \
+            posteriors_matrix * np.expand_dims(routing_decisions_matrix, axis=1)
+        posteriors_summed = np.sum(posteriors_matrix_with_routing, axis=2)
+        leaf_counts_vector = np.sum(routing_decisions_matrix, axis=1, keepdims=True)
+        posteriors_averaged = posteriors_summed / leaf_counts_vector
+        # Method 2: Use a weighted average for all valid posteriors, by using their path probabilities
+        path_probabilities_matrix_with_routing = path_probabilities_matrix * routing_decisions_matrix
+        path_probabilities_with_routing_sum = np.sum(path_probabilities_matrix_with_routing, axis=1, keepdims=True)
+        leaf_weights = path_probabilities_matrix_with_routing / path_probabilities_with_routing_sum
+        posteriors_matrix_with_weights = posteriors_matrix * np.expand_dims(leaf_weights, axis=1)
+        posteriors_weighted_averaged = np.sum(posteriors_matrix_with_weights, axis=2)
 
 
 
