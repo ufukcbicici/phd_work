@@ -65,20 +65,20 @@ class MultipathCalculatorV2(threading.Thread):
             branching_info_dict[curr_node.index] = \
                 MultipathCalculatorV2.BranchingInfo(branching_probs=p_n_given_x, routing_matrix=routing_matrix,
                                                     path_probs=path_probabilities)
-            # Calculate averaged posteriors
-            posterior_matrices_list = []
-            routing_decisions_list = []
-            path_probability_list = []
-            for curr_node in leaf_nodes:
-                reaches_to_this_node_vector, path_probability = \
-                    self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
-                posteriors = self.posteriorProbs[curr_node.index]
-                posterior_matrices_list.append(posteriors)
-                routing_decisions_list.append(reaches_to_this_node_vector)
-                path_probability_list.append(path_probability)
-            posteriors_matrix = np.concatenate(posterior_matrices_list, axis=2)
-            routing_decisions_matrix = np.concatenate(routing_decisions_list, axis=1)
-            path_probabilities_matrix = np.concatenate(path_probability_list, axis=1)
+        # Calculate averaged posteriors
+        posterior_matrices_list = []
+        routing_decisions_list = []
+        path_probability_list = []
+        for curr_node in leaf_nodes:
+            reaches_to_this_node_vector, path_probability = \
+                self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
+            posteriors = self.posteriorProbs[curr_node.index]
+            posterior_matrices_list.append(posteriors)
+            routing_decisions_list.append(reaches_to_this_node_vector)
+            path_probability_list.append(path_probability)
+        posteriors_matrix = np.concatenate(posterior_matrices_list, axis=2)
+        routing_decisions_matrix = np.concatenate(routing_decisions_list, axis=1)
+        path_probabilities_matrix = np.concatenate(path_probability_list, axis=1)
 
 
 
