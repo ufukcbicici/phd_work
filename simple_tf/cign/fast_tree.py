@@ -2,17 +2,26 @@ from collections import deque
 
 import numpy as np
 import tensorflow as tf
+import time
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import FixedParameter, DecayingParameter, DiscreteParameter
 from simple_tf.cign.tree import TreeNetwork
-from simple_tf.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from simple_tf.info_gain import InfoGainLoss
 from simple_tf.node import Node
+from auxillary.constants import DatasetTypes
 
 
 class FastTreeNetwork(TreeNetwork):
+    class UpdateResults:
+        def __init__(self, lr, sample_counts, is_open_indicators):
+            self.lr = lr
+            self.sampleCounts = sample_counts
+            self.isOpenIndicators = is_open_indicators
+
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                  dataset):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
@@ -347,7 +356,9 @@ class FastTreeNetwork(TreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             self.verbose_update(eval_dict=results[-1])
         # Unit Test for Unified Batch Normalization
-        return lr, sample_counts, is_open_indicators
+        update_results = FastTreeNetwork.UpdateResults(lr=lr, sample_counts=sample_counts,
+                                                       is_open_indicators=is_open_indicators)
+        return update_results
 
     def eval_network(self, sess, dataset, use_masking):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
@@ -444,43 +455,160 @@ class FastTreeNetwork(TreeNetwork):
         return feed_dict
 
     def set_hyperparameters(self, **kwargs):
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
-        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
-        if not self.isBaseline:
-            GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
-            GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
-            self.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
-                                                                    value=kwargs["decision_keep_probability"])
-
-            # Noise Coefficient
-            self.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
-                                                                decay=0.0,
-                                                                decay_period=1,
-                                                                min_limit=0.0)
-            # Decision Loss Coefficient
-            # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
-            #                                                               value=0.0,
-            #                                                               schedule=[(12000, 1.0)])
-            self.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
-                                                                    value=1.0)
-            for node in self.topologicalSortedNodes:
-                if node.isLeaf:
-                    continue
-                # Probability Threshold
-                node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
-                initial_value = 1.0 / float(node_degree)
-                threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
-                # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                #                                                  decay_period=70000,
-                #                                                  min_limit=0.4)
-                node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
-                # Softmax Decay
-                decay_name = self.get_variable_name(name="softmax_decay", node=node)
-                node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
-                                                                value=GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL,
-                                                                decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
-                                                                decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
-                                                                min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
+        pass
+        # GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
+        # GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
+        # if not self.isBaseline:
+        #     GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
+        #     GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
+        #     self.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+        #                                                             value=kwargs["decision_keep_probability"])
+        #
+        #     # Noise Coefficient
+        #     self.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
+        #                                                         decay=0.0,
+        #                                                         decay_period=1,
+        #                                                         min_limit=0.0)
+        #     # Decision Loss Coefficient
+        #     # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
+        #     #                                                               value=0.0,
+        #     #                                                               schedule=[(12000, 1.0)])
+        #     self.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
+        #                                                             value=1.0)
+        #     for node in self.topologicalSortedNodes:
+        #         if node.isLeaf:
+        #             continue
+        #         # Probability Threshold
+        #         node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
+        #         initial_value = 1.0 / float(node_degree)
+        #         threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
+        #         # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
+        #         #                                                  decay_period=70000,
+        #         #                                                  min_limit=0.4)
+        #         node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
+        #         # Softmax Decay
+        #         decay_name = self.get_variable_name(name="softmax_decay", node=node)
+        #         node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
+        #                                                         value=GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL,
+        #                                                         decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
+        #                                                         decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
+        #                                                         min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
 
     def get_explanation_string(self):
         pass
+
+    def print_iteration_info(self, iteration_counter, update_results):
+        lr = update_results.lr
+        sample_counts = update_results.sampleCounts
+        is_open_indicators = update_results.isOpenIndicators
+        print("Iteration:{0}".format(iteration_counter))
+        print("Lr:{0}".format(lr))
+        # Print sample counts (classification)
+        sample_count_str = "Classification:   "
+        for k, v in sample_counts.items():
+            sample_count_str += "[{0}={1}]".format(k, v)
+        print(sample_count_str)
+        # Print node open indicators
+        indicator_str = ""
+        for k, v in is_open_indicators.items():
+            indicator_str += "[{0}={1}]".format(k, v)
+        print(indicator_str)
+
+    def train(self, sess, dataset, run_id):
+        iteration_counter = 0
+        for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
+            # An epoch is a complete pass on the whole dataset.
+            dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
+            print("*************Epoch {0}*************".format(epoch_id))
+            total_time = 0.0
+            leaf_info_rows = []
+            while True:
+                start_time = time.time()
+                update_results = self.update_params(sess=sess,
+                                                    dataset=dataset,
+                                                    epoch=epoch_id,
+                                                    iteration=iteration_counter)
+                if all([update_results.lr, update_results.sampleCounts, update_results.isOpenIndicators]):
+                    elapsed_time = time.time() - start_time
+                    total_time += elapsed_time
+                    self.print_iteration_info(iteration_counter=iteration_counter, update_results=update_results)
+                    iteration_counter += 1
+                if dataset.isNewEpoch:
+                    # moving_results_1 = sess.run(moving_stat_vars)
+                    is_evaluation_epoch_at_report_period = \
+                        epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING \
+                        and (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0
+                    is_evaluation_epoch_before_ending = \
+                        epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING
+                    if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
+                        print("Epoch Time={0}".format(total_time))
+                        if not self.modeTracker.isCompressed:
+                            training_accuracy, training_confusion = \
+                                self.calculate_accuracy(sess=sess, dataset=dataset,
+                                                        dataset_type=DatasetTypes.training,
+                                                        run_id=run_id, iteration=iteration_counter,
+                                                        calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy, validation_confusion = \
+                                self.calculate_accuracy(sess=sess, dataset=dataset,
+                                                        dataset_type=DatasetTypes.test,
+                                                        run_id=run_id, iteration=iteration_counter,
+                                                        calculation_type=AccuracyCalcType.regular)
+                            if not self.isBaseline:
+                                validation_accuracy_corrected, validation_marginal_corrected = \
+                                    self.calculate_accuracy(sess=sess, dataset=dataset,
+                                                            dataset_type=DatasetTypes.test,
+                                                            run_id=run_id,
+                                                            iteration=iteration_counter,
+                                                            calculation_type=
+                                                            AccuracyCalcType.route_correction)
+                                if is_evaluation_epoch_before_ending:
+                                    self.calculate_accuracy(sess=sess, dataset=dataset,
+                                                            dataset_type=DatasetTypes.test,
+                                                            run_id=run_id,
+                                                            iteration=iteration_counter,
+                                                            calculation_type=
+                                                            AccuracyCalcType.multi_path)
+                            else:
+                                validation_accuracy_corrected = 0.0
+                                validation_marginal_corrected = 0.0
+                            DbLogger.write_into_table(
+                                rows=[(run_id, iteration_counter, epoch_id, training_accuracy,
+                                       validation_accuracy, validation_accuracy_corrected,
+                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                            # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
+                            if GlobalConstants.SAVE_CONFUSION_MATRICES:
+                                DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
+                                                          col_count=7)
+                                DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
+                                                          col_count=7)
+                        else:
+                            training_accuracy_best_leaf, training_confusion_residue = \
+                                self.calculate_accuracy(sess=sess, dataset=dataset,
+                                                        dataset_type=DatasetTypes.training,
+                                                        run_id=run_id, iteration=iteration_counter,
+                                                        calculation_type=AccuracyCalcType.regular)
+                            validation_accuracy_best_leaf, validation_confusion_residue = \
+                                self.calculate_accuracy(sess=sess, dataset=dataset,
+                                                        dataset_type=DatasetTypes.test,
+                                                        run_id=run_id, iteration=iteration_counter,
+                                                        calculation_type=AccuracyCalcType.regular)
+                            DbLogger.write_into_table(rows=[(run_id, iteration_counter, epoch_id,
+                                                             training_accuracy_best_leaf,
+                                                             validation_accuracy_best_leaf,
+                                                             validation_confusion_residue,
+                                                             0.0, 0.0, "XXX")], table=DbLogger.logsTable,
+                                                      col_count=9)
+                        leaf_info_rows = []
+                    break
+            # # Compress softmax classifiers
+            # if GlobalConstants.USE_SOFTMAX_DISTILLATION:
+            #     do_compress = network.check_for_compression(dataset=dataset, run_id=experiment_id,
+            #                                                 iteration=iteration_counter, epoch=epoch_id)
+            #     if do_compress:
+            #         print("**********************Compressing the network**********************")
+            #         network.softmaxCompresser.compress_network_softmax(sess=sess)
+            #         print("**********************Compressing the network**********************")
+        # except Exception as e:
+        #     print(e)
+        #     print("ERROR!!!!")
+        # Reset the computation graph

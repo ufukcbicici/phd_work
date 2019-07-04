@@ -366,6 +366,14 @@ class FashionCignV2(FastTreeNetwork):
         return explanation
 
     def set_hyperparameters(self, **kwargs):
+        # Regularization Parameters
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
+        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
+        self.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                                value=kwargs["decision_keep_probability"])
+
         # Training Parameters
         GlobalConstants.TOTAL_EPOCH_COUNT = 100
         GlobalConstants.EPOCH_COUNT = 100
@@ -409,3 +417,5 @@ class FashionCignV2(FastTreeNetwork):
                                                             decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
                                                             min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
         GlobalConstants.SOFTMAX_TEST_TEMPERATURE = 50.0
+
+
