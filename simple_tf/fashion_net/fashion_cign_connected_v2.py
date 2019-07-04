@@ -381,6 +381,8 @@ class FashionCignV2(FastTreeNetwork):
         GlobalConstants.BATCH_SIZE = 125
         GlobalConstants.EVAL_BATCH_SIZE = 250
         GlobalConstants.USE_MULTI_GPU = False
+        GlobalConstants.USE_SAMPLING_CIGN = False
+        GlobalConstants.USE_RANDOM_SAMPLING = False
         GlobalConstants.INITIAL_LR = 0.01
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,

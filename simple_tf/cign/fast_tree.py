@@ -154,7 +154,7 @@ class FastTreeNetwork(TreeNetwork):
         # Build all symbolic networks in each node
         for node in self.topologicalSortedNodes:
             print("Building Node {0}".format(node.index))
-            self.nodeBuildFuncs[node.depth](node=node, network=self)
+            self.nodeBuildFuncs[node.depth](node=node)
         # Build the residue loss
         # self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
@@ -337,7 +337,7 @@ class FastTreeNetwork(TreeNetwork):
     def update_params(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
-        minibatch = dataset.get_next_batch()
+        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
         if minibatch is None:
             return None, None, None
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
