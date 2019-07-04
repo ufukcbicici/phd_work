@@ -1,5 +1,6 @@
 import numpy as np
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
 
@@ -23,10 +24,12 @@ class SimpleAccuracyCalculator:
         posterior_probs_dict = leaf_node_collections["posterior_probs"]
         thresholds = []
         for threshold in GlobalConstants.MULTIPATH_SCHEDULES:
-
-
-
-
+            t_dict = {}
+            for node in network.topologicalSortedNodes:
+                if not node.isLeaf:
+                    child_count = len(network.dag.children(node=node))
+                    t_dict[node.index] = threshold * np.ones(shape=(child_count,))
+            thresholds.append(t_dict)
         assert all([np.array_equal(list(leaf_true_labels_dict.values())[0], list(leaf_true_labels_dict.values())[i])
                     for i in range(len(leaf_true_labels_dict))])
         label_list = list(leaf_true_labels_dict.values())[0]
@@ -34,66 +37,18 @@ class SimpleAccuracyCalculator:
         # This is temporary
         threshold_dict = UtilityFuncs.distribute_evenly_to_threads(
             num_of_threads=GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT,
-            list_to_distribute=GlobalConstants.MULTIPATH_SCHEDULES)
+            list_to_distribute=thresholds)
         threads_dict = {}
         for thread_id in range(GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT):
-            threads_dict[thread_id] = MultipathCalculatorV2(thread_id=0, run_id=run_id, iteration=iteration,
-                                                              thresholds_list=thresholds, network=network,
-                                                              sample_count=sample_count, label_list=label_list,
-                                                              branch_probs=branch_probs_dict,
-                                                              posterior_probs=posterior_probs_dict)
+            threads_dict[thread_id] = MultipathCalculatorV2(thread_id=thread_id, run_id=run_id, iteration=iteration,
+                                                            thresholds_dict=threshold_dict[thread_id], network=network,
+                                                            sample_count=sample_count, label_list=label_list,
+                                                            branch_probs=branch_probs_dict,
+                                                            posterior_probs=posterior_probs_dict)
             threads_dict[thread_id].start()
         all_results = []
         for thread in threads_dict.values():
             thread.join()
         for thread in threads_dict.values():
             all_results.extend(thread.kvRows)
-        DbLogger.write_into_table(rows=all_results, table=DbLogger.multipath_results_table, col_count=6)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        multipath_accuracy_calculator = MultipathCalculatorV2(thread_id=0, run_id=run_id, iteration=iteration,
-                                                              thresholds_list=thresholds, network=network,
-                                                              sample_count=sample_count, label_list=label_list,
-                                                              branch_probs=branch_probs_dict,
-                                                              posterior_probs=posterior_probs_dict)
-        multipath_accuracy_calculator
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        # leaf_predicted_labels_dict = {}
-        # leaf_true_labels_dict = {}
-        # info_gain_dict = {}
-        # branch_activations = {}
-        # branch_probs = {}
-        # one_hot_branch_probs = {}
-        # posterior_probs = {}
-        # hash_codes = {}
+        DbLogger.write_into_table(rows=all_results, table=DbLogger.multipath_results_table_v2, col_count=6)

@@ -14,6 +14,7 @@ class DbLogger:
     confusionTable = "confusion_matrices"
     compressionTestsTable = "compression_tests_table"
     multipath_results_table = "multipath_results"
+    multipath_results_table_v2 = "multipath_results_v2"
     sample_wise_table = "sample_wise_results"
 
     # DGX DB 1
