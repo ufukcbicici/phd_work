@@ -24,7 +24,7 @@ class TreeNetwork:
         self.nodes = {}
         self.topologicalSortedNodes = []
         self.gradFunc = grad_func
-        self.hyperparameterFunc = hyperparameter_func
+        self.hyperparameter_func = hyperparameter_func
         self.residueFunc = residue_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
