@@ -242,6 +242,13 @@ class FashionCignV2(FastTreeNetwork):
         # return tf.constant(value=0.0)
 
     def set_hyperparameters(self, **kwargs):
+        # Training Parameters
+        GlobalConstants.TOTAL_EPOCH_COUNT = 100
+        GlobalConstants.EPOCH_COUNT = 100
+        GlobalConstants.EPOCH_REPORT_PERIOD = 1
+        GlobalConstants.BATCH_SIZE = 125
+        GlobalConstants.EVAL_BATCH_SIZE = 250
+        GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.INITIAL_LR = 0.01
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
