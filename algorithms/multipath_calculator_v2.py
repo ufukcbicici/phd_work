@@ -9,14 +9,14 @@ class MultipathCalculatorV2(threading.Thread):
             self.routingMatrix = routing_matrix
             self.pathProbabilities = path_probs
 
-    def __init__(self, thread_id, run_id, iteration, thresholds_list,
+    def __init__(self, thread_id, run_id, iteration, thresholds_dict,
                  network, sample_count, label_list, branch_probs, posterior_probs):
         threading.Thread.__init__(self)
         self.threadId = thread_id
         self.runId = run_id
         self.iteration = iteration
-        self.thresholdsList = thresholds_list
-        # self.thresholdsList structure: (node_index, thresholds[] -> len(child_nodes) sized array.
+        self.thresholdsDict = thresholds_dict
+        # self.thresholdsDict structure: (node_index, thresholds[] -> len(child_nodes) sized array.
         # Thresholds are sorted according to the child node indices:
         # i.th child's threshold is at: thresholds[sorted(child_nodes).index_of(child_node[i])]
         self.network = network
@@ -58,7 +58,7 @@ class MultipathCalculatorV2(threading.Thread):
             child_nodes = self.network.dagObject.children(node=curr_node)
             child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
             for child_index, child_node in enumerate(child_nodes_sorted):
-                thresholds_matrix[:, child_index] = self.thresholdsList[curr_node.index][child_index]
+                thresholds_matrix[:, child_index] = self.thresholdsDict[curr_node.index][child_index]
             routing_matrix = p_n_given_x >= thresholds_matrix
             routing_matrix = np.logical_and(routing_matrix, np.expand_dims(reaches_to_this_node_vector, axis=1))
             path_probabilities = p_n_given_x * np.expand_dims(path_probability, axis=1)
@@ -102,9 +102,9 @@ class MultipathCalculatorV2(threading.Thread):
         print(
             "******* Multipath Threshold:{0} Simple Accuracy:{1} "
             "Weighted Accuracy:{2} Total Leaves Evaluated:{3}*******"
-                .format(self.thresholdsList, accuracy_simple_avg, accuracy_weighted_avg, total_leaves_evaluated))
+                .format(self.thresholdsDict, accuracy_simple_avg, accuracy_weighted_avg, total_leaves_evaluated))
         # Temporary
-        path_threshold = self.thresholdsList[0][0]
+        path_threshold = self.thresholdsDict[0][0]
         self.kvRows.append((self.runId, self.iteration, 0, path_threshold, accuracy_simple_avg,
                             total_leaves_evaluated))
         self.kvRows.append((self.runId, self.iteration, 1, path_threshold, accuracy_weighted_avg,
