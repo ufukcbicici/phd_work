@@ -365,15 +365,7 @@ class FashionCignV2(FastTreeNetwork):
         # explanation += "Dropout Prob:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
         return explanation
 
-    def set_hyperparameters(self, **kwargs):
-        # Regularization Parameters
-        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
-        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
-        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
-        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
-        self.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
-                                                                value=kwargs["decision_keep_probability"])
-
+    def set_training_parameters(self):
         # Training Parameters
         GlobalConstants.TOTAL_EPOCH_COUNT = 100
         GlobalConstants.EPOCH_COUNT = 100
@@ -389,6 +381,15 @@ class FashionCignV2(FastTreeNetwork):
                                                                      schedule=[(15000, 0.005),
                                                                                (30000, 0.0025),
                                                                                (40000, 0.00025)])
+
+    def set_hyperparameters(self, **kwargs):
+        # Regularization Parameters
+        GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
+        GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
+        GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
+        GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
+        self.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                                value=kwargs["decision_keep_probability"])
         # Noise Coefficient
         self.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
                                                             decay=0.0,

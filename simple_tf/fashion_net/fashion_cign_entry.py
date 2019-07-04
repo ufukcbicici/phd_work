@@ -40,6 +40,7 @@ def fashion_net_training():
         else:
             sess = tf.Session()
         network = FashionCignV2(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
+        network.set_training_parameters()
         network.build_network()
         init = tf.global_variables_initializer()
         print("********************NEW RUN:{0}********************".format(run_id))

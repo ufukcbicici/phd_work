@@ -454,6 +454,9 @@ class FastTreeNetwork(TreeNetwork):
                 feed_dict[self.decisionDropoutKeepProb] = 1.0
         return feed_dict
 
+    def set_training_parameters(self):
+        pass
+
     def set_hyperparameters(self, **kwargs):
         pass
         # GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
