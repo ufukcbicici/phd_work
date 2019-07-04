@@ -481,3 +481,6 @@ class FastTreeNetwork(TreeNetwork):
                                                                 decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
                                                                 decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
                                                                 min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
+
+    def get_explanation_string(self):
+        pass
