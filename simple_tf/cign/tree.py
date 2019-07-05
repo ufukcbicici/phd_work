@@ -294,47 +294,6 @@ class TreeNetwork:
         else:
             self.residueLoss = GlobalConstants.RESIDUE_LOSS_COEFFICIENT * self.residueFunc(network=self)
 
-    # Sample from categorical distribution using Gumbel-Max trick
-    @staticmethod
-    def sample_from_categorical(probs, batch_size, category_count):
-        uniform = tf.distributions.Uniform(low=0.0, high=1.0)
-        uniform_sample = uniform.sample(sample_shape=(tf.cast(batch_size, tf.int32), category_count))
-        gumbel_sample = -1.0 * tf.log(-1.0 * tf.log(uniform_sample))
-        log_probs = tf.log(probs)
-        gumbel_max = gumbel_sample + log_probs
-        selected_indices = tf.cast(tf.argmax(gumbel_max, axis=1), tf.int32)
-        return selected_indices
-
-    def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
-        if not self.modeTracker.isCompressed:
-            if calculation_type == AccuracyCalcType.regular:
-                accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
-                                                                                 dataset_type=dataset_type,
-                                                                                 run_id=run_id,
-                                                                                 iteration=iteration)
-                return accuracy, confusion
-            elif calculation_type == AccuracyCalcType.route_correction:
-                accuracy_corrected, marginal_corrected = \
-                    self.accuracyCalculator.calculate_accuracy_with_route_correction(
-                        sess=sess, dataset=dataset,
-                        dataset_type=dataset_type)
-                return accuracy_corrected, marginal_corrected
-            elif calculation_type == AccuracyCalcType.with_residue_network:
-                self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                                dataset_type=dataset_type)
-            elif calculation_type == AccuracyCalcType.multi_path:
-                self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
-                                                                     dataset_type=dataset_type, run_id=run_id,
-                                                                     iteration=iteration)
-            else:
-                raise NotImplementedError()
-        else:
-            best_leaf_accuracy, residue_corrected_accuracy = \
-                self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
-                                                                             dataset_type=dataset_type,
-                                                                             run_id=run_id, iteration=iteration)
-            return best_leaf_accuracy, residue_corrected_accuracy
-
     def check_for_compression(self, run_id, epoch, iteration, dataset):
         do_compress = self.modeTracker.check_for_compression_start(dataset=dataset, epoch=epoch)
         kv_rows = [(run_id, iteration, "Compressed Softmax", do_compress)]

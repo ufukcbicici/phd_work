@@ -27,7 +27,7 @@ class SimpleAccuracyCalculator:
             t_dict = {}
             for node in network.topologicalSortedNodes:
                 if not node.isLeaf:
-                    child_count = len(network.dag.children(node=node))
+                    child_count = len(network.dagObject.children(node=node))
                     t_dict[node.index] = threshold * np.ones(shape=(child_count,))
             thresholds.append(t_dict)
         assert all([np.array_equal(list(leaf_true_labels_dict.values())[0], list(leaf_true_labels_dict.values())[i])
@@ -35,11 +35,12 @@ class SimpleAccuracyCalculator:
         label_list = list(leaf_true_labels_dict.values())[0]
         sample_count = label_list.shape[0]
         # This is temporary
+        thread_count = 1
         threshold_dict = UtilityFuncs.distribute_evenly_to_threads(
-            num_of_threads=GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT,
+            num_of_threads=thread_count,
             list_to_distribute=thresholds)
         threads_dict = {}
-        for thread_id in range(GlobalConstants.SOFTMAX_DISTILLATION_CPU_COUNT):
+        for thread_id in range(thread_count):
             threads_dict[thread_id] = MultipathCalculatorV2(thread_id=thread_id, run_id=run_id, iteration=iteration,
                                                             thresholds_dict=threshold_dict[thread_id], network=network,
                                                             sample_count=sample_count, label_list=label_list,
