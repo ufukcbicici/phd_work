@@ -22,6 +22,7 @@ class SimpleAccuracyCalculator:
         leaf_true_labels_dict = leaf_node_collections["label_tensor"]
         branch_probs_dict = inner_node_collections["p(n|x)"]
         posterior_probs_dict = leaf_node_collections["posterior_probs"]
+        activations_dict = inner_node_collections["activations"]
         thresholds = []
         for threshold in GlobalConstants.MULTIPATH_SCHEDULES:
             t_dict = {}
@@ -42,14 +43,15 @@ class SimpleAccuracyCalculator:
         threads_dict = {}
         for thread_id in range(thread_count):
             threads_dict[thread_id] = MultipathCalculatorV2(thread_id=thread_id, run_id=run_id, iteration=iteration,
-                                                            thresholds_dict=threshold_dict[thread_id], network=network,
+                                                            thresholds_list=threshold_dict[thread_id], network=network,
                                                             sample_count=sample_count, label_list=label_list,
                                                             branch_probs=branch_probs_dict,
+                                                            activations=activations_dict,
                                                             posterior_probs=posterior_probs_dict)
-            threads_dict[thread_id].start()
+            threads_dict[thread_id].run()
         all_results = []
-        for thread in threads_dict.values():
-            thread.join()
+        # for thread in threads_dict.values():
+        #     thread.join()
         for thread in threads_dict.values():
             all_results.extend(thread.kvRows)
         DbLogger.write_into_table(rows=all_results, table=DbLogger.multipath_results_table_v2, col_count=6)

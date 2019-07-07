@@ -2,20 +2,20 @@ import threading
 import numpy as np
 
 
-class MultipathCalculatorV2(threading.Thread):
+class MultipathCalculatorV2: #(threading.Thread):
     class BranchingInfo:
         def __init__(self, branching_probs, routing_matrix, path_probs):
             self.branchingProbs = branching_probs
             self.routingMatrix = routing_matrix
             self.pathProbabilities = path_probs
 
-    def __init__(self, thread_id, run_id, iteration, thresholds_dict,
-                 network, sample_count, label_list, branch_probs, posterior_probs):
+    def __init__(self, thread_id, run_id, iteration, thresholds_list,
+                 network, sample_count, label_list, branch_probs, activations, posterior_probs):
         threading.Thread.__init__(self)
         self.threadId = thread_id
         self.runId = run_id
         self.iteration = iteration
-        self.thresholdsDict = thresholds_dict
+        self.thresholdsList = thresholds_list
         # self.thresholdsDict structure: (node_index, thresholds[] -> len(child_nodes) sized array.
         # Thresholds are sorted according to the child node indices:
         # i.th child's threshold is at: thresholds[sorted(child_nodes).index_of(child_node[i])]
@@ -23,6 +23,7 @@ class MultipathCalculatorV2(threading.Thread):
         self.sampleCount = sample_count
         self.labelList = label_list
         self.branchProbs = branch_probs
+        self.activations = activations
         self.posteriorProbs = posterior_probs
         self.kvRows = []
 
@@ -31,7 +32,7 @@ class MultipathCalculatorV2(threading.Thread):
             reaches_to_this_node_vector = np.ones(shape=(self.sampleCount,), dtype=np.bool_)
             path_probability = np.ones(shape=(self.sampleCount,))
         else:
-            parent_node = self.network.parents(node=curr_node)[0]
+            parent_node = self.network.dagObject.parents(node=curr_node)[0]
             siblings_dict = {sibling_node.index: order_index for order_index, sibling_node in
                              enumerate(
                                  sorted(self.network.dagObject.children(node=parent_node),
@@ -42,6 +43,10 @@ class MultipathCalculatorV2(threading.Thread):
         return reaches_to_this_node_vector, path_probability
 
     def run(self):
+        for thresholds_dict in self.thresholdsList:
+            self.calculate_for_threshold(thresholds_dict=thresholds_dict)
+
+    def calculate_for_threshold(self, thresholds_dict):
         root_node = self.network.nodes[0]
         leaf_count = len([node for node in self.network.topologicalSortedNodes if node.isLeaf])
         max_num_of_samples = leaf_count * self.sampleCount
@@ -58,7 +63,7 @@ class MultipathCalculatorV2(threading.Thread):
             child_nodes = self.network.dagObject.children(node=curr_node)
             child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
             for child_index, child_node in enumerate(child_nodes_sorted):
-                thresholds_matrix[:, child_index] = self.thresholdsDict[curr_node.index][child_index]
+                thresholds_matrix[:, child_index] = thresholds_dict[curr_node.index][child_index]
             routing_matrix = p_n_given_x >= thresholds_matrix
             routing_matrix = np.logical_and(routing_matrix, np.expand_dims(reaches_to_this_node_vector, axis=1))
             path_probabilities = p_n_given_x * np.expand_dims(path_probability, axis=1)
@@ -72,10 +77,10 @@ class MultipathCalculatorV2(threading.Thread):
         for curr_node in leaf_nodes:
             reaches_to_this_node_vector, path_probability = \
                 self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
-            posteriors = self.posteriorProbs[curr_node.index]
+            posteriors = np.expand_dims(self.posteriorProbs[curr_node.index], axis=2)
             posterior_matrices_list.append(posteriors)
-            routing_decisions_list.append(reaches_to_this_node_vector)
-            path_probability_list.append(path_probability)
+            routing_decisions_list.append(np.expand_dims(reaches_to_this_node_vector, axis=1))
+            path_probability_list.append(np.expand_dims(path_probability, axis=2))
         posteriors_matrix = np.concatenate(posterior_matrices_list, axis=2)
         routing_decisions_matrix = np.concatenate(routing_decisions_list, axis=1).astype(np.float32)
         path_probabilities_matrix = np.concatenate(path_probability_list, axis=1)
@@ -94,7 +99,7 @@ class MultipathCalculatorV2(threading.Thread):
         # Measure accuracies
         simple_avg_predicted_labels = np.argmax(posteriors_averaged, axis=1)
         weighted_avg_predicted_labels = np.argmax(posteriors_weighted_averaged, axis=1)
-        total_leaves_evaluated = np.sum(leaf_counts_vector)
+        total_leaves_evaluated = np.asscalar(np.sum(leaf_counts_vector))
         accuracy_simple_avg = np.sum((simple_avg_predicted_labels == self.labelList).astype(np.float32)) \
                               / float(self.sampleCount)
         accuracy_weighted_avg = np.sum((weighted_avg_predicted_labels == self.labelList).astype(np.float32)) \
@@ -102,9 +107,9 @@ class MultipathCalculatorV2(threading.Thread):
         print(
             "******* Multipath Threshold:{0} Simple Accuracy:{1} "
             "Weighted Accuracy:{2} Total Leaves Evaluated:{3}*******"
-                .format(self.thresholdsDict, accuracy_simple_avg, accuracy_weighted_avg, total_leaves_evaluated))
+                .format(thresholds_dict, accuracy_simple_avg, accuracy_weighted_avg, total_leaves_evaluated))
         # Temporary
-        path_threshold = self.thresholdsDict[0][0]
+        path_threshold = thresholds_dict[0][0]
         self.kvRows.append((self.runId, self.iteration, 0, path_threshold, accuracy_simple_avg,
                             total_leaves_evaluated))
         self.kvRows.append((self.runId, self.iteration, 1, path_threshold, accuracy_weighted_avg,
