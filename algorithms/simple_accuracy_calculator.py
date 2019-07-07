@@ -48,10 +48,10 @@ class SimpleAccuracyCalculator:
                                                             branch_probs=branch_probs_dict,
                                                             activations=activations_dict,
                                                             posterior_probs=posterior_probs_dict)
-            threads_dict[thread_id].run()
+            threads_dict[thread_id].start()
         all_results = []
-        # for thread in threads_dict.values():
-        #     thread.join()
+        for thread in threads_dict.values():
+            thread.join()
         for thread in threads_dict.values():
             all_results.extend(thread.kvRows)
         DbLogger.write_into_table(rows=all_results, table=DbLogger.multipath_results_table_v2, col_count=6)

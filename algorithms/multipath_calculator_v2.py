@@ -2,7 +2,7 @@ import threading
 import numpy as np
 
 
-class MultipathCalculatorV2: #(threading.Thread):
+class MultipathCalculatorV2(threading.Thread):
     class BranchingInfo:
         def __init__(self, branching_probs, routing_matrix, path_probs):
             self.branchingProbs = branching_probs
