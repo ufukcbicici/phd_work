@@ -2,17 +2,15 @@ import threading
 import numpy as np
 
 
-class MultipathCalculatorV2(threading.Thread):
+class MultipathCalculatorV2():
     class BranchingInfo:
         def __init__(self, branching_probs, routing_matrix, path_probs):
             self.branchingProbs = branching_probs
             self.routingMatrix = routing_matrix
             self.pathProbabilities = path_probs
 
-    def __init__(self, thread_id, run_id, iteration, thresholds_list,
+    def __init__(self, run_id, iteration, thresholds_list,
                  network, sample_count, label_list, branch_probs, activations, posterior_probs):
-        threading.Thread.__init__(self)
-        self.threadId = thread_id
         self.runId = run_id
         self.iteration = iteration
         self.thresholdsList = thresholds_list
@@ -43,8 +41,13 @@ class MultipathCalculatorV2(threading.Thread):
         return reaches_to_this_node_vector, path_probability
 
     def run(self):
+        results = []
+        self.kvRows = []
         for thresholds_dict in self.thresholdsList:
-            self.calculate_for_threshold(thresholds_dict=thresholds_dict)
+            res_0, res_1 = self.calculate_for_threshold(thresholds_dict=thresholds_dict)
+            results.append(res_0)
+            results.append(res_1)
+        return results
 
     def calculate_for_threshold(self, thresholds_dict):
         root_node = self.network.nodes[0]
@@ -114,3 +117,8 @@ class MultipathCalculatorV2(threading.Thread):
                             total_leaves_evaluated))
         self.kvRows.append((self.runId, self.iteration, 1, path_threshold, accuracy_weighted_avg,
                             total_leaves_evaluated))
+        computation_overload = total_leaves_evaluated / self.sampleCount
+        # Tuple: Entry 0: Method Entry 1: Thresholds Entry 2: Accuracy Entry 3: Num of leaves evaluated
+        res_method_0 = (0, thresholds_dict, accuracy_simple_avg, computation_overload)
+        res_method_1 = (1, thresholds_dict, accuracy_weighted_avg, computation_overload)
+        return res_method_0, res_method_1

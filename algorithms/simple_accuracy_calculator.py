@@ -35,23 +35,44 @@ class SimpleAccuracyCalculator:
                     for i in range(len(leaf_true_labels_dict))])
         label_list = list(leaf_true_labels_dict.values())[0]
         sample_count = label_list.shape[0]
-        # This is temporary
-        thread_count = 1
-        threshold_dict = UtilityFuncs.distribute_evenly_to_threads(
-            num_of_threads=thread_count,
-            list_to_distribute=thresholds)
-        threads_dict = {}
-        for thread_id in range(thread_count):
-            threads_dict[thread_id] = MultipathCalculatorV2(thread_id=thread_id, run_id=run_id, iteration=iteration,
-                                                            thresholds_list=threshold_dict[thread_id], network=network,
-                                                            sample_count=sample_count, label_list=label_list,
-                                                            branch_probs=branch_probs_dict,
-                                                            activations=activations_dict,
-                                                            posterior_probs=posterior_probs_dict)
-            threads_dict[thread_id].start()
-        all_results = []
-        for thread in threads_dict.values():
-            thread.join()
-        for thread in threads_dict.values():
-            all_results.extend(thread.kvRows)
-        DbLogger.write_into_table(rows=all_results, table=DbLogger.multipath_results_table_v2, col_count=6)
+        multipath_calculator = MultipathCalculatorV2(run_id=run_id, iteration=iteration,
+                                                     thresholds_list=thresholds, network=network,
+                                                     sample_count=sample_count, label_list=label_list,
+                                                     branch_probs=branch_probs_dict,
+                                                     activations=activations_dict,
+                                                     posterior_probs=posterior_probs_dict)
+        multipath_calculator.run()
+        DbLogger.write_into_table(rows=multipath_calculator.kvRows, table=DbLogger.multipath_results_table_v2,
+                                  col_count=6)
+
+        # # This is temporary
+        # thread_count = 1
+        # threshold_dict = UtilityFuncs.distribute_evenly_to_threads(
+        #     num_of_threads=thread_count,
+        #     list_to_distribute=thresholds)
+        # threads_dict = {}
+        # for thread_id in range(thread_count):
+        #     threads_dict[thread_id] = MultipathCalculatorV2(run_id=run_id, iteration=iteration,
+        #                                                     thresholds_list=threshold_dict[thread_id], network=network,
+        #                                                     sample_count=sample_count, label_list=label_list,
+        #                                                     branch_probs=branch_probs_dict,
+        #                                                     activations=activations_dict,
+        #                                                     posterior_probs=posterior_probs_dict)
+        #     threads_dict[thread_id].start()
+        # all_results = []
+        # for thread in threads_dict.values():
+        #     thread.join()
+        # for thread in threads_dict.values():
+        #     all_results.extend(thread.kvRows)
+        # DbLogger.write_into_table(rows=all_results, table=DbLogger.multipath_results_table_v2, col_count=6)
+
+    # @staticmethod
+    # def calculate_accuracy_multipath_ex\
+    #                 (branch_probs_dict, activations_dict, posteriors_dict, labels_dict, thresholds):
+    #     # Assert that all dictionary contain the same keys (for same epochs)
+    #     epochs = branch_probs_dict.keys()
+    #     for epoch in epochs:
+    #         assert epoch in branch_probs_dict and epoch in activations_dict \
+    #                and epoch in posteriors_dict and epoch in labels_dict
+    #     results = []
+    #     for epoch in epochs:
