@@ -103,18 +103,9 @@ class MultipathCalculatorV2():
                               / float(self.sampleCount)
         accuracy_weighted_avg = np.sum((weighted_avg_predicted_labels == self.labelList).astype(np.float32)) \
                               / float(self.sampleCount)
-        print(
-            "******* Multipath Threshold:{0} Simple Accuracy:{1} "
-            "Weighted Accuracy:{2} Total Leaves Evaluated:{3}*******"
-                .format(thresholds_dict, accuracy_simple_avg, accuracy_weighted_avg, total_leaves_evaluated))
-        # Temporary
-        path_threshold = thresholds_dict[0][0]
-        self.kvRows.append((self.runId, self.iteration, 0, path_threshold, accuracy_simple_avg,
-                            total_leaves_evaluated))
-        self.kvRows.append((self.runId, self.iteration, 1, path_threshold, accuracy_weighted_avg,
-                            total_leaves_evaluated))
         computation_overload = total_leaves_evaluated / self.sampleCount
         # Tuple: Entry 0: Method Entry 1: Thresholds Entry 2: Accuracy Entry 3: Num of leaves evaluated
-        res_method_0 = (0, thresholds_dict, accuracy_simple_avg, computation_overload)
-        res_method_1 = (1, thresholds_dict, accuracy_weighted_avg, computation_overload)
+        # Entry 4: Computation Overload
+        res_method_0 = (0, thresholds_dict, accuracy_simple_avg, total_leaves_evaluated, computation_overload)
+        res_method_1 = (1, thresholds_dict, accuracy_weighted_avg, total_leaves_evaluated, computation_overload)
         return res_method_0, res_method_1
