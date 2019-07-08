@@ -50,10 +50,6 @@ class MultipathCalculatorV2():
         return results
 
     def calculate_for_threshold(self, thresholds_dict):
-        root_node = self.network.nodes[0]
-        leaf_count = len([node for node in self.network.topologicalSortedNodes if node.isLeaf])
-        max_num_of_samples = leaf_count * self.sampleCount
-        root_node = self.network.topologicalSortedNodes[0]
         branching_info_dict = {}
         inner_nodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         leaf_nodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
