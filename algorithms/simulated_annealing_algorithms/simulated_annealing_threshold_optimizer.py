@@ -65,3 +65,4 @@ class SimulatedAnnealingThresholdOptimizer:
             if accepted:
                 curr_state = candidate_state
                 curr_score = candidate_score
+        return curr_state
