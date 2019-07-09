@@ -547,9 +547,10 @@ class FastTreeNetwork(TreeNetwork):
                 self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                                                                                 dataset_type=dataset_type)
             elif calculation_type == AccuracyCalcType.multi_path:
-                self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
-                                                                     dataset_type=dataset_type, run_id=run_id,
-                                                                     iteration=iteration)
+                # Outdated
+                # self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
+                #                                                      dataset_type=dataset_type, run_id=run_id,
+                #                                                      iteration=iteration)
                 SimpleAccuracyCalculator.calculate_accuracy_multipath(network=self, sess=sess,
                                                                       dataset=dataset,
                                                                       dataset_type=dataset_type,
