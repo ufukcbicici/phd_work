@@ -3,6 +3,7 @@ from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
+import os
 
 
 class SimpleAccuracyCalculator:
@@ -23,6 +24,19 @@ class SimpleAccuracyCalculator:
         branch_probs_dict = inner_node_collections["p(n|x)"]
         posterior_probs_dict = leaf_node_collections["posterior_probs"]
         activations_dict = inner_node_collections["activations"]
+        # Save the the info from this iteration
+        if GlobalConstants.SAVE_PATH_INFO_TO_HD:
+            curr_path = os.path.dirname(os.path.abspath(__file__))
+            directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(curr_path, ".."),
+                                                                       "saved_training_data"),
+                                                          "run_{0}_iteration_{1}".format(run_id, iteration)))
+            os.mkdir(directory_path)
+            npz_file_name = os.path.abspath(os.path.join(directory_path, "branching_info"))
+            UtilityFuncs.save_npz(npz_file_name,
+                                  arr_dict={"label_tensor": leaf_true_labels_dict,
+                                            "p(n|x)": branch_probs_dict,
+                                            "posterior_probs": posterior_probs_dict,
+                                            "activations": activations_dict})
         thresholds = []
         for threshold in GlobalConstants.MULTIPATH_SCHEDULES:
             t_dict = {}
