@@ -9,6 +9,16 @@ class MultipathCalculatorV2():
             self.routingMatrix = routing_matrix
             self.pathProbabilities = path_probs
 
+    class MultipathResult:
+        def __init__(self, result_tuple):
+            self.methodType = result_tuple[0]
+            self.thresholdsDict = result_tuple[1]
+            self.accuracy = result_tuple[2]
+            self.totalLeavesEvaluated = result_tuple[3]
+            self.computationOverload = result_tuple[4]
+            # res_method_0 = (0, thresholds_dict, accuracy_simple_avg, total_leaves_evaluated, computation_overload)
+            # res_method_1 = (1, thresholds_dict, accuracy_weighted_avg, total_leaves_evaluated, computation_overload)
+
     def __init__(self, run_id, iteration, thresholds_list,
                  network, sample_count, label_list, branch_probs, activations, posterior_probs):
         self.runId = run_id
@@ -106,6 +116,10 @@ class MultipathCalculatorV2():
         computation_overload = total_leaves_evaluated / self.sampleCount
         # Tuple: Entry 0: Method Entry 1: Thresholds Entry 2: Accuracy Entry 3: Num of leaves evaluated
         # Entry 4: Computation Overload
-        res_method_0 = (0, thresholds_dict, accuracy_simple_avg, total_leaves_evaluated, computation_overload)
-        res_method_1 = (1, thresholds_dict, accuracy_weighted_avg, total_leaves_evaluated, computation_overload)
+        res_method_0 = MultipathCalculatorV2.MultipathResult(result_tuple=(0, thresholds_dict, accuracy_simple_avg,
+                                                                           total_leaves_evaluated,
+                                                                           computation_overload))
+        res_method_1 = MultipathCalculatorV2.MultipathResult(result_tuple=(1, thresholds_dict, accuracy_weighted_avg,
+                                                                           total_leaves_evaluated,
+                                                                           computation_overload))
         return res_method_0, res_method_1
