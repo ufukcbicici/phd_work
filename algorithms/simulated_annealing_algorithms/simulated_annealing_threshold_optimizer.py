@@ -84,8 +84,15 @@ class SimulatedAnnealingThresholdOptimizer:
                 print("Candidate Score:{0}".format(candidate_score))
                 print("Candidate Accuracy:{0}".format(candidate_accuracy))
                 print("Candidate Computation Overload:{0}".format(candidate_computation_overload))
-                print("****************Iteration {0}****************".format(iteration_id))
             if accepted:
+                if self.verbose:
+                    print("Candidate accepted.")
                 curr_state = candidate_state
                 curr_score = candidate_score
+            else:
+                if self.verbose:
+                    print("Candidate rejected.")
+            if self.verbose:
+                print("****************Iteration {0}****************".format(iteration_id))
+                self.annealingSchedule.update(iteration=iteration_id)
         return curr_state
