@@ -33,7 +33,8 @@ class SimpleAccuracyCalculator:
             os.mkdir(directory_path)
             npz_file_name = os.path.abspath(os.path.join(directory_path, "branching_info"))
             UtilityFuncs.save_npz(npz_file_name,
-                                  arr_dict={"label_tensor": leaf_true_labels_dict,
+                                  arr_dict={"tree_type": np.array(network.degreeList),
+                                            "label_tensor": leaf_true_labels_dict,
                                             "p(n|x)": branch_probs_dict,
                                             "posterior_probs": posterior_probs_dict,
                                             "activations": activations_dict})
