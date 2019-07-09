@@ -34,19 +34,17 @@ class SimulatedAnnealingThresholdOptimizer:
         for scorer in self.multipathScoreCalculators:
             res_method_0, res_method_1 = scorer.calculate_for_threshold(thresholds_dict=threshold_state)
             result = res_method_1 if self.useWeightedScoring else res_method_0
-
-
-
-
-
-
+            accuracy_gain = self.balanceCoefficient * result.accuracy
+            computation_overload_loss = (1.0 - self.balanceCoefficient) * (result.computationOverload - 1.0)
+            score = accuracy_gain - computation_overload_loss
+            scores.append(score)
+        final_score = np.mean(np.array_equal(scores))
+        return final_score
 
     def run(self):
         # Get initial state
         curr_state = self.pick_fully_random_state()
         curr_score = self.network
-
-
 
         for iteration_id in range(self.maxNumOfIterations):
             # Pick a random neighbor
@@ -54,9 +52,6 @@ class SimulatedAnnealingThresholdOptimizer:
             rand_val = np.random.uniform(low=0.0, high=1.0)
             # acceptance_threshold = self.annealingSchedule.value
             # if acceptance_threshold >= rand_val:
-
-
-
 
     # @staticmethod
     # def pick_fully_random_state(network):
