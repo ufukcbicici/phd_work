@@ -75,6 +75,7 @@ class SimulatedAnnealingThresholdOptimizer:
             # Report current state
             if self.verbose:
                 print("****************Iteration {0}****************".format(iteration_id))
+                print("Current Temperature:{0}".format(self.annealingSchedule.value))
                 print("Current State:{0}".format(curr_state))
                 print("Current Score:{0}".format(curr_score))
                 print("Current Accuracy:{0}".format(curr_accuracy))
