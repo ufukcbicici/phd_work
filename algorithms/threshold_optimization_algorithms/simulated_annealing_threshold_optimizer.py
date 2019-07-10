@@ -1,53 +1,17 @@
 import numpy as np
 
+from algorithms.threshold_optimization_algorithms.threshold_optimizer import ThresholdOptimizer
 
-class SimulatedAnnealingThresholdOptimizer:
-    def __init__(self, network,
-                 max_num_of_iterations,
-                 annealing_schedule,
-                 balance_coefficient,
-                 use_weighted_scoring,
-                 multipath_score_calculators,
-                 verbose):
-        self.network = network
+
+class SimulatedAnnealingThresholdOptimizer(ThresholdOptimizer):
+    def __init__(self, network, max_num_of_iterations, annealing_schedule, balance_coefficient, use_weighted_scoring,
+                 multipath_score_calculators, verbose):
+        super().__init__(network, multipath_score_calculators, balance_coefficient, use_weighted_scoring, verbose)
         self.maxNumOfIterations = max_num_of_iterations
         self.annealingSchedule = annealing_schedule
-        self.balanceCoefficient = balance_coefficient
-        self.useWeightedScoring = use_weighted_scoring
-        self.multipathScoreCalculators = multipath_score_calculators
-        self.verbose = verbose
-
-    def pick_fully_random_state(self):
-        threshold_state = {}
-        for node in self.network.topologicalSortedNodes:
-            if node.isLeaf:
-                continue
-            child_count = len(self.network.dagObject.children(node=node))
-            max_threshold = 1.0 / float(child_count)
-            thresholds = max_threshold * np.random.uniform(size=(child_count,))
-            threshold_state[node.index] = thresholds
-        return threshold_state
 
     def get_neighbor(self, threshold_state):
         pass
-
-    def calculate_threshold_score(self, threshold_state):
-        scores = []
-        accuracies = []
-        computation_overloads = []
-        for scorer in self.multipathScoreCalculators:
-            res_method_0, res_method_1 = scorer.calculate_for_threshold(thresholds_dict=threshold_state)
-            result = res_method_1 if self.useWeightedScoring else res_method_0
-            accuracy_gain = self.balanceCoefficient * result.accuracy
-            computation_overload_loss = (1.0 - self.balanceCoefficient) * (result.computationOverload - 1.0)
-            score = accuracy_gain - computation_overload_loss
-            accuracies.append(result.accuracy)
-            computation_overloads.append(result.computationOverload)
-            scores.append(score)
-        final_score = np.mean(np.array(scores))
-        final_accuracy = np.mean(np.array(accuracies))
-        final_computation_overload = np.mean(np.array(computation_overloads))
-        return final_score, final_accuracy, final_computation_overload
 
     def get_acceptance(self, curr_score, candidate_score):
         if candidate_score > curr_score:
@@ -55,6 +19,9 @@ class SimulatedAnnealingThresholdOptimizer:
         else:
             temperature = self.annealingSchedule.value
             acceptance_threshold = np.exp((candidate_score - curr_score) / temperature)
+            if self.verbose:
+                print("Temperature:{0}".format(temperature))
+                print("Acceptance Threshold:{0}".format(acceptance_threshold))
             rand_val = np.random.uniform(low=0.0, high=1.0)
             if acceptance_threshold >= rand_val:
                 return True

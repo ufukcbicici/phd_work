@@ -1,16 +1,18 @@
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
 from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
-from algorithms.simulated_annealing_algorithms.simulated_annealing_uniform_optimizer import \
+from algorithms.threshold_optimization_algorithms.brute_force_threshold_optimizer import BruteForceOptimizer
+from algorithms.threshold_optimization_algorithms.simulated_annealing_uniform_optimizer import \
     SimulatedAnnealingUniformOptimizer
 from auxillary.parameters import DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 run_id = 789
 iterations = [43680 + i * 480 for i in range(10)]
-max_num_of_iterations = 1000000
-annealing_schedule = DecayingParameter(name="Temperature", value=100.0, decay=0.99999, decay_period=1)
+max_num_of_iterations = 100000
+annealing_schedule = DecayingParameter(name="Temperature", value=100.0, decay=0.9999, decay_period=1)
 balance_coefficient = 0.5
 use_weighted_scoring = False
+brute_force_sample_count = 10000000
 
 
 def main():
@@ -32,5 +34,12 @@ def main():
                                                       use_weighted_scoring=use_weighted_scoring,
                                                       multipath_score_calculators=multipath_calculators,
                                                       verbose=True, neighbor_volume_ratio=0.1)
-    sa_optimizer.run()
+    # sa_optimizer.run()
+
+    bf_optimizer = BruteForceOptimizer(network=tree, sample_count=brute_force_sample_count,
+                                       multipath_score_calculators=multipath_calculators,
+                                       balance_coefficient=balance_coefficient,
+                                       use_weighted_scoring=use_weighted_scoring,
+                                       thread_count=1, verbose=True)
+    bf_optimizer.run()
     print("X")

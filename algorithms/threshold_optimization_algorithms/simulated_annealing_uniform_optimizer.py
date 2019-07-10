@@ -1,6 +1,6 @@
 import numpy as np
 
-from algorithms.simulated_annealing_algorithms.simulated_annealing_threshold_optimizer import \
+from algorithms.threshold_optimization_algorithms.simulated_annealing_threshold_optimizer import \
     SimulatedAnnealingThresholdOptimizer
 
 
