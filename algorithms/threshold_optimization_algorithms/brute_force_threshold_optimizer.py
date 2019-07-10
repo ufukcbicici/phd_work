@@ -39,9 +39,9 @@ class BruteForceOptimizer(ThresholdOptimizer):
     def sample_random_states(self):
         generated_samples = 0
         while True:
-            threshold_states = [self.pick_fully_random_state() for _ in range(self.batchSize)]
+            threshold_states = [self.pick_fully_random_state() for _ in range(self.batchSize * self.threadCount)]
             yield threshold_states
-            generated_samples += self.batchSize
+            generated_samples += self.batchSize * self.threadCount
             if generated_samples >= self.sampleCount:
                 break
 

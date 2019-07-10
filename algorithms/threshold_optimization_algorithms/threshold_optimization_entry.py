@@ -28,7 +28,8 @@ def main():
                                                      label_list=label_list, branch_probs=branch_probs_dict,
                                                      activations=activations_dict, posterior_probs=posterior_probs_dict)
         multipath_calculators.append(multipath_calculator)
-    sa_optimizer = SimulatedAnnealingUniformOptimizer(network=tree, max_num_of_iterations=max_num_of_iterations,
+    sa_optimizer = SimulatedAnnealingUniformOptimizer(run_id=run_id,
+                                                      network=tree, max_num_of_iterations=max_num_of_iterations,
                                                       annealing_schedule=annealing_schedule,
                                                       balance_coefficient=balance_coefficient,
                                                       use_weighted_scoring=use_weighted_scoring,
@@ -36,10 +37,10 @@ def main():
                                                       verbose=True, neighbor_volume_ratio=0.1)
     # sa_optimizer.run()
 
-    bf_optimizer = BruteForceOptimizer(network=tree, sample_count=brute_force_sample_count,
+    bf_optimizer = BruteForceOptimizer(run_id=run_id, network=tree, sample_count=brute_force_sample_count,
                                        multipath_score_calculators=multipath_calculators,
                                        balance_coefficient=balance_coefficient,
                                        use_weighted_scoring=use_weighted_scoring,
-                                       thread_count=8, verbose=True, batch_size=1000)
+                                       thread_count=8, verbose=True, batch_size=100)
     bf_optimizer.run()
     print("X")
