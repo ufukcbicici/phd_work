@@ -1,7 +1,5 @@
 import threading
 
-import numpy as np
-
 from algorithms.threshold_optimization_algorithms.threshold_optimizer import ThresholdOptimizer
 from auxillary.general_utility_funcs import UtilityFuncs
 
@@ -21,6 +19,10 @@ class BruteForceOptimizer(ThresholdOptimizer):
                     self.optimizer.calculate_threshold_score(threshold_state=threshold_state)
                 if self.bestResult is None or score >= self.bestResult[1]:
                     self.bestResult = (threshold_state, score, accuracy, computation_overload)
+            if self.optimizer.verbose:
+                print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
+                    self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3],
+                    self.bestResult[4]))
 
     def __init__(self, network, sample_count, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
                  verbose, thread_count=1, batch_size=10000):
@@ -40,6 +42,7 @@ class BruteForceOptimizer(ThresholdOptimizer):
                 break
 
     def run(self):
+        all_results = []
         for sampled_thresholds in self.sample_random_states():
             thread_to_thresholds_dict = UtilityFuncs.distribute_evenly_to_threads(num_of_threads=self.threadCount,
                                                                                   list_to_distribute=sampled_thresholds)
@@ -51,9 +54,10 @@ class BruteForceOptimizer(ThresholdOptimizer):
                                                                                   thread_id],
                                                                               optimizer=self)
                 threads_dict[thread_id].start()
-            all_results = []
             for thread in threads_dict.values():
                 thread.join()
             for thread in threads_dict.values():
-                all_results.extend(thread.bestResult)
-
+                all_results.append(thread.bestResult)
+        for result in all_results:
+            print("threshold_state:{0} score:{1} accuracy:{2} computation_overload:{3}".format(
+                result[0], result[1], result[2], result[3], result[4]))
