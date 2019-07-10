@@ -65,6 +65,16 @@ class FastTreeNetwork(TreeNetwork):
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
 
+    @staticmethod
+    def get_mock_tree(degree_list):
+        tree = FastTreeNetwork(node_build_funcs=None, grad_func=None, hyperparameter_func=None,
+                               residue_func=None, summary_func=None, degree_list=degree_list, dataset=None)
+        # Build the tree topologically and create the Tensorflow placeholders
+        tree.build_tree()
+        # Build symbolic networks
+        tree.topologicalSortedNodes = tree.dagObject.get_topological_sort()
+        return tree
+
     def prepare_evaluation_dictionary(self):
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:

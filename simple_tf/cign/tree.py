@@ -20,7 +20,7 @@ class TreeNetwork:
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list, dataset):
         self.dagObject = Dag()
         self.nodeBuildFuncs = node_build_funcs
-        self.depth = len(self.nodeBuildFuncs)
+        self.depth = len(degree_list) + 1
         self.nodes = {}
         self.topologicalSortedNodes = []
         self.gradFunc = grad_func
@@ -28,14 +28,23 @@ class TreeNetwork:
         self.residueFunc = residue_func
         self.summaryFunc = summary_func
         self.degreeList = degree_list
-        self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
-                                         shape=(None, dataset.get_image_size(),
-                                                dataset.get_image_size(),
-                                                dataset.get_num_of_channels()),
-                                         name="dataTensor")
-        self.labelTensor = tf.placeholder(tf.int64, shape=(None,), name="labelTensor")
-        self.oneHotLabelTensor = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
-                                                shape=(None, dataset.get_label_count()), name="oneHotLabelTensor")
+        if dataset is not None:
+            self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
+                                             shape=(None, dataset.get_image_size(),
+                                                    dataset.get_image_size(),
+                                                    dataset.get_num_of_channels()),
+                                             name="dataTensor")
+            self.labelTensor = tf.placeholder(tf.int64, shape=(None,), name="labelTensor")
+            self.oneHotLabelTensor = tf.placeholder(dtype=GlobalConstants.DATA_TYPE,
+                                                    shape=(None, dataset.get_label_count()), name="oneHotLabelTensor")
+            self.labelCount = dataset.get_label_count()
+            self.numChannels = dataset.get_num_of_channels()
+        else:
+            self.dataTensor = None
+            self.labelTensor = None
+            self.oneHotLabelTensor = None
+            self.labelCount = None
+            self.numChannels = None
         self.indicesTensor = tf.placeholder(tf.int64, shape=(None,), name="indicesTensor")
         self.filteredMask = tf.placeholder(dtype=tf.bool, shape=(None,), name="filteredMask")
         self.coarseLabelTensor = tf.placeholder(tf.int64, shape=(None,), name="coarseLabelTensor")
@@ -75,8 +84,6 @@ class TreeNetwork:
         self.learningRateCalculator = GlobalConstants.LEARNING_RATE_CALCULATOR
         self.decisionLossCoefficientCalculator = None
         self.isBaseline = None
-        self.labelCount = dataset.get_label_count()
-        self.numChannels = dataset.get_num_of_channels()
         # Algorithms
         self.modeTracker = ModeTracker(network=self)
         self.accuracyCalculator = AccuracyCalculator(network=self)
