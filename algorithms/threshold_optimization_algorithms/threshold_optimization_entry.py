@@ -40,6 +40,6 @@ def main():
                                        multipath_score_calculators=multipath_calculators,
                                        balance_coefficient=balance_coefficient,
                                        use_weighted_scoring=use_weighted_scoring,
-                                       thread_count=8, verbose=True, batch_size=10000)
+                                       thread_count=8, verbose=True, batch_size=1000)
     bf_optimizer.run()
     print("X")

@@ -19,7 +19,7 @@ class BruteForceOptimizer(ThresholdOptimizer):
                     self.optimizer.calculate_threshold_score(threshold_state=threshold_state)
                 if self.bestResult is None or score >= self.bestResult[1]:
                     self.bestResult = (threshold_state, score, accuracy, computation_overload)
-                if self.optimizer.verbose and (idx + 1) % 100 == 0:
+                if self.optimizer.verbose and (idx + 1) % 1000 == 0:
                     print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
                         self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3]))
             print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
@@ -44,7 +44,9 @@ class BruteForceOptimizer(ThresholdOptimizer):
 
     def run(self):
         all_results = []
+        iteration = 0
         for sampled_thresholds in self.sample_random_states():
+            print("Iteration:{0}".format(iteration))
             thread_to_thresholds_dict = UtilityFuncs.distribute_evenly_to_threads(num_of_threads=self.threadCount,
                                                                                   list_to_distribute=sampled_thresholds)
 
@@ -59,6 +61,7 @@ class BruteForceOptimizer(ThresholdOptimizer):
                 thread.join()
             for thread in threads_dict.values():
                 all_results.append(thread.bestResult)
+            iteration += 1
         for result in all_results:
             print("threshold_state:{0} score:{1} accuracy:{2} computation_overload:{3}".format(
                 result[0], result[1], result[2], result[3]))
