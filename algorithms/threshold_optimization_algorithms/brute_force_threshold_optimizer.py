@@ -14,15 +14,18 @@ class BruteForceOptimizer(ThresholdOptimizer):
             self.bestResult = None
 
         def run(self):
-            for threshold_state in self.thresholdList:
+            for idx, threshold_state in enumerate(self.thresholdList):
                 score, accuracy, computation_overload = \
                     self.optimizer.calculate_threshold_score(threshold_state=threshold_state)
                 if self.bestResult is None or score >= self.bestResult[1]:
                     self.bestResult = (threshold_state, score, accuracy, computation_overload)
-            if self.optimizer.verbose:
-                print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
-                    self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3],
-                    self.bestResult[4]))
+                if self.optimizer.verbose and (idx + 1) % 100 == 0:
+                    print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
+                        self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3],
+                        self.bestResult[4]))
+            print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
+                self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3],
+                self.bestResult[4]))
 
     def __init__(self, network, sample_count, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
                  verbose, thread_count=1, batch_size=10000):
