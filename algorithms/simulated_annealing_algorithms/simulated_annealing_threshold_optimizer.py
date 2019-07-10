@@ -89,6 +89,8 @@ class SimulatedAnnealingThresholdOptimizer:
                     print("Candidate accepted.")
                 curr_state = candidate_state
                 curr_score = candidate_score
+                curr_accuracy = candidate_accuracy
+                curr_computation_overload = candidate_computation_overload
             else:
                 if self.verbose:
                     print("Candidate rejected.")

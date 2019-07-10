@@ -5,8 +5,10 @@ from algorithms.simulated_annealing_algorithms.simulated_annealing_threshold_opt
 
 
 class SimulatedAnnealingUniformOptimizer(SimulatedAnnealingThresholdOptimizer):
-    def __init__(self, network, max_num_of_iterations, neighbor_volume_ratio):
-        super().__init__(network, max_num_of_iterations)
+    def __init__(self, network, max_num_of_iterations, annealing_schedule, balance_coefficient, use_weighted_scoring,
+                 multipath_score_calculators, verbose, neighbor_volume_ratio):
+        super().__init__(network, max_num_of_iterations, annealing_schedule, balance_coefficient, use_weighted_scoring,
+                         multipath_score_calculators, verbose)
         self.neighborVolumeRatio = neighbor_volume_ratio
 
     def get_neighbor(self, threshold_state):

@@ -2,7 +2,7 @@ import threading
 import numpy as np
 
 
-class MultipathCalculatorV2():
+class MultipathCalculatorV2:
     class BranchingInfo:
         def __init__(self, branching_probs, routing_matrix, path_probs):
             self.branchingProbs = branching_probs
@@ -19,10 +19,8 @@ class MultipathCalculatorV2():
             # res_method_0 = (0, thresholds_dict, accuracy_simple_avg, total_leaves_evaluated, computation_overload)
             # res_method_1 = (1, thresholds_dict, accuracy_weighted_avg, total_leaves_evaluated, computation_overload)
 
-    def __init__(self, run_id, iteration, thresholds_list,
+    def __init__(self, thresholds_list,
                  network, sample_count, label_list, branch_probs, activations, posterior_probs):
-        self.runId = run_id
-        self.iteration = iteration
         self.thresholdsList = thresholds_list
         # self.thresholdsDict structure: (node_index, thresholds[] -> len(child_nodes) sized array.
         # Thresholds are sorted according to the child node indices:

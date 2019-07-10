@@ -119,8 +119,7 @@ class SimpleAccuracyCalculator:
                     for i in range(len(leaf_true_labels_dict))])
         label_list = list(leaf_true_labels_dict.values())[0]
         sample_count = label_list.shape[0]
-        multipath_calculator = MultipathCalculatorV2(run_id=run_id, iteration=iteration,
-                                                     thresholds_list=thresholds, network=network,
+        multipath_calculator = MultipathCalculatorV2(thresholds_list=thresholds, network=network,
                                                      sample_count=sample_count, label_list=label_list,
                                                      branch_probs=branch_probs_dict,
                                                      activations=activations_dict,
