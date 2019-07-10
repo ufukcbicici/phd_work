@@ -21,11 +21,9 @@ class BruteForceOptimizer(ThresholdOptimizer):
                     self.bestResult = (threshold_state, score, accuracy, computation_overload)
                 if self.optimizer.verbose and (idx + 1) % 100 == 0:
                     print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
-                        self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3],
-                        self.bestResult[4]))
+                        self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3]))
             print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
-                self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3],
-                self.bestResult[4]))
+                self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3]))
 
     def __init__(self, network, sample_count, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
                  verbose, thread_count=1, batch_size=10000):
@@ -63,4 +61,4 @@ class BruteForceOptimizer(ThresholdOptimizer):
                 all_results.append(thread.bestResult)
         for result in all_results:
             print("threshold_state:{0} score:{1} accuracy:{2} computation_overload:{3}".format(
-                result[0], result[1], result[2], result[3], result[4]))
+                result[0], result[1], result[2], result[3]))
