@@ -2,7 +2,9 @@ import numpy as np
 
 
 class ThresholdOptimizer:
-    def __init__(self, network, multipath_score_calculators, balance_coefficient, use_weighted_scoring, verbose):
+    def __init__(self, run_id, network, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
+                 verbose):
+        self.runId = run_id
         self.network = network
         self.multipathScoreCalculators = multipath_score_calculators
         self.balanceCoefficient = balance_coefficient

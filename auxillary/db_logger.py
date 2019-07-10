@@ -15,6 +15,7 @@ class DbLogger:
     compressionTestsTable = "compression_tests_table"
     multipath_results_table = "multipath_results"
     multipath_results_table_v2 = "multipath_results_v2"
+    threshold_optimization = "threshold_optimization"
     sample_wise_table = "sample_wise_results"
 
     # DGX DB 1

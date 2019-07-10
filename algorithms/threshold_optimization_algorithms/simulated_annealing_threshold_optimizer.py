@@ -4,9 +4,11 @@ from algorithms.threshold_optimization_algorithms.threshold_optimizer import Thr
 
 
 class SimulatedAnnealingThresholdOptimizer(ThresholdOptimizer):
-    def __init__(self, network, max_num_of_iterations, annealing_schedule, balance_coefficient, use_weighted_scoring,
+    def __init__(self, run_id, network, max_num_of_iterations, annealing_schedule, balance_coefficient,
+                 use_weighted_scoring,
                  multipath_score_calculators, verbose):
-        super().__init__(network, multipath_score_calculators, balance_coefficient, use_weighted_scoring, verbose)
+        super().__init__(run_id, network, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
+                         verbose)
         self.maxNumOfIterations = max_num_of_iterations
         self.annealingSchedule = annealing_schedule
 

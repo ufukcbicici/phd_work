@@ -1,6 +1,7 @@
 import threading
 
 from algorithms.threshold_optimization_algorithms.threshold_optimizer import ThresholdOptimizer
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 
 
@@ -25,9 +26,11 @@ class BruteForceOptimizer(ThresholdOptimizer):
             print("Thread ID:{0} threshold_state:{1} score:{2} accuracy:{3} computation_overload:{4}".format(
                 self.threadId, self.bestResult[0], self.bestResult[1], self.bestResult[2], self.bestResult[3]))
 
-    def __init__(self, network, sample_count, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
+    def __init__(self, run_id, network, sample_count, multipath_score_calculators, balance_coefficient,
+                 use_weighted_scoring,
                  verbose, thread_count=1, batch_size=10000):
-        super().__init__(network, multipath_score_calculators, balance_coefficient, use_weighted_scoring, verbose)
+        super().__init__(run_id, network, multipath_score_calculators, balance_coefficient,
+                         use_weighted_scoring, verbose)
         self.network = network
         self.sampleCount = sample_count
         self.threadCount = thread_count
@@ -43,7 +46,7 @@ class BruteForceOptimizer(ThresholdOptimizer):
                 break
 
     def run(self):
-        all_results = []
+        # all_results = []
         iteration = 0
         for sampled_thresholds in self.sample_random_states():
             print("Iteration:{0}".format(iteration))
@@ -59,9 +62,15 @@ class BruteForceOptimizer(ThresholdOptimizer):
                 threads_dict[thread_id].start()
             for thread in threads_dict.values():
                 thread.join()
+            batch_results = []
             for thread in threads_dict.values():
-                all_results.append(thread.bestResult)
+                score = thread.bestResult[1]
+                accuracy = thread.bestResult[2]
+                computation_overload = thread.bestResult[3]
+                batch_results.append((self.runId, self.balanceCoefficient, int(self.useWeightedScoring),
+                                      score, accuracy, computation_overload))
             iteration += 1
-        for result in all_results:
-            print("threshold_state:{0} score:{1} accuracy:{2} computation_overload:{3}".format(
-                result[0], result[1], result[2], result[3]))
+            DbLogger.write_into_table(rows=batch_results, table=DbLogger.threshold_optimization, col_count=6)
+        # for result in batch_results:
+        #     print("threshold_state:{0} score:{1} accuracy:{2} computation_overload:{3}".format(
+        #         result[0], result[1], result[2], result[3]))
