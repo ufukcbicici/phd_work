@@ -178,7 +178,8 @@ class FastTreeNetwork(TreeNetwork):
         self.build_regularization_loss()
         # Final Loss
         self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
-        self.build_optimizer()
+        if not GlobalConstants.USE_MULTI_GPU:
+            self.build_optimizer()
         self.prepare_evaluation_dictionary()
 
     def apply_decision(self, node, branching_feature):
@@ -189,12 +190,29 @@ class FastTreeNetwork(TreeNetwork):
                                                                                tf.bool))
         ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
         node_degree = self.degreeList[node.depth]
-        hyperplane_weights = tf.Variable(
-            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE),
-            name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
-        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                        name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
+        if GlobalConstants.USE_MULTI_GPU:
+            # MultiGPU OK
+            hyperplane_weights = UtilityFuncs.create_variable(
+                name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node),
+                shape=[ig_feature_size, node_degree],
+                dtype=GlobalConstants.DATA_TYPE,
+                initializer=tf.truncated_normal(
+                    [ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                    dtype=GlobalConstants.DATA_TYPE))
+            # MultiGPU OK
+            hyperplane_biases = UtilityFuncs.create_variable(
+                name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node),
+                shape=[node_degree],
+                dtype=GlobalConstants.DATA_TYPE,
+                initializer=tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE))
+        else:
+            hyperplane_weights = tf.Variable(
+                tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                    dtype=GlobalConstants.DATA_TYPE),
+                name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
+            hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                            name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
+
         activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
@@ -219,25 +237,53 @@ class FastTreeNetwork(TreeNetwork):
                                                               name="Mask_with_threshold_{0}".format(child_index)), [-1])
             mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                                          name="Mask_without_threshold_{0}".format(child_index)), [-1])
-            mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            if GlobalConstants.USE_MULTI_GPU:
+                with tf.device("/device:CPU:0"):
+                    mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            else:
+                mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
     def apply_decision_with_unified_batch_norm(self, node, branching_feature):
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
-        normed_x = CustomBatchNormAlgorithms.masked_batch_norm(x=branching_feature, masked_x=masked_branching_feature,
-                                                               network=self, node=node,
-                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                                               iteration=self.iterationHolder,
-                                                               is_training_phase=self.isTrain)
-        ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
-        node_degree = self.degreeList[node.depth]
-        hyperplane_weights = tf.Variable(
-            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE),
-            name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
-        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                        name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
+        if GlobalConstants.USE_MULTI_GPU:
+            normed_x = CustomBatchNormAlgorithms.batch_norm_multi_gpu_v2(x=branching_feature,
+                                                                         masked_x=masked_branching_feature,
+                                                                         network=self, node=node,
+                                                                         momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                                         is_training=self.isTrain)
+            ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
+            node_degree = self.degreeList[node.depth]
+            # MultiGPU OK
+            hyperplane_weights = UtilityFuncs.create_variable(
+                name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node),
+                shape=[ig_feature_size, node_degree],
+                dtype=GlobalConstants.DATA_TYPE,
+                initializer=tf.truncated_normal(
+                    [ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                    dtype=GlobalConstants.DATA_TYPE))
+            # MultiGPU OK
+            hyperplane_biases = UtilityFuncs.create_variable(
+                name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node),
+                shape=[node_degree],
+                dtype=GlobalConstants.DATA_TYPE,
+                initializer=tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE))
+        else:
+            normed_x = CustomBatchNormAlgorithms.masked_batch_norm(x=branching_feature,
+                                                                   masked_x=masked_branching_feature,
+                                                                   network=self, node=node,
+                                                                   momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                                   iteration=self.iterationHolder,
+                                                                   is_training_phase=self.isTrain)
+            ig_feature_size = node.hOpsList[-1].get_shape().as_list()[-1]
+            node_degree = self.degreeList[node.depth]
+            hyperplane_weights = tf.Variable(
+                tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                    dtype=GlobalConstants.DATA_TYPE),
+                name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
+            hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                            name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
         activations = tf.matmul(normed_x, hyperplane_weights) + hyperplane_biases
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
@@ -268,7 +314,11 @@ class FastTreeNetwork(TreeNetwork):
             mask_without_threshold = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int64),
                                                          name="Mask_without_threshold_{0}".format(child_index)), [-1])
             mask_without_threshold = tf.logical_and(mask_without_threshold, node.filteredMask)
-            mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            if GlobalConstants.USE_MULTI_GPU:
+                with tf.device("/device:CPU:0"):
+                    mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
+            else:
+                mask_tensor = tf.where(self.useThresholding > 0, x=mask_with_threshold, y=mask_without_threshold)
             node.maskTensors[child_index] = mask_tensor
             node.masksWithoutThreshold[child_index] = mask_without_threshold
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
@@ -291,22 +341,39 @@ class FastTreeNetwork(TreeNetwork):
             mask_tensor = parent_node.maskTensors[node.index]
             if GlobalConstants.USE_UNIFIED_BATCH_NORM:
                 mask_without_threshold = parent_node.masksWithoutThreshold[node.index]
-            mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
-                                   tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
+            if GlobalConstants.USE_MULTI_GPU:
+                with tf.device("/device:CPU:0"):
+                    mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
+                                           tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
+            else:
+                mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
+                                       tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
             sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
-            node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
+            if GlobalConstants.USE_MULTI_GPU:
+                with tf.device("/device:CPU:0"):
+                    node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
+            else:
+                node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
             # Mask all inputs: F channel, H  channel, activations from ancestors, labels
             parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
             parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
             for k, v in parent_node.activationsDict.items():
                 node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
-            if GlobalConstants.USE_UNIFIED_BATCH_NORM:
-                node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
+            if GlobalConstants.USE_MULTI_GPU:
+                with tf.device("/device:CPU:0"):
+                    node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+                    node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
+                    node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
+                    if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                        node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
+            else:
+                node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+                node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
+                node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
+                if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+                    node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
             return parent_F, parent_H
 
     # MultiGPU OK

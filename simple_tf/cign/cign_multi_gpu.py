@@ -1,16 +1,11 @@
-import tensorflow as tf
 import numpy as np
-
-from collections import deque
+import tensorflow as tf
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from auxillary.general_utility_funcs import UtilityFuncs
+from auxillary.parameters import FixedParameter, DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.cign.fast_tree_multi_gpu import FastTreeMultiGpu
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
-from auxillary.parameters import FixedParameter, DiscreteParameter, DecayingParameter
-from simple_tf.info_gain import InfoGainLoss
-from simple_tf.node import Node
 
 
 class CignMultiGpu(FastTreeNetwork):
@@ -69,12 +64,12 @@ class CignMultiGpu(FastTreeNetwork):
                         with tf.name_scope("tower_{0}".format(tower_id)):
                             print(device_str)
                             # Build a Multi GPU supporting CIGN
-                            tower_cign = FastTreeMultiGpu(
+                            tower_cign = FastTreeNetwork(
                                 node_build_funcs=self.nodeBuildFuncs,
-                                grad_func=self.gradFunc,
-                                hyperparameter_func=self.hyperparameterFunc,
-                                residue_func=self.residueFunc,
-                                summary_func=self.summaryFunc,
+                                grad_func=None,
+                                hyperparameter_func=None,
+                                residue_func=None,
+                                summary_func=None,
                                 degree_list=self.degreeList,
                                 dataset=self.dataset)
                             tower_cign.build_network()
@@ -100,8 +95,8 @@ class CignMultiGpu(FastTreeNetwork):
                                                                            global_step=self.globalCounter)
         # Unify all evaluation tensors across towers
         self.prepare_evaluation_dictionary()
-        placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
-        all_vars = tf.global_variables()
+        # placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
+        # all_vars = tf.global_variables()
         # Assert that all variables are created on the CPU memory.
         # assert all(["CPU" in var.device for var in all_vars])
         self.dataset = None

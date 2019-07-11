@@ -339,6 +339,11 @@ def cifar100_multi_gpu_training():
         dataset = CifarDataSet(session=sess,
                                validation_sample_count=0, load_validation_from=None)
         dataset.set_curr_session(sess=sess)
+
+
+
+
+
         # dataset = CifarDataSet(validation_sample_count=0, load_validation_from=None)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
