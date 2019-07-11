@@ -115,9 +115,9 @@ class SimpleAccuracyCalculator:
                     child_count = len(network.dagObject.children(node=node))
                     t_dict[node.index] = threshold * np.ones(shape=(child_count,))
             thresholds.append(t_dict)
-        assert all([np.array_equal(list(leaf_true_labels_dict.values())[0], list(leaf_true_labels_dict.values())[i])
-                    for i in range(len(leaf_true_labels_dict))])
-        label_list = list(leaf_true_labels_dict.values())[0]
+        leaf_labels = list(leaf_true_labels_dict.values())
+        assert all([np.array_equal(leaf_labels[0], leaf_labels[i]) for i in range(len(leaf_labels))])
+        label_list = leaf_labels[0]
         sample_count = label_list.shape[0]
         multipath_calculator = MultipathCalculatorV2(thresholds_list=thresholds, network=network,
                                                      sample_count=sample_count, label_list=label_list,

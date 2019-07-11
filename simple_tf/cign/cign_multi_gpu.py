@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
+from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import FixedParameter, DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
@@ -389,9 +390,11 @@ class CignMultiGpu(FastTreeNetwork):
                 network.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                                                                                    dataset_type=dataset_type)
             elif calculation_type == AccuracyCalcType.multi_path:
-                network.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
-                                                                        dataset_type=dataset_type, run_id=run_id,
-                                                                        iteration=iteration)
+                SimpleAccuracyCalculator.calculate_accuracy_multipath(network=network, sess=sess,
+                                                                      dataset=dataset,
+                                                                      dataset_type=dataset_type,
+                                                                      run_id=run_id,
+                                                                      iteration=iteration)
             else:
                 raise NotImplementedError()
         else:
