@@ -1,7 +1,5 @@
 import tensorflow as tf
 import numpy as np
-from tensorflow.python.client import device_lib
-from tensorflow.contrib.nccl.ops import gen_nccl_ops
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -47,7 +45,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 #
 #     print("X")
 from simple_tf.global_params import GlobalConstants
-from simple_tf.resnet_experiments.resnet_generator import ResnetGenerator
+from algorithms.resnet.resnet_generator import ResnetGenerator
 
 
 def experiment_with_towers():

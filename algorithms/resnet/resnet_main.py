@@ -19,9 +19,9 @@ import time
 import six
 import sys
 
-import simple_tf.resnet_experiments.cifar_input as cifar_input
+import algorithms.resnet.cifar_input as cifar_input
 import numpy as np
-import simple_tf.resnet_experiments.resnet_model as resnet_model
+import algorithms.resnet.resnet_model as resnet_model
 import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS

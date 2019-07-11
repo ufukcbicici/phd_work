@@ -2,8 +2,7 @@ import tensorflow as tf
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
-from simple_tf.resnet_experiments.resnet_generator import ResnetGenerator
-from data_handling.cifar_dataset import CifarDataSet
+from algorithms.resnet.resnet_generator import ResnetGenerator
 
 
 def baseline(node, network, variables=None):
