@@ -8,7 +8,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter
 from data_handling.cifar_dataset import CifarDataSet
-from simple_tf.cifar_nets import cign_resnet
+from simple_tf.cifar_nets import cifar100_cign
 from simple_tf.cign.cign_multi_gpu import CignMultiGpu
 from simple_tf.cign.cign_random_sampling import CignRandomSample
 from simple_tf.cign.fast_tree import FastTreeNetwork
@@ -118,30 +118,30 @@ def get_network(dataset):
         print("USING SAMPLING CIGN!!!")
         if not GlobalConstants.USE_RANDOM_SAMPLING:
             network = CignWithSampling(
-                node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
-                grad_func=cign_resnet.grad_func,
-                hyperparameter_func=cign_resnet.hyperparameter_func_sampling,
-                residue_func=cign_resnet.residue_network_func,
-                summary_func=cign_resnet.tensorboard_func,
+                node_build_funcs=[cifar100_cign.root_func, cifar100_cign.l1_func, cifar100_cign.leaf_func],
+                grad_func=cifar100_cign.grad_func,
+                hyperparameter_func=cifar100_cign.hyperparameter_func_sampling,
+                residue_func=cifar100_cign.residue_network_func,
+                summary_func=cifar100_cign.tensorboard_func,
                 degree_list=GlobalConstants.RESNET_TREE_DEGREES,
                 dataset=dataset)
         else:
             print("USING RANDOM SAMPLING CIGN!!!")
             network = CignRandomSample(
-                node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
-                grad_func=cign_resnet.grad_func,
-                hyperparameter_func=cign_resnet.hyperparameter_func_sampling,
-                residue_func=cign_resnet.residue_network_func,
-                summary_func=cign_resnet.tensorboard_func,
+                node_build_funcs=[cifar100_cign.root_func, cifar100_cign.l1_func, cifar100_cign.leaf_func],
+                grad_func=cifar100_cign.grad_func,
+                hyperparameter_func=cifar100_cign.hyperparameter_func_sampling,
+                residue_func=cifar100_cign.residue_network_func,
+                summary_func=cifar100_cign.tensorboard_func,
                 degree_list=GlobalConstants.RESNET_TREE_DEGREES,
                 dataset=dataset)
     else:
         network = FastTreeNetwork(
-            node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
-            grad_func=cign_resnet.grad_func,
-            hyperparameter_func=cign_resnet.hyperparameter_func,
-            residue_func=cign_resnet.residue_network_func,
-            summary_func=cign_resnet.tensorboard_func,
+            node_build_funcs=[cifar100_cign.root_func, cifar100_cign.l1_func, cifar100_cign.leaf_func],
+            grad_func=cifar100_cign.grad_func,
+            hyperparameter_func=cifar100_cign.hyperparameter_func,
+            residue_func=cifar100_cign.residue_network_func,
+            summary_func=cifar100_cign.tensorboard_func,
             degree_list=GlobalConstants.RESNET_TREE_DEGREES,
             dataset=dataset)
     return network
@@ -353,11 +353,11 @@ def cifar100_multi_gpu_training():
                                                                                (100000, 0.0001)])
         # network = get_network(dataset=dataset)
         network = CignMultiGpu(
-            node_build_funcs=[cign_resnet.root_func, cign_resnet.l1_func, cign_resnet.leaf_func],
-            grad_func=cign_resnet.grad_func,
-            hyperparameter_func=cign_resnet.hyperparameter_func,
-            residue_func=cign_resnet.residue_network_func,
-            summary_func=cign_resnet.tensorboard_func,
+            node_build_funcs=[cifar100_cign.root_func, cifar100_cign.l1_func, cifar100_cign.leaf_func],
+            grad_func=cifar100_cign.grad_func,
+            hyperparameter_func=cifar100_cign.hyperparameter_func,
+            residue_func=cifar100_cign.residue_network_func,
+            summary_func=cifar100_cign.tensorboard_func,
             degree_list=GlobalConstants.RESNET_TREE_DEGREES,
             dataset=dataset)
         network.build_network()

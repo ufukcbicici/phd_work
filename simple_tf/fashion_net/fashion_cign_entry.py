@@ -9,7 +9,7 @@ from auxillary.parameters import DiscreteParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.fashion_net import fashion_cign_connected_v2
-from simple_tf.fashion_net.fashion_cign_connected_v2 import FashionCignV2
+from simple_tf.fashion_net.fashion_cign_connected_v2 import FashionCignLite
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from auxillary.constants import DatasetTypes
 
@@ -39,7 +39,7 @@ def fashion_net_training():
             sess = tf.Session(config=config)
         else:
             sess = tf.Session()
-        network = FashionCignV2(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
+        network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
         network.set_training_parameters()
         network.build_network()
         init = tf.global_variables_initializer()

@@ -165,7 +165,7 @@ class FastTreeNetwork(TreeNetwork):
         # Build all symbolic networks in each node
         for node in self.topologicalSortedNodes:
             print("Building Node {0}".format(node.index))
-            self.nodeBuildFuncs[node.depth](node=node)
+            self.nodeBuildFuncs[node.depth](network=self, node=node)
         # Build the residue loss
         # self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
