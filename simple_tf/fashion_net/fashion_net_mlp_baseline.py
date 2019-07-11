@@ -1,5 +1,5 @@
 import tensorflow as tf
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 
 FIRST_LAYER = 256
 SECOND_LAYER = 128

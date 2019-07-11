@@ -3,7 +3,7 @@ import numpy as np
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 # USE CLASS BALANCING
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 
 
 class ClassWeightedTree(FastTreeNetwork):

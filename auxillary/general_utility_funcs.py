@@ -6,7 +6,7 @@ from os.path import isfile, join
 import itertools
 
 from auxillary.parameters import DecayingParameter, FixedParameter
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 from tensorflow.python.client import device_lib
 
 

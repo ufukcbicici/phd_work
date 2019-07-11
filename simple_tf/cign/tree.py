@@ -8,7 +8,7 @@ from algorithms.variable_manager import VariableManager
 from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.uncategorized.global_params import GlobalConstants, GradientType
+from simple_tf.global_params import GlobalConstants, GradientType
 from algorithms.info_gain import InfoGainLoss
 from simple_tf.uncategorized.node import Node
 from collections import deque

@@ -1,102 +1,23 @@
 import tensorflow as tf
 import numpy as np
-from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DiscreteParameter, FixedParameter
-from simple_tf.cign.fast_tree import FastTreeNetwork
+
+from auxillary.parameters import DiscreteParameter, FixedParameter, DecayingParameter
+from simple_tf.cifar_nets.cifar100_cign import Cifar100_Cign
+from simple_tf.cign.cign_with_sampling import CignWithSampling
 from simple_tf.global_params import GlobalConstants
-from algorithms.resnet.resnet_generator import ResnetGenerator
 
 
-class Cifar100_Baseline(FastTreeNetwork):
-    def __init__(self, dataset):
-        node_build_funcs = [Cifar100_Baseline.baseline]
-        super().__init__(node_build_funcs, None, None, None, None, [], dataset)
-
-    @staticmethod
-    def baseline(network, node):
-        network.mask_input_nodes(node=node)
-        strides = GlobalConstants.RESNET_HYPERPARAMS.strides
-        activate_before_residual = GlobalConstants.RESNET_HYPERPARAMS.activate_before_residual
-        filters = GlobalConstants.RESNET_HYPERPARAMS.num_of_features_per_block
-        num_of_units_per_block = GlobalConstants.RESNET_HYPERPARAMS.num_residual_units
-        relu_leakiness = GlobalConstants.RESNET_HYPERPARAMS.relu_leakiness
-        first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_size
-
-        # Input layer
-        x = ResnetGenerator.get_input(input=network.dataTensor, out_filters=filters[0],
-                                      first_conv_filter_size=first_conv_filter_size)
-        # Block 1
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_0", node=node)):
-            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[0], out_filter=filters[1],
-                                                    stride=ResnetGenerator.stride_arr(strides[0]),
-                                                    activate_before_residual=activate_before_residual[0],
-                                                    relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        for i in range(num_of_units_per_block-1):
-            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_{0}".format(i + 1), node=node)):
-                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1],
-                                                        out_filter=filters[1],
-                                                        stride=ResnetGenerator.stride_arr(1),
-                                                        activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # Block 2
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_2_0", node=node)):
-            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1], out_filter=filters[2],
-                                                    stride=ResnetGenerator.stride_arr(strides[1]),
-                                                    activate_before_residual=activate_before_residual[1],
-                                                    relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        for i in range(num_of_units_per_block-1):
-            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_2_{0}".format(i + 1), node=node)):
-                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[2],
-                                                        out_filter=filters[2],
-                                                        stride=ResnetGenerator.stride_arr(1),
-                                                        activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # Block 3
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_3_0", node=node)):
-            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[2], out_filter=filters[3],
-                                                    stride=ResnetGenerator.stride_arr(strides[2]),
-                                                    activate_before_residual=activate_before_residual[2],
-                                                    relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        for i in range(num_of_units_per_block-1):
-            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_3_{0}".format(i + 1), node=node)):
-                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[3],
-                                                        out_filter=filters[3],
-                                                        stride=ResnetGenerator.stride_arr(1),
-                                                        activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # Logit Layers
-        with tf.variable_scope('unit_last'):
-            x = ResnetGenerator.get_output(x=x, is_train=network.isTrain, leakiness=relu_leakiness,
-                                           bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        net_shape = x.get_shape().as_list()
-        # assert len(net_shape) == 4
-        # x = tf.reshape(x, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
-        output = x
-        out_dim = network.labelCount
-        weight = tf.get_variable(
-            name=network.get_variable_name(name="fc_softmax_weights", node=node),
-            shape=[x.get_shape()[1], out_dim],
-            initializer=tf.uniform_unit_scaling_initializer(factor=1.0))
-        bias = tf.get_variable(network.get_variable_name(name="fc_softmax_biases", node=node), [out_dim],
-                               initializer=tf.constant_initializer())
-        # Loss
-        final_feature, logits = network.apply_loss(node=node, final_feature=output,
-                                                   softmax_weights=weight, softmax_biases=bias)
-        # Evaluation
-        node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
-        node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
+class Cifar100_CignSampling(CignWithSampling):
+    def __init__(self, degree_list, dataset):
+        node_build_funcs = [Cifar100_Cign.root_func, Cifar100_Cign.l1_func, Cifar100_Cign.leaf_func]
+        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset)
 
     def get_explanation_string(self):
         total_param_count = 0
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
-        explanation = "Resnet-50 Baseline Tests\n"
+        explanation = "Resnet-50 Sampling CIGN\n"
+        # explanation = "Resnet-50 CIGN Random Sampling Routing Tests\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
         explanation += "Tree Degree:{0}\n".format(GlobalConstants.TREE_DEGREE_LIST)
@@ -187,13 +108,13 @@ class Cifar100_Baseline(FastTreeNetwork):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 300
-        GlobalConstants.EPOCH_COUNT = 300
+        GlobalConstants.TOTAL_EPOCH_COUNT = 600
+        GlobalConstants.EPOCH_COUNT = 600
         GlobalConstants.EPOCH_REPORT_PERIOD = 5
-        GlobalConstants.BATCH_SIZE = 125
-        GlobalConstants.EVAL_BATCH_SIZE = 125
+        GlobalConstants.BATCH_SIZE = 250
+        GlobalConstants.EVAL_BATCH_SIZE = 250
         GlobalConstants.USE_MULTI_GPU = False
-        GlobalConstants.USE_SAMPLING_CIGN = False
+        GlobalConstants.USE_SAMPLING_CIGN = True
         GlobalConstants.USE_RANDOM_SAMPLING = False
         GlobalConstants.INITIAL_LR = 0.1
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
@@ -208,7 +129,27 @@ class Cifar100_Baseline(FastTreeNetwork):
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
-
+        self.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
+                                                                value=kwargs["decision_keep_probability"])
+        # Noise Coefficient
+        self.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
+                                                            decay=0.0,
+                                                            decay_period=1,
+                                                            min_limit=0.0)
         # Decision Loss Coefficient
         self.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
-                                                                value=0.0)
+                                                                value=1.0)
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            # Probability Threshold
+            threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
+            node.probThresholdCalculator = FixedParameter(name=threshold_name, value=0.0)
+            # Softmax Decay
+            decay_name = self.get_variable_name(name="softmax_decay", node=node)
+            node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
+                                                            value=GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL,
+                                                            decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
+                                                            decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
+                                                            min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
+        GlobalConstants.SOFTMAX_TEST_TEMPERATURE = 50.0

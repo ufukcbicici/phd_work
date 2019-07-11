@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 
 
 def build_conv_layer(input, filter_size, num_of_input_channels, num_of_output_channels, name_suffix=""):

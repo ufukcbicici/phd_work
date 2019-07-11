@@ -3,7 +3,7 @@ import numpy as np
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter, DiscreteParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 from algorithms.resnet.resnet_generator import ResnetGenerator
 
 strides = GlobalConstants.RESNET_HYPERPARAMS.strides
@@ -182,9 +182,6 @@ class Cifar100_Cign(FastTreeNetwork):
         total_param_count = 0
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
-        # Tree
-        # explanation = "Resnet-50 CIGN 2 GPUs Parallel Test\n"
-        # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation = "Resnet-50 CIGN Tests\n"
         # explanation = "Resnet-50 CIGN Random Sampling Routing Tests\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
@@ -271,6 +268,8 @@ class Cifar100_Cign(FastTreeNetwork):
         explanation += "\nUse Sampling CIGN:{0}".format(GlobalConstants.USE_SAMPLING_CIGN)
         explanation += "\nUse Random Sampling CIGN:{0}".format(GlobalConstants.USE_RANDOM_SAMPLING)
         explanation += "\nPinning Device:{0}".format(GlobalConstants.GLOBAL_PINNING_DEVICE)
+        explanation += "TRAINING PARAMETERS:\n"
+        explanation += super().get_explanation_string()
         return explanation
 
     def set_training_parameters(self):
@@ -327,5 +326,4 @@ class Cifar100_Cign(FastTreeNetwork):
                                                             decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
                                                             decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
                                                             min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
-        #
         GlobalConstants.SOFTMAX_TEST_TEMPERATURE = 50.0

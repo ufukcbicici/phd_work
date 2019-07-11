@@ -9,7 +9,7 @@ from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cigj.jungle_gumbel_softmax import JungleGumbelSoftmax
 from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
-from simple_tf.uncategorized.global_params import GlobalConstants, AccuracyCalcType
+from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 
 def get_explanation_string(network):

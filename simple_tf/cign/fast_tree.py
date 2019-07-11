@@ -9,7 +9,7 @@ from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.tree import TreeNetwork
-from simple_tf.uncategorized.global_params import GlobalConstants, AccuracyCalcType
+from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 from algorithms.info_gain import InfoGainLoss
 from simple_tf.uncategorized.node import Node
 from auxillary.constants import DatasetTypes
@@ -536,46 +536,19 @@ class FastTreeNetwork(TreeNetwork):
 
     def set_hyperparameters(self, **kwargs):
         pass
-        # GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
-        # GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
-        # if not self.isBaseline:
-        #     GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
-        #     GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
-        #     self.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
-        #                                                             value=kwargs["decision_keep_probability"])
-        #
-        #     # Noise Coefficient
-        #     self.noiseCoefficientCalculator = DecayingParameter(name="noise_coefficient_calculator", value=0.0,
-        #                                                         decay=0.0,
-        #                                                         decay_period=1,
-        #                                                         min_limit=0.0)
-        #     # Decision Loss Coefficient
-        #     # network.decisionLossCoefficientCalculator = DiscreteParameter(name="decision_loss_coefficient_calculator",
-        #     #                                                               value=0.0,
-        #     #                                                               schedule=[(12000, 1.0)])
-        #     self.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
-        #                                                             value=1.0)
-        #     for node in self.topologicalSortedNodes:
-        #         if node.isLeaf:
-        #             continue
-        #         # Probability Threshold
-        #         node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
-        #         initial_value = 1.0 / float(node_degree)
-        #         threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
-        #         # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-        #         #                                                  decay_period=70000,
-        #         #                                                  min_limit=0.4)
-        #         node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
-        #         # Softmax Decay
-        #         decay_name = self.get_variable_name(name="softmax_decay", node=node)
-        #         node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
-        #                                                         value=GlobalConstants.RESNET_SOFTMAX_DECAY_INITIAL,
-        #                                                         decay=GlobalConstants.RESNET_SOFTMAX_DECAY_COEFFICIENT,
-        #                                                         decay_period=GlobalConstants.RESNET_SOFTMAX_DECAY_PERIOD,
-        #                                                         min_limit=GlobalConstants.RESNET_SOFTMAX_DECAY_MIN_LIMIT)
 
     def get_explanation_string(self):
-        pass
+        explanation = ""
+        explanation += "TOTAL_EPOCH_COUNT:{0}\n".format(GlobalConstants.TOTAL_EPOCH_COUNT)
+        explanation += "EPOCH_COUNT:{0}\n".format(GlobalConstants.EPOCH_COUNT)
+        explanation += "EPOCH_REPORT_PERIOD:{0}\n".format(GlobalConstants.EPOCH_REPORT_PERIOD)
+        explanation += "BATCH_SIZE:{0}\n".format(GlobalConstants.BATCH_SIZE)
+        explanation += "EVAL_BATCH_SIZE:{0}\n".format(GlobalConstants.EVAL_BATCH_SIZE)
+        explanation += "USE_MULTI_GPU:{0}\n".format(GlobalConstants.USE_MULTI_GPU)
+        explanation += "USE_SAMPLING_CIGN:{0}\n".format(GlobalConstants.USE_SAMPLING_CIGN)
+        explanation += "USE_RANDOM_SAMPLING:{0}\n".format(GlobalConstants.USE_RANDOM_SAMPLING)
+        explanation += "LR SCHEDULE:{0}\n".format(GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation())
+        return explanation
 
     def print_iteration_info(self, iteration_counter, update_results):
         lr = update_results.lr

@@ -7,7 +7,7 @@ from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cigj.jungle import Jungle
 from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 
 
 class CigjTesting:

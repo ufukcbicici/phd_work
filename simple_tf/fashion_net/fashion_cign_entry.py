@@ -5,7 +5,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.fashion_net.fashion_cign_connected_v2 import FashionCignLite
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 from auxillary.constants import DatasetTypes
 
 

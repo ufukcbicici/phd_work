@@ -3,7 +3,7 @@ from data_handling.mnist_data_set import MnistDataSet
 import tensorflow as tf
 import numpy as np
 
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 
 
 def batch_norm_2(x, decay, g, b):

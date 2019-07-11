@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 
 data_tensor = tf.placeholder(GlobalConstants.DATA_TYPE, shape=(None, 28, 28, 100), name="dataTensor")
 indices_tensor = tf.ones(100, dtype=tf.int32)

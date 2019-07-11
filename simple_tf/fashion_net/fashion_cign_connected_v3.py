@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from auxillary.parameters import DecayingParameter, FixedParameter
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 
 
 def apply_heavy_router_transform(net, network, node, decision_feature_size, node_degree):

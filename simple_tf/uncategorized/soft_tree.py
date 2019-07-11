@@ -3,7 +3,7 @@ from collections import deque
 import tensorflow as tf
 
 from simple_tf.cign.tree import TreeNetwork
-from simple_tf.uncategorized.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants
 from algorithms.info_gain import InfoGainLoss
 from simple_tf.uncategorized.node import Node
 

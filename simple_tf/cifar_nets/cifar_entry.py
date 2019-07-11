@@ -13,7 +13,7 @@ from simple_tf.cign.cign_multi_gpu import CignMultiGpu
 from simple_tf.cign.cign_random_sampling import CignRandomSample
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.cign.cign_with_sampling import CignWithSampling
-from simple_tf.uncategorized.global_params import GlobalConstants, AccuracyCalcType
+from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 
 
