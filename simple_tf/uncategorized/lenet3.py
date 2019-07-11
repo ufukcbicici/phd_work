@@ -1,10 +1,7 @@
 import tensorflow as tf
-import numpy as np
 
 from auxillary.parameters import DecayingParameter, DiscreteParameter
-from simple_tf import batch_norm
-from simple_tf.global_params import GlobalConstants
-from simple_tf.global_params import GradientType
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 
 def root_func(node, network, variables=None):

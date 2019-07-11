@@ -1,21 +1,9 @@
-import itertools
-import threading
-from random import shuffle
-
 import numpy as np
 import scipy
-import tensorflow as tf
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
 
 from algorithms.softmax_compresser import SoftmaxCompresser
-from auxillary.constants import DatasetTypes
-from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants, SoftmaxCompressionStrategy, GradientType
-from collections import namedtuple
 from scipy.stats import expon
-import matplotlib.pyplot as plt
 from sklearn.svm import LinearSVC
 from sklearn.model_selection import GridSearchCV
 

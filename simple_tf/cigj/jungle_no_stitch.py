@@ -6,8 +6,8 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle import Jungle
 from simple_tf.cigj.jungle_node import NodeType
-from simple_tf.global_params import GlobalConstants
-from simple_tf.info_gain import InfoGainLoss
+from simple_tf.uncategorized.global_params import GlobalConstants
+from algorithms.info_gain import InfoGainLoss
 
 
 class JungleNoStitch(Jungle):

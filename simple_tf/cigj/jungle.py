@@ -9,9 +9,9 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle_node import JungleNode
 from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.global_params import GlobalConstants
-from simple_tf.info_gain import InfoGainLoss
-from simple_tf.global_params import Optimizer
+from simple_tf.uncategorized.global_params import GlobalConstants
+from algorithms.info_gain import InfoGainLoss
+from simple_tf.uncategorized.global_params import Optimizer
 
 
 class Jungle(FastTreeNetwork):

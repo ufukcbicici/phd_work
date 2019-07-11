@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 
 class CustomBatchNormAlgorithms:

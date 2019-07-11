@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from simple_tf.batch_norm import fast_tree_batch_norm
+from simple_tf.uncategorized.batch_norm import fast_tree_batch_norm
 
 decay = 0.99
 x_input = tf.placeholder(dtype=tf.float32, shape=(125, 32))

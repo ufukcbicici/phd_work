@@ -3,9 +3,9 @@ import numpy as np
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle_no_stitch import JungleNoStitch
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 from simple_tf.cigj.jungle_node import NodeType
-from simple_tf.info_gain import InfoGainLoss
+from algorithms.info_gain import InfoGainLoss
 
 
 class JungleGumbelSoftmax(JungleNoStitch):

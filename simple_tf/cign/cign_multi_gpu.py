@@ -5,7 +5,7 @@ from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import FixedParameter, DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.global_params import GlobalConstants, AccuracyCalcType
+from simple_tf.uncategorized.global_params import GlobalConstants, AccuracyCalcType
 
 
 class CignMultiGpu(FastTreeNetwork):

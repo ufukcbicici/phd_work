@@ -8,11 +8,10 @@ from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import FixedParameter, DecayingParameter, DiscreteParameter
 from simple_tf.cign.tree import TreeNetwork
-from simple_tf.global_params import GlobalConstants, AccuracyCalcType
-from simple_tf.info_gain import InfoGainLoss
-from simple_tf.node import Node
+from simple_tf.uncategorized.global_params import GlobalConstants, AccuracyCalcType
+from algorithms.info_gain import InfoGainLoss
+from simple_tf.uncategorized.node import Node
 from auxillary.constants import DatasetTypes
 
 

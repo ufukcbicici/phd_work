@@ -1,10 +1,10 @@
 import tensorflow as tf
 
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DiscreteParameter, FixedParameter, DecayingParameter
+from auxillary.parameters import FixedParameter, DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.global_params import GlobalConstants
-from simple_tf.info_gain import InfoGainLoss
+from simple_tf.uncategorized.global_params import GlobalConstants
+from algorithms.info_gain import InfoGainLoss
 
 
 class CignWithSampling(FastTreeNetwork):

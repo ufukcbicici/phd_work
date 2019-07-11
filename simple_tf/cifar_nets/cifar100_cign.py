@@ -3,7 +3,7 @@ import numpy as np
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter, DiscreteParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 from algorithms.resnet.resnet_generator import ResnetGenerator
 
 strides = GlobalConstants.RESNET_HYPERPARAMS.strides

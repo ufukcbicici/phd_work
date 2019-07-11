@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 
 class VariableManager:

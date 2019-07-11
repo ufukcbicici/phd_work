@@ -5,14 +5,11 @@ import numpy as np
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import FixedParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.cigj.jungle import Jungle
 from simple_tf.cigj.jungle_gumbel_softmax import JungleGumbelSoftmax
-from simple_tf.cigj.jungle_no_stitch import JungleNoStitch
 from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
-from simple_tf.global_params import GlobalConstants, AccuracyCalcType
+from simple_tf.uncategorized.global_params import GlobalConstants, AccuracyCalcType
 
 
 def get_explanation_string(network):

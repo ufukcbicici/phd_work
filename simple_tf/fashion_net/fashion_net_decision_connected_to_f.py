@@ -1,7 +1,7 @@
 import tensorflow as tf
 
-from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
-from simple_tf.global_params import GlobalConstants
+from auxillary.parameters import DecayingParameter, FixedParameter
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 
 def root_func(node, network, variables=None):

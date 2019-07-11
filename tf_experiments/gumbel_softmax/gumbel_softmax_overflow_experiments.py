@@ -3,8 +3,8 @@ import numpy as np
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle_gumbel_softmax import JungleGumbelSoftmax
-from simple_tf.global_params import GlobalConstants
-from simple_tf.info_gain import InfoGainLoss
+from simple_tf.uncategorized.global_params import GlobalConstants
+from algorithms.info_gain import InfoGainLoss
 
 arrs = UtilityFuncs.load_npz("C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//cigj//tensors")
 # arrs = UtilityFuncs.load_npz("C://Users//ufuk.bicici//Desktop//PHD//phd_work//tensors")

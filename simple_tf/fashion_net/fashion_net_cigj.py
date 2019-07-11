@@ -3,7 +3,7 @@ import tensorflow as tf
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter
 from simple_tf.cigj.jungle_node import NodeType
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 
 class FashionNetCigj:

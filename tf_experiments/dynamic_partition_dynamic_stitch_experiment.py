@@ -2,9 +2,6 @@ import tensorflow as tf
 import numpy as np
 import time
 
-from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants
-
 sess = tf.Session()
 init = tf.global_variables_initializer()
 sess.run(init)

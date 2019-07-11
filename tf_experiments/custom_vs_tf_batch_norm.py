@@ -3,8 +3,7 @@ import numpy as np
 import time
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
-from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 sess = tf.Session()
 init = tf.global_variables_initializer()

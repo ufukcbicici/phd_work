@@ -3,8 +3,8 @@ import numpy as np
 from auxillary.constants import DatasetTypes
 from auxillary.parameters import DiscreteParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.global_params import GlobalConstants
-from simple_tf.info_gain import InfoGainLoss
+from simple_tf.uncategorized.global_params import GlobalConstants
+from algorithms.info_gain import InfoGainLoss
 
 
 def build_conv_layer(x, filter_size, num_of_input_channels, num_of_output_channels, name_suffix=""):

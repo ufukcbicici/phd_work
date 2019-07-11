@@ -16,12 +16,10 @@ from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, FixedParameter
-from data_handling.cifar_dataset import CifarDataSet
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.cifar_nets import fashion_net_for_cifar100, cifar100_resnet_baseline
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline, fashion_cign_connected_v2
-from simple_tf.global_params import GlobalConstants, AccuracyCalcType
+from simple_tf.uncategorized.global_params import GlobalConstants, AccuracyCalcType
 
 
 # tf.set_random_seed(1234)

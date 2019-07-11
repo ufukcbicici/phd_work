@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 from data_handling.data_set import DataSet
 
 

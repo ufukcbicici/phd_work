@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 
 def calculate_entropy(prob_distribution):

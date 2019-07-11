@@ -3,7 +3,7 @@ import numpy as np
 from algorithms.multipath_calculator import MultipathCalculator
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 
 class AccuracyCalculator:

@@ -1,15 +1,12 @@
 from algorithms.softmax_compresser import SoftmaxCompresser
-from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 import numpy as np
 import tensorflow as tf
 import itertools
-from random import shuffle, random
-from sklearn.preprocessing import RobustScaler
 from sklearn.linear_model import LogisticRegression
 
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 # class_count = 3
 # features_dim = 64

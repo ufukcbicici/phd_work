@@ -1,14 +1,6 @@
-import tensorflow as tf
-import tensorflow_probability as tfp
 import numpy as np
-from scipy.integrate import quad
 from scipy.integrate import dblquad
 from scipy.special import logsumexp
-import pdb
-import warnings
-from data_handling.fashion_mnist import FashionMnistDataSet
-from simple_tf.global_params import GlobalConstants
-from simple_tf.info_gain import InfoGainLoss
 
 
 def gumbel_softmax_density(z, probs, temperature):

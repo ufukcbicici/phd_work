@@ -1,7 +1,7 @@
 import numpy as np
 
 from auxillary.constants import DatasetTypes
-from simple_tf.global_params import GlobalConstants, ModeTrackingStrategy, ModeComputationStrategy
+from simple_tf.uncategorized.global_params import GlobalConstants, ModeTrackingStrategy, ModeComputationStrategy
 
 
 class ModeTracker:

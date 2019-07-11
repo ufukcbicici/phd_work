@@ -1,6 +1,5 @@
 import struct
 import os
-import platform
 import numpy as np
 from array import array
 from auxillary.constants import DatasetTypes
@@ -9,7 +8,7 @@ from data_handling.data_set import DataSet
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-from simple_tf.global_params import GlobalConstants
+from simple_tf.uncategorized.global_params import GlobalConstants
 
 
 class MnistDataSet(DataSet):
