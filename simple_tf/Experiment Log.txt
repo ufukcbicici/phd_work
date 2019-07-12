@@ -141,7 +141,7 @@ FROM
 	AND
 	Explanation LIKE "%Resnet-50 CIGN Random Sampling Routing Tests%" AND
 	Explanation LIKE "%Use Sampling CIGN:True%" AND
-	Explanation LIKE "%Use Sampling CIGN:True%" AND
+	Explanation LIKE "%Use Random Sampling CIGN:True%" AND
 	Explanation LIKE "%Batch Size:250%"
 
 

@@ -122,6 +122,7 @@ class Cifar100_MultiGpuCign(CignMultiGpu):
                                                                      schedule=[(40000, 0.01),
                                                                                (70000, 0.001),
                                                                                (100000, 0.0001)])
+        GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:CPU:0"
 
     def set_hyperparameters(self, **kwargs):
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
