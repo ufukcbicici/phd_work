@@ -9,19 +9,13 @@ from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.tree import TreeNetwork
-from simple_tf.global_params import GlobalConstants, AccuracyCalcType
+from simple_tf.global_params import GlobalConstants, AccuracyCalcType, TrainingUpdateResult
 from algorithms.info_gain import InfoGainLoss
 from simple_tf.uncategorized.node import Node
 from auxillary.constants import DatasetTypes
 
 
 class FastTreeNetwork(TreeNetwork):
-    class UpdateResults:
-        def __init__(self, lr, sample_counts, is_open_indicators):
-            self.lr = lr
-            self.sampleCounts = sample_counts
-            self.isOpenIndicators = is_open_indicators
-
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                  dataset):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
@@ -433,8 +427,7 @@ class FastTreeNetwork(TreeNetwork):
         if GlobalConstants.USE_VERBOSE:
             self.verbose_update(eval_dict=results[-1])
         # Unit Test for Unified Batch Normalization
-        update_results = FastTreeNetwork.UpdateResults(lr=lr, sample_counts=sample_counts,
-                                                       is_open_indicators=is_open_indicators)
+        update_results = TrainingUpdateResult(lr=lr, sample_counts=sample_counts, is_open_indicators=is_open_indicators)
         return update_results
 
     def eval_network(self, sess, dataset, use_masking):
@@ -628,6 +621,7 @@ class FastTreeNetwork(TreeNetwork):
                                                     dataset=dataset,
                                                     epoch=epoch_id,
                                                     iteration=iteration_counter)
+                print("update_results type:{0}".format(update_results.__class__))
                 if all([update_results.lr, update_results.sampleCounts, update_results.isOpenIndicators]):
                     elapsed_time = time.time() - start_time
                     total_time += elapsed_time

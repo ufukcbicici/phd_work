@@ -323,25 +323,6 @@ class CignMultiGpu(FastTreeNetwork):
         #            self.infoGainDicts]
         return run_ops
 
-    def update_params(self, sess, dataset, epoch, iteration):
-        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
-        minibatch = dataset.get_next_batch()
-        if minibatch is None:
-            return None, None, None
-        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
-                                           is_train=True, use_masking=True)
-        # Prepare result tensors to collect
-        run_ops = self.get_run_ops()
-        if GlobalConstants.USE_VERBOSE:
-            run_ops.append(self.evalDict)
-        results = sess.run(run_ops, feed_dict=feed_dict)
-        # self.unit_test_batch_norm_ops(sess=sess, eval_results=results[-1])
-        lr = results[1]
-        sample_counts = results[2]
-        is_open_indicators = results[3]
-        return lr, sample_counts, is_open_indicators
-
     def unit_test_batch_norm_ops(self, sess, eval_results):
         batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
         moving_average_curr_value_tensors = {}

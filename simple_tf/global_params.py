@@ -42,6 +42,13 @@ class Optimizer(Enum):
     Adam = 1
 
 
+class TrainingUpdateResult:
+    def __init__(self, lr, sample_counts, is_open_indicators):
+        self.lr = lr
+        self.sampleCounts = sample_counts
+        self.isOpenIndicators = is_open_indicators
+
+
 class GlobalConstants:
 
     # 2 GPU Settings
@@ -84,7 +91,7 @@ class GlobalConstants:
     USE_RANDOM_SAMPLING = False
 
     USE_FAST_TREE_MODE = True
-    EXPERIMENT_MULTIPLICATION_FACTOR = 4
+    EXPERIMENT_MULTIPLICATION_FACTOR = 3
     OPTIMIZER_TYPE = Optimizer.Momentum
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
