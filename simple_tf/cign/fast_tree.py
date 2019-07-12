@@ -616,12 +616,13 @@ class FastTreeNetwork(TreeNetwork):
             total_time = 0.0
             leaf_info_rows = []
             while True:
+                print("Iteration:{0}".format(iteration_counter))
                 start_time = time.time()
                 update_results = self.update_params(sess=sess,
                                                     dataset=dataset,
                                                     epoch=epoch_id,
                                                     iteration=iteration_counter)
-                print("update_results type:{0}".format(update_results.__class__))
+                print("Update_results type new:{0}".format(update_results.__class__))
                 if all([update_results.lr, update_results.sampleCounts, update_results.isOpenIndicators]):
                     elapsed_time = time.time() - start_time
                     total_time += elapsed_time

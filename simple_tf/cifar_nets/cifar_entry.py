@@ -11,7 +11,7 @@ from simple_tf.cifar_nets.cifar100_cign_random_sampling import Cifar100_CignRand
 from simple_tf.cifar_nets.cifar100_cign_sampling import Cifar100_CignSampling
 from simple_tf.cifar_nets.cifar100_multi_gpu_cign import Cifar100_MultiGpuCign
 from simple_tf.cifar_nets.cifar100_resnet_baseline import Cifar100_Baseline
-from simple_tf.global_params import GlobalConstants, TrainingUpdateResult, DenemeClass
+from simple_tf.global_params import GlobalConstants
 
 use_multi_gpu = True
 use_sampling = False
@@ -38,12 +38,6 @@ def get_network(dataset):
 def cifar_100_training():
     import sys
     print(sys.version)
-
-    update_obj = TrainingUpdateResult(lr=3, sample_counts=5, is_open_indicators=7)
-    deneme_obj = DenemeClass(_x=5, _y=6, _z=7)
-    print(update_obj.__class__)
-    print(deneme_obj.__class__)
-
     classification_wd = [0.0002] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
