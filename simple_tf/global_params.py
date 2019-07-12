@@ -49,6 +49,13 @@ class TrainingUpdateResult:
         self.isOpenIndicators = is_open_indicators
 
 
+class DenemeClass:
+    def __init__(self, _x, _y, _z):
+        self.x = _x
+        self.y = _y
+        self.z = _z
+
+
 class GlobalConstants:
 
     # 2 GPU Settings
@@ -91,7 +98,7 @@ class GlobalConstants:
     USE_RANDOM_SAMPLING = False
 
     USE_FAST_TREE_MODE = True
-    EXPERIMENT_MULTIPLICATION_FACTOR = 3
+    EXPERIMENT_MULTIPLICATION_FACTOR = 4
     OPTIMIZER_TYPE = Optimizer.Momentum
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
