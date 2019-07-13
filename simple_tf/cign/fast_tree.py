@@ -410,7 +410,7 @@ class FastTreeNetwork(TreeNetwork):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
         if minibatch is None:
-            return None, None, None
+            return TrainingUpdateResult(lr=None, sample_counts=None, is_open_indicators=None)
         feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
                                            is_train=True, use_masking=True)
         # Prepare result tensors to collect
