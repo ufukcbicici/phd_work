@@ -123,6 +123,7 @@ class Cifar100_CignRandomSampling(CignRandomSample):
                                                                                (70000, 0.001),
                                                                                (100000, 0.0001)])
         GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:GPU:0"
+        self.networkName = "Cifar100_CIGN_Random_Sampling"
 
     def set_hyperparameters(self, **kwargs):
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]

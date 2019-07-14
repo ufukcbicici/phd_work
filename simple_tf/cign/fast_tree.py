@@ -24,6 +24,7 @@ class FastTreeNetwork(TreeNetwork):
         self.optimizer = None
         self.infoGainDicts = None
         self.extra_update_ops = None
+        self.networkName = None
 
     # OK for MultiGPU
     def build_tree(self):

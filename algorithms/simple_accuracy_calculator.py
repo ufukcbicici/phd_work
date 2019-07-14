@@ -17,7 +17,8 @@ class SimpleAccuracyCalculator:
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(curr_path, ".."),
                                                                    "saved_training_data"),
-                                                      "run_{0}_iteration_{1}".format(run_id, iteration)))
+                                                      "{0}_run_{1}_iteration_{2}".format(network.networkName,
+                                                                                         run_id, iteration)))
         os.mkdir(directory_path)
         arr_dict = {"tree_type": {"tree_type": np.array(network.degreeList)},
                     "label_tensor": leaf_true_labels_dict,
@@ -36,7 +37,8 @@ class SimpleAccuracyCalculator:
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(curr_path, ".."),
                                                                    "saved_training_data"),
-                                                      "run_{0}_iteration_{1}".format(run_id, iteration)))
+                                                      "{0}_run_{1}_iteration_{2}".format(network.networkName,
+                                                                                         run_id, iteration)))
         # Assert that the tree architecture is compatible with the loaded info
         npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
         degree_list = UtilityFuncs.load_npz(file_name=npz_file_name)
