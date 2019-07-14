@@ -310,6 +310,9 @@ class FashionCignLite(FastTreeNetwork):
         explanation += "Use Class Weighting:{0}\n".format(GlobalConstants.USE_CLASS_WEIGHTING)
         explanation += "Class Weight Running Average:{0}\n".format(GlobalConstants.CLASS_WEIGHT_RUNNING_AVERAGE)
         explanation += "Zero Label Count Epsilon:{0}\n".format(GlobalConstants.LABEL_EPSILON)
+        explanation += "TRAINING PARAMETERS:\n"
+        explanation += super().get_explanation_string()
+        return explanation
         # Baseline
         # explanation = "Fashion Mnist Baseline. Double Dropout, Discrete learning rate\n"
         # explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -326,7 +329,6 @@ class FashionCignLite(FastTreeNetwork):
         #            GlobalConstants.FASHION_FILTERS_3_SIZE)
         # explanation += "Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
         # explanation += "Dropout Prob:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
-        return explanation
 
     def set_training_parameters(self):
         # Training Parameters
@@ -344,6 +346,8 @@ class FashionCignLite(FastTreeNetwork):
                                                                      schedule=[(15000, 0.005),
                                                                                (30000, 0.0025),
                                                                                (40000, 0.00025)])
+        GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:GPU:0"
+        self.networkName = "FashionNet_Lite"
 
     def set_hyperparameters(self, **kwargs):
         # Regularization Parameters
