@@ -155,3 +155,41 @@ ORDER BY AvgValidationAccuracy DESC
 SELECT RunID, Avg(ValidationAccuracy) AS AvgValidationAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 595 GROUP BY RunID;
 SELECT RunID, Avg(TestAccuracy) AS AvgTestAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 129 GROUP BY RunID;
 ***************************************************************************************************************
+
+
+
+***************************************************************************************************************
+14.07.2019 - Lab dblogger3.db
+-FashionNet Lite CIGN
+-Dropout Grid Search
+-Batch Size:125
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Dropout Probability:") + LENGTH("Classification Dropout Probability:"), 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 90
+	AND
+	Explanation LIKE "%Fashion Net - Multipath Optimization%" AND
+	Explanation LIKE "%Batch Size:125%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+
+SELECT RunID, Avg(ValidationAccuracy) AS AvgValidationAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 595 GROUP BY RunID;
+SELECT RunID, Avg(TestAccuracy) AS AvgTestAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 129 GROUP BY RunID;
+***************************************************************************************************************
