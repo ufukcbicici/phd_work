@@ -1,60 +1,68 @@
 import tensorflow as tf
 
 from auxillary.parameters import DecayingParameter, FixedParameter
+from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 
 
-def root_func(node, network, variables=None):
-    # Parameters
-    node_degree = network.degreeList[node.depth]
-    conv_weights = tf.Variable(
-        tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_FILTERS_1], stddev=0.1,
-                            seed=GlobalConstants.SEED,
-                            dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_weight",
-                                                                                             node=node))
-    conv_biases = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
-                              name=network.get_variable_name(name="conv_bias",
-                                                             node=node))
-    node.variablesSet = {conv_weights, conv_biases}
-    # Operations
-    network.mask_input_nodes(node=node)
-    # F
-    conv = tf.nn.conv2d(network.dataTensor, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-    relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
-    pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    node.fOpsList.extend([conv, relu, pool])
-    # H
-    pool_h = tf.nn.max_pool(relu, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
-    flat_pool = tf.contrib.layers.flatten(pool_h)
-    feature_size = flat_pool.get_shape().as_list()[-1]
-    fc_h_weights = tf.Variable(tf.truncated_normal(
-        [feature_size, GlobalConstants.NO_H_FROM_F_UNITS_1],
-        stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_decision_weights", node=node))
-    fc_h_bias = tf.Variable(
-        tf.constant(0.1, shape=[GlobalConstants.NO_H_FC_UNITS_1], dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="fc_decision_bias", node=node))
-    node.variablesSet.add(fc_h_weights)
-    node.variablesSet.add(fc_h_bias)
-    raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
-    # ***************** Dropout *****************
-    relu_ig_feature = tf.nn.relu(raw_ig_feature)
-    drooped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
-    ig_feature = drooped_ig_feature
-    # ***************** Dropout *****************
-    node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
-    ig_feature_size = ig_feature.get_shape().as_list()[-1]
-    hyperplane_weights = tf.Variable(
-        tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                            dtype=GlobalConstants.DATA_TYPE),
-        name=network.get_variable_name(name="hyperplane_weights", node=node))
-    hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                    name=network.get_variable_name(name="hyperplane_biases", node=node))
-    node.variablesSet.add(hyperplane_weights)
-    node.variablesSet.add(hyperplane_biases)
-    # Decisions
-    network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
-                           hyperplane_biases=hyperplane_biases)
+class Lenet(FastTreeNetwork):
+    def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
+                 dataset):
+        super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
+                         dataset)
+
+    @staticmethod
+    def root_func(node, network):
+        # Parameters
+        node_degree = network.degreeList[node.depth]
+        conv_weights = tf.Variable(
+            tf.truncated_normal([5, 5, GlobalConstants.NUM_CHANNELS, GlobalConstants.NO_FILTERS_1], stddev=0.1,
+                                seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv_weight",
+                                                                                                 node=node))
+        conv_biases = tf.Variable(tf.constant(0.1, shape=[GlobalConstants.NO_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
+                                  name=network.get_variable_name(name="conv_bias",
+                                                                 node=node))
+        node.variablesSet = {conv_weights, conv_biases}
+        # Operations
+        network.mask_input_nodes(node=node)
+        # F
+        conv = tf.nn.conv2d(network.dataTensor, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
+        relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
+        pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        node.fOpsList.extend([conv, relu, pool])
+        # H
+        pool_h = tf.nn.max_pool(relu, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
+        flat_pool = tf.contrib.layers.flatten(pool_h)
+        feature_size = flat_pool.get_shape().as_list()[-1]
+        fc_h_weights = tf.Variable(tf.truncated_normal(
+            [feature_size, GlobalConstants.NO_H_FROM_F_UNITS_1],
+            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="fc_decision_weights", node=node))
+        fc_h_bias = tf.Variable(
+            tf.constant(0.1, shape=[GlobalConstants.NO_H_FC_UNITS_1], dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="fc_decision_bias", node=node))
+        node.variablesSet.add(fc_h_weights)
+        node.variablesSet.add(fc_h_bias)
+        raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
+        # ***************** Dropout *****************
+        relu_ig_feature = tf.nn.relu(raw_ig_feature)
+        drooped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
+        ig_feature = drooped_ig_feature
+        # ***************** Dropout *****************
+        node.hOpsList.extend([pool_h, flat_pool, raw_ig_feature, relu_ig_feature, drooped_ig_feature, ig_feature])
+        ig_feature_size = ig_feature.get_shape().as_list()[-1]
+        hyperplane_weights = tf.Variable(
+            tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                dtype=GlobalConstants.DATA_TYPE),
+            name=network.get_variable_name(name="hyperplane_weights", node=node))
+        hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
+                                        name=network.get_variable_name(name="hyperplane_biases", node=node))
+        node.variablesSet.add(hyperplane_weights)
+        node.variablesSet.add(hyperplane_biases)
+        # Decisions
+        network.apply_decision(node=node, branching_feature=ig_feature, hyperplane_weights=hyperplane_weights,
+                               hyperplane_biases=hyperplane_biases)
 
 
 def l1_func(node, network, variables=None):
