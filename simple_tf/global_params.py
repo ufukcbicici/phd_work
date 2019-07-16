@@ -189,8 +189,8 @@ class GlobalConstants:
     NO_H_FC_UNITS_1 = 20
     NO_H_FILTERS_2 = 5
     NO_H_FC_UNITS_2 = 20
-    NO_H_FROM_F_UNITS_1 = 20
-    NO_H_FROM_F_UNITS_2 = 20
+    LENET_H_FEATURE_SIZE_1 = 20
+    LENET_H_FEATURE_SIZE_2 = 20
 
     DATA_TYPE = tf.float32
     SEED = None
