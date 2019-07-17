@@ -14,6 +14,13 @@ class Cifar100_Baseline(FastTreeNetwork):
 
     @staticmethod
     def baseline(network, node):
+        GlobalConstants.RESNET_HYPERPARAMS = GlobalConstants.ResnetHParams(num_residual_units=16, use_bottleneck=True,
+                                                                           num_of_features_per_block=[16, 64, 128, 128],
+                                                                           first_conv_filter_size=3, relu_leakiness=0.1,
+                                                                           strides=[1, 2, 2],
+                                                                           activate_before_residual=[True, False,
+                                                                                                     False])
+
         network.mask_input_nodes(node=node)
         strides = GlobalConstants.RESNET_HYPERPARAMS.strides
         activate_before_residual = GlobalConstants.RESNET_HYPERPARAMS.activate_before_residual
@@ -32,7 +39,7 @@ class Cifar100_Baseline(FastTreeNetwork):
                                                     activate_before_residual=activate_before_residual[0],
                                                     relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                     bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        for i in range(num_of_units_per_block-1):
+        for i in range(num_of_units_per_block - 1):
             with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_{0}".format(i + 1), node=node)):
                 x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1],
                                                         out_filter=filters[1],
@@ -47,7 +54,7 @@ class Cifar100_Baseline(FastTreeNetwork):
                                                     activate_before_residual=activate_before_residual[1],
                                                     relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                     bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        for i in range(num_of_units_per_block-1):
+        for i in range(num_of_units_per_block - 1):
             with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_2_{0}".format(i + 1), node=node)):
                 x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[2],
                                                         out_filter=filters[2],
@@ -62,7 +69,7 @@ class Cifar100_Baseline(FastTreeNetwork):
                                                     activate_before_residual=activate_before_residual[2],
                                                     relu_leakiness=relu_leakiness, is_train=network.isTrain,
                                                     bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        for i in range(num_of_units_per_block-1):
+        for i in range(num_of_units_per_block - 1):
             with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_3_{0}".format(i + 1), node=node)):
                 x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[3],
                                                         out_filter=filters[3],
@@ -156,7 +163,6 @@ class Cifar100_Baseline(FastTreeNetwork):
         explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
         explanation += "Classification Dropout Probability:{0}\n".format(
             GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
-        explanation += "Decision Dropout Probability:{0}\n".format(self.decisionDropoutKeepProbCalculator.value)
         if GlobalConstants.USE_PROBABILITY_THRESHOLD:
             for node in self.topologicalSortedNodes:
                 if node.isLeaf:
