@@ -14,7 +14,7 @@ max_num_of_iterations = 10
 annealing_schedule = DecayingParameter(name="Temperature", value=100.0, decay=0.9999, decay_period=1)
 balance_coefficient = 1.0
 use_weighted_scoring = False
-brute_force_sample_count = 10000
+brute_force_sample_count = 100000
 
 
 def main():
@@ -43,6 +43,6 @@ def main():
                                        multipath_score_calculators=multipath_calculators,
                                        balance_coefficient=balance_coefficient,
                                        use_weighted_scoring=use_weighted_scoring,
-                                       thread_count=8, verbose=True, batch_size=100)
+                                       thread_count=10, verbose=True, batch_size=100)
     bf_optimizer.run()
     print("X")
