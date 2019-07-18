@@ -60,13 +60,14 @@ class FastTreeNetwork(TreeNetwork):
                     d.append(child_node)
 
     @staticmethod
-    def get_mock_tree(degree_list):
+    def get_mock_tree(degree_list, network_name):
         tree = FastTreeNetwork(node_build_funcs=None, grad_func=None, hyperparameter_func=None,
                                residue_func=None, summary_func=None, degree_list=degree_list, dataset=None)
         # Build the tree topologically and create the Tensorflow placeholders
         tree.build_tree()
         # Build symbolic networks
         tree.topologicalSortedNodes = tree.dagObject.get_topological_sort()
+        tree.networkName = network_name
         return tree
 
     def prepare_evaluation_dictionary(self):

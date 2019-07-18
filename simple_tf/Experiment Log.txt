@@ -65,7 +65,7 @@ FROM
 (
 	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
-	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1180
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1190
 	AND
 	Explanation LIKE "%Decay Step:35000%"
 	AND 
