@@ -334,7 +334,7 @@ class FashionCignLite(FastTreeNetwork):
         # Training Parameters
         GlobalConstants.TOTAL_EPOCH_COUNT = 200
         GlobalConstants.EPOCH_COUNT = 200
-        GlobalConstants.EPOCH_REPORT_PERIOD = 1
+        GlobalConstants.EPOCH_REPORT_PERIOD = 5
         GlobalConstants.BATCH_SIZE = 250
         GlobalConstants.EVAL_BATCH_SIZE = 250
         GlobalConstants.USE_MULTI_GPU = False
