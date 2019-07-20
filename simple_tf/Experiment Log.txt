@@ -365,17 +365,51 @@ Avg(ValidationAccuracy) AS AvgValidationAccuracy,
 Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
 Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
 COUNT(1) AS CNT,
-SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+SUBSTR(Explanation, INSTR(Explanation,"Classification Dropout Probability:") + LENGTH("Classification Dropout Probability:"), 4) AS ClassificationDropout,
+SUBSTR(Explanation, INSTR(Explanation,"Decision Dropout Probability:") + LENGTH("Decision Dropout Probability:"), 4) AS DecisionDropout
 FROM
 (
-	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
-	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
-	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 190
-	AND
-	Explanation LIKE "%Decay Step:35000%"
-	AND
-	Explanation LIKE "%Batch Size:250%"
+    SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+    LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+    WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 190
+    AND
+    Explanation LIKE "%Fashion Net - Multipath Optimization%" AND
+    Explanation LIKE "%Batch Size:250%"
 )
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
+
+
+SELECT
+Avg(AvgValidationAccuracy) AS AvgValidationAccuracy,
+Avg(AvgTrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+Wd
+FROM
+(
+	SELECT
+	RunId,
+	Max(RunId),
+	Min(RunId),
+	Max(ValidationAccuracy) AS MaxValidationAccuracy,
+	Min(ValidationAccuracy) AS MinValidationAccuracy,
+	Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+	Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+	Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+	COUNT(1) AS CNT,
+	SUBSTR(Explanation, INSTR(Explanation,"Classification Dropout Probability:") + LENGTH("Classification Dropout Probability:"), 4) AS ClassificationDropout,
+	SUBSTR(Explanation, INSTR(Explanation,"Decision Dropout Probability:") + LENGTH("Decision Dropout Probability:"), 4) AS DecisionDropout
+	FROM
+	(
+		SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+		LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+		WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 190
+		AND
+		Explanation LIKE "%Fashion Net - Multipath Optimization%" AND
+		Explanation LIKE "%Batch Size:250%"
+	)
+	GROUP BY Explanation
+	ORDER BY AvgValidationAccuracy DESC
+)
+GROUP BY ClassificationDropout, DecisionDropout
 ***************************************************************************************************************

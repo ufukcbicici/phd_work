@@ -19,13 +19,13 @@ class DbLogger:
     sample_wise_table = "sample_wise_results"
 
     # DGX DB 1
-    # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger.db"
+    log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger.db"
 
     # DGX DB 2
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger2.db"
 
     # DGX DB 3
-    log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
+    # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # Lab
     # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger3.db"
