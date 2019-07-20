@@ -42,6 +42,41 @@ class CignMixtureOfExperts(FastTreeNetwork):
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
 
+    def mask_input_nodes(self, node):
+        print("Masking Node:{0}".format(node.index))
+        if node.isRoot:
+            node.labelTensor = self.labelTensor
+            node.indicesTensor = self.indicesTensor
+            node.oneHotLabelTensor = self.oneHotLabelTensor
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
+            node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
+            node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+        else:
+            # Obtain the mask vector, sample counts and determine if this node receives samples.
+            parent_node = self.dagObject.parents(node=node)[0]
+            # Mask all inputs: F channel, H  channel, activations from ancestors, labels
+            parent_F = parent_node.fOpsList[-1]
+            parent_H = parent_node.hOpsList[-1]
+            for k, v in parent_node.activationsDict.items():
+                node.activationsDict[k] = v
+            node.labelTensor = parent_node.labelTensor
+            node.indicesTensor = parent_node.indicesTensor
+            node.oneHotLabelTensor = parent_node.oneHotLabelTensor
+            return parent_F, parent_H
+
+    def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
+        node.residueOutputTensor = final_feature
+        node.finalFeatures = final_feature
+        node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature
+        node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature)
+        logits = tf.matmul(final_feature, softmax_weights) + softmax_biases
+        cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
+                                                                                   logits=logits)
+        pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
+        loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
+        node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
+        node.lossList.append(loss)
+        return final_feature, logits
 
         # # Step 1: Sample random from uniform distribution. No use of information gain.
         # assert self.get_variable_name(name="sample_count", node=node) in node.evalDict
