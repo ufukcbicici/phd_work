@@ -15,7 +15,7 @@ class Cifar100_Baseline(FastTreeNetwork):
     @staticmethod
     def baseline(network, node):
         GlobalConstants.RESNET_HYPERPARAMS = GlobalConstants.ResnetHParams(num_residual_units=16, use_bottleneck=True,
-                                                                           num_of_features_per_block=[16, 64, 128, 128],
+                                                                           num_of_features_per_block=[16, 64, 116, 120],
                                                                            first_conv_filter_size=3, relu_leakiness=0.1,
                                                                            strides=[1, 2, 2],
                                                                            activate_before_residual=[True, False,

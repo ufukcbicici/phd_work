@@ -50,12 +50,12 @@ SELECT RunID, Avg(TestAccuracy) AS AvgTestAccuracy, COUNT(1) AS CNT FROM logs_ta
 
 Query:
 
-SELECT 
+SELECT
 RunId,
 Max(RunId),
 Min(RunId),
-Max(ValidationAccuracy) AS MaxValidationAccuracy, 
-Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
 Avg(ValidationAccuracy) AS AvgValidationAccuracy,
 Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
 Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
@@ -63,18 +63,16 @@ COUNT(1) AS CNT,
 SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
 FROM
 (
-	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
 	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1190
 	AND
 	Explanation LIKE "%Decay Step:35000%"
-	AND 
+	AND
 	Explanation LIKE "%Batch Size:500%"
 )
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
-
-
 ***************************************************************************************************************
 
 
@@ -88,12 +86,12 @@ ORDER BY AvgValidationAccuracy DESC
 
 
 
-SELECT 
+SELECT
 RunId,
 Max(RunId),
 Min(RunId),
-Max(ValidationAccuracy) AS MaxValidationAccuracy, 
-Min(ValidationAccuracy) AS MinValidationAccuracy, 
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
 Avg(ValidationAccuracy) AS AvgValidationAccuracy,
 Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
 Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
@@ -101,12 +99,12 @@ COUNT(1) AS CNT,
 SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
 FROM
 (
-	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table 
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
 	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
 	AND
 	Explanation LIKE "%Use Sampling CIGN:True%"
-	AND 
+	AND
 	Explanation LIKE "%Batch Size:250%"
 )
 GROUP BY Explanation
@@ -141,7 +139,6 @@ FROM
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
 	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
 	AND
-	Explanation LIKE "%Resnet-50 CIGN Random Sampling Routing Tests%" AND
 	Explanation LIKE "%Use Sampling CIGN:True%" AND
 	Explanation LIKE "%Use Random Sampling CIGN:True%" AND
 	Explanation LIKE "%Batch Size:250%"
@@ -204,7 +201,6 @@ SELECT RunID, Avg(TestAccuracy) AS AvgTestAccuracy, COUNT(1) AS CNT FROM logs_ta
 ***************************************************************************************************************
 17.07.2019 - TRUBA dblogger_cign.db
 -Resnet-50 CIFAR-100 Thick Baseline Tests
--Probability Threshold:0.0 (Tüm samplelar training boyunca her yere gidecek)
 -Wd: [0.00005, 0.0001, 0.00015, 0.0002, 0.00025]
 -Batch Size:125
 
@@ -225,7 +221,7 @@ FROM
 (
 	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
-	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 290
 	AND
 	Explanation LIKE "%Resnet-50 Baseline Tests%" AND
 	Explanation LIKE "%num_of_features_per_block=[16, 64, 128, 128]%"
@@ -236,4 +232,115 @@ ORDER BY AvgValidationAccuracy DESC
 
 SELECT RunID, Avg(ValidationAccuracy) AS AvgValidationAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 595 GROUP BY RunID;
 SELECT RunID, Avg(TestAccuracy) AS AvgTestAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 129 GROUP BY RunID;
+***************************************************************************************************************
+
+
+***************************************************************************************************************
+17.07.2019 - TRUBA dblogger3_cign.db
+-Resnet-50 CIFAR-100 Equal Num of Weights with CIGN Baseline Tests
+-Wd: [0.00005, 0.0001, 0.00015, 0.0002, 0.00025]
+-Batch Size:125
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 290
+	AND
+	Explanation LIKE "%Resnet-50 Baseline Tests%" AND
+	Explanation LIKE "%num_of_features_per_block=[16, 64, 116, 120]%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+
+SELECT RunID, Avg(ValidationAccuracy) AS AvgValidationAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 595 GROUP BY RunID;
+SELECT RunID, Avg(TestAccuracy) AS AvgTestAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 129 GROUP BY RunID;
+***************************************************************************************************************
+
+
+***************************************************************************************************************
+19.07.2019 - TRUBA dblogger4_cign.db
+-Resnet-50 CIFAR-100 CIGN Best Case Scenarios
+-Wd: classification_wd = [0.00025, 0.0003, 0.00035] * (GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR * 5)
+-Batch Size:250
+-Single GPU
+-Threshold starts with 0.5, decays to 0.4 at 35000. Iteration
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Decay Step:35000%"
+	AND
+	Explanation LIKE "%Batch Size:250%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+***************************************************************************************************************
+
+***************************************************************************************************************
+19.07.2019 - TRUBA dblogger5_cign.db
+-Resnet-50 CIGN
+-Probability Threshold:0.5 35000 Iteration after 0.4
+- Share among 4 GPUs, 125 batch size per GPU
+-Wd: classification_wd = [0.0002, 0.00025, 0.0003, 0.00035] * (GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR * 5)
+-Decision Wd:0.0
+-Batch Size:500
+-Multi GPU
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1190
+	AND
+	Explanation LIKE "%Decay Step:35000%"
+	AND
+	Explanation LIKE "%Batch Size:500%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
