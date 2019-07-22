@@ -5,8 +5,22 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.fashion_net.fashion_cign_connected_v2 import FashionCignLite
+from simple_tf.fashion_net.fashion_cign_moe_logits import FashionCignMoeLogits
 from simple_tf.global_params import GlobalConstants
 from auxillary.constants import DatasetTypes
+
+
+use_moe = True
+
+
+def get_network(dataset):
+    if not use_moe:
+        network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    elif use_moe:
+        network = FashionCignMoeLogits(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    else:
+        raise NotImplementedError()
+    return network
 
 
 def fashion_net_training():
@@ -35,7 +49,7 @@ def fashion_net_training():
             sess = tf.Session(config=config)
         else:
             sess = tf.Session()
-        network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
+        network = get_network(dataset=dataset)
         network.set_training_parameters()
         network.build_network()
         init = tf.global_variables_initializer()
