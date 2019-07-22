@@ -429,8 +429,12 @@ class FastTreeNetwork(TreeNetwork):
         # Unit Test for Unified Batch Normalization
         if GlobalConstants.USE_VERBOSE:
             self.verbose_update(eval_dict=results[-1])
-        # Unit Test for Unified Batch Normalization
-        update_results = TrainingUpdateResult(lr=lr, sample_counts=sample_counts, is_open_indicators=is_open_indicators)
+            update_results = TrainingUpdateResult(lr=lr, sample_counts=sample_counts,
+                                                  is_open_indicators=is_open_indicators, eval_dict=results[-1])
+        else:
+            # Unit Test for Unified Batch Normalization
+            update_results = TrainingUpdateResult(lr=lr, sample_counts=sample_counts,
+                                                  is_open_indicators=is_open_indicators)
         return update_results
 
     def eval_network(self, sess, dataset, use_masking):

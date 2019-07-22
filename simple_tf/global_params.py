@@ -43,10 +43,11 @@ class Optimizer(Enum):
 
 
 class TrainingUpdateResult:
-    def __init__(self, lr, sample_counts, is_open_indicators):
+    def __init__(self, lr, sample_counts, is_open_indicators, eval_dict=None):
         self.lr = lr
         self.sampleCounts = sample_counts
         self.isOpenIndicators = is_open_indicators
+        self.evalDict = eval_dict
 
 
 class DenemeClass:
@@ -57,7 +58,6 @@ class DenemeClass:
 
 
 class GlobalConstants:
-
     # 2 GPU Settings
     # TOTAL_EPOCH_COUNT = 1200
     # EPOCH_COUNT = 1200
@@ -98,7 +98,7 @@ class GlobalConstants:
     USE_RANDOM_SAMPLING = False
 
     USE_FAST_TREE_MODE = True
-    EXPERIMENT_MULTIPLICATION_FACTOR = 3
+    EXPERIMENT_MULTIPLICATION_FACTOR = 4
     OPTIMIZER_TYPE = Optimizer.Momentum
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20

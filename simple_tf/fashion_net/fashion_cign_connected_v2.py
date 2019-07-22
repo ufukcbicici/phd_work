@@ -125,8 +125,8 @@ class FashionCignLite(FastTreeNetwork):
         # ***************** F: Convolution Layer *****************
 
         # ***************** H: Connected to F *****************
-        network.apply_router_transformation(network=network, net=net, node=node,
-                                            decision_feature_size=GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2)
+        FashionCignLite.apply_router_transformation(network=network, net=net, node=node,
+                                                    decision_feature_size=GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2)
         # ***************** H: Connected to F *****************
 
     @staticmethod
