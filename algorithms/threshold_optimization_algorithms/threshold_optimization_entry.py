@@ -6,10 +6,10 @@ from algorithms.threshold_optimization_algorithms.simulated_annealing_uniform_op
 from auxillary.parameters import DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
-run_id = 261
+run_id = 0
 # network_name = "Cifar100_CIGN_Sampling"
 network_name = "Cifar100_CIGN_MultiGpu"
-iterations = [119100 + i * 100 for i in range(10)]
+iterations = [118200]
 max_num_of_iterations = 10
 annealing_schedule = DecayingParameter(name="Temperature", value=100.0, decay=0.9999, decay_period=1)
 balance_coefficient = 1.0

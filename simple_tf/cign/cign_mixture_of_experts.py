@@ -49,9 +49,9 @@ class CignMixtureOfExperts(FastTreeNetwork):
             child_node = child_nodes[index]
             child_index = child_node.index
             arg_max_mask = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int32),
-                                              name="Mask_without_threshold_{0}".format(child_index)), [-1])
-            select_all_mask =
-            node.maskTensors[child_index] = mask_tensor
+                                               name="Mask_without_threshold_{0}".format(child_index)), [-1])
+            select_all_mask = tf.ones_like(arg_max_mask, dtype=tf.bool)
+            node.maskTensors[child_index] = tf.where(self.isTrain > 0, select_all_mask, arg_max_mask)
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
     def mask_input_nodes(self, node):
@@ -66,18 +66,21 @@ class CignMixtureOfExperts(FastTreeNetwork):
         else:
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
-            # Mask all inputs: F channel, H  channel, activations from ancestors, labels
-            parent_F = parent_node.fOpsList[-1]
-            parent_H = parent_node.hOpsList[-1]
-            for k, v in parent_node.activationsDict.items():
-                node.activationsDict[k] = v
-            node.labelTensor = parent_node.labelTensor
-            node.indicesTensor = parent_node.indicesTensor
-            node.oneHotLabelTensor = parent_node.oneHotLabelTensor
-            node.oneHotLabelTensor = self.oneHotLabelTensor
-            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
-            node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
+            mask_tensor = parent_node.maskTensors[node.index]
+            mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
+                                   tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
+            sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
+            node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
+            node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            # Mask all inputs: F channel, H  channel, activations from ancestors, labels
+            parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
+            parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
+            for k, v in parent_node.activationsDict.items():
+                node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
+            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
+            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
+            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
             return parent_F, parent_H
 
     def get_node_routing_probabilities(self, node):

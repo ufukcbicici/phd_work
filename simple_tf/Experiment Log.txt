@@ -137,6 +137,30 @@ FROM
 (
 	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 0 AND logs_table.Epoch <= 394
+	AND
+	Explanation LIKE "%Use Sampling CIGN:True%" AND
+	Explanation LIKE "%Use Random Sampling CIGN:True%" AND
+	Explanation LIKE "%Batch Size:250%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
 	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
 	AND
 	Explanation LIKE "%Use Sampling CIGN:True%" AND
@@ -267,6 +291,28 @@ FROM
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
 
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 0 AND logs_table.Epoch <= 144
+	AND
+	Explanation LIKE "%Resnet-50 Baseline Tests%" AND
+	Explanation LIKE "%num_of_features_per_block=[16, 64, 116, 120]%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
 
 SELECT RunID, Avg(ValidationAccuracy) AS AvgValidationAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 595 GROUP BY RunID;
 SELECT RunID, Avg(TestAccuracy) AS AvgTestAccuracy, COUNT(1) AS CNT FROM logs_table WHERE RunID IN (57,58) AND Epoch <= 129 GROUP BY RunID;
