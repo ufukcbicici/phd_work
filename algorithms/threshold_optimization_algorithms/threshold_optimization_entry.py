@@ -8,7 +8,7 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 
 run_id = 0
 # network_name = "Cifar100_CIGN_Sampling"
-network_name = "Cifar100_CIGN_MultiGpu"
+network_name = "Cifar100_CIGN_Single_GPU"
 iterations = [118200]
 max_num_of_iterations = 10
 annealing_schedule = DecayingParameter(name="Temperature", value=100.0, decay=0.9999, decay_period=1)
@@ -19,7 +19,7 @@ brute_force_sample_count = 100000
 
 def main():
     tree = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-    multipath_calculators = []
+    multipath_calculators = {}
     for iteration in iterations:
         leaf_true_labels_dict, branch_probs_dict, posterior_probs_dict, activations_dict = \
             SimpleAccuracyCalculator.load_routing_info(network=tree, run_id=run_id, iteration=iteration)
@@ -29,7 +29,7 @@ def main():
                                                      sample_count=sample_count,
                                                      label_list=label_list, branch_probs=branch_probs_dict,
                                                      activations=activations_dict, posterior_probs=posterior_probs_dict)
-        multipath_calculators.append(multipath_calculator)
+        multipath_calculators[iteration] = multipath_calculator
     sa_optimizer = SimulatedAnnealingUniformOptimizer(run_id=run_id,
                                                       network=tree, max_num_of_iterations=max_num_of_iterations,
                                                       annealing_schedule=annealing_schedule,

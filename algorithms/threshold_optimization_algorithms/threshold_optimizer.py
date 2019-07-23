@@ -7,6 +7,7 @@ class ThresholdOptimizer:
         self.runId = run_id
         self.network = network
         self.multipathScoreCalculators = multipath_score_calculators
+        self.iterations = str(list(self.multipathScoreCalculators.keys()))
         self.balanceCoefficient = balance_coefficient
         self.useWeightedScoring = use_weighted_scoring
         self.verbose = verbose
@@ -26,7 +27,7 @@ class ThresholdOptimizer:
         scores = []
         accuracies = []
         computation_overloads = []
-        for scorer in self.multipathScoreCalculators:
+        for scorer in self.multipathScoreCalculators.values():
             res_method_0, res_method_1 = scorer.calculate_for_threshold(thresholds_dict=threshold_state)
             result = res_method_1 if self.useWeightedScoring else res_method_0
             accuracy_gain = self.balanceCoefficient * result.accuracy

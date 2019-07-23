@@ -67,11 +67,11 @@ class BruteForceOptimizer(ThresholdOptimizer):
                 score = thread.bestResult[1]
                 accuracy = thread.bestResult[2]
                 computation_overload = thread.bestResult[3]
-                batch_results.append((self.runId, self.network.networkName,
+                batch_results.append((self.runId, self.network.networkName, self.iterations,
                                       self.balanceCoefficient, int(self.useWeightedScoring),
                                       score, accuracy, computation_overload))
             iteration += 1
-            DbLogger.write_into_table(rows=batch_results, table=DbLogger.threshold_optimization, col_count=7)
+            DbLogger.write_into_table(rows=batch_results, table=DbLogger.threshold_optimization, col_count=8)
         # for result in batch_results:
         #     print("threshold_state:{0} score:{1} accuracy:{2} computation_overload:{3}".format(
         #         result[0], result[1], result[2], result[3]))
