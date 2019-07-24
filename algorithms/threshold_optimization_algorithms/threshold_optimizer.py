@@ -31,7 +31,7 @@ class ThresholdOptimizer:
             res_method_0, res_method_1 = scorer.calculate_for_threshold(thresholds_dict=threshold_state)
             result = res_method_1 if self.useWeightedScoring else res_method_0
             accuracy_gain = self.balanceCoefficient * result.accuracy
-            computation_overload_loss = (1.0 - self.balanceCoefficient) * (result.computationOverload - 1.0)
+            computation_overload_loss = (1.0 - self.balanceCoefficient) * result.computationOverload
             score = accuracy_gain - computation_overload_loss
             accuracies.append(result.accuracy)
             computation_overloads.append(result.computationOverload)

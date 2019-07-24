@@ -25,6 +25,7 @@ class FastTreeNetwork(TreeNetwork):
         self.infoGainDicts = None
         self.extra_update_ops = None
         self.networkName = None
+        self.nodeCosts = {}
 
     # OK for MultiGPU
     def build_tree(self):
@@ -60,7 +61,7 @@ class FastTreeNetwork(TreeNetwork):
                     d.append(child_node)
 
     @staticmethod
-    def get_mock_tree(degree_list, network_name):
+    def get_mock_tree(degree_list, network_name, node_costs):
         tree = FastTreeNetwork(node_build_funcs=None, grad_func=None, hyperparameter_func=None,
                                residue_func=None, summary_func=None, degree_list=degree_list, dataset=None)
         # Build the tree topologically and create the Tensorflow placeholders
@@ -68,6 +69,7 @@ class FastTreeNetwork(TreeNetwork):
         # Build symbolic networks
         tree.topologicalSortedNodes = tree.dagObject.get_topological_sort()
         tree.networkName = network_name
+        tree.nodeCosts = node_costs
         return tree
 
     def prepare_evaluation_dictionary(self):

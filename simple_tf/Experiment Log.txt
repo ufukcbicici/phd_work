@@ -430,7 +430,7 @@ ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
 
 ***************************************************************************************************************
-20.07.2019 - DGX dblogger3.db
+20.07.2019 - DGX dblogger4.db
 -FashionNet Lite Large Batch Size Experiments
 -Probability Threshold:0.5 35000 Iteration after 0.4
 -Classification Dropouts are grid searched.

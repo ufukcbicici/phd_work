@@ -12,13 +12,14 @@ network_name = "Cifar100_CIGN_Single_GPU"
 iterations = [118200]
 max_num_of_iterations = 10
 annealing_schedule = DecayingParameter(name="Temperature", value=100.0, decay=0.9999, decay_period=1)
-balance_coefficient = 1.0
+balance_coefficient = 0.95
 use_weighted_scoring = False
 brute_force_sample_count = 100000
+node_costs = {i: 1 for i in range(7)}
 
 
 def main():
-    tree = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
+    tree = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
     multipath_calculators = {}
     for iteration in iterations:
         leaf_true_labels_dict, branch_probs_dict, posterior_probs_dict, activations_dict = \
@@ -37,12 +38,12 @@ def main():
                                                       use_weighted_scoring=use_weighted_scoring,
                                                       multipath_score_calculators=multipath_calculators,
                                                       verbose=True, neighbor_volume_ratio=0.1)
-    # sa_optimizer.run()
+    sa_optimizer.run()
 
-    bf_optimizer = BruteForceOptimizer(run_id=run_id, network=tree, sample_count=brute_force_sample_count,
-                                       multipath_score_calculators=multipath_calculators,
-                                       balance_coefficient=balance_coefficient,
-                                       use_weighted_scoring=use_weighted_scoring,
-                                       thread_count=10, verbose=True, batch_size=100)
-    bf_optimizer.run()
+    # bf_optimizer = BruteForceOptimizer(run_id=run_id, network=tree, sample_count=brute_force_sample_count,
+    #                                    multipath_score_calculators=multipath_calculators,
+    #                                    balance_coefficient=balance_coefficient,
+    #                                    use_weighted_scoring=use_weighted_scoring,
+    #                                    thread_count=10, verbose=True, batch_size=100)
+    # bf_optimizer.run()
     print("X")

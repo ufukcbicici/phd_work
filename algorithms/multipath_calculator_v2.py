@@ -36,20 +36,20 @@ class MultipathCalculatorV2:
         self.activations = activations
         self.posteriorProbs = posterior_probs
         self.routingResultsDict = {}
-        # all_result_tuples = cartesian_product()
-        # self.routingResultsDict = {}
-        # for node in self.network.topologicalSortedNodes:
-        #     if node.isLeaf:
-        #         leaf_ancestors = self.network.dagObject.ancestors(node=node)
-        #         leaf_ancestors.append(node)
-        #         self.rootToLeafPaths[node.index] = leaf_ancestors
+        self.networkActivationCosts = {}
         self.kvRows = []
+        self.baseEvaluationCost = None
+        self.get_evaluation_costs()
 
     def get_evaluation_costs(self):
         list_of_lists = []
-        for node in self.network.topologicalSortedNodes:
-            if node.isLeaf:
-                list_of_lists.append([0, 1])
+        path_costs = []
+        for node in self.leafNodes:
+            list_of_lists.append([0, 1])
+            leaf_ancestors = self.network.dagObject.ancestors(node=node)
+            leaf_ancestors.append(node)
+            path_costs.append(sum([self.network.nodeCosts[ancestor.index] for ancestor in leaf_ancestors]))
+        self.baseEvaluationCost = np.mean(np.array(path_costs))
         all_result_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=list_of_lists)
         for result_tuple in all_result_tuples:
             processed_nodes_set = set()
@@ -60,10 +60,9 @@ class MultipathCalculatorV2:
                 leaf_ancestors.append(curr_node)
                 for ancestor in leaf_ancestors:
                     processed_nodes_set.add(ancestor.index)
+            total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
+            self.networkActivationCosts[result_tuple] = total_cost
 
-
-
-        
     def get_routing_info_from_parent(self, curr_node, branching_info_dict):
         if curr_node.isRoot:
             reaches_to_this_node_vector = np.ones(shape=(self.sampleCount,), dtype=np.bool_)
@@ -90,6 +89,10 @@ class MultipathCalculatorV2:
 
     def calculate_for_threshold(self, thresholds_dict):
         branching_info_dict = {}
+
+        def get_computation_cost(leaf_activation):
+            return self.networkActivationCosts[tuple(leaf_activation.tolist())]
+
         # Calculate path probabilities
         for curr_node in self.innerNodes:
             reaches_to_this_node_vector, path_probability = \
@@ -127,6 +130,7 @@ class MultipathCalculatorV2:
             posteriors_matrix * np.expand_dims(routing_decisions_matrix, axis=1)
         posteriors_summed = np.sum(posteriors_matrix_with_routing, axis=2)
         leaf_counts_vector = np.sum(routing_decisions_matrix, axis=1, keepdims=True)
+        total_computation_cost = np.sum(np.apply_along_axis(get_computation_cost, axis=1, arr=routing_decisions_matrix))
         posteriors_averaged = posteriors_summed / leaf_counts_vector
         # Method 2: Use a weighted average for all valid posteriors, by using their path probabilities
         path_probabilities_matrix_with_routing = path_probabilities_matrix * routing_decisions_matrix
@@ -142,7 +146,7 @@ class MultipathCalculatorV2:
                               / float(self.sampleCount)
         accuracy_weighted_avg = np.sum((weighted_avg_predicted_labels == self.labelList).astype(np.float32)) \
                               / float(self.sampleCount)
-        computation_overload = total_leaves_evaluated / self.sampleCount
+        computation_overload = total_computation_cost / (self.sampleCount * self.baseEvaluationCost)
         # Tuple: Entry 0: Method Entry 1: Thresholds Entry 2: Accuracy Entry 3: Num of leaves evaluated
         # Entry 4: Computation Overload
         res_method_0 = MultipathCalculatorV2.MultipathResult(result_tuple=(0, thresholds_dict, accuracy_simple_avg,
