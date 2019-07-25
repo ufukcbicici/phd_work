@@ -10,11 +10,11 @@ run_id = 0
 # network_name = "Cifar100_CIGN_Sampling"
 network_name = "Cifar100_CIGN_Single_GPU"
 iterations = [118200]
-max_num_of_iterations = 10
-annealing_schedule = DecayingParameter(name="Temperature", value=100.0, decay=0.9999, decay_period=1)
+max_num_of_iterations = 10000
+annealing_schedule = DecayingParameter(name="Temperature", value=0.75, decay=0.999, decay_period=1)
 balance_coefficient = 0.95
 use_weighted_scoring = False
-brute_force_sample_count = 100000
+brute_force_sample_count = 10000
 node_costs = {i: 1 for i in range(7)}
 
 
