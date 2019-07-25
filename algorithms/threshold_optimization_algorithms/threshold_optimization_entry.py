@@ -1,6 +1,8 @@
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
 from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
 from algorithms.threshold_optimization_algorithms.brute_force_threshold_optimizer import BruteForceOptimizer
+from algorithms.threshold_optimization_algorithms.simulated_annealing_thread_runner import \
+    SimulatedAnnealingThreadRunner
 from algorithms.threshold_optimization_algorithms.simulated_annealing_uniform_optimizer import \
     SimulatedAnnealingUniformOptimizer
 from auxillary.parameters import DecayingParameter
@@ -11,8 +13,9 @@ run_id = 0
 network_name = "Cifar100_CIGN_Single_GPU"
 iterations = [118200]
 max_num_of_iterations = 10000
-annealing_schedule = DecayingParameter(name="Temperature", value=0.75, decay=0.999, decay_period=1)
-balance_coefficient = 0.95
+balance_coefficient = 1.0
+sa_sample_count = 100
+
 use_weighted_scoring = False
 brute_force_sample_count = 10000
 node_costs = {i: 1 for i in range(7)}
@@ -31,15 +34,22 @@ def main():
                                                      label_list=label_list, branch_probs=branch_probs_dict,
                                                      activations=activations_dict, posterior_probs=posterior_probs_dict)
         multipath_calculators[iteration] = multipath_calculator
-    sa_optimizer = SimulatedAnnealingUniformOptimizer(run_id=run_id,
-                                                      network=tree, max_num_of_iterations=max_num_of_iterations,
-                                                      annealing_schedule=annealing_schedule,
-                                                      balance_coefficient=balance_coefficient,
-                                                      use_weighted_scoring=use_weighted_scoring,
-                                                      multipath_score_calculators=multipath_calculators,
-                                                      verbose=True, neighbor_volume_ratio=0.1)
-    sa_optimizer.run()
 
+    sa_optimizers = []
+    for _ in range(sa_sample_count):
+        annealing_schedule = DecayingParameter(name="Temperature", value=0.75, decay=0.999, decay_period=1)
+        sa_optimizer = SimulatedAnnealingUniformOptimizer(run_id=run_id,
+                                                          network=tree, max_num_of_iterations=max_num_of_iterations,
+                                                          annealing_schedule=annealing_schedule,
+                                                          balance_coefficient=balance_coefficient,
+                                                          use_weighted_scoring=use_weighted_scoring,
+                                                          multipath_score_calculators=multipath_calculators,
+                                                          verbose=False, neighbor_volume_ratio=0.1)
+        sa_optimizers.append(sa_optimizer)
+
+    sa_algorithm_runner = SimulatedAnnealingThreadRunner(sa_optimizers=sa_optimizers, thread_count=10)
+    sa_algorithm_runner.run()
+    # sa_optimizer.run()
     # bf_optimizer = BruteForceOptimizer(run_id=run_id, network=tree, sample_count=brute_force_sample_count,
     #                                    multipath_score_calculators=multipath_calculators,
     #                                    balance_coefficient=balance_coefficient,
