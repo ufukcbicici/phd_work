@@ -49,6 +49,7 @@ SELECT RunID, Avg(TestAccuracy) AS AvgTestAccuracy, COUNT(1) AS CNT FROM logs_ta
 -Multi GPU
 
 Query:
+
 SELECT
 RunId,
 Max(RunId),
@@ -519,4 +520,43 @@ FROM
 	ORDER BY AvgValidationAccuracy DESC
 )
 GROUP BY ClassificationDropout, DecisionDropout
+***************************************************************************************************************
+
+
+***************************************************************************************************************
+27.07.2019 - DGX dblogger2.db
+-Resnet-50 CIFAR-100 CIGN, Info Gain Balance Coefficient: [2.0]
+-Wd: classification_wd = [0.00025, 0.0003, 0.00035]
+-Batch Size:250
+-Single GPU
+-Threshold starts with 0.5, decays to 0.4 at 35000. Iteration
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Decay Step:35000%"
+	AND
+	Explanation LIKE "%Batch Size:250%"
+	AND
+	Explanation LIKE "%Info Gain Balance Coefficient:2.0%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
 ***************************************************************************************************************
