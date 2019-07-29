@@ -162,13 +162,13 @@ FROM
 (
 	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
-	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 0 AND logs_table.Epoch <= 394
+	WHERE logs_table.RunId >= 51 AND logs_table.Epoch >= 499 AND logs_table.Epoch <= 529
 	AND
 	Explanation LIKE "%Use Sampling CIGN:True%" AND
 	Explanation LIKE "%Use Random Sampling CIGN:True%" AND
 	Explanation LIKE "%Batch Size:250%"
 )
-GROUP BY Explanation
+GROUP BY RunID
 ORDER BY AvgValidationAccuracy DESC
 
 SELECT

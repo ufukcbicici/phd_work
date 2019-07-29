@@ -14,6 +14,24 @@ class CignMixtureOfExperts(FastTreeNetwork):
                          dataset)
         GlobalConstants.USE_UNIFIED_BATCH_NORM = False
 
+    def get_parent_route_probs(self, node):
+        parent_nodes = self.dagObject.parents(node=node)
+        if len(parent_nodes) == 0:
+            raise Exception("This is the root node.")
+        assert len(parent_nodes) == 1
+        parent_node = parent_nodes[0]
+        p_n_given_x = parent_node.evalDict[self.get_variable_name(name="p(n|x)", node=parent_node)]
+        child_nodes = self.dagObject.children(node=parent_node)
+        child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
+        route_probs = None
+        for child_index, child_node in enumerate(child_nodes_sorted):
+            if child_node.index != node.index:
+                continue
+            route_probs = tf.expand_dims(p_n_given_x[:, child_index], axis=1)
+            break
+        assert route_probs is not None
+        return route_probs
+
     def apply_decision(self, node, branching_feature):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
@@ -35,25 +53,20 @@ class CignMixtureOfExperts(FastTreeNetwork):
         p_c_given_x = node.oneHotLabelTensor
         node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x,
                                                   balance_coefficient=self.informationGainBalancingCoefficient)
+        category_count = tf.constant(node_degree)
+        arg_max_indices = tf.argmax(p_n_given_x, axis=1, output_type=tf.int32)
+        arg_max_one_hot_matrix = tf.one_hot(arg_max_indices, category_count)
+        routing_probs = tf.where(self.isTrain > 0, p_n_given_x, arg_max_one_hot_matrix)
         node.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
         node.evalDict[self.get_variable_name(name="activations", node=node)] = activations
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
         node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
-        # During inference, pick argmax indices. Otherwise pick all samples during the training
-        arg_max_indices = tf.argmax(p_n_given_x, axis=1, output_type=tf.int32)
-        child_nodes = self.dagObject.children(node=node)
-        child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
-        for index in range(len(child_nodes)):
-            child_node = child_nodes[index]
-            child_index = child_node.index
-            arg_max_mask = tf.reshape(tf.equal(x=arg_max_indices, y=tf.constant(index, tf.int32),
-                                               name="Mask_without_threshold_{0}".format(child_index)), [-1])
-            select_all_mask = tf.ones_like(arg_max_mask, dtype=tf.bool)
-            node.maskTensors[child_index] = tf.where(self.isTrain > 0, select_all_mask, arg_max_mask)
-            node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
+        node.evalDict[self.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
+        node.evalDict[self.get_variable_name(name="routing_probs", node=node)] = routing_probs
 
+    # No actual masking for MoE models.
     def mask_input_nodes(self, node):
         print("Masking Node:{0}".format(node.index))
         if node.isRoot:
@@ -66,21 +79,19 @@ class CignMixtureOfExperts(FastTreeNetwork):
         else:
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
-            mask_tensor = parent_node.maskTensors[node.index]
-            mask_tensor = tf.where(self.useMasking > 0, mask_tensor,
-                                   tf.logical_or(x=tf.constant(value=True, dtype=tf.bool), y=mask_tensor))
-            sample_count_tensor = tf.reduce_sum(tf.cast(mask_tensor, tf.float32))
+            route_probs = self.get_parent_route_probs(node=node)
+            sample_count_tensor = tf.reduce_sum(route_probs)
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
             node.isOpenIndicatorTensor = tf.where(sample_count_tensor > 0.0, 1.0, 0.0)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
             # Mask all inputs: F channel, H  channel, activations from ancestors, labels
-            parent_F = tf.boolean_mask(parent_node.fOpsList[-1], mask_tensor)
-            parent_H = tf.boolean_mask(parent_node.hOpsList[-1], mask_tensor)
+            parent_F = parent_node.fOpsList[-1]
+            parent_H = parent_node.hOpsList[-1]
             for k, v in parent_node.activationsDict.items():
-                node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
-            node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
-            node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
-            node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
+                node.activationsDict[k] = v
+            node.labelTensor = parent_node.labelTensor
+            node.indicesTensor = parent_node.indicesTensor
+            node.oneHotLabelTensor = parent_node.oneHotLabelTensor
             return parent_F, parent_H
 
     def get_node_routing_probabilities(self, node):
@@ -93,14 +104,8 @@ class CignMixtureOfExperts(FastTreeNetwork):
                 break
             assert len(parent_nodes) == 1
             parent_node = parent_nodes[0]
-            p_n_given_x = parent_node.evalDict[self.get_variable_name(name="p(n|x)", node=parent_node)]
-            child_nodes = self.dagObject.children(node=parent_node)
-            child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
-            for child_index, child_node in enumerate(child_nodes_sorted):
-                if child_node.index != curr_node.index:
-                    continue
-                route_probs = tf.expand_dims(p_n_given_x[:, child_index], axis=1)
-                routing_probs.append(route_probs)
+            route_probs = self.get_parent_route_probs(node=curr_node)
+            routing_probs.append(route_probs)
             curr_node = parent_node
         routing_matrix = tf.concat(values=routing_probs, axis=1)
         final_route_probs = tf.reduce_prod(routing_matrix, axis=1, keepdims=True)
