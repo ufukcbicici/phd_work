@@ -9,7 +9,7 @@ from simple_tf.global_params import GlobalConstants
 
 class Cifar100_CignRandomSampling(CignRandomSample):
     def __init__(self, degree_list, dataset):
-        node_build_funcs = [Cifar100_Cign.root_func, Cifar100_Cign.l1_func, Cifar100_Cign.leaf_func]
+        node_build_funcs = [Cifar100_Cign.cign_block_func] * (len(degree_list) + 1)
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset)
 
     def get_explanation_string(self):

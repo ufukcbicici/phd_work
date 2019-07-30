@@ -9,14 +9,16 @@ from algorithms.resnet.resnet_generator import ResnetGenerator
 strides = GlobalConstants.RESNET_HYPERPARAMS.strides
 activate_before_residual = GlobalConstants.RESNET_HYPERPARAMS.activate_before_residual
 filters = GlobalConstants.RESNET_HYPERPARAMS.num_of_features_per_block
-# num_of_units_per_block = GlobalConstants.RESNET_HYPERPARAMS.num_residual_units
+num_of_units_per_block = GlobalConstants.RESNET_HYPERPARAMS.num_residual_units
 relu_leakiness = GlobalConstants.RESNET_HYPERPARAMS.relu_leakiness
 first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_size
+
+assert len(num_of_units_per_block) + 1 == len(filters)
 
 
 class Cifar100_Cign(FastTreeNetwork):
     def __init__(self, degree_list, dataset):
-        node_build_funcs = [Cifar100_Cign.root_func, Cifar100_Cign.l1_func, Cifar100_Cign.leaf_func]
+        node_build_funcs = [Cifar100_Cign.cign_block_func] * (len(degree_list) + 1)
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset)
 
     @staticmethod
@@ -54,115 +56,7 @@ class Cifar100_Cign(FastTreeNetwork):
             network.apply_decision(node=node, branching_feature=ig_feature)
 
     @staticmethod
-    def resnet_block(x, network, node, block_id, num_of_units_per_block,
-                     filter_0, filter_1, stride, activate_before_residual):
-        # MultiGPU OK
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_0".format(block_id), node=node)):
-            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filter_0, out_filter=filter_1,
-                                                    stride=ResnetGenerator.stride_arr(stride),
-                                                    activate_before_residual=activate_before_residual,
-                                                    relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # MultiGPU OK
-        for i in range(num_of_units_per_block - 1):
-            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(block_id, i + 1),
-                                                                  node=node)):
-                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filter_1,
-                                                        out_filter=filter_1,
-                                                        stride=ResnetGenerator.stride_arr(1),
-                                                        activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        return x
-
-    # MultiGPU OK
-    @staticmethod
-    def root_func(network, node):
-        network.mask_input_nodes(node=node)
-        # Input layer
-        # MultiGPU OK
-        x = ResnetGenerator.get_input(input=network.dataTensor, out_filters=filters[0],
-                                      first_conv_filter_size=first_conv_filter_size)
-        # Block 1
-
-
-
-        # # MultiGPU OK
-        # with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_0", node=node)):
-        #     x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[0], out_filter=filters[1],
-        #                                             stride=ResnetGenerator.stride_arr(strides[0]),
-        #                                             activate_before_residual=activate_before_residual[0],
-        #                                             relu_leakiness=relu_leakiness, is_train=network.isTrain,
-        #                                             bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # # MultiGPU OK
-        # for i in range(num_of_units_per_block - 1):
-        #     with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_{0}".format(i + 1), node=node)):
-        #         x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1],
-        #                                                 out_filter=filters[1],
-        #                                                 stride=ResnetGenerator.stride_arr(1),
-        #                                                 activate_before_residual=False,
-        #                                                 relu_leakiness=relu_leakiness, is_train=network.isTrain,
-        #                                                 bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        node.fOpsList.extend([x])
-        # MultiGPU OK
-        # ***************** H: Connected to F *****************
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="decision_variables", node=node)):
-            Cifar100_Cign.apply_router_transformation(net=x, network=network, node=node,
-                                                      decision_feature_size=GlobalConstants.RESNET_DECISION_DIMENSION)
-        # ***************** H: Connected to F *****************
-
-    # MultiGPU OK
-    @staticmethod
-    def l1_func(network, node):
-        # MultiGPU OK
-        parent_F, parent_H = network.mask_input_nodes(node=node)
-        x = parent_F
-        # MultiGPU OK
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_2_0", node=node)):
-            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1], out_filter=filters[2],
-                                                    stride=ResnetGenerator.stride_arr(strides[1]),
-                                                    activate_before_residual=activate_before_residual[1],
-                                                    relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # MultiGPU OK
-        for i in range(num_of_units_per_block - 1):
-            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_2_{0}".format(i + 1), node=node)):
-                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[2],
-                                                        out_filter=filters[2],
-                                                        stride=ResnetGenerator.stride_arr(1),
-                                                        activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        node.fOpsList.extend([x])
-        # MultiGPU OK
-        # ***************** H: Connected to F *****************
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="decision_variables", node=node)):
-            Cifar100_Cign.apply_router_transformation(net=x, network=network, node=node,
-                                                      decision_feature_size=GlobalConstants.RESNET_DECISION_DIMENSION)
-        # ***************** H: Connected to F *****************
-
-    # MultiGPU OK
-    @staticmethod
-    def leaf_func(network, node):
-        # MultiGPU OK
-        parent_F, parent_H = network.mask_input_nodes(node=node)
-        x = parent_F
-        # MultiGPU OK
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_3_0", node=node)):
-            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[2], out_filter=filters[3],
-                                                    stride=ResnetGenerator.stride_arr(strides[2]),
-                                                    activate_before_residual=activate_before_residual[2],
-                                                    relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # MultiGPU OK
-        for i in range(num_of_units_per_block - 1):
-            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_3_{0}".format(i + 1), node=node)):
-                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[3],
-                                                        out_filter=filters[3],
-                                                        stride=ResnetGenerator.stride_arr(1),
-                                                        activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+    def apply_resnet_loss(x, network, node):
         # Logit Layers
         with tf.variable_scope(UtilityFuncs.get_variable_name(name="unit_last", node=node)):
             x = ResnetGenerator.get_output(x=x, is_train=network.isTrain, leakiness=relu_leakiness,
@@ -190,6 +84,50 @@ class Cifar100_Cign(FastTreeNetwork):
         # Evaluation
         node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
         node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
+
+    @staticmethod
+    def cign_block_func(network, node):
+        # Block Parameters
+        in_filter = filters[node.depth]
+        out_filter = filters[node.depth + 1]
+        stride = strides[node.depth]
+        _activate_before_residual = activate_before_residual[node.depth]
+        num_of_units_in_this_node = num_of_units_per_block[node.depth]
+        # Input to the node
+        parent_F, parent_H = network.mask_input_nodes(node=node)
+        if node.isRoot:
+            x = ResnetGenerator.get_input(input=network.dataTensor, out_filters=in_filter,
+                                          first_conv_filter_size=first_conv_filter_size)
+        else:
+            x = parent_F
+        # Block body
+        if num_of_units_in_this_node > 0:
+            # MultiGPU OK
+            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_0".format(node.depth + 1), node=node)):
+                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=in_filter, out_filter=out_filter,
+                                                        stride=ResnetGenerator.stride_arr(stride),
+                                                        activate_before_residual=_activate_before_residual,
+                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+            # MultiGPU OK
+            for i in range(num_of_units_in_this_node - 1):
+                with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(node.depth + 1, i + 1),
+                                                                      node=node)):
+                    x = ResnetGenerator.bottleneck_residual(x=x, in_filter=out_filter,
+                                                            out_filter=out_filter,
+                                                            stride=ResnetGenerator.stride_arr(1),
+                                                            activate_before_residual=False,
+                                                            relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                            bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+        node.fOpsList.extend([x])
+        if not node.isLeaf:
+            # ***************** H: Connected to F *****************
+            with tf.variable_scope(UtilityFuncs.get_variable_name(name="decision_variables", node=node)):
+                Cifar100_Cign.apply_router_transformation(net=x, network=network, node=node,
+                                                          decision_feature_size=GlobalConstants.RESNET_DECISION_DIMENSION)
+            # ***************** H: Connected to F *****************
+        else:
+            Cifar100_Cign.apply_resnet_loss(x=x, network=network, node=node)
 
     @staticmethod
     def residue_network_func(network):

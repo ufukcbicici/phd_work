@@ -76,6 +76,7 @@ class CignMixtureOfExperts(FastTreeNetwork):
             node.evalDict[self.get_variable_name(name="sample_count", node=node)] = tf.size(node.labelTensor)
             node.isOpenIndicatorTensor = tf.constant(value=1.0, dtype=tf.float32)
             node.evalDict[self.get_variable_name(name="is_open", node=node)] = node.isOpenIndicatorTensor
+            return None, None
         else:
             # Obtain the mask vector, sample counts and determine if this node receives samples.
             parent_node = self.dagObject.parents(node=node)[0]
