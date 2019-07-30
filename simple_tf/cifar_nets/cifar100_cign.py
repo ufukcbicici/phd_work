@@ -9,7 +9,7 @@ from algorithms.resnet.resnet_generator import ResnetGenerator
 strides = GlobalConstants.RESNET_HYPERPARAMS.strides
 activate_before_residual = GlobalConstants.RESNET_HYPERPARAMS.activate_before_residual
 filters = GlobalConstants.RESNET_HYPERPARAMS.num_of_features_per_block
-num_of_units_per_block = GlobalConstants.RESNET_HYPERPARAMS.num_residual_units
+# num_of_units_per_block = GlobalConstants.RESNET_HYPERPARAMS.num_residual_units
 relu_leakiness = GlobalConstants.RESNET_HYPERPARAMS.relu_leakiness
 first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_size
 
@@ -53,6 +53,28 @@ class Cifar100_Cign(FastTreeNetwork):
         else:
             network.apply_decision(node=node, branching_feature=ig_feature)
 
+    @staticmethod
+    def resnet_block(x, network, node, block_id, num_of_units_per_block,
+                     filter_0, filter_1, stride, activate_before_residual):
+        # MultiGPU OK
+        with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_0".format(block_id), node=node)):
+            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filter_0, out_filter=filter_1,
+                                                    stride=ResnetGenerator.stride_arr(stride),
+                                                    activate_before_residual=activate_before_residual,
+                                                    relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+        # MultiGPU OK
+        for i in range(num_of_units_per_block - 1):
+            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(block_id, i + 1),
+                                                                  node=node)):
+                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filter_1,
+                                                        out_filter=filter_1,
+                                                        stride=ResnetGenerator.stride_arr(1),
+                                                        activate_before_residual=False,
+                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
+                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+        return x
+
     # MultiGPU OK
     @staticmethod
     def root_func(network, node):
@@ -62,22 +84,25 @@ class Cifar100_Cign(FastTreeNetwork):
         x = ResnetGenerator.get_input(input=network.dataTensor, out_filters=filters[0],
                                       first_conv_filter_size=first_conv_filter_size)
         # Block 1
-        # MultiGPU OK
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_0", node=node)):
-            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[0], out_filter=filters[1],
-                                                    stride=ResnetGenerator.stride_arr(strides[0]),
-                                                    activate_before_residual=activate_before_residual[0],
-                                                    relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # MultiGPU OK
-        for i in range(num_of_units_per_block - 1):
-            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_{0}".format(i + 1), node=node)):
-                x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1],
-                                                        out_filter=filters[1],
-                                                        stride=ResnetGenerator.stride_arr(1),
-                                                        activate_before_residual=False,
-                                                        relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+
+
+
+        # # MultiGPU OK
+        # with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_0", node=node)):
+        #     x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[0], out_filter=filters[1],
+        #                                             stride=ResnetGenerator.stride_arr(strides[0]),
+        #                                             activate_before_residual=activate_before_residual[0],
+        #                                             relu_leakiness=relu_leakiness, is_train=network.isTrain,
+        #                                             bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+        # # MultiGPU OK
+        # for i in range(num_of_units_per_block - 1):
+        #     with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_{0}".format(i + 1), node=node)):
+        #         x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[1],
+        #                                                 out_filter=filters[1],
+        #                                                 stride=ResnetGenerator.stride_arr(1),
+        #                                                 activate_before_residual=False,
+        #                                                 relu_leakiness=relu_leakiness, is_train=network.isTrain,
+        #                                                 bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
         node.fOpsList.extend([x])
         # MultiGPU OK
         # ***************** H: Connected to F *****************
