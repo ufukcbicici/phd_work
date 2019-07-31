@@ -13,9 +13,9 @@ from simple_tf.cifar_nets.cifar100_multi_gpu_cign import Cifar100_MultiGpuCign
 from simple_tf.cifar_nets.cifar100_resnet_baseline import Cifar100_Baseline
 from simple_tf.global_params import GlobalConstants
 
-use_multi_gpu = True
+use_multi_gpu = False
 use_sampling = False
-use_random_sampling = False
+use_random_sampling = True
 use_baseline = False
 
 
@@ -38,7 +38,8 @@ def get_network(dataset):
 def cifar_100_training():
     import sys
     print(sys.version)
-    classification_wd = [0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+    classification_wd = [0.00035]
+    classification_wd.extend([0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
