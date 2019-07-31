@@ -126,6 +126,7 @@ class Cifar100_CignSampling(CignWithSampling):
         self.networkName = "Cifar100_CIGN_Sampling"
 
     def set_hyperparameters(self, **kwargs):
+        self.nodeCosts = {node.index: 1 for node in self.topologicalSortedNodes}
         # Regularization Parameters
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
