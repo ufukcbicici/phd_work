@@ -3,9 +3,10 @@ from collections import deque
 import numpy as np
 import tensorflow as tf
 import time
+import os
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
-from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
+from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.tree import TreeNetwork
@@ -13,6 +14,7 @@ from simple_tf.global_params import GlobalConstants, AccuracyCalcType, TrainingU
 from algorithms.info_gain import InfoGainLoss
 from simple_tf.uncategorized.node import Node
 from auxillary.constants import DatasetTypes
+from sklearn.metrics import confusion_matrix
 
 
 class FastTreeNetwork(TreeNetwork):
@@ -581,41 +583,301 @@ class FastTreeNetwork(TreeNetwork):
         selected_indices = tf.cast(tf.argmax(gumbel_max, axis=1), tf.int32)
         return selected_indices
 
-    def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
-        if not self.modeTracker.isCompressed:
-            if calculation_type == AccuracyCalcType.regular:
-                accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
-                                                                                 dataset_type=dataset_type,
-                                                                                 run_id=run_id,
-                                                                                 iteration=iteration)
-                return accuracy, confusion
-            elif calculation_type == AccuracyCalcType.route_correction:
-                accuracy_corrected, marginal_corrected = \
-                    self.accuracyCalculator.calculate_accuracy_with_route_correction(
-                        sess=sess, dataset=dataset,
-                        dataset_type=dataset_type)
-                return accuracy_corrected, marginal_corrected
-            elif calculation_type == AccuracyCalcType.with_residue_network:
-                self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                                dataset_type=dataset_type)
-            elif calculation_type == AccuracyCalcType.multi_path:
-                # Outdated
-                # self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
-                #                                                      dataset_type=dataset_type, run_id=run_id,
-                #                                                      iteration=iteration)
-                SimpleAccuracyCalculator.calculate_accuracy_multipath(network=self, sess=sess,
-                                                                      dataset=dataset,
-                                                                      dataset_type=dataset_type,
-                                                                      run_id=run_id,
-                                                                      iteration=iteration)
+    @staticmethod
+    def save_routing_info(network, run_id, iteration,
+                          leaf_true_labels_dict, branch_probs_dict,
+                          posterior_probs_dict, activations_dict):
+        curr_path = os.path.dirname(os.path.abspath(__file__))
+        directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(curr_path, ".."),
+                                                                   "saved_training_data"),
+                                                      "{0}_run_{1}_iteration_{2}".format(network.networkName,
+                                                                                         run_id, iteration)))
+        os.mkdir(directory_path)
+        arr_dict = {"tree_type": {"tree_type": np.array(network.degreeList)},
+                    "label_tensor": leaf_true_labels_dict,
+                    "branch_probs": branch_probs_dict,
+                    "posterior_probs": posterior_probs_dict,
+                    "activations": activations_dict}
+        for arr_name, _dict in arr_dict.items():
+            npz_file_name = os.path.abspath(os.path.join(directory_path, arr_name))
+            _string_dict = {}
+            for k, v in _dict.items():
+                _string_dict["{0}".format(k)] = v
+            UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=_string_dict)
+
+    @staticmethod
+    def load_routing_info(network, run_id, iteration):
+        curr_path = os.path.dirname(os.path.abspath(__file__))
+        directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(curr_path, ".."),
+                                                                   "saved_training_data"),
+                                                      "{0}_run_{1}_iteration_{2}".format(network.networkName,
+                                                                                         run_id, iteration)))
+        # Assert that the tree architecture is compatible with the loaded info
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
+        degree_list = UtilityFuncs.load_npz(file_name=npz_file_name)
+        assert np.array_equal(np.array(network.degreeList), degree_list["tree_type"])
+        # True labels
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "label_tensor"))
+        leaf_true_labels_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
+        # Branch probabilities
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "branch_probs"))
+        branch_probs_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
+        # Posterior probabilities
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "posterior_probs"))
+        posterior_probs_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
+        # Activations
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "activations"))
+        activations_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
+        return leaf_true_labels_dict, branch_probs_dict, posterior_probs_dict, activations_dict
+
+    # Unit Test
+    @staticmethod
+    def test_save_load(network, run_id, iteration,
+                       leaf_true_labels_dict, branch_probs_dict,
+                       posterior_probs_dict, activations_dict):
+        FastTreeNetwork.save_routing_info(network=network, run_id=run_id, iteration=iteration,
+                                          leaf_true_labels_dict=leaf_true_labels_dict,
+                                          branch_probs_dict=branch_probs_dict,
+                                          posterior_probs_dict=posterior_probs_dict,
+                                          activations_dict=activations_dict)
+
+        r_leaf_true_labels_dict, r_branch_probs_dict, r_posterior_probs_dict, r_activations_dict = \
+            FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration)
+        assert len(leaf_true_labels_dict) == len(r_leaf_true_labels_dict)
+        assert len(branch_probs_dict) == len(r_branch_probs_dict)
+        assert len(posterior_probs_dict) == len(r_posterior_probs_dict)
+        assert len(activations_dict) == len(r_activations_dict)
+        for k, v in leaf_true_labels_dict.items():
+            assert np.array_equal(v, r_leaf_true_labels_dict[k])
+        for k, v in branch_probs_dict.items():
+            assert np.array_equal(v, r_branch_probs_dict[k])
+        for k, v in posterior_probs_dict.items():
+            assert np.array_equal(v, r_posterior_probs_dict[k])
+        for k, v in activations_dict.items():
+            assert np.array_equal(v, r_activations_dict[k])
+
+    @staticmethod
+    def calculate_information_gain(info_gain_dict, kv_rows, dataset_type, run_id, iteration):
+        # Measure Information Gain
+        total_info_gain = 0.0
+        for k, v in info_gain_dict.items():
+            avg_info_gain = sum(v) / float(len(v))
+            print("IG_{0}={1}".format(k, -avg_info_gain))
+            total_info_gain -= avg_info_gain
+            kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
+        kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
+
+    @staticmethod
+    def measure_branch_probs(branch_probs, run_id, iteration, dataset_type, kv_rows):
+        # Measure Branching Probabilities
+        for k, v in branch_probs.items():
+            p_n = np.mean(v, axis=0)
+            arg_max_arr = np.argmax(v, axis=1)
+            max_counts = {i: np.sum(arg_max_arr == i) for i in range(p_n.shape[0])}
+            print("Argmax counts:{0}".format(max_counts))
+            for branch in range(p_n.shape[0]):
+                print("{0} p_{1}({2})={3}".format(dataset_type, k, branch, p_n[branch]))
+                kv_rows.append((run_id, iteration, "{0} p_{1}({2})".format(dataset_type, k, branch),
+                                np.asscalar(p_n[branch])))
+
+    @staticmethod
+    def calculate_branch_probability_histograms(branch_probs):
+        for k, v in branch_probs.items():
+            # Interval analysis
+            print("Node:{0}".format(k))
+            bin_size = 0.1
+            for j in range(v.shape[1]):
+                histogram = {}
+                for i in range(v.shape[0]):
+                    prob = v[i, j]
+                    bin_id = int(prob / bin_size)
+                    if bin_id not in histogram:
+                        histogram[bin_id] = 0
+                    histogram[bin_id] += 1
+                sorted_histogram = sorted(list(histogram.items()), key=lambda e: e[0], reverse=False)
+                print(histogram)
+
+    def label_distribution_analysis(self,
+                                    run_id,
+                                    iteration,
+                                    kv_rows,
+                                    leaf_true_labels_dict,
+                                    dataset,
+                                    dataset_type):
+        label_count = dataset.get_label_count()
+        label_distribution = np.zeros(shape=(label_count,))
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            if node.index not in leaf_true_labels_dict:
+                continue
+            true_labels = leaf_true_labels_dict[node.index]
+            for l in range(label_count):
+                label_distribution[l] = np.sum(true_labels == l)
+                kv_rows.append((run_id, iteration, "{0} Leaf:{1} True Label:{2}".
+                                format(dataset_type, node.index, l), np.asscalar(label_distribution[l])))
+
+    def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration):
+        kv_rows = []
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        inner_node_outputs = ["info_gain", "p(n|x)", "activations"]
+        leaf_node_outputs = ["posterior_probs", "label_tensor"]
+        leaf_node_collections, inner_node_collections = \
+            self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
+                                                   use_masking=True,
+                                                   leaf_node_collection_names=leaf_node_outputs,
+                                                   inner_node_collections_names=inner_node_outputs)
+        info_gain_dict = inner_node_collections["info_gain"]
+        branch_probs_dict = inner_node_collections["p(n|x)"]
+        leaf_true_labels_dict = leaf_node_collections["label_tensor"]
+        posteriors_dict = leaf_node_collections["posterior_probs"]
+        # Measure Information Gain
+        FastTreeNetwork.calculate_information_gain(info_gain_dict=info_gain_dict, kv_rows=kv_rows,
+                                                   dataset_type=dataset_type, run_id=run_id, iteration=iteration)
+        # Measure Branching Probabilities
+        FastTreeNetwork.measure_branch_probs(run_id=run_id, iteration=iteration, dataset_type=dataset_type,
+                                             branch_probs=branch_probs_dict, kv_rows=kv_rows)
+        # Measure The Histogram of Branching Probabilities
+        FastTreeNetwork.calculate_branch_probability_histograms(branch_probs=branch_probs_dict)
+        # Measure Label Distribution
+        self.label_distribution_analysis(run_id=run_id, iteration=iteration, kv_rows=kv_rows,
+                                         leaf_true_labels_dict=leaf_true_labels_dict,
+                                         dataset=dataset, dataset_type=dataset_type)
+        # Measure accuracy
+        total_correct_count = 0
+        total_sample_count = 0
+        all_predicted = None
+        all_truths = None
+        for node in self.topologicalSortedNodes:
+            if not node.isLeaf:
+                continue
+            leaf_posteriors = posteriors_dict[node.index]
+            true_labels = leaf_true_labels_dict[node.index]
+            assert leaf_posteriors.shape[0] == true_labels.shape[0]
+            predicted_labels = np.argmax(leaf_posteriors, axis=1)
+            correct_count = np.sum(predicted_labels == true_labels)
+            total_correct_count += correct_count
+            total_sample_count += true_labels.shape[0]
+            if all_predicted is None:
+                all_predicted = predicted_labels
             else:
-                raise NotImplementedError()
-        else:
-            best_leaf_accuracy, residue_corrected_accuracy = \
-                self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
-                                                                             dataset_type=dataset_type,
-                                                                             run_id=run_id, iteration=iteration)
-            return best_leaf_accuracy, residue_corrected_accuracy
+                all_predicted = np.concatenate([all_predicted, predicted_labels], axis=0)
+            if all_truths is None:
+                all_truths = true_labels
+            else:
+                all_truths = np.concatenate([all_truths, true_labels], axis=0)
+            if true_labels.shape[0] > 0:
+                print("Leaf {0}: Sample Count:{1} Accuracy:{2}".format(node.index, correct_count,
+                                                                       float(correct_count) / float(
+                                                                           true_labels.shape[0])))
+            else:
+                print("Leaf {0} is empty.".format(node.index))
+        total_accuracy = float(total_correct_count) / float(total_sample_count)
+        # Prepare the confusion matrix
+        cm = confusion_matrix(y_true=all_truths, y_pred=all_predicted)
+        print("*************Overall {0} samples. Overall Accuracy:{1}*************"
+              .format(total_sample_count, total_accuracy))
+        # Calculate modes
+        self.modeTracker.calculate_modes(leaf_true_labels_dict=leaf_true_labels_dict,
+                                         dataset=dataset, dataset_type=dataset_type, kv_rows=kv_rows,
+                                         run_id=run_id, iteration=iteration)
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+
+    def calculate_accuracy_multipath(self, sess, dataset, dataset_type, run_id, iteration):
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        inner_node_outputs = ["p(n|x)", "activations"]
+        leaf_node_outputs = ["posterior_probs", "label_tensor"]
+        leaf_node_collections, inner_node_collections = \
+            self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
+                                                   use_masking=False,
+                                                   leaf_node_collection_names=leaf_node_outputs,
+                                                   inner_node_collections_names=inner_node_outputs)
+        leaf_true_labels_dict = leaf_node_collections["label_tensor"]
+        branch_probs_dict = inner_node_collections["p(n|x)"]
+        posterior_probs_dict = leaf_node_collections["posterior_probs"]
+        activations_dict = inner_node_collections["activations"]
+        # SimpleAccuracyCalculator.test_save_load(network=network, run_id=run_id, iteration=iteration,
+        #                                         leaf_true_labels_dict=leaf_true_labels_dict,
+        #                                         branch_probs_dict=branch_probs_dict,
+        #                                         posterior_probs_dict=posterior_probs_dict,
+        #                                         activations_dict=activations_dict)
+        # # Save the the info from this iteration
+        if GlobalConstants.SAVE_PATH_INFO_TO_HD:
+            FastTreeNetwork.save_routing_info(network=self, run_id=run_id, iteration=iteration,
+                                              leaf_true_labels_dict=leaf_true_labels_dict,
+                                              branch_probs_dict=branch_probs_dict,
+                                              posterior_probs_dict=posterior_probs_dict,
+                                              activations_dict=activations_dict)
+        thresholds = []
+        for threshold in GlobalConstants.MULTIPATH_SCHEDULES:
+            t_dict = {}
+            for node in self.topologicalSortedNodes:
+                if not node.isLeaf:
+                    child_count = len(self.dagObject.children(node=node))
+                    t_dict[node.index] = threshold * np.ones(shape=(child_count,))
+            thresholds.append(t_dict)
+        leaf_labels = list(leaf_true_labels_dict.values())
+        assert all([np.array_equal(leaf_labels[0], leaf_labels[i]) for i in range(len(leaf_labels))])
+        label_list = leaf_labels[0]
+        sample_count = label_list.shape[0]
+        multipath_calculator = MultipathCalculatorV2(thresholds_list=thresholds, network=self,
+                                                     sample_count=sample_count, label_list=label_list,
+                                                     branch_probs=branch_probs_dict,
+                                                     activations=activations_dict,
+                                                     posterior_probs=posterior_probs_dict)
+        results = multipath_calculator.run()
+        kv_rows = []
+        for result in results:
+            # Tuple: Entry 0: Method Entry 1: Thresholds Entry 2: Accuracy Entry 3: Num of leaves evaluated
+            # Entry 4: Computation Overload
+            method = result.methodType
+            path_threshold = result.thresholdsDict[0][0]
+            accuracy = result.accuracy
+            total_leaves_evaluated = result.totalLeavesEvaluated
+            kv_rows.append((run_id, iteration, method, path_threshold, accuracy, total_leaves_evaluated))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.multipath_results_table_v2, col_count=6)
+
+    def calculate_model_performance(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
+        # Delete this in future
+        accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
+                                                                         dataset_type=dataset_type,
+                                                                         run_id=run_id,
+                                                                         iteration=iteration)
+
+        # if not self.modeTracker.isCompressed:
+        #     if calculation_type == AccuracyCalcType.regular:
+        #         accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
+        #                                                                          dataset_type=dataset_type,
+        #                                                                          run_id=run_id,
+        #                                                                          iteration=iteration)
+        #         return accuracy, confusion
+        #     elif calculation_type == AccuracyCalcType.route_correction:
+        #         accuracy_corrected, marginal_corrected = \
+        #             self.accuracyCalculator.calculate_accuracy_with_route_correction(
+        #                 sess=sess, dataset=dataset,
+        #                 dataset_type=dataset_type)
+        #         return accuracy_corrected, marginal_corrected
+        #     elif calculation_type == AccuracyCalcType.with_residue_network:
+        #         self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+        #                                                                         dataset_type=dataset_type)
+        #     elif calculation_type == AccuracyCalcType.multi_path:
+        #         # Outdated
+        #         # self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
+        #         #                                                      dataset_type=dataset_type, run_id=run_id,
+        #         #                                                      iteration=iteration)
+        #         self.calculate_accuracy_multipath(sess=sess,
+        #                                           dataset=dataset,
+        #                                           dataset_type=dataset_type,
+        #                                           run_id=run_id,
+        #                                           iteration=iteration)
+        #     else:
+        #         raise NotImplementedError()
+        # else:
+        #     best_leaf_accuracy, residue_corrected_accuracy = \
+        #         self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
+        #                                                                      dataset_type=dataset_type,
+        #                                                                      run_id=run_id, iteration=iteration)
+        #     return best_leaf_accuracy, residue_corrected_accuracy
 
     def train(self, sess, dataset, run_id):
         iteration_counter = 0
@@ -649,30 +911,30 @@ class FastTreeNetwork(TreeNetwork):
                         print("Epoch Time={0}".format(total_time))
                         if not self.modeTracker.isCompressed:
                             training_accuracy, training_confusion = \
-                                self.calculate_accuracy(sess=sess, dataset=dataset,
-                                                        dataset_type=DatasetTypes.training,
-                                                        run_id=run_id, iteration=iteration_counter,
-                                                        calculation_type=AccuracyCalcType.regular)
+                                self.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                 dataset_type=DatasetTypes.training,
+                                                                 run_id=run_id, iteration=iteration_counter,
+                                                                 calculation_type=AccuracyCalcType.regular)
                             validation_accuracy, validation_confusion = \
-                                self.calculate_accuracy(sess=sess, dataset=dataset,
-                                                        dataset_type=DatasetTypes.test,
-                                                        run_id=run_id, iteration=iteration_counter,
-                                                        calculation_type=AccuracyCalcType.regular)
+                                self.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                 dataset_type=DatasetTypes.test,
+                                                                 run_id=run_id, iteration=iteration_counter,
+                                                                 calculation_type=AccuracyCalcType.regular)
                             if not self.isBaseline:
                                 validation_accuracy_corrected, validation_marginal_corrected = \
-                                    self.calculate_accuracy(sess=sess, dataset=dataset,
-                                                            dataset_type=DatasetTypes.test,
-                                                            run_id=run_id,
-                                                            iteration=iteration_counter,
-                                                            calculation_type=
-                                                            AccuracyCalcType.route_correction)
+                                    self.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                     dataset_type=DatasetTypes.test,
+                                                                     run_id=run_id,
+                                                                     iteration=iteration_counter,
+                                                                     calculation_type=
+                                                                     AccuracyCalcType.route_correction)
                                 if is_evaluation_epoch_before_ending:
-                                    self.calculate_accuracy(sess=sess, dataset=dataset,
-                                                            dataset_type=DatasetTypes.test,
-                                                            run_id=run_id,
-                                                            iteration=iteration_counter,
-                                                            calculation_type=
-                                                            AccuracyCalcType.multi_path)
+                                    self.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                     dataset_type=DatasetTypes.test,
+                                                                     run_id=run_id,
+                                                                     iteration=iteration_counter,
+                                                                     calculation_type=
+                                                                     AccuracyCalcType.multi_path)
                             else:
                                 validation_accuracy_corrected = 0.0
                                 validation_marginal_corrected = 0.0
@@ -688,15 +950,15 @@ class FastTreeNetwork(TreeNetwork):
                                                           col_count=7)
                         else:
                             training_accuracy_best_leaf, training_confusion_residue = \
-                                self.calculate_accuracy(sess=sess, dataset=dataset,
-                                                        dataset_type=DatasetTypes.training,
-                                                        run_id=run_id, iteration=iteration_counter,
-                                                        calculation_type=AccuracyCalcType.regular)
+                                self.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                 dataset_type=DatasetTypes.training,
+                                                                 run_id=run_id, iteration=iteration_counter,
+                                                                 calculation_type=AccuracyCalcType.regular)
                             validation_accuracy_best_leaf, validation_confusion_residue = \
-                                self.calculate_accuracy(sess=sess, dataset=dataset,
-                                                        dataset_type=DatasetTypes.test,
-                                                        run_id=run_id, iteration=iteration_counter,
-                                                        calculation_type=AccuracyCalcType.regular)
+                                self.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                 dataset_type=DatasetTypes.test,
+                                                                 run_id=run_id, iteration=iteration_counter,
+                                                                 calculation_type=AccuracyCalcType.regular)
                             DbLogger.write_into_table(rows=[(run_id, iteration_counter, epoch_id,
                                                              training_accuracy_best_leaf,
                                                              validation_accuracy_best_leaf,

@@ -2,9 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
-from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
 from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import FixedParameter, DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
@@ -352,14 +350,14 @@ class CignMultiGpu(FastTreeNetwork):
 
     # TODO: At sometime in the future, we should implement multi gpu accuracy calculation as well.
     #  But not now (31.05.2019)
-    def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
+    def calculate_model_performance(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
         network = self.towerNetworks[0][1]
         if not network.modeTracker.isCompressed:
             if calculation_type == AccuracyCalcType.regular:
-                accuracy, confusion = network.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
-                                                                                    dataset_type=dataset_type,
-                                                                                    run_id=run_id,
-                                                                                    iteration=iteration)
+                accuracy, confusion = network.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                                             dataset_type=dataset_type,
+                                                                                             run_id=run_id,
+                                                                                             iteration=iteration)
                 return accuracy, confusion
             elif calculation_type == AccuracyCalcType.route_correction:
                 accuracy_corrected, marginal_corrected = \
@@ -371,11 +369,11 @@ class CignMultiGpu(FastTreeNetwork):
                 network.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
                                                                                    dataset_type=dataset_type)
             elif calculation_type == AccuracyCalcType.multi_path:
-                SimpleAccuracyCalculator.calculate_accuracy_multipath(network=network, sess=sess,
-                                                                      dataset=dataset,
-                                                                      dataset_type=dataset_type,
-                                                                      run_id=run_id,
-                                                                      iteration=iteration)
+                network.calculate_accuracy_multipath(sess=sess,
+                                                     dataset=dataset,
+                                                     dataset_type=dataset_type,
+                                                     run_id=run_id,
+                                                     iteration=iteration)
             else:
                 raise NotImplementedError()
         else:

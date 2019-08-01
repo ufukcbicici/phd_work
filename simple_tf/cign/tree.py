@@ -306,22 +306,6 @@ class TreeNetwork:
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return do_compress
 
-    def calculate_branch_probability_histograms(self, branch_probs):
-        for k, v in branch_probs.items():
-            # Interval analysis
-            print("Node:{0}".format(k))
-            bin_size = 0.1
-            for j in range(v.shape[1]):
-                histogram = {}
-                for i in range(v.shape[0]):
-                    prob = v[i, j]
-                    bin_id = int(prob / bin_size)
-                    if bin_id not in histogram:
-                        histogram[bin_id] = 0
-                    histogram[bin_id] += 1
-                sorted_histogram = sorted(list(histogram.items()), key=lambda e: e[0], reverse=False)
-                print(histogram)
-
     def get_probability_thresholds(self, feed_dict, iteration, update):
         for node in self.topologicalSortedNodes:
             if node.isLeaf:

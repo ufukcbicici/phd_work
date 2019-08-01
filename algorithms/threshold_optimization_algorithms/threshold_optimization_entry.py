@@ -1,5 +1,4 @@
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
-from algorithms.simple_accuracy_calculator import SimpleAccuracyCalculator
 from algorithms.threshold_optimization_algorithms.brute_force_threshold_optimizer import BruteForceOptimizer
 from algorithms.threshold_optimization_algorithms.simulated_annealing_thread_runner import \
     SimulatedAnnealingThreadRunner
@@ -26,7 +25,7 @@ def main():
     multipath_calculators = {}
     for iteration in iterations:
         leaf_true_labels_dict, branch_probs_dict, posterior_probs_dict, activations_dict = \
-            SimpleAccuracyCalculator.load_routing_info(network=tree, run_id=run_id, iteration=iteration)
+            FastTreeNetwork.load_routing_info(network=tree, run_id=run_id, iteration=iteration)
         label_list = list(leaf_true_labels_dict.values())[0]
         sample_count = label_list.shape[0]
         multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=tree,

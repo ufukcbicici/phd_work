@@ -182,7 +182,7 @@ class JungleNoStitch(Jungle):
                 test(results[-1])
         return lr, sample_counts, is_open_indicators
 
-    def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
+    def calculate_model_performance(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}

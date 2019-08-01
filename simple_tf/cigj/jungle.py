@@ -447,7 +447,7 @@ class Jungle(FastTreeNetwork):
                 kv_rows.append((run_id, iteration, "{0} Leaf:{1} True Label:{2}".
                                 format(dataset_type, node.index, l), np.asscalar(label_distribution[l])))
 
-    def calculate_accuracy(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
+    def calculate_model_performance(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}

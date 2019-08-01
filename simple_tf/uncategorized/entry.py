@@ -642,29 +642,29 @@ def main_fast_tree():
                         print("Epoch Time={0}".format(total_time))
                         if not network.modeTracker.isCompressed:
                             training_accuracy, training_confusion = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.training,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
+                                network.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                    dataset_type=DatasetTypes.training,
+                                                                    run_id=experiment_id, iteration=iteration_counter,
+                                                                    calculation_type=AccuracyCalcType.regular)
                             validation_accuracy, validation_confusion = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.test,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
+                                network.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                    dataset_type=DatasetTypes.test,
+                                                                    run_id=experiment_id, iteration=iteration_counter,
+                                                                    calculation_type=AccuracyCalcType.regular)
                             if not network.isBaseline:
                                 validation_accuracy_corrected, validation_marginal_corrected = \
-                                    network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                               dataset_type=DatasetTypes.test,
-                                                               run_id=experiment_id,
-                                                               iteration=iteration_counter,
-                                                               calculation_type=
+                                    network.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                        dataset_type=DatasetTypes.test,
+                                                                        run_id=experiment_id,
+                                                                        iteration=iteration_counter,
+                                                                        calculation_type=
                                                                AccuracyCalcType.route_correction)
                                 if epoch_id >= 90:
-                                    network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                               dataset_type=DatasetTypes.test,
-                                                               run_id=experiment_id,
-                                                               iteration=iteration_counter,
-                                                               calculation_type=
+                                    network.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                        dataset_type=DatasetTypes.test,
+                                                                        run_id=experiment_id,
+                                                                        iteration=iteration_counter,
+                                                                        calculation_type=
                                                                AccuracyCalcType.multi_path)
                             else:
                                 validation_accuracy_corrected = 0.0
@@ -681,15 +681,15 @@ def main_fast_tree():
                                                           col_count=7)
                         else:
                             training_accuracy_best_leaf, training_confusion_residue = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.training,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
+                                network.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                    dataset_type=DatasetTypes.training,
+                                                                    run_id=experiment_id, iteration=iteration_counter,
+                                                                    calculation_type=AccuracyCalcType.regular)
                             validation_accuracy_best_leaf, validation_confusion_residue = \
-                                network.calculate_accuracy(sess=sess, dataset=dataset,
-                                                           dataset_type=DatasetTypes.test,
-                                                           run_id=experiment_id, iteration=iteration_counter,
-                                                           calculation_type=AccuracyCalcType.regular)
+                                network.calculate_model_performance(sess=sess, dataset=dataset,
+                                                                    dataset_type=DatasetTypes.test,
+                                                                    run_id=experiment_id, iteration=iteration_counter,
+                                                                    calculation_type=AccuracyCalcType.regular)
                             DbLogger.write_into_table(rows=[(experiment_id, iteration_counter, epoch_id,
                                                              training_accuracy_best_leaf,
                                                              validation_accuracy_best_leaf,
