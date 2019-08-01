@@ -104,7 +104,7 @@ class GlobalConstants:
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
     # NO_HIDDEN = 10  # 30
-    TREE_DEGREE_LIST = [2, 2, 2]
+    TREE_DEGREE_LIST = [2, 2]
     NO_FILTERS_1 = 20
     NO_FILTERS_2 = 15  # 10
     NO_HIDDEN = 25  # 30
@@ -262,10 +262,16 @@ class GlobalConstants:
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
     # Resnet Params
-    RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 15, 1], use_bottleneck=True,
-                                       num_of_features_per_block=[16, 64, 64, 64, 64],
+    # RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 15, 1], use_bottleneck=True,
+    #                                    num_of_features_per_block=[16, 64, 64, 64, 64],
+    #                                    first_conv_filter_size=3, relu_leakiness=0.1,
+    #                                    strides=[1, 2, 2, 1], activate_before_residual=[True, False, False, False])
+
+    RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 16], use_bottleneck=True,
+                                       num_of_features_per_block=[16, 64, 64, 64],
                                        first_conv_filter_size=3, relu_leakiness=0.1,
-                                       strides=[1, 2, 2, 1], activate_before_residual=[True, False, False, False])
+                                       strides=[1, 2, 2], activate_before_residual=[True, False, False])
+
     RESNET_TREE_DEGREES = [2, 2]
     RESNET_DECISION_DIMENSION = 128
 
