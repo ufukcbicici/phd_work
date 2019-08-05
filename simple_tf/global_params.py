@@ -104,7 +104,7 @@ class GlobalConstants:
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
     # NO_HIDDEN = 10  # 30
-    TREE_DEGREE_LIST = [2, 2]
+    TREE_DEGREE_LIST = [2, 3]
     NO_FILTERS_1 = 20
     NO_FILTERS_2 = 15  # 10
     NO_HIDDEN = 25  # 30

@@ -49,10 +49,10 @@ class DbLogger:
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger3_cign.db"
 
     # TRUBA 4
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger4_cign.db"
+    log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger4_cign.db"
 
     # TRUBA 5
-    log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger5_cign.db"
+    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger5_cign.db"
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}
