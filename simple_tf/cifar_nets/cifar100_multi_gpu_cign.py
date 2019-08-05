@@ -108,10 +108,10 @@ class Cifar100_MultiGpuCign(CignMultiGpu):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 1200
-        GlobalConstants.EPOCH_COUNT = 1200
-        GlobalConstants.EPOCH_REPORT_PERIOD = 10
-        GlobalConstants.BATCH_SIZE = 500
+        GlobalConstants.TOTAL_EPOCH_COUNT = 2400
+        GlobalConstants.EPOCH_COUNT = 2400
+        GlobalConstants.EPOCH_REPORT_PERIOD = 20
+        GlobalConstants.BATCH_SIZE = 1000
         GlobalConstants.EVAL_BATCH_SIZE = 250
         GlobalConstants.USE_MULTI_GPU = True
         GlobalConstants.USE_SAMPLING_CIGN = False

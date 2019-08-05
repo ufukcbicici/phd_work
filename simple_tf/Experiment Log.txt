@@ -169,7 +169,7 @@ FROM
 	Explanation LIKE "%Batch Size:250%"
 )
 GROUP BY RunID
-ORDER BY AvgValidationAccuracy DESC
+ORDER BY RunID DESC
 
 SELECT
 RunId,
@@ -418,13 +418,13 @@ ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
 
 ***************************************************************************************************************
-19.07.2019 - TRUBA dblogger5_cign.db
+04.08.2019 - TRUBA dblogger5_cign.db
 -Resnet-50 CIGN
 -Probability Threshold:0.5 35000 Iteration after 0.4
-- Share among 4 GPUs, 125 batch size per GPU
--Wd: classification_wd = [0.0002, 0.00025, 0.0003, 0.00035] * (GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR * 5)
+- Share among 4 GPUs, 250 batch size per GPU
+-Wd: classification_wd = [0.00025, 0.0003, 0.00035, 0.0004] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
 -Decision Wd:0.0
--Batch Size:500
+-Batch Size:1000
 -Multi GPU
 
 Query:
@@ -444,7 +444,7 @@ FROM
 (
 	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
-	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1190
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 2390
 	AND
 	Explanation LIKE "%Decay Step:35000%"
 	AND
@@ -555,6 +555,87 @@ FROM
 	Explanation LIKE "%Batch Size:250%"
 	AND
 	Explanation LIKE "%Info Gain Balance Coefficient:2.0%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+***************************************************************************************************************
+
+
+***************************************************************************************************************
+04.08.2019 - TRUBA dblogger3_cign.db
+-Depth 4 Resnet-50 CIGN
+-RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 16, 0], use_bottleneck=True,
+                                       num_of_features_per_block=[16, 64, 64, 64, 64],
+                                       first_conv_filter_size=3, relu_leakiness=0.1,
+                                       strides=[1, 2, 2, 1], activate_before_residual=[True, False, False, False])
+-Resnet-50 CIFAR-100 CIGN, Info Gain Balance Coefficient: [1.0]
+-Wd: classification_wd = [0.0001, 0.00015, 0.0002, 0.00025] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+-Batch Size:250
+-Single GPU
+-Threshold starts with 0.5, decays to 0.4 at 35000. Iteration
+-Information Gain Balance:2.0
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Decay Step:35000%"
+	AND
+	Explanation LIKE "%Batch Size:250%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+***************************************************************************************************************
+
+***************************************************************************************************************
+05.08.2019 - TRUBA dblogger4_cign.db
+-[2, 3] Resnet-50 CIGN
+-Resnet-50 CIFAR-100 CIGN, Info Gain Balance Coefficient: [1.0]
+-Wd: classification_wd = [0.0001, 0.00015, 0.0002, 0.00025] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+-Batch Size:250
+-Single GPU
+-Threshold starts with 0.5, decays to 0.4 at 35000. Iteration
+-Information Gain Balance:1.0
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
+	AND
+	Explanation LIKE "%Decay Step:35000%"
+	AND
+	Explanation LIKE "%Batch Size:250%"
 )
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
