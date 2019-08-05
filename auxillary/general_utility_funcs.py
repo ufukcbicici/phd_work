@@ -126,9 +126,17 @@ class UtilityFuncs:
     @staticmethod
     def concat_to_np_array_dict(dct, key, array):
         if key not in dct:
-            dct[key] = array
+            if not np.isscalar(array):
+                dct[key] = array
+            else:
+                scalar = array
+                dct[key] = np.array(scalar)
         else:
-            dct[key] = np.concatenate((dct[key], array))
+            if not np.isscalar(array):
+                dct[key] = np.concatenate((dct[key], array))
+            else:
+                scalar = array
+                dct[key] = np.append(dct[key], scalar)
 
     @staticmethod
     def unpickle(file):

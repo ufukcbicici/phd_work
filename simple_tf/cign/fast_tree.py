@@ -839,45 +839,42 @@ class FastTreeNetwork(TreeNetwork):
 
     def calculate_model_performance(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
         # Delete this in future
-        accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
-                                                                         dataset_type=dataset_type,
-                                                                         run_id=run_id,
-                                                                         iteration=iteration)
-
-        # if not self.modeTracker.isCompressed:
-        #     if calculation_type == AccuracyCalcType.regular:
-        #         accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
-        #                                                                          dataset_type=dataset_type,
-        #                                                                          run_id=run_id,
-        #                                                                          iteration=iteration)
-        #         return accuracy, confusion
-        #     elif calculation_type == AccuracyCalcType.route_correction:
-        #         accuracy_corrected, marginal_corrected = \
-        #             self.accuracyCalculator.calculate_accuracy_with_route_correction(
-        #                 sess=sess, dataset=dataset,
-        #                 dataset_type=dataset_type)
-        #         return accuracy_corrected, marginal_corrected
-        #     elif calculation_type == AccuracyCalcType.with_residue_network:
-        #         self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-        #                                                                         dataset_type=dataset_type)
-        #     elif calculation_type == AccuracyCalcType.multi_path:
-        #         # Outdated
-        #         # self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
-        #         #                                                      dataset_type=dataset_type, run_id=run_id,
-        #         #                                                      iteration=iteration)
-        #         self.calculate_accuracy_multipath(sess=sess,
-        #                                           dataset=dataset,
-        #                                           dataset_type=dataset_type,
-        #                                           run_id=run_id,
-        #                                           iteration=iteration)
-        #     else:
-        #         raise NotImplementedError()
-        # else:
-        #     best_leaf_accuracy, residue_corrected_accuracy = \
-        #         self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
-        #                                                                      dataset_type=dataset_type,
-        #                                                                      run_id=run_id, iteration=iteration)
-        #     return best_leaf_accuracy, residue_corrected_accuracy
+        if not self.modeTracker.isCompressed:
+            if calculation_type == AccuracyCalcType.regular:
+                accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
+                                                                                 dataset_type=dataset_type,
+                                                                                 run_id=run_id,
+                                                                                 iteration=iteration)
+                self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=dataset_type, run_id=run_id,
+                                        iteration=iteration)
+                return accuracy, confusion
+            elif calculation_type == AccuracyCalcType.route_correction:
+                accuracy_corrected, marginal_corrected = \
+                    self.accuracyCalculator.calculate_accuracy_with_route_correction(
+                        sess=sess, dataset=dataset,
+                        dataset_type=dataset_type)
+                return accuracy_corrected, marginal_corrected
+            elif calculation_type == AccuracyCalcType.with_residue_network:
+                self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
+                                                                                dataset_type=dataset_type)
+            elif calculation_type == AccuracyCalcType.multi_path:
+                # Outdated
+                # self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
+                #                                                      dataset_type=dataset_type, run_id=run_id,
+                #                                                      iteration=iteration)
+                self.calculate_accuracy_multipath(sess=sess,
+                                                  dataset=dataset,
+                                                  dataset_type=dataset_type,
+                                                  run_id=run_id,
+                                                  iteration=iteration)
+            else:
+                raise NotImplementedError()
+        else:
+            best_leaf_accuracy, residue_corrected_accuracy = \
+                self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
+                                                                             dataset_type=dataset_type,
+                                                                             run_id=run_id, iteration=iteration)
+            return best_leaf_accuracy, residue_corrected_accuracy
 
     def train(self, sess, dataset, run_id):
         iteration_counter = 0

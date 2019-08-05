@@ -332,11 +332,11 @@ class FashionCignLite(FastTreeNetwork):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 200
-        GlobalConstants.EPOCH_COUNT = 200
-        GlobalConstants.EPOCH_REPORT_PERIOD = 5
-        GlobalConstants.BATCH_SIZE = 250
-        GlobalConstants.EVAL_BATCH_SIZE = 250
+        GlobalConstants.TOTAL_EPOCH_COUNT = 100
+        GlobalConstants.EPOCH_COUNT = 100
+        GlobalConstants.EPOCH_REPORT_PERIOD = 1
+        GlobalConstants.BATCH_SIZE = 125
+        GlobalConstants.EVAL_BATCH_SIZE = 125
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False
         GlobalConstants.USE_RANDOM_SAMPLING = False
