@@ -588,7 +588,7 @@ class FastTreeNetwork(TreeNetwork):
                           leaf_true_labels_dict, branch_probs_dict,
                           posterior_probs_dict, activations_dict):
         curr_path = os.path.dirname(os.path.abspath(__file__))
-        directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(curr_path, ".."),
+        directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
                                                       "{0}_run_{1}_iteration_{2}".format(network.networkName,
                                                                                          run_id, iteration)))
@@ -722,11 +722,14 @@ class FastTreeNetwork(TreeNetwork):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         inner_node_outputs = ["info_gain", "p(n|x)", "activations"]
         leaf_node_outputs = ["posterior_probs", "label_tensor"]
+        t0 = time.time()
         leaf_node_collections, inner_node_collections = \
             self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
                                                    use_masking=True,
                                                    leaf_node_collection_names=leaf_node_outputs,
                                                    inner_node_collections_names=inner_node_outputs)
+        t1 = time.time()
+        print(t1 - t0)
         info_gain_dict = inner_node_collections["info_gain"]
         branch_probs_dict = inner_node_collections["p(n|x)"]
         leaf_true_labels_dict = leaf_node_collections["label_tensor"]
@@ -782,6 +785,7 @@ class FastTreeNetwork(TreeNetwork):
                                          dataset=dataset, dataset_type=dataset_type, kv_rows=kv_rows,
                                          run_id=run_id, iteration=iteration)
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
+        return total_accuracy, cm
 
     def calculate_accuracy_multipath(self, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
@@ -845,9 +849,10 @@ class FastTreeNetwork(TreeNetwork):
                                                                                  dataset_type=dataset_type,
                                                                                  run_id=run_id,
                                                                                  iteration=iteration)
-                self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=dataset_type, run_id=run_id,
-                                        iteration=iteration)
-                return accuracy, confusion
+                accuray2, confusion2 = self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=dataset_type,
+                                                               run_id=run_id,
+                                                               iteration=iteration)
+                return accuracy, confusion, accuray2, confusion2
             elif calculation_type == AccuracyCalcType.route_correction:
                 accuracy_corrected, marginal_corrected = \
                     self.accuracyCalculator.calculate_accuracy_with_route_correction(
@@ -907,12 +912,12 @@ class FastTreeNetwork(TreeNetwork):
                     if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
                         print("Epoch Time={0}".format(total_time))
                         if not self.modeTracker.isCompressed:
-                            training_accuracy, training_confusion = \
+                            training_accuracy, training_confusion, training_accuracy2, training_confusion2 = \
                                 self.calculate_model_performance(sess=sess, dataset=dataset,
                                                                  dataset_type=DatasetTypes.training,
                                                                  run_id=run_id, iteration=iteration_counter,
                                                                  calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy, validation_confusion = \
+                            validation_accuracy, validation_confusion, validation_accuracy2, validation_confusion2 = \
                                 self.calculate_model_performance(sess=sess, dataset=dataset,
                                                                  dataset_type=DatasetTypes.test,
                                                                  run_id=run_id, iteration=iteration_counter,
@@ -938,6 +943,10 @@ class FastTreeNetwork(TreeNetwork):
                             DbLogger.write_into_table(
                                 rows=[(run_id, iteration_counter, epoch_id, training_accuracy,
                                        validation_accuracy, validation_accuracy_corrected,
+                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                            DbLogger.write_into_table(
+                                rows=[(run_id, iteration_counter, epoch_id, training_accuracy2,
+                                       validation_accuracy2, validation_accuracy_corrected,
                                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
                             # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                             if GlobalConstants.SAVE_CONFUSION_MATRICES:

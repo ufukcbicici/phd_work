@@ -1,5 +1,5 @@
 import numpy as np
-
+import time
 from algorithms.multipath_calculator import MultipathCalculator
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -94,6 +94,7 @@ class AccuracyCalculator:
         info_gain_dict = {}
         branch_probs_dict = {}
         chosen_indices_dict = {}
+        t0 = time.time()
         while True:
             results, _ = self.network.eval_network(sess=sess, dataset=dataset, use_masking=True)
             if results is not None:
@@ -129,6 +130,8 @@ class AccuracyCalculator:
                     raise Exception("Incorrect batch size:{0}".format(batch_sample_count))
             if dataset.isNewEpoch:
                 break
+        t1 = time.time()
+        print(t1 - t0)
         print("****************Dataset:{0}****************".format(dataset_type))
         if GlobalConstants.USE_SAMPLING_CIGN:
             for node_id in branch_probs_dict.keys():

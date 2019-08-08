@@ -636,6 +636,8 @@ FROM
 	Explanation LIKE "%Decay Step:35000%"
 	AND
 	Explanation LIKE "%Batch Size:250%"
+	AND
+	Explanation LIKE "%Tree Degree:[2, 3]%"
 )
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
