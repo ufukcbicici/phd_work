@@ -845,14 +845,14 @@ class FastTreeNetwork(TreeNetwork):
         # Delete this in future
         if not self.modeTracker.isCompressed:
             if calculation_type == AccuracyCalcType.regular:
-                accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
-                                                                                 dataset_type=dataset_type,
-                                                                                 run_id=run_id,
-                                                                                 iteration=iteration)
-                accuray2, confusion2 = self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=dataset_type,
-                                                               run_id=run_id,
-                                                               iteration=iteration)
-                return accuracy, confusion, accuray2, confusion2
+                # accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
+                #                                                                  dataset_type=dataset_type,
+                #                                                                  run_id=run_id,
+                #                                                                  iteration=iteration)
+                accuracy, confusion = self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=dataset_type,
+                                                              run_id=run_id,
+                                                              iteration=iteration)
+                return accuracy, confusion
             elif calculation_type == AccuracyCalcType.route_correction:
                 accuracy_corrected, marginal_corrected = \
                     self.accuracyCalculator.calculate_accuracy_with_route_correction(
@@ -912,12 +912,12 @@ class FastTreeNetwork(TreeNetwork):
                     if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
                         print("Epoch Time={0}".format(total_time))
                         if not self.modeTracker.isCompressed:
-                            training_accuracy, training_confusion, training_accuracy2, training_confusion2 = \
+                            training_accuracy, training_confusion = \
                                 self.calculate_model_performance(sess=sess, dataset=dataset,
                                                                  dataset_type=DatasetTypes.training,
                                                                  run_id=run_id, iteration=iteration_counter,
                                                                  calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy, validation_confusion, validation_accuracy2, validation_confusion2 = \
+                            validation_accuracy, validation_confusion = \
                                 self.calculate_model_performance(sess=sess, dataset=dataset,
                                                                  dataset_type=DatasetTypes.test,
                                                                  run_id=run_id, iteration=iteration_counter,
@@ -944,10 +944,10 @@ class FastTreeNetwork(TreeNetwork):
                                 rows=[(run_id, iteration_counter, epoch_id, training_accuracy,
                                        validation_accuracy, validation_accuracy_corrected,
                                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
-                            DbLogger.write_into_table(
-                                rows=[(run_id, iteration_counter, epoch_id, training_accuracy2,
-                                       validation_accuracy2, validation_accuracy_corrected,
-                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                            # DbLogger.write_into_table(
+                            #     rows=[(run_id, iteration_counter, epoch_id, training_accuracy2,
+                            #            validation_accuracy2, validation_accuracy_corrected,
+                            #            0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
                             # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
                             if GlobalConstants.SAVE_CONFUSION_MATRICES:
                                 DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,

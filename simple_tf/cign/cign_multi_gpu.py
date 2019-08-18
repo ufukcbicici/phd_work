@@ -354,10 +354,9 @@ class CignMultiGpu(FastTreeNetwork):
         network = self.towerNetworks[0][1]
         if not network.modeTracker.isCompressed:
             if calculation_type == AccuracyCalcType.regular:
-                accuracy, confusion = network.calculate_model_performance(sess=sess, dataset=dataset,
-                                                                                             dataset_type=dataset_type,
-                                                                                             run_id=run_id,
-                                                                                             iteration=iteration)
+                accuracy, confusion = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=dataset_type,
+                                                                 run_id=run_id,
+                                                                 iteration=iteration)
                 return accuracy, confusion
             elif calculation_type == AccuracyCalcType.route_correction:
                 accuracy_corrected, marginal_corrected = \
