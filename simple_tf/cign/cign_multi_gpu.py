@@ -22,7 +22,6 @@ class CignMultiGpu(FastTreeNetwork):
         self.dataset = dataset
         self.applyGradientsOp = None
         self.batchNormMovingAvgAssignOps = []
-        self.towerBatchSize = None
         # Unit test variables
         self.batchNormMovingAverageValues = {}
 
@@ -55,7 +54,6 @@ class CignMultiGpu(FastTreeNetwork):
         print(devices)
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
-        self.towerBatchSize = GlobalConstants.BATCH_SIZE / len(devices)
         with tf.device(GlobalConstants.GLOBAL_PINNING_DEVICE):
             with tf.variable_scope("multiple_networks"):
                 self.build_optimizer()
@@ -264,13 +262,16 @@ class CignMultiGpu(FastTreeNetwork):
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         # Load the placeholders in each tower separately
+        actual_batch_size = minibatch.samples.shape[0]
+        assert actual_batch_size % len(self.towerNetworks) == 0
+        single_tower_batch_size = actual_batch_size / len(self.towerNetworks)
         feed_dict = {self.iterationHolder: iteration}
         # Global parameters
         for tower_id, tpl in enumerate(self.towerNetworks):
             device_str = tpl[0]
             network = tpl[1]
-            lower_bound = int(tower_id * self.towerBatchSize)
-            upper_bound = int((tower_id + 1) * self.towerBatchSize)
+            lower_bound = int(tower_id * single_tower_batch_size)
+            upper_bound = int((tower_id + 1) * single_tower_batch_size)
             feed_dict[network.dataTensor] = minibatch.samples[lower_bound:upper_bound]
             feed_dict[network.labelTensor] = minibatch.labels[lower_bound:upper_bound]
             feed_dict[network.indicesTensor] = minibatch.indices[lower_bound:upper_bound]
@@ -282,7 +283,7 @@ class CignMultiGpu(FastTreeNetwork):
             feed_dict[network.useMasking] = int(use_masking)
             feed_dict[network.informationGainBalancingCoefficient] = GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT
             feed_dict[network.iterationHolder] = iteration
-            feed_dict[network.filteredMask] = np.ones((int(self.towerBatchSize),), dtype=bool)
+            feed_dict[network.filteredMask] = np.ones((int(single_tower_batch_size),), dtype=bool)
             if is_train:
                 feed_dict[network.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             else:
