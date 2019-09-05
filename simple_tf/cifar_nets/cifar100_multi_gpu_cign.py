@@ -122,6 +122,21 @@ class Cifar100_MultiGpuCign(CignMultiGpu):
                                                                      schedule=[(40000, 0.01),
                                                                                (70000, 0.001),
                                                                                (100000, 0.0001)])
+        # GlobalConstants.TOTAL_EPOCH_COUNT = 1200
+        # GlobalConstants.EPOCH_COUNT = 1200
+        # GlobalConstants.EPOCH_REPORT_PERIOD = 10
+        # GlobalConstants.BATCH_SIZE = 500
+        # GlobalConstants.EVAL_BATCH_SIZE = 250
+        # GlobalConstants.USE_MULTI_GPU = True
+        # GlobalConstants.USE_SAMPLING_CIGN = False
+        # GlobalConstants.USE_RANDOM_SAMPLING = False
+        # GlobalConstants.INITIAL_LR = 0.1
+        # GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+        #                                                              value=GlobalConstants.INITIAL_LR,
+        #                                                              schedule=[(40000, 0.01),
+        #                                                                        (70000, 0.001),
+        #                                                                        (100000, 0.0001)])
+
         GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:CPU:0"
         self.networkName = "Cifar100_CIGN_MultiGpu"
 
