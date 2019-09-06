@@ -42,7 +42,8 @@ def cifar_100_training():
     # classification_wd = [0.00025, 0.0003, 0.00035, 0.0004] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd.extend([0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
     classification_wd = [0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    # classification_wd = [0.0004, 0.0004, 0.0004]
+    # classification_wd = [0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+    # classification_wd = [0.00015, 0.0002, 0.00025] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]

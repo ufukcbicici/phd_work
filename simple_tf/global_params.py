@@ -81,6 +81,7 @@ class GlobalConstants:
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 250
     USE_MULTI_GPU = False
+    USE_CPU_AS_DEVICE = False
 
     # 1 GPU Setting Random Sampling
     # TOTAL_EPOCH_COUNT = 240

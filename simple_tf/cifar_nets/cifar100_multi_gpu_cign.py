@@ -182,3 +182,4 @@ class Cifar100_MultiGpuCign(CignMultiGpu):
         self.decisionDropoutKeepProbCalculator = self.towerNetworks[0][1].decisionDropoutKeepProbCalculator
         self.noiseCoefficientCalculator = self.towerNetworks[0][1].noiseCoefficientCalculator
         self.decisionLossCoefficientCalculator = self.towerNetworks[0][1].decisionLossCoefficientCalculator
+        super().set_hyperparameters()

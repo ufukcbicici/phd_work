@@ -50,7 +50,7 @@ class CignMultiGpu(FastTreeNetwork):
         #                                                                                  global_step=self.globalCounter)
 
     def build_network(self):
-        devices = UtilityFuncs.get_available_devices(only_gpu=True)
+        devices = UtilityFuncs.get_available_devices(only_gpu=(not GlobalConstants.USE_CPU_AS_DEVICE))
         print(devices)
         device_count = len(devices)
         assert GlobalConstants.BATCH_SIZE % device_count == 0
@@ -348,6 +348,11 @@ class CignMultiGpu(FastTreeNetwork):
             assert np.allclose(self.batchNormMovingAverageValues[var_name], tf_moving_average_value)
             # if not np.allclose(self.batchNormMovingAverageValues[var_name], tf_moving_average_value):
             #     print("X")
+
+    def set_hyperparameters(self):
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            network = tpl[1]
+            network.nodeCosts = self.nodeCosts
 
     # TODO: At sometime in the future, we should implement multi gpu accuracy calculation as well.
     #  But not now (31.05.2019)
