@@ -1,4 +1,6 @@
 import tensorflow as tf
+
+from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 
 
@@ -78,9 +80,11 @@ def baseline(node, network, variables=None):
                                                 dtype=GlobalConstants.DATA_TYPE),
                                     name=network.get_variable_name(name="fc_softmax_biases", node=node))
     # Fully Connected Layers
-    hidden_layer_1 = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
+    x_hat = FastTreeNetwork.fc_layer(x=flattened, W=fc_weights_1, b=fc_biases_1, node=node)
+    hidden_layer_1 = tf.nn.relu(x_hat)
     dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
-    hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
+    x_hat_2 = FastTreeNetwork.fc_layer(x=dropped_layer_1, W=fc_weights_2, b=fc_biases_2, node=node)
+    hidden_layer_2 = tf.nn.relu(x_hat_2)
     dropped_layer_2 = tf.nn.dropout(hidden_layer_2, network.classificationDropoutKeepProb)
     # logits = tf.matmul(hidden_layer_2, fc_softmax_weights) + fc_softmax_biases
     # Loss

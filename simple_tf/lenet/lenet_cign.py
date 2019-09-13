@@ -23,7 +23,7 @@ class Lenet_Cign(FastTreeNetwork):
         fc_h_bias = tf.Variable(
             tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="fc_decision_bias", node=node))
-        raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
+        raw_ig_feature = FastTreeNetwork.fc_layer(x=flat_pool, W=fc_h_weights, b=fc_h_bias, node=node)
         # ***************** Dropout *****************
         relu_ig_feature = tf.nn.relu(raw_ig_feature)
         ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
@@ -111,7 +111,8 @@ class Lenet_Cign(FastTreeNetwork):
         # Mask inputs
         parent_F, parent_H = network.mask_input_nodes(node=node)
         flattened = tf.contrib.layers.flatten(parent_F)
-        hidden_layer = tf.nn.relu(tf.matmul(flattened, fc_weights_1) + fc_biases_1)
+        x_hat = FastTreeNetwork.fc_layer(x=flattened, W=fc_weights_1, b=fc_biases_1, node=node)
+        hidden_layer = tf.nn.relu(x_hat)
         final_feature, logits = network.apply_loss(node=node, final_feature=hidden_layer,
                                                    softmax_weights=fc_softmax_weights, softmax_biases=fc_softmax_biases)
         node.fOpsList.extend([flattened])

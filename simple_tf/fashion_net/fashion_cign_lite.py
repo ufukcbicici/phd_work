@@ -23,7 +23,7 @@ class FashionCignLite(FastTreeNetwork):
             name=network.get_variable_name(name="fc_decision_bias", node=node))
         node.variablesSet.add(fc_h_weights)
         node.variablesSet.add(fc_h_bias)
-        raw_ig_feature = tf.matmul(flat_pool, fc_h_weights) + fc_h_bias
+        raw_ig_feature = FastTreeNetwork.fc_layer(x=flat_pool, W=fc_h_weights, b=fc_h_bias, node=node)
         # ***************** Dropout *****************
         relu_ig_feature = tf.nn.relu(raw_ig_feature)
         dropped_ig_feature = tf.nn.dropout(relu_ig_feature, keep_prob=network.decisionDropoutKeepProb)
@@ -56,7 +56,7 @@ class FashionCignLite(FastTreeNetwork):
             name=network.get_variable_name(name="fc_decision_bias", node=node))
         node.variablesSet.add(fc_h_weights)
         node.variablesSet.add(fc_h_bias)
-        h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
+        h_net = FastTreeNetwork.fc_layer(x=h_net, W=fc_h_weights, b=fc_h_bias, node=node)
         h_net = tf.nn.relu(h_net)
         h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
         ig_feature = h_net
@@ -189,9 +189,11 @@ class FashionCignLite(FastTreeNetwork):
         node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2, fc_softmax_weights,
                              fc_softmax_biases}
         # OPS
-        hidden_layer_1 = tf.nn.relu(tf.matmul(net, fc_weights_1) + fc_biases_1)
+        x_hat = FastTreeNetwork.fc_layer(x=net, W=fc_weights_1, b=fc_biases_1, node=node)
+        hidden_layer_1 = tf.nn.relu(x_hat)
         dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
-        hidden_layer_2 = tf.nn.relu(tf.matmul(dropped_layer_1, fc_weights_2) + fc_biases_2)
+        x_hat2 = FastTreeNetwork.fc_layer(x=dropped_layer_1, W=fc_weights_2, b=fc_biases_2, node=node)
+        hidden_layer_2 = tf.nn.relu(x_hat2)
         dropped_layer_2 = tf.nn.dropout(hidden_layer_2, network.classificationDropoutKeepProb)
         final_feature, logits = network.apply_loss(node=node, final_feature=dropped_layer_2,
                                                    softmax_weights=fc_softmax_weights, softmax_biases=fc_softmax_biases)

@@ -18,7 +18,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, FixedParameter
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline, fashion_cign_connected_v2
+from simple_tf.fashion_net import fashion_net_decision_connected_to_f, fashion_net_baseline, fashion_cign_lite
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 
@@ -562,13 +562,13 @@ def main_fast_tree():
         #     degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
 
         network = FastTreeNetwork(
-            node_build_funcs=[fashion_cign_connected_v2.root_func,
-                              fashion_cign_connected_v2.l1_func,
-                              fashion_cign_connected_v2.leaf_func],
-            grad_func=fashion_cign_connected_v2.grad_func,
-            hyperparameter_func=fashion_cign_connected_v2.threshold_calculator_func,
-            residue_func=fashion_cign_connected_v2.residue_network_func,
-            summary_func=fashion_cign_connected_v2.tensorboard_func,
+            node_build_funcs=[fashion_cign_lite.root_func,
+                              fashion_cign_lite.l1_func,
+                              fashion_cign_lite.leaf_func],
+            grad_func=fashion_cign_lite.grad_func,
+            hyperparameter_func=fashion_cign_lite.threshold_calculator_func,
+            residue_func=fashion_cign_lite.residue_network_func,
+            summary_func=fashion_cign_lite.tensorboard_func,
             degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
 
         # network = FastTreeNetwork(

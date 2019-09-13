@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from simple_tf.cign.cign_mixture_of_experts import CignMixtureOfExperts
+from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 
 
@@ -19,7 +20,7 @@ class CignMixtureOfExpertsLogitEnsemble(CignMixtureOfExperts):
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature)
         routing_probs = self.get_node_routing_probabilities(node=node)
         node.evalDict[self.get_variable_name(name="routing_probs", node=node)] = routing_probs
-        logits = tf.matmul(final_feature, softmax_weights) + softmax_biases
+        logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node)
         node.evalDict[self.get_variable_name(name="logits", node=node)] = logits
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)

@@ -44,7 +44,7 @@ class Cifar100_Cign(FastTreeNetwork):
             shape=[decision_feature_size],
             dtype=GlobalConstants.DATA_TYPE,
             initializer=tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE))
-        h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
+        h_net = FastTreeNetwork.fc_layer(x=h_net, W=fc_h_weights, b=fc_h_bias, node=node)
         h_net = tf.nn.relu(h_net)
         h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
         ig_feature = h_net

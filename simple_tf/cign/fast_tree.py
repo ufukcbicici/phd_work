@@ -30,7 +30,7 @@ class FastTreeNetwork(TreeNetwork):
         self.nodeCosts = {}
 
     @staticmethod
-    def conv_layer(x, kernel, strides, bias=None, node=None, padding='SAME'):
+    def conv_layer(x, kernel, strides, node, bias=None, padding='SAME'):
         assert len(x.get_shape().as_list()) == 4
         assert len(kernel.get_shape().as_list()) == 4
         assert kernel.get_shape().as_list()[2] == x.get_shape().as_list()[3]
@@ -57,7 +57,7 @@ class FastTreeNetwork(TreeNetwork):
         return x_hat
 
     @staticmethod
-    def fc_layer(x, W, b, node=None):
+    def fc_layer(x, W, b, node):
         assert len(x.get_shape().as_list()) == 2
         assert len(W.get_shape().as_list()) == 2
         x_hat = tf.matmul(x, W) + b
@@ -258,8 +258,8 @@ class FastTreeNetwork(TreeNetwork):
                 name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
             hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
                                             name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
-
-        activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
+        activations = FastTreeNetwork.fc_layer(x=branching_feature, W=hyperplane_weights, b=hyperplane_biases,
+                                               node=node)
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
         p_n_given_x = tf.nn.softmax(decayed_activation)
@@ -330,7 +330,8 @@ class FastTreeNetwork(TreeNetwork):
                 name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
             hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
                                             name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
-        activations = tf.matmul(normed_x, hyperplane_weights) + hyperplane_biases
+        activations = FastTreeNetwork.fc_layer(x=normed_x, W=hyperplane_weights, b=hyperplane_biases,
+                                               node=node)
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
         p_n_given_x = tf.nn.softmax(decayed_activation)
@@ -429,7 +430,7 @@ class FastTreeNetwork(TreeNetwork):
         node.finalFeatures = final_feature
         node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature)
-        logits = tf.matmul(final_feature, softmax_weights) + softmax_biases
+        logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node)
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
         pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)

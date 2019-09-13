@@ -40,7 +40,7 @@ class ClassWeightedTree(FastTreeNetwork):
         node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(
             final_feature)
-        logits = tf.matmul(final_feature, softmax_weights) + softmax_biases
+        logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node)
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
         self.leafSampleWeightTensorsDict[node.index] = \

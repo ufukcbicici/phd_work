@@ -3,6 +3,7 @@ import numpy as np
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle_no_stitch import JungleNoStitch
+from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 from simple_tf.cigj.jungle_node import NodeType
 from algorithms.info_gain import InfoGainLoss
@@ -136,7 +137,8 @@ class JungleGumbelSoftmax(JungleNoStitch):
                                                               momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                               training=tf.cast(self.isTrain, tf.bool))
             # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
-            activations = tf.matmul(node.H_output, hyperplane_weights) + hyperplane_biases
+            activations = FastTreeNetwork.fc_layer(x=node.H_output, W=hyperplane_weights, b=hyperplane_biases,
+                                                   node=node)
             node.activationsDict[node.index] = activations
             decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
             p_F_given_x = tf.nn.softmax(decayed_activation)

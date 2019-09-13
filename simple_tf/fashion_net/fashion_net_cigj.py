@@ -3,6 +3,7 @@ import tensorflow as tf
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter
 from simple_tf.cigj.jungle_node import NodeType
+from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 
 
@@ -34,7 +35,8 @@ class FashionNetCigj:
         # OK
         fc_biases = tf.Variable(tf.constant(0.1, shape=[output_dim], dtype=GlobalConstants.DATA_TYPE),
                                 name=UtilityFuncs.get_variable_name(name="fc_biases{0}".format(name_suffix), node=node))
-        hidden_layer = tf.nn.relu(tf.matmul(input, fc_weights) + fc_biases)
+        x_hat = FastTreeNetwork.fc_layer(x=input, W=fc_weights, b=fc_biases, node=node)
+        hidden_layer = tf.nn.relu(x_hat)
         dropped_layer = tf.nn.dropout(hidden_layer, dropout_prob_tensor)
         return dropped_layer
 
@@ -58,7 +60,7 @@ class FashionNetCigj:
         fc_h_bias = tf.Variable(
             tf.constant(0.1, shape=[h_feature_size], dtype=GlobalConstants.DATA_TYPE),
             name=network.get_variable_name(name="fc_decision_bias", node=node))
-        h_net = tf.matmul(h_net, fc_h_weights) + fc_h_bias
+        h_net = FastTreeNetwork.fc_layer(x=h_net, W=fc_h_weights, b=fc_h_bias, node=node)
         h_net = tf.nn.relu(h_net)
         h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
         ig_feature = h_net

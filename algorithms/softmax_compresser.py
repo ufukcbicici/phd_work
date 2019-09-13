@@ -11,6 +11,7 @@ from sklearn.model_selection import cross_val_score
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
+from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, SoftmaxCompressionStrategy, GradientType
 from collections import namedtuple
 from scipy.stats import expon
@@ -250,7 +251,7 @@ class SoftmaxCompresser:
     def change_leaf_loss(self, node, compressed_layers_dict):
         softmax_weights = compressed_layers_dict[node.index][0]
         softmax_biases = compressed_layers_dict[node.index][1]
-        logits = tf.matmul(node.finalFeatures, softmax_weights) + softmax_biases
+        logits = FastTreeNetwork.fc_layer(x=node.finalFeatures, W=softmax_weights, b=softmax_biases, node=node)
         self.network.evalDict[self.network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
         if node.labelMappingTensor is None:
             node.labelMappingTensor = tf.placeholder(name="label_mapping_node_{0}".format(node.index), dtype=tf.int64)
@@ -365,7 +366,8 @@ class SoftmaxCompresser:
             is_trainable=True
         )
         # Compressed softmax probabilities
-        compressed_logits = tf.matmul(features_tensor, softmax_weights) + softmax_biases
+        compressed_logits = FastTreeNetwork.fc_layer(x=features_tensor, W=softmax_weights, b=softmax_biases,
+                                                     node=leaf_node)
         # Prepare the loss function, according to Hinton's Distillation Recipe
         # Term 1: Cross entropy between the tempered, squashed posteriors p and q: H(p,q)
         soft_loss_vec = tf.nn.softmax_cross_entropy_with_logits(labels=p, logits=compressed_logits)
@@ -795,7 +797,8 @@ class SoftmaxCompresser:
         sess.run([softmax_weights.initializer, softmax_biases.initializer])
         if GlobalConstants.SOFTMAX_DISTILLATION_VERBOSE:
             x_tensor = tf.placeholder(tf.float32)
-            compressed_logits = tf.matmul(x_tensor, softmax_weights) + softmax_biases
+            compressed_logits = FastTreeNetwork.fc_layer(x=x_tensor, W=softmax_weights, b=softmax_biases,
+                                                         node=leaf_node)
             result = sess.run([compressed_logits], feed_dict={x_tensor: all_training_data.training_features})
             tensorflow_response = result[0]
             scilearn_response = confidences_manual_normalized
@@ -878,7 +881,8 @@ class SoftmaxCompresser:
         print("Selected L2 Weight:{0}".format(best_result_validation[2]))
         if GlobalConstants.SOFTMAX_DISTILLATION_VERBOSE:
             x_tensor = tf.placeholder(tf.float32)
-            compressed_logits = tf.matmul(x_tensor, softmax_weights) + softmax_biases
+            compressed_logits = FastTreeNetwork.fc_layer(x=x_tensor, W=softmax_weights, b=softmax_biases,
+                                                         node=leaf_node)
             result = sess.run([compressed_logits], feed_dict={x_tensor: all_training_data.training_features})
             tensorflow_response = result[0]
             scilearn_response = selected_logistic_model.decision_function(all_training_data.training_features)

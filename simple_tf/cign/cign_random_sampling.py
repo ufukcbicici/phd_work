@@ -2,6 +2,7 @@ import tensorflow as tf
 
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import FixedParameter, DecayingParameter
+from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 from algorithms.info_gain import InfoGainLoss
 from simple_tf.cign.cign_with_sampling import CignWithSampling
@@ -27,7 +28,8 @@ class CignRandomSample(CignWithSampling):
             name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
         hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
                                         name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
-        activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
+        activations = FastTreeNetwork.fc_layer(x=branching_feature, W=hyperplane_weights, b=hyperplane_biases,
+                                               node=node)
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
         p_n_given_x = tf.nn.softmax(decayed_activation)

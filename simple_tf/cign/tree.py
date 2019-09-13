@@ -8,6 +8,7 @@ from algorithms.variable_manager import VariableManager
 from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
+from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, GradientType
 from algorithms.info_gain import InfoGainLoss
 from simple_tf.uncategorized.node import Node
@@ -719,7 +720,8 @@ class TreeNetwork:
             # branching_feature = noisy_feature
         # if GlobalConstants.USE_DROPOUT_FOR_DECISION:
         #     branching_feature = tf.nn.dropout(branching_feature, self.decisionDropoutKeepProb)
-        activations = tf.matmul(branching_feature, hyperplane_weights) + hyperplane_biases
+        activations = FastTreeNetwork.fc_layer(x=branching_feature, W=hyperplane_weights, b=hyperplane_biases,
+                                               node=node)
         node.activationsDict[node.index] = activations
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
         p_n_given_x = tf.nn.softmax(decayed_activation)
@@ -767,7 +769,7 @@ class TreeNetwork:
         node.finalFeatures = final_feature_final
         node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature_final
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature_final)
-        logits = tf.matmul(final_feature_final, softmax_weights) + softmax_biases
+        logits = FastTreeNetwork.fc_layer(x=final_feature_final, W=softmax_weights, b=softmax_biases, node=node)
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
         parallel_dnn_updates = {GradientType.parallel_dnns_unbiased, GradientType.parallel_dnns_biased}

@@ -3,7 +3,7 @@ import numpy as np
 
 from auxillary.parameters import DiscreteParameter, FixedParameter, DecayingParameter
 from simple_tf.cign.cign_mixture_of_experts_logit_ensemble import CignMixtureOfExpertsLogitEnsemble
-from simple_tf.fashion_net.fashion_cign_connected_v2 import FashionCignLite
+from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from simple_tf.global_params import GlobalConstants
 
 
