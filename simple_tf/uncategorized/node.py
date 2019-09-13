@@ -32,6 +32,7 @@ class Node:
         self.infoGainBalanceCoefficient = None
         self.p_n_given_x = None
         self.leafCountUnderThisNode = 0
+        self.macCost = 0
         # Indexed by the nodes producing them
         self.activationsDict = {}
         self.proxyLossInputDicts = {}

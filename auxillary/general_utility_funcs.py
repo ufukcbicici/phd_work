@@ -146,8 +146,19 @@ class UtilityFuncs:
             #                     for k in range(C):
             #                         cost += 1
             return cost
+        elif type == "fc":
+            C = num_of_input_channels
+            H = 1
+            W = 1
+            R = 1
+            S = 1
+            M = num_of_output_channels
+            E = 1
+            F = 1
         else:
             raise NotImplementedError()
+        cost = M * F * E * R * S * C
+        return cost
 
     @staticmethod
     def get_available_devices(only_gpu=True):

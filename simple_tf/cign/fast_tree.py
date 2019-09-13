@@ -29,6 +29,52 @@ class FastTreeNetwork(TreeNetwork):
         self.networkName = None
         self.nodeCosts = {}
 
+    @staticmethod
+    def conv_layer(x, kernel, strides, bias=None, node=None, padding='SAME'):
+        assert len(x.get_shape().as_list()) == 4
+        assert len(kernel.get_shape().as_list()) == 4
+        assert kernel.get_shape().as_list()[2] == x.get_shape().as_list()[3]
+        assert strides[1] == strides[2]
+        # shape = [filter_size, filter_size, in_filters, out_filters]
+        num_of_input_channels = x.get_shape().as_list()[3]
+        height_of_input_map = x.get_shape().as_list()[2]
+        width_of_input_map = x.get_shape().as_list()[1]
+        height_of_filter = kernel.get_shape().as_list()[1]
+        width_of_filter = kernel.get_shape().as_list()[0]
+        num_of_output_channels = kernel.get_shape().as_list()[3]
+        convolution_stride = strides[1]
+        cost = UtilityFuncs.calculate_mac_of_computation(
+            num_of_input_channels=num_of_input_channels,
+            height_of_input_map=height_of_input_map, width_of_input_map=width_of_input_map,
+            height_of_filter=height_of_filter, width_of_filter=width_of_filter,
+            num_of_output_channels=num_of_output_channels, convolution_stride=convolution_stride
+        )
+        if node is not None:
+            node.macCost += cost
+        x_hat = tf.nn.conv2d(x, kernel, strides, padding=padding)
+        if bias is not None:
+            x_hat = tf.nn.bias_add(x_hat, bias)
+        return x_hat
+
+    @staticmethod
+    def fc_layer(x, W, b, node=None):
+        assert len(x.get_shape().as_list()) == 2
+        assert len(W.get_shape().as_list()) == 2
+        x_hat = tf.matmul(x, W) + b
+        num_of_input_channels = x.get_shape().as_list()[1]
+        num_of_output_channels = W.get_shape().as_list()[2]
+        cost = UtilityFuncs.calculate_mac_of_computation(num_of_input_channels=num_of_input_channels,
+                                                         height_of_input_map=1,
+                                                         width_of_input_map=1,
+                                                         height_of_filter=1,
+                                                         width_of_filter=1,
+                                                         num_of_output_channels=num_of_output_channels,
+                                                         convolution_stride=1,
+                                                         type="fc")
+        if node is not None:
+            node.macCost += cost
+        return x_hat
+
     # OK for MultiGPU
     def build_tree(self):
         # Create itself
