@@ -117,6 +117,39 @@ class UtilityFuncs:
         np.savez(file_name, **arr_dict)
 
     @staticmethod
+    def calculate_mac_of_computation(num_of_input_channels,
+                                     height_of_input_map,
+                                     width_of_input_map,
+                                     height_of_filter,
+                                     width_of_filter,
+                                     num_of_output_channels,
+                                     convolution_stride,
+                                     type="conv"):
+        if type == "conv":
+            C = num_of_input_channels
+            H = height_of_input_map
+            W = width_of_input_map
+            R = height_of_filter
+            S = width_of_filter
+            M = num_of_output_channels
+            # E = height_of_output_map
+            # F = width_of_output_map
+            U = convolution_stride
+            E = (H - R + U)/U
+            F = (W - S + U) / U
+            cost = M * F * E * R * S * C
+            # for m in range(M):
+            #     for x in range(F):
+            #         for y in range(E):
+            #             for i in range(R):
+            #                 for j in range(S):
+            #                     for k in range(C):
+            #                         cost += 1
+            return cost
+        else:
+            raise NotImplementedError()
+
+    @staticmethod
     def get_available_devices(only_gpu=True):
         local_device_protos = device_lib.list_local_devices()
         if only_gpu:

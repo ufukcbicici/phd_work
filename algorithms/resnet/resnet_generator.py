@@ -14,12 +14,36 @@ class ResnetGenerator:
     def conv(name, x, filter_size, in_filters, out_filters, strides):
         """Convolution."""
         with tf.variable_scope(name):
+            assert len(x.get_shape().as_list()) == 4
+            assert x.get_shape().as_list()[3] == in_filters
+            assert strides[1] == strides[2]
             n = filter_size * filter_size * out_filters
             shape = [filter_size, filter_size, in_filters, out_filters]
             initializer = tf.random_normal_initializer(stddev=np.sqrt(2.0 / n))
             kernel = UtilityFuncs.create_variable(name="conv_kernel", shape=shape, dtype=tf.float32,
                                                   initializer=initializer)
-            return tf.nn.conv2d(x, kernel, strides, padding='SAME')
+            num_of_input_channels = x.get_shape().as_list()[3]
+            height_of_input_map = x.get_shape().as_list()[2]
+            width_of_input_map = x.get_shape().as_list()[1]
+            height_of_filter = filter_size
+            width_of_filter = filter_size
+            num_of_output_channels = out_filters
+            convolution_stride = strides[1]
+            # def calculate_mac_of_computation(num_of_input_channels,
+            #                                  height_of_input_map,
+            #                                  width_of_input_map,
+            #                                  height_of_filter,
+            #                                  width_of_filter,
+            #                                  num_of_output_channels,
+            #                                  convolution_stride,
+            #                                  type="conv"):
+            cost = UtilityFuncs.calculate_mac_of_computation(
+                num_of_input_channels=num_of_input_channels,
+                height_of_input_map=height_of_input_map, width_of_input_map=width_of_input_map,
+                height_of_filter=height_of_filter, width_of_filter=width_of_filter,
+                num_of_output_channels=num_of_output_channels, convolution_stride=convolution_stride
+            )
+            return tf.nn.conv2d(x, kernel, strides, padding='SAME'), cost
 
     # MultiGpu OK
     @staticmethod
@@ -61,6 +85,7 @@ class ResnetGenerator:
     @staticmethod
     def bottleneck_residual(x, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual,
                             bn_momentum):
+        total_cost = 0
         """Bottleneck residual unit with 3 sub layers."""
         if activate_before_residual:
             with tf.variable_scope("common_bn_relu"):
@@ -74,32 +99,36 @@ class ResnetGenerator:
                 x = ResnetGenerator.relu(x, relu_leakiness)
 
         with tf.variable_scope("sub1"):
-            x = ResnetGenerator.conv("conv_1", x, 1, in_filter, out_filter / 4, stride)
+            x, cost = ResnetGenerator.conv("conv_1", x, 1, in_filter, out_filter / 4, stride)
+            total_cost += cost
 
         with tf.variable_scope("sub2"):
             x = ResnetGenerator.batch_norm("bn2", x, is_train, bn_momentum)
             x = ResnetGenerator.relu(x, relu_leakiness)
-            x = ResnetGenerator.conv("conv2", x, 3, out_filter / 4, out_filter / 4, [1, 1, 1, 1])
+            x, cost = ResnetGenerator.conv("conv2", x, 3, out_filter / 4, out_filter / 4, [1, 1, 1, 1])
+            total_cost += cost
 
         with tf.variable_scope("sub3"):
             x = ResnetGenerator.batch_norm("bn3", x, is_train, bn_momentum)
             x = ResnetGenerator.relu(x, relu_leakiness)
-            x = ResnetGenerator.conv("conv3", x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
+            x, cost = ResnetGenerator.conv("conv3", x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
+            total_cost += cost
 
         with tf.variable_scope("sub_add"):
             if in_filter != out_filter or not all([d == 1 for d in stride]):
-                orig_x = ResnetGenerator.conv("project", orig_x, 1, in_filter, out_filter, stride)
+                orig_x, cost = ResnetGenerator.conv("project", orig_x, 1, in_filter, out_filter, stride)
+                total_cost += cost
             x += orig_x
-        return x
+        return x, total_cost
 
     # MultiGpu OK
     @staticmethod
     def get_input(input, out_filters, first_conv_filter_size):
         assert input.get_shape().ndims == 4
         input_filters = input.get_shape().as_list()[-1]
-        x = ResnetGenerator.conv("init_conv", input, first_conv_filter_size, input_filters, out_filters,
+        x, cost = ResnetGenerator.conv("init_conv", input, first_conv_filter_size, input_filters, out_filters,
                                  ResnetGenerator.stride_arr(1))
-        return x
+        return x, cost
 
     # MultiGpu OK
     @staticmethod
