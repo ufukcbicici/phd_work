@@ -28,6 +28,7 @@ class FastTreeNetwork(TreeNetwork):
         self.extra_update_ops = None
         self.networkName = None
         self.nodeCosts = {}
+        self.dbName = None
 
     @staticmethod
     def conv_layer(x, kernel, strides, node, bias=None, padding='SAME'):
@@ -216,6 +217,7 @@ class FastTreeNetwork(TreeNetwork):
         # self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
         # self.variableManager.get_all_node_variables()
+        self.dbName = DbLogger.log_db_path[DbLogger.log_db_path.rindex("//") + 2:]
         self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
         # Build main classification loss
         self.build_main_loss()
@@ -644,7 +646,7 @@ class FastTreeNetwork(TreeNetwork):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}".format(network.networkName,
+                                                      "{0}_run_{1}_iteration_{2}".format(network.dbName,
                                                                                          run_id, iteration)))
         os.mkdir(directory_path)
         arr_dict = {"tree_type": {"tree_type": np.array(network.degreeList)},
