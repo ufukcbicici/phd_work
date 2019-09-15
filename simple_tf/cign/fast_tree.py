@@ -62,7 +62,7 @@ class FastTreeNetwork(TreeNetwork):
         assert len(W.get_shape().as_list()) == 2
         x_hat = tf.matmul(x, W) + b
         num_of_input_channels = x.get_shape().as_list()[1]
-        num_of_output_channels = W.get_shape().as_list()[2]
+        num_of_output_channels = W.get_shape().as_list()[1]
         cost = UtilityFuncs.calculate_mac_of_computation(num_of_input_channels=num_of_input_channels,
                                                          height_of_input_map=1,
                                                          width_of_input_map=1,
@@ -600,6 +600,11 @@ class FastTreeNetwork(TreeNetwork):
         explanation += "USE_SAMPLING_CIGN:{0}\n".format(GlobalConstants.USE_SAMPLING_CIGN)
         explanation += "USE_RANDOM_SAMPLING:{0}\n".format(GlobalConstants.USE_RANDOM_SAMPLING)
         explanation += "LR SCHEDULE:{0}\n".format(GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation())
+        leaf_node = [node for node in self.topologicalSortedNodes if node.isLeaf][0]
+        root_to_leaf_path = self.dagObject.ancestors(node=leaf_node)
+        root_to_leaf_path.append(leaf_node)
+        path_mac_cost = sum([node.macCost for node in root_to_leaf_path])
+        explanation += "Mac Cost:{0}\n".format(path_mac_cost)
         return explanation
 
     def print_iteration_info(self, iteration_counter, update_results):

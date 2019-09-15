@@ -97,7 +97,7 @@ class Cifar100_Cign(FastTreeNetwork):
         parent_F, parent_H = network.mask_input_nodes(node=node)
         if node.isRoot:
             x = ResnetGenerator.get_input(input=network.dataTensor, out_filters=in_filter,
-                                          first_conv_filter_size=first_conv_filter_size)
+                                          first_conv_filter_size=first_conv_filter_size, node=node)
         else:
             x = parent_F
         # Block body
@@ -108,7 +108,7 @@ class Cifar100_Cign(FastTreeNetwork):
                                                         stride=ResnetGenerator.stride_arr(stride),
                                                         activate_before_residual=_activate_before_residual,
                                                         relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY, node=node)
             # MultiGPU OK
             for i in range(num_of_units_in_this_node - 1):
                 with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(node.depth + 1, i + 1),
@@ -118,7 +118,7 @@ class Cifar100_Cign(FastTreeNetwork):
                                                             stride=ResnetGenerator.stride_arr(1),
                                                             activate_before_residual=False,
                                                             relu_leakiness=relu_leakiness, is_train=network.isTrain,
-                                                            bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+                                                            bn_momentum=GlobalConstants.BATCH_NORM_DECAY, node=node)
         node.fOpsList.extend([x])
         if not node.isLeaf:
             # ***************** H: Connected to F *****************

@@ -52,8 +52,9 @@ class Lenet_Cign(FastTreeNetwork):
         # Operations
         network.mask_input_nodes(node=node)
         # F
-        conv = tf.nn.conv2d(network.dataTensor, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-        relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
+        conv = FastTreeNetwork.conv_layer(x=network.dataTensor, kernel=conv_weights, strides=[1, 1, 1, 1],
+                                          padding='SAME', bias=conv_biases, node=node)
+        relu = tf.nn.relu(conv)
         pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         node.fOpsList.extend([conv, relu, pool])
         # ***************** H: Connected to F *****************
@@ -76,8 +77,9 @@ class Lenet_Cign(FastTreeNetwork):
         # Operations
         parent_F, parent_H = network.mask_input_nodes(node=node)
         # F
-        conv = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-        relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
+        conv = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv_weights, strides=[1, 1, 1, 1],
+                                          padding='SAME', bias=conv_biases, node=node)
+        relu = tf.nn.relu(conv)
         pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         node.fOpsList.extend([conv, relu, pool])
         # H

@@ -676,7 +676,7 @@ FROM
 	AND
 	Explanation LIKE "%Decay Step:35000%"
 	AND
-	Explanation LIKE "%Batch Size:250%"
+	Explanation LIKE "%Batch Size:750%"
 	AND
 	Explanation LIKE "%Tree Degree:[2, 3]%"
 )

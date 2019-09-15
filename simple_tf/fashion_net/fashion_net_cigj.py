@@ -21,8 +21,9 @@ class FashionNetCigj:
         conv_biases = tf.Variable(
             tf.constant(0.1, shape=[num_of_output_channels], dtype=GlobalConstants.DATA_TYPE),
             name=UtilityFuncs.get_variable_name(name="conv_bias{0}".format(name_suffix), node=node))
-        conv = tf.nn.conv2d(input, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-        relu = tf.nn.relu(tf.nn.bias_add(conv, conv_biases))
+        net = FastTreeNetwork.conv_layer(x=input, kernel=conv_weights, strides=[1, 1, 1, 1],
+                                         padding='SAME', bias=conv_biases, node=node)
+        relu = tf.nn.relu(net)
         pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         return pool
 

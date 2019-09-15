@@ -88,8 +88,9 @@ class FashionCignLite(FastTreeNetwork):
         # ***************** F: Convolution Layers *****************
         # First Conv Layer
         network.mask_input_nodes(node=node)
-        net = tf.nn.conv2d(network.dataTensor, conv1_weights, strides=[1, 1, 1, 1], padding='SAME')
-        net = tf.nn.relu(tf.nn.bias_add(net, conv1_biases))
+        net = FastTreeNetwork.conv_layer(x=network.dataTensor, kernel=conv1_weights, strides=[1, 1, 1, 1],
+                                         padding='SAME', bias=conv1_biases, node=node)
+        net = tf.nn.relu(net)
         net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         node.fOpsList.extend([net])
         # ***************** F: Convolution Layers *****************
@@ -118,8 +119,9 @@ class FashionCignLite(FastTreeNetwork):
         node.variablesSet = {conv_weights, conv_biases}
         # ***************** F: Convolution Layer *****************
         parent_F, parent_H = network.mask_input_nodes(node=node)
-        net = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-        net = tf.nn.relu(tf.nn.bias_add(net, conv_biases))
+        net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv_weights, strides=[1, 1, 1, 1],
+                                         padding='SAME', bias=conv_biases, node=node)
+        net = tf.nn.relu(net)
         net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         node.fOpsList.extend([net])
         # ***************** F: Convolution Layer *****************
@@ -147,8 +149,9 @@ class FashionCignLite(FastTreeNetwork):
         # ***************** F: Convolution Layer *****************
         # Conv Layer
         parent_F, parent_H = network.mask_input_nodes(node=node)
-        net = tf.nn.conv2d(parent_F, conv_weights, strides=[1, 1, 1, 1], padding='SAME')
-        net = tf.nn.relu(tf.nn.bias_add(net, conv_biases))
+        net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv_weights, strides=[1, 1, 1, 1],
+                                         padding='SAME', bias=conv_biases, node=node)
+        net = tf.nn.relu(net)
         net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
         # FC Layers
