@@ -141,7 +141,6 @@ class Cifar100_MultiGpuCign(CignMultiGpu):
         self.networkName = "Cifar100_CIGN_MultiGpu"
 
     def set_hyperparameters(self, **kwargs):
-        self.nodeCosts = {node.index: 1 for node in self.topologicalSortedNodes}
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
@@ -182,4 +181,3 @@ class Cifar100_MultiGpuCign(CignMultiGpu):
         self.decisionDropoutKeepProbCalculator = self.towerNetworks[0][1].decisionDropoutKeepProbCalculator
         self.noiseCoefficientCalculator = self.towerNetworks[0][1].noiseCoefficientCalculator
         self.decisionLossCoefficientCalculator = self.towerNetworks[0][1].decisionLossCoefficientCalculator
-        super().set_hyperparameters()

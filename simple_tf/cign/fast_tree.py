@@ -216,6 +216,7 @@ class FastTreeNetwork(TreeNetwork):
         # self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
         # self.variableManager.get_all_node_variables()
+        self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
         # Build main classification loss
         self.build_main_loss()
         # Build information gain loss
@@ -605,6 +606,7 @@ class FastTreeNetwork(TreeNetwork):
         root_to_leaf_path.append(leaf_node)
         path_mac_cost = sum([node.macCost for node in root_to_leaf_path])
         explanation += "Mac Cost:{0}\n".format(path_mac_cost)
+        explanation += "Mac Cost per Nodes:{0}\n".format(self.nodeCosts)
         return explanation
 
     def print_iteration_info(self, iteration_counter, update_results):
