@@ -217,7 +217,8 @@ class FastTreeNetwork(TreeNetwork):
         # self.build_residue_loss()
         # Record all variables into the variable manager (For backwards compatibility)
         # self.variableManager.get_all_node_variables()
-        self.dbName = DbLogger.log_db_path[DbLogger.log_db_path.rindex("//") + 2:]
+        self.dbName = DbLogger.log_db_path[DbLogger.log_db_path.rindex("/") + 1:]
+        print(self.dbName)
         self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
         # Build main classification loss
         self.build_main_loss()
