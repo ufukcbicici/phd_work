@@ -366,7 +366,7 @@ class CignMultiGpu(FastTreeNetwork):
         root_to_leaf_path.append(leaf_node)
         path_mac_cost = sum([node.macCost for node in root_to_leaf_path])
         explanation += "Mac Cost:{0}\n".format(path_mac_cost)
-        explanation += "Mac Cost per Nodes:{0}\n".format(self.nodeCosts)
+        explanation += "Mac Cost per Nodes:{0}\n".format(network.nodeCosts)
         return explanation
 
     # TODO: At sometime in the future, we should implement multi gpu accuracy calculation as well.

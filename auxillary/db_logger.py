@@ -40,7 +40,7 @@ class DbLogger:
     # log_db_path = "C://Users//ufuk.bicici//Desktop//PHD//phd_work//simple_tf//bnnlogger.db"
 
     # TRUBA 1
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger_cign.db"
+    log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger_cign.db"
 
     # TRUBA 2
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2_cign.db"
@@ -49,7 +49,7 @@ class DbLogger:
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger3_cign.db"
 
     # TRUBA 4
-    log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger4_cign.db"
+    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger4_cign.db"
 
     # TRUBA 5
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger5_cign.db"

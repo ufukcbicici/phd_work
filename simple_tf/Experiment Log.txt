@@ -690,7 +690,7 @@ ORDER BY AvgValidationAccuracy DESC
 02.09.2019 - TRUBA dblogger2_cign.db
 -[2, 2] Resnet-50 CIGN
 -Resnet-50 CIFAR-100 CIGN, Info Gain Balance Coefficient: [1.0]
--Wd: classification_wd = [0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+-Wd: classification_wd = [0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
 -Batch Size:500
 -2 GPU
 -Threshold starts with 0.5, decays to 0.4 at 35000. Iteration
@@ -838,7 +838,7 @@ FROM
 (
 	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
-	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1190
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 590
 	AND
 	Explanation LIKE "%Decay Step:35000%"
 	AND
