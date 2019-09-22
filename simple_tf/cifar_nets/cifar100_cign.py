@@ -237,11 +237,26 @@ class Cifar100_Cign(FastTreeNetwork):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 600
-        GlobalConstants.EPOCH_COUNT = 600
-        GlobalConstants.EPOCH_REPORT_PERIOD = 5
-        GlobalConstants.BATCH_SIZE = 250
-        GlobalConstants.EVAL_BATCH_SIZE = 250
+        # GlobalConstants.TOTAL_EPOCH_COUNT = 600
+        # GlobalConstants.EPOCH_COUNT = 600
+        # GlobalConstants.EPOCH_REPORT_PERIOD = 5
+        # GlobalConstants.BATCH_SIZE = 250
+        # GlobalConstants.EVAL_BATCH_SIZE = 250
+        # GlobalConstants.USE_MULTI_GPU = False
+        # GlobalConstants.USE_SAMPLING_CIGN = False
+        # GlobalConstants.USE_RANDOM_SAMPLING = False
+        # GlobalConstants.INITIAL_LR = 0.1
+        # GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
+        #                                                              value=GlobalConstants.INITIAL_LR,
+        #                                                              schedule=[(40000, 0.01),
+        #                                                                        (70000, 0.001),
+        #                                                                        (100000, 0.0001)])
+
+        GlobalConstants.TOTAL_EPOCH_COUNT = 960
+        GlobalConstants.EPOCH_COUNT = 960
+        GlobalConstants.EPOCH_REPORT_PERIOD = 8
+        GlobalConstants.BATCH_SIZE = 400
+        GlobalConstants.EVAL_BATCH_SIZE = 400
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False
         GlobalConstants.USE_RANDOM_SAMPLING = False
@@ -251,6 +266,7 @@ class Cifar100_Cign(FastTreeNetwork):
                                                                      schedule=[(40000, 0.01),
                                                                                (70000, 0.001),
                                                                                (100000, 0.0001)])
+
         GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:GPU:0"
         self.networkName = "Cifar100_CIGN_Single_GPU"
 
