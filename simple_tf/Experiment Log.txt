@@ -722,7 +722,7 @@ FROM
 	AND
 	Explanation LIKE "%Tree Degree:[2, 2]%"
 )
-GROUP BY RunID
+GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
 
