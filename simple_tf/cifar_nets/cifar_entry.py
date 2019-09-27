@@ -42,7 +42,7 @@ def cifar_100_training():
     # classification_wd = [0.00025, 0.0003, 0.00035, 0.0004] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd.extend([0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
     # classification_wd = [0.0002, 0.0002, 0.0025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    classification_wd = [0.0001, 0.00015, 0.0002] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
+    classification_wd = [0.00025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00015, 0.0002, 0.00025] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
@@ -78,7 +78,7 @@ def cifar_100_training():
                                     decision_keep_probability=1.0 - tpl[4])
         experiment_id = DbLogger.get_run_id()
         explanation = network.get_explanation_string()
-        series_id = int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
+        series_id = 0 # int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)
