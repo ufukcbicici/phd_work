@@ -109,9 +109,11 @@ class MultipathCalculatorV2:
         for curr_node in self.innerNodes:
             self.get_inner_node_routing_info(curr_node=curr_node, branching_info_dict=branching_info_dict,
                                              thresholds_dict=thresholds_dict)
+        leaf_reachability_dict = {}
         for curr_node in self.leafNodes:
             reaches_to_this_node_vector, path_probability = \
                 self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
+            leaf_reachability_dict[curr_node.index] = reaches_to_this_node_vector
 
         print("X")
 
