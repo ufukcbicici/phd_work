@@ -10,11 +10,6 @@ class SimpleAccuracyCalculator:
     def __init__(self):
         pass
 
-
-
-
-
-
     @staticmethod
     def calculate_accuracy_multipath(network, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)

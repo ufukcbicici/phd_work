@@ -87,6 +87,34 @@ class MultipathCalculatorV2:
             results.append(res_1)
         return results
 
+    def get_inner_node_routing_info(self, curr_node, thresholds_dict, branching_info_dict):
+        reaches_to_this_node_vector, path_probability = \
+            self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
+        p_n_given_x = self.branchProbs[curr_node.index]
+        thresholds_matrix = np.zeros_like(p_n_given_x)
+        child_nodes = self.network.dagObject.children(node=curr_node)
+        child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
+        for child_index, child_node in enumerate(child_nodes_sorted):
+            thresholds_matrix[:, child_index] = thresholds_dict[curr_node.index][child_index]
+        routing_matrix = p_n_given_x >= thresholds_matrix
+        routing_matrix = np.logical_and(routing_matrix, np.expand_dims(reaches_to_this_node_vector, axis=1))
+        path_probabilities = p_n_given_x * np.expand_dims(path_probability, axis=1)
+        branching_info_dict[curr_node.index] = \
+            MultipathCalculatorV2.BranchingInfo(branching_probs=p_n_given_x, routing_matrix=routing_matrix,
+                                                path_probs=path_probabilities)
+
+    def get_sample_distributions_on_leaf_nodes(self, thresholds_dict):
+        branching_info_dict = {}
+        # Calculate path probabilities
+        for curr_node in self.innerNodes:
+            self.get_inner_node_routing_info(curr_node=curr_node, branching_info_dict=branching_info_dict,
+                                             thresholds_dict=thresholds_dict)
+        for curr_node in self.leafNodes:
+            reaches_to_this_node_vector, path_probability = \
+                self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
+
+        print("X")
+
     def calculate_for_threshold(self, thresholds_dict):
         branching_info_dict = {}
 
@@ -95,20 +123,8 @@ class MultipathCalculatorV2:
 
         # Calculate path probabilities
         for curr_node in self.innerNodes:
-            reaches_to_this_node_vector, path_probability = \
-                self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
-            p_n_given_x = self.branchProbs[curr_node.index]
-            thresholds_matrix = np.zeros_like(p_n_given_x)
-            child_nodes = self.network.dagObject.children(node=curr_node)
-            child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
-            for child_index, child_node in enumerate(child_nodes_sorted):
-                thresholds_matrix[:, child_index] = thresholds_dict[curr_node.index][child_index]
-            routing_matrix = p_n_given_x >= thresholds_matrix
-            routing_matrix = np.logical_and(routing_matrix, np.expand_dims(reaches_to_this_node_vector, axis=1))
-            path_probabilities = p_n_given_x * np.expand_dims(path_probability, axis=1)
-            branching_info_dict[curr_node.index] = \
-                MultipathCalculatorV2.BranchingInfo(branching_probs=p_n_given_x, routing_matrix=routing_matrix,
-                                                    path_probs=path_probabilities)
+            self.get_inner_node_routing_info(curr_node=curr_node, branching_info_dict=branching_info_dict,
+                                             thresholds_dict=thresholds_dict)
         # Calculate averaged posteriors
         posterior_matrices_list = []
         routing_decisions_list = []

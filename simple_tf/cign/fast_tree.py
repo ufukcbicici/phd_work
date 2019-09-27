@@ -665,9 +665,9 @@ class FastTreeNetwork(TreeNetwork):
     @staticmethod
     def load_routing_info(network, run_id, iteration):
         curr_path = os.path.dirname(os.path.abspath(__file__))
-        directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(curr_path, ".."),
+        directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}".format(network.networkName,
+                                                      "{0}_run_{1}_iteration_{2}".format(network.dbName,
                                                                                          run_id, iteration)))
         # Assert that the tree architecture is compatible with the loaded info
         npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
