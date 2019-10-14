@@ -7,17 +7,18 @@ from algorithms.threshold_optimization_algorithms.simulated_annealing_uniform_op
 from auxillary.parameters import DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
-run_id = 0
+run_id = 67
 # network_name = "Cifar100_CIGN_Sampling"
-network_name = "Cifar100_CIGN_Single_GPU"
-iterations = [118200]
+network_name = "None"
+iterations = [119100]
 max_num_of_iterations = 10000
 balance_coefficient = 1.0
 sa_sample_count = 100
 
 use_weighted_scoring = False
 brute_force_sample_count = 10000
-node_costs = {i: 1 for i in range(7)}
+# node_costs = {i: 1 for i in range(7)}
+node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
 
 
 def main():
