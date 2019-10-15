@@ -268,20 +268,20 @@ class GlobalConstants:
     #                                    first_conv_filter_size=3, relu_leakiness=0.1,
     #                                    strides=[1, 2, 2, 1], activate_before_residual=[True, False, False, False])
 
-    RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 16], use_bottleneck=True,
-                                       num_of_features_per_block=[16, 52, 64, 72],
-                                       first_conv_filter_size=3, relu_leakiness=0.1,
-                                       strides=[1, 2, 2], activate_before_residual=[True, False, False])
+    # RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 16], use_bottleneck=True,
+    #                                    num_of_features_per_block=[16, 52, 64, 72],
+    #                                    first_conv_filter_size=3, relu_leakiness=0.1,
+    #                                    strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
     # RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[10, 18, 18], use_bottleneck=True,
     #                                    num_of_features_per_block=[16, 64, 64, 64],
     #                                    first_conv_filter_size=3, relu_leakiness=0.1,
     #                                    strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
-    # RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 16], use_bottleneck=True,
-    #                                    num_of_features_per_block=[16, 64, 64, 64],
-    #                                    first_conv_filter_size=3, relu_leakiness=0.1,
-    #                                    strides=[1, 2, 2], activate_before_residual=[True, False, False])
+    RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 16], use_bottleneck=True,
+                                       num_of_features_per_block=[16, 64, 64, 64],
+                                       first_conv_filter_size=3, relu_leakiness=0.1,
+                                       strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
     RESNET_DECISION_DIMENSION = 128
 

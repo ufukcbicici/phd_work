@@ -13,7 +13,8 @@ class SimulatedAnnealingThreadRunner:
             self.results = []
 
         def run(self):
-            for sa_optimizer in self.saOptimizers:
+            for idx, sa_optimizer in enumerate(self.saOptimizers):
+                print("Thread:{0} Optimizer:{1}".format(self.threadId, idx))
                 best_state, best_score, best_accuracy, best_computation_overload = sa_optimizer.run()
                 result_tuple = (sa_optimizer.runId, sa_optimizer.network.networkName, sa_optimizer.iterations,
                                 sa_optimizer.balanceCoefficient, int(sa_optimizer.useWeightedScoring),

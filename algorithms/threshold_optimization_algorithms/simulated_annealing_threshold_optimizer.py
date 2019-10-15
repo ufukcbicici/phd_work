@@ -38,7 +38,7 @@ class SimulatedAnnealingThresholdOptimizer(ThresholdOptimizer):
         curr_score, curr_accuracy, curr_computation_overload = \
             self.calculate_threshold_score(threshold_state=curr_state)
         for iteration_id in range(self.maxNumOfIterations):
-            if iteration_id + 1 % 100:
+            if iteration_id + 1 % 1000 == 0:
                 print("SA Iteration:{0}".format(iteration_id))
             # Pick a random neighbor
             candidate_state = self.get_neighbor(threshold_state=curr_state)

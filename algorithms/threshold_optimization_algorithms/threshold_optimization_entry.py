@@ -16,7 +16,7 @@ balance_coefficient = 1.0
 sa_sample_count = 100
 
 use_weighted_scoring = False
-brute_force_sample_count = 10000
+brute_force_sample_count = 1000000
 # node_costs = {i: 1 for i in range(7)}
 node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
 
@@ -35,25 +35,25 @@ def main():
                                                      activations=activations_dict, posterior_probs=posterior_probs_dict)
         multipath_calculators[iteration] = multipath_calculator
 
-    sa_optimizers = []
-    for _ in range(sa_sample_count):
-        annealing_schedule = DecayingParameter(name="Temperature", value=0.75, decay=0.999, decay_period=1)
-        sa_optimizer = SimulatedAnnealingUniformOptimizer(run_id=run_id,
-                                                          network=tree, max_num_of_iterations=max_num_of_iterations,
-                                                          annealing_schedule=annealing_schedule,
-                                                          balance_coefficient=balance_coefficient,
-                                                          use_weighted_scoring=use_weighted_scoring,
-                                                          multipath_score_calculators=multipath_calculators,
-                                                          verbose=False, neighbor_volume_ratio=0.1)
-        sa_optimizers.append(sa_optimizer)
-
-    sa_algorithm_runner = SimulatedAnnealingThreadRunner(sa_optimizers=sa_optimizers, thread_count=10)
-    sa_algorithm_runner.run()
+    # sa_optimizers = []
+    # for _ in range(sa_sample_count):
+    #     annealing_schedule = DecayingParameter(name="Temperature", value=0.75, decay=0.999, decay_period=1)
+    #     sa_optimizer = SimulatedAnnealingUniformOptimizer(run_id=run_id,
+    #                                                       network=tree, max_num_of_iterations=max_num_of_iterations,
+    #                                                       annealing_schedule=annealing_schedule,
+    #                                                       balance_coefficient=balance_coefficient,
+    #                                                       use_weighted_scoring=use_weighted_scoring,
+    #                                                       multipath_score_calculators=multipath_calculators,
+    #                                                       verbose=False, neighbor_volume_ratio=0.1)
+    #     sa_optimizers.append(sa_optimizer)
+    #
+    # sa_algorithm_runner = SimulatedAnnealingThreadRunner(sa_optimizers=sa_optimizers, thread_count=10)
+    # sa_algorithm_runner.run()
     # sa_optimizer.run()
-    # bf_optimizer = BruteForceOptimizer(run_id=run_id, network=tree, sample_count=brute_force_sample_count,
-    #                                    multipath_score_calculators=multipath_calculators,
-    #                                    balance_coefficient=balance_coefficient,
-    #                                    use_weighted_scoring=use_weighted_scoring,
-    #                                    thread_count=10, verbose=True, batch_size=100)
-    # bf_optimizer.run()
+    bf_optimizer = BruteForceOptimizer(run_id=run_id, network=tree, sample_count=brute_force_sample_count,
+                                       multipath_score_calculators=multipath_calculators,
+                                       balance_coefficient=balance_coefficient,
+                                       use_weighted_scoring=use_weighted_scoring,
+                                       thread_count=8, verbose=True, batch_size=10000)
+    bf_optimizer.run()
     print("X")
