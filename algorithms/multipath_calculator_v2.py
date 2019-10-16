@@ -1,5 +1,6 @@
 import threading
 import numpy as np
+from collections import Counter
 
 from auxillary.general_utility_funcs import UtilityFuncs
 
@@ -103,7 +104,8 @@ class MultipathCalculatorV2:
             MultipathCalculatorV2.BranchingInfo(branching_probs=p_n_given_x, routing_matrix=routing_matrix,
                                                 path_probs=path_probabilities)
 
-    def get_sample_distributions_on_leaf_nodes(self, thresholds_dict):
+    def get_sample_distributions_on_leaf_nodes(self, thresholds_dict, mode_threshold=0.8):
+        num_of_labels = len(set(self.labelList.tolist()))
         branching_info_dict = {}
         # Calculate path probabilities
         for curr_node in self.innerNodes:
@@ -114,6 +116,20 @@ class MultipathCalculatorV2:
             reaches_to_this_node_vector, path_probability = \
                 self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
             leaf_reachability_dict[curr_node.index] = reaches_to_this_node_vector
+            reached_labels = self.labelList[leaf_reachability_dict[curr_node.index]]
+            counter = Counter(reached_labels)
+            label_freq_pairs = [(label, float(count) / float(reached_labels.shape[0]))
+                                for label, count in counter.items()]
+            label_freq_pairs = sorted(label_freq_pairs, key=lambda tpl: tpl[1], reverse=True)
+            cut_off_idx = 0
+            cumulative_probability = 0
+            while True:
+                new_cumul_prob = cumulative_probability + label_freq_pairs[cut_off_idx][1]
+                if new_cumul_prob >= mode_threshold:
+                    break
+                cumulative_probability = new_cumul_prob
+            mode_labels = label_freq_pairs[0: cut_off_idx]
+            print("X")
 
         print("X")
 
@@ -163,7 +179,7 @@ class MultipathCalculatorV2:
         accuracy_simple_avg = np.sum((simple_avg_predicted_labels == self.labelList).astype(np.float32)) \
                               / float(self.sampleCount)
         accuracy_weighted_avg = np.sum((weighted_avg_predicted_labels == self.labelList).astype(np.float32)) \
-                              / float(self.sampleCount)
+                                / float(self.sampleCount)
         computation_overload = total_computation_cost / (self.sampleCount * self.baseEvaluationCost)
         # Tuple: Entry 0: Method Entry 1: Thresholds Entry 2: Accuracy Entry 3: Num of leaves evaluated
         # Entry 4: Computation Overload
