@@ -44,7 +44,7 @@ def cifar_100_training():
     # classification_wd = [0.0002, 0.0002, 0.0025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00015, 0.0002, 0.00025] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    classification_wd = [0.00035, 0.00035, 0.00035, 0.00035]
+    classification_wd = [0.00025, 0.00025, 0.00025, 0.00025]
     # classification_wd = [0.0001, 0.00015, 0.0002] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]

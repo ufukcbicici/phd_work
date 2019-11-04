@@ -14,7 +14,7 @@ class UNet:
     WINDOW_SIZE = 320
     STRIDE = 40
     BATCH_SIZE = 32
-    LAYER_DEPTH = 2
+    LAYER_DEPTH = 1
     LAYER_WIDTH = 1
 
     def __init__(self, dataset):
