@@ -72,19 +72,22 @@ class DecayingParameter(Parameter):
         if not self.isActive:
             return
         if iteration % self.decayPeriod == 0 and self.value > self.minLimit:
-            self.value *= self.decay
+            self.value = max(self.decay * self.value, self.minLimit)
             # dbg_str = "Hyperparameter:{0} New value:{1}".format(self.name, self.value)
             # print(dbg_str)
             # BnnLogger.print_log(log_file_name=self.logFileName, log_string=dbg_str)
         if self.epsilon_value is not None:
             if self.value < self.epsilon_value:
                 self.value = 0.0
+        # if self.value < self.minLimit:
+        #     self.value = self.minLimit
 
     def get_explanation(self):
         explanation = ""
         explanation += "Initial Value:{0}\n".format(self.value)
         explanation += "Decay Step:{0}\n".format(self.decayPeriod)
         explanation += "Decay Ratio:{0}\n".format(self.decay)
+        explanation += "Minimum Limit:{0}\n".format(self.minLimit)
         return explanation
 
 

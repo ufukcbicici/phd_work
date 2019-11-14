@@ -168,7 +168,7 @@ class Cifar100_MultiGpuCign(CignMultiGpu):
                 node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value,
                                                                  decay=0.8,
                                                                  decay_period=35000,
-                                                                 min_limit=0.4)
+                                                                 min_limit=initial_value * 0.8)
                 # Softmax Decay
                 decay_name = self.get_variable_name(name="softmax_decay", node=node)
                 node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
