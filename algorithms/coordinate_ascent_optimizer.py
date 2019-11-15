@@ -8,7 +8,7 @@ class CoordinateAscentOptimizer:
         pass
 
     @staticmethod
-    def maximizer(bounds, p0, sample_count_per_coordinate, func, max_iter=1000, tol=1e-20):
+    def maximizer(bounds, p0, sample_count_per_coordinate, func, max_iter=10000, tol=1e-20):
         dim = len(bounds)
         curr_p = np.copy(p0)
         curr_max_y = func(curr_p)
@@ -19,6 +19,7 @@ class CoordinateAscentOptimizer:
         #         min_x=bounds[0][0], max_x=bounds[0][1], min_y=bounds[1][0], max_y=bounds[1][1],
         #         points=p_list, func=func)
         for iter_id in range(max_iter):
+            print("Iteration:{0}".format(iter_id))
             iter_max_y = curr_max_y
             iter_max_p = curr_p
             for curr_coord_idx in range(dim):
@@ -86,8 +87,12 @@ def experiment():
 
     p0 = np.random.uniform(low=min_b, high=max_b, size=(dim,))
     res = CoordinateAscentOptimizer.maximizer(bounds=bounds, p0=p0, func=func, sample_count_per_coordinate=10000,
-                                              max_iter=1000)
-    print("X")
+                                              max_iter=100000)
+    print("Gaussian Means")
+    for rv in rv_list:
+        print(rv.mean)
+    print("p_max")
+    print(res[1])
     # mean0 = np.array([0.0, 0.0])
     # cov0 = np.array([[0.1, 0.02], [0.02, 0.2]])
     # rv0 = multivariate_normal(mean=mean0, cov=cov0)
