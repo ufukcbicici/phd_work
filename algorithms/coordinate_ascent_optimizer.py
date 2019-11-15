@@ -49,11 +49,11 @@ def experiment():
     cov2 = np.array([[0.15, -0.08], [-0.08, 0.15]])
     rv2 = multivariate_normal(mean=mean2, cov=cov2)
 
-    func = lambda x: (1.0/3.0) * rv0.pdf(x) + (1.0/3.0) * rv1.pdf(x) + (1.0/3.0) * rv2.pdf(x)
+    func = lambda x: (1.0 / 3.0) * rv0.pdf(x) + (1.0 / 3.0) * rv1.pdf(x) + (1.0 / 3.0) * rv2.pdf(x)
     p0 = np.array([-1.6, 1.7])
     bounds = [[-2.0, 2.0], [-2.0, 2.0]]
     CoordinateAscentOptimizer.maximizer(bounds=bounds, p0=p0, func=func, sample_count_per_coordinate=10000,
-                                               max_iter=1000)
+                                        max_iter=1000)
 
     # _x = np.linspace(-2, 2, 1000)
     # _y = np.linspace(-2, 2, 1000)
