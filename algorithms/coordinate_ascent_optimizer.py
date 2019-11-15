@@ -8,32 +8,56 @@ class CoordinateAscentOptimizer:
         pass
 
     @staticmethod
-    def maximizer(bounds, p0, sample_count_per_coordinate, func, max_iter=1000, tol=1e-5):
-        iter_count = 0
-        curr_coord_idx = 0
+    def maximizer(bounds, p0, sample_count_per_coordinate, func, max_iter=1000, tol=1e-20):
         dim = len(bounds)
-        p = np.copy(p0)
-        curr_max_y = func(p)
+        curr_p = np.copy(p0)
+        curr_max_y = func(curr_p)
         y_list = [curr_max_y]
-        while True:
-            x = np.repeat(np.expand_dims(p, axis=0), repeats=sample_count_per_coordinate, axis=0)
-            min_x, max_x = bounds[curr_coord_idx]
-            ix = np.linspace(min_x, max_x, endpoint=True, num=sample_count_per_coordinate)
-            x[:, curr_coord_idx] = ix
-            y = func(x)
-            y_max = np.max(y)
-            y_argmax = np.argmax(y)
-            p_max = x[y_argmax, :]
-            iter_count += 1
-            if iter_count == max_iter:
+        p_list = [curr_p]
+        if dim == 2:
+            CoordinateAscentOptimizer.draw_figure(
+                min_x=bounds[0][0], max_x=bounds[0][1], min_y=bounds[1][0], max_y=bounds[1][1],
+                points=p_list, func=func)
+        for iter_id in range(max_iter):
+            iter_max_y = curr_max_y
+            iter_max_p = curr_p
+            for curr_coord_idx in range(dim):
+                x = np.repeat(np.expand_dims(iter_max_p, axis=0), repeats=sample_count_per_coordinate, axis=0)
+                min_x, max_x = bounds[curr_coord_idx]
+                ix = np.linspace(min_x, max_x, endpoint=True, num=sample_count_per_coordinate)
+                x[:, curr_coord_idx] = ix
+                y = func(x)
+                y_max = np.max(y)
+                y_argmax = np.argmax(y)
+                p_max = x[y_argmax, :]
+                if y_max > iter_max_y + tol:
+                    iter_max_y = y_max
+                    iter_max_p = p_max
+                    y_list.append(iter_max_y)
+                    p_list.append(iter_max_p)
+                    if dim == 2:
+                        CoordinateAscentOptimizer.draw_figure(
+                            min_x=bounds[0][0], max_x=bounds[0][1], min_y=bounds[1][0], max_y=bounds[1][1],
+                            points=p_list, func=func)
+            if iter_max_y > curr_max_y + tol:
+                curr_max_y = iter_max_y
+                curr_p = iter_max_p
+            else:
                 break
-            if np.abs(curr_max_y - y_max) < tol:
-                break
-            curr_coord_idx = (curr_coord_idx + 1) % dim
-            p = p_max
-            curr_max_y = y_max
-            y_list.append(curr_max_y)
-            print("X")
+        return curr_max_y, curr_p
+
+    @staticmethod
+    def draw_figure(min_x, max_x, min_y, max_y, points, func):
+        _x = np.linspace(min_x, max_x, 1000)
+        _y = np.linspace(min_y, max_y, 1000)
+        x_ax, y_ax = np.meshgrid(_x, _y)
+        coords = np.stack([x_ax, y_ax], axis=2)
+        z = func(coords)
+        fig, ax = plt.subplots()
+        ax.contourf(x_ax, y_ax, z, levels=100)
+        points_stacked = np.stack(points, axis=0)
+        ax.plot(points_stacked[:, 0], points_stacked[:, 1], 'r+', ms=3)
+        fig.savefig('coord_ascent_{0}.png'.format(points_stacked.shape[0]))
 
 
 def experiment():
@@ -50,7 +74,7 @@ def experiment():
     rv2 = multivariate_normal(mean=mean2, cov=cov2)
 
     func = lambda x: (1.0 / 3.0) * rv0.pdf(x) + (1.0 / 3.0) * rv1.pdf(x) + (1.0 / 3.0) * rv2.pdf(x)
-    p0 = np.array([-1.6, 1.7])
+    p0 = np.array([-0.95, -1.95])
     bounds = [[-2.0, 2.0], [-2.0, 2.0]]
     CoordinateAscentOptimizer.maximizer(bounds=bounds, p0=p0, func=func, sample_count_per_coordinate=10000,
                                         max_iter=1000)
@@ -60,9 +84,19 @@ def experiment():
     # x_ax, y_ax = np.meshgrid(_x, _y)
     # coords = np.stack([x_ax, y_ax], axis=2)
     # z = func(coords)
-    # plt.contourf(x_ax, y_ax, z, levels=100)
+    # fig, ax = plt.subplots()
+    # # ax = plt.contourf(x_ax, y_ax, z, levels=100)
+    # ax.contourf(x_ax, y_ax, z, levels=100)
+    # x = np.array([0.5])
+    # y = np.array([0.5])
+    # ax.plot(x, y, 'ko', ms=3)
+    # fig.savefig('ax1_figure.png')
+    # x = np.array([0.6])
+    # y = np.array([0.6])
+    # ax.plot(x, y, 'ko', ms=3)
+    # fig.savefig('ax2_figure.png')
     # plt.show()
-    print("X")
+    # print("X")
 
 
 experiment()
