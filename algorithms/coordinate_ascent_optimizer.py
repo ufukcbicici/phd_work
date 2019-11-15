@@ -70,11 +70,11 @@ def experiment():
     rv1 = multivariate_normal(mean=mean1, cov=cov1)
 
     mean2 = np.array([-0.8, -0.8])
-    cov2 = np.array([[0.15, -0.08], [-0.08, 0.15]])
+    cov2 = np.array([[0.05, -0.08], [-0.08, 0.15]])
     rv2 = multivariate_normal(mean=mean2, cov=cov2)
 
     func = lambda x: (1.0 / 3.0) * rv0.pdf(x) + (1.0 / 3.0) * rv1.pdf(x) + (1.0 / 3.0) * rv2.pdf(x)
-    p0 = np.array([-0.95, -1.95])
+    p0 = np.random.uniform(-2.0, 2.0, size=(2, ))
     bounds = [[-2.0, 2.0], [-2.0, 2.0]]
     CoordinateAscentOptimizer.maximizer(bounds=bounds, p0=p0, func=func, sample_count_per_coordinate=10000,
                                         max_iter=1000)
