@@ -54,7 +54,7 @@ class CoordinateAscentOptimizer:
         coords = np.stack([x_ax, y_ax], axis=2)
         z = func(coords)
         fig, ax = plt.subplots()
-        ax.contourf(x_ax, y_ax, z, levels=100)
+        ax.contourf(x_ax, y_ax, z, levels=1000)
         points_stacked = np.stack(points, axis=0)
         ax.plot(points_stacked[:, 0], points_stacked[:, 1], 'r+', ms=3)
         fig.savefig('coord_ascent_{0}.png'.format(points_stacked.shape[0]))
@@ -73,8 +73,15 @@ def experiment():
     cov2 = np.array([[0.05, -0.08], [-0.08, 0.15]])
     rv2 = multivariate_normal(mean=mean2, cov=cov2)
 
-    func = lambda x: (1.0 / 3.0) * rv0.pdf(x) + (1.0 / 3.0) * rv1.pdf(x) + (1.0 / 3.0) * rv2.pdf(x)
-    p0 = np.random.uniform(-2.0, 2.0, size=(2, ))
+    # func = lambda x: (1.0 / 3.0) * rv0.pdf(x) + (1.0 / 3.0) * rv1.pdf(x) + (1.0 / 3.0) * rv2.pdf(x) + np.sum(np.square(x), axis=2)
+    def func(x):
+        y = (1.0 / 3.0) * rv0.pdf(x) + (1.0 / 3.0) * rv1.pdf(x) + (1.0 / 3.0) * rv2.pdf(x)
+        y += np.sin(x[..., 0])
+        y += np.cos(x[..., 1])
+        return y
+
+
+    p0 = np.random.uniform(-2.0, 2.0, size=(2,))
     bounds = [[-2.0, 2.0], [-2.0, 2.0]]
     CoordinateAscentOptimizer.maximizer(bounds=bounds, p0=p0, func=func, sample_count_per_coordinate=10000,
                                         max_iter=1000)
