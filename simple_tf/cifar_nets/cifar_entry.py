@@ -44,11 +44,11 @@ def cifar_100_training():
     # classification_wd = [0.0002, 0.0002, 0.0025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00015, 0.0002, 0.00025] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    classification_wd = [0.00015, 0.00015, 0.00015, 0.00015]
+    classification_wd = [0.00025, 0.00025, 0.00025, 0.00025]
     # classification_wd = [0.0001, 0.00015, 0.0002] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
-    info_gain_balance_coeffs = [1.0]
+    info_gain_balance_coeffs = [2.0]
     classification_dropout_probs = [0.0]
     decision_dropout_probs = [0.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,

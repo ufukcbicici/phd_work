@@ -1,4 +1,5 @@
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
+from algorithms.threshold_optimization_algorithms.bayesian_threshold_optimization import BayesianOptimizer
 from algorithms.threshold_optimization_algorithms.brute_force_threshold_optimizer import BruteForceOptimizer
 from algorithms.threshold_optimization_algorithms.simulated_annealing_thread_runner import \
     SimulatedAnnealingThreadRunner
@@ -50,10 +51,17 @@ def main():
     # sa_algorithm_runner = SimulatedAnnealingThreadRunner(sa_optimizers=sa_optimizers, thread_count=10)
     # sa_algorithm_runner.run()
     # sa_optimizer.run()
-    bf_optimizer = BruteForceOptimizer(run_id=run_id, network=tree, sample_count=brute_force_sample_count,
-                                       multipath_score_calculators=multipath_calculators,
-                                       balance_coefficient=balance_coefficient,
-                                       use_weighted_scoring=use_weighted_scoring,
-                                       thread_count=8, verbose=True, batch_size=10000)
-    bf_optimizer.run()
+    # bf_optimizer = BruteForceOptimizer(run_id=run_id, network=tree, sample_count=brute_force_sample_count,
+    #                                    multipath_score_calculators=multipath_calculators,
+    #                                    balance_coefficient=balance_coefficient,
+    #                                    use_weighted_scoring=use_weighted_scoring,
+    #                                    thread_count=1, verbose=True, batch_size=10000)
+    # bf_optimizer.run()
+
+    bayesian_optimizer = BayesianOptimizer(
+        run_id=run_id, network=tree, multipath_score_calculators=multipath_calculators,
+        balance_coefficient=balance_coefficient,
+        use_weighted_scoring=False,
+        verbose=True)
+    bayesian_optimizer.run()
     print("X")

@@ -12,6 +12,17 @@ class ThresholdOptimizer:
         self.useWeightedScoring = use_weighted_scoring
         self.verbose = verbose
 
+    @staticmethod
+    def thresholds_to_numpy(thresholds):
+        indices = sorted(list(thresholds.keys()))
+        arr_list = []
+        for threshold_dict in thresholds:
+            arr_as_list = [threshold_dict[node_idx] for node_idx in indices]
+            threshold_arr = np.concatenate(arr_as_list)
+            arr_list.append(threshold_arr)
+        thresholds_matrix = np.stack(arr_list, axis=0)
+        return thresholds_matrix
+
     def pick_fully_random_state(self):
         threshold_state = {}
         for node in self.network.topologicalSortedNodes:
