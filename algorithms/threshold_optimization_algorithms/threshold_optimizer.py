@@ -14,7 +14,9 @@ class ThresholdOptimizer:
 
     @staticmethod
     def thresholds_to_numpy(thresholds):
-        indices = sorted(list(thresholds.keys()))
+        key_set = set([frozenset(thr.keys()) for thr in thresholds])
+        assert len(key_set) == 1
+        indices = sorted(list(thresholds[0].keys()))
         arr_list = []
         for threshold_dict in thresholds:
             arr_as_list = [threshold_dict[node_idx] for node_idx in indices]

@@ -24,4 +24,11 @@ class BayesianOptimizer(ThresholdOptimizer):
         for idx in range(self.initialSampleCount):
             random_thresholds.append(self.pick_fully_random_state())
         initial_thresholds = ThresholdOptimizer.thresholds_to_numpy(thresholds=random_thresholds)
+        # Step 2: The selected thresholds constitute our hyperparameter samples. Get the performance metrics, the "t"
+        # variables.
+        scores = []
+        for threshold in random_thresholds:
+            final_score, final_accuracy, final_computation_overload = \
+                self.calculate_threshold_score(threshold_state=threshold)
+            scores.append(final_score)
         print("X")
