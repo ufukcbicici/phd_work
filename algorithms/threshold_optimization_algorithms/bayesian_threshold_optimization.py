@@ -62,7 +62,7 @@ class BayesianOptimizer(ThresholdOptimizer):
             new_score, new_accuracy, new_computation_overload = \
                 self.calculate_threshold_score(threshold_state=best_threshold_as_dict)
             X = np.vstack((X, np.expand_dims(best_threshold, axis=0)))
-            y = np.vstack((y, new_score))
+            y = np.vstack((y, np.array([new_score])))
             print("X")
         print("X")
 
