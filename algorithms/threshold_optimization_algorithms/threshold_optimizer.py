@@ -31,12 +31,12 @@ class ThresholdOptimizer:
         for node in self.network.topologicalSortedNodes:
             if node.isLeaf:
                 continue
-            other_children_counts = sum([k for k, v in child_counts.items() if k < node.index])
+            other_children_counts = sum([v for k, v in child_counts.items() if k < node.index])
             this_children_count = child_counts[node.index]
             threshold_dict[node.index] = thresholds_arr[other_children_counts:
                                                         other_children_counts + this_children_count]
-        assert len(child_counts) == sum([len(v) for v in threshold_dict.values()])
-        return thresholds_arr
+        assert sum(child_counts.values()) == sum([len(v) for v in threshold_dict.values()])
+        return threshold_dict
 
     def pick_fully_random_state(self, as_numpy=False):
         threshold_state = {}
