@@ -12,20 +12,33 @@ class ThresholdOptimizer:
         self.useWeightedScoring = use_weighted_scoring
         self.verbose = verbose
 
-    @staticmethod
-    def thresholds_to_numpy(thresholds):
-        key_set = set([frozenset(thr.keys()) for thr in thresholds])
-        assert len(key_set) == 1
-        indices = sorted(list(thresholds[0].keys()))
+    def thresholds_to_numpy(self, thresholds):
+        sorted_indices = sorted([node.index for node in self.network.topologicalSortedNodes if not node.isLeaf])
         arr_list = []
         for threshold_dict in thresholds:
-            arr_as_list = [threshold_dict[node_idx] for node_idx in indices]
+            assert len(threshold_dict) == len(sorted_indices)
+            arr_as_list = [threshold_dict[node_idx] for node_idx in sorted_indices]
             threshold_arr = np.concatenate(arr_as_list)
             arr_list.append(threshold_arr)
         thresholds_matrix = np.stack(arr_list, axis=0)
         return thresholds_matrix
 
-    def pick_fully_random_state(self):
+    def numpy_to_threshold_dict(self, thresholds_arr):
+        child_counts = {node.index: len(self.network.dagObject.children(node=node)) for
+                        node in self.network.topologicalSortedNodes
+                        if not node.isLeaf}
+        threshold_dict = {}
+        for node in self.network.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            other_children_counts = sum([k for k, v in child_counts.items() if k < node.index])
+            this_children_count = child_counts[node.index]
+            threshold_dict[node.index] = thresholds_arr[other_children_counts:
+                                                        other_children_counts + this_children_count]
+        assert len(child_counts) == sum([len(v) for v in threshold_dict.values()])
+        return thresholds_arr
+
+    def pick_fully_random_state(self, as_numpy=False):
         threshold_state = {}
         for node in self.network.topologicalSortedNodes:
             if node.isLeaf:
@@ -34,6 +47,8 @@ class ThresholdOptimizer:
             max_threshold = 1.0 / float(child_count)
             thresholds = max_threshold * np.random.uniform(size=(child_count,))
             threshold_state[node.index] = thresholds
+        if as_numpy:
+            return self.thresholds_to_numpy(thresholds=[threshold_state])
         return threshold_state
 
     def calculate_threshold_score(self, threshold_state):

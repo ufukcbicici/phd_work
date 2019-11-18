@@ -8,10 +8,10 @@ class CoordinateAscentOptimizer:
         pass
 
     @staticmethod
-    def maximizer(bounds, p0, sample_count_per_coordinate, func, max_iter=10000, tol=1e-20):
+    def maximizer(bounds, p0, sample_count_per_coordinate, func, max_iter=10000, tol=1e-20, **kwargs):
         dim = len(bounds)
         curr_p = np.copy(p0)
-        curr_max_y = func(curr_p)
+        curr_max_y = func(curr_p, **kwargs)
         y_list = [curr_max_y]
         p_list = [curr_p]
         # if dim == 2:
@@ -27,7 +27,7 @@ class CoordinateAscentOptimizer:
                 min_x, max_x = bounds[curr_coord_idx]
                 ix = np.linspace(min_x, max_x, endpoint=True, num=sample_count_per_coordinate)
                 x[:, curr_coord_idx] = ix
-                y = func(x)
+                y = func(x, **kwargs)
                 y_max = np.max(y)
                 y_argmax = np.argmax(y)
                 p_max = x[y_argmax, :]
@@ -137,4 +137,4 @@ def experiment():
     # print("X")
 
 
-experiment()
+# experiment()

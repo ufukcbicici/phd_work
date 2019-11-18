@@ -61,7 +61,7 @@ def main():
     bayesian_optimizer = BayesianOptimizer(
         run_id=run_id, network=tree, multipath_score_calculators=multipath_calculators,
         balance_coefficient=balance_coefficient,
-        use_weighted_scoring=False,
+        use_weighted_scoring=False, initial_sample_count=100,
         verbose=True)
     bayesian_optimizer.run()
     print("X")
