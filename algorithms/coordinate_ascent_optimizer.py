@@ -19,7 +19,7 @@ class CoordinateAscentOptimizer:
         #         min_x=bounds[0][0], max_x=bounds[0][1], min_y=bounds[1][0], max_y=bounds[1][1],
         #         points=p_list, func=func)
         for iter_id in range(max_iter):
-            print("Iteration:{0}".format(iter_id))
+            # print("Iteration:{0}".format(iter_id))
             iter_max_y = curr_max_y
             iter_max_p = curr_p
             for curr_coord_idx in range(dim):
