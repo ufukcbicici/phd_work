@@ -8,12 +8,14 @@ from algorithms.threshold_optimization_algorithms.threshold_optimizer import Thr
 class BayesianOptimizer(ThresholdOptimizer):
     def __init__(self, run_id, network, multipath_score_calculators, balance_coefficient,
                  use_weighted_scoring,
-                 verbose, initial_sample_count=10000):
+                 verbose, max_iter=1000, initial_sample_count=10000):
         super().__init__(run_id, network, multipath_score_calculators, balance_coefficient,
                          use_weighted_scoring, verbose)
         self.network = network
         self.initialSampleCount = initial_sample_count
         self.gpKernel = ConstantKernel(1.0) * Matern(length_scale=1.0, nu=2.5)
+        self.noiseLevel = 1e-10
+        self.maxIterations = max_iter
         # self.sampleCount = sample_count
         # self.threadCount = thread_count
         # self.batchSize = batch_size
@@ -31,4 +33,12 @@ class BayesianOptimizer(ThresholdOptimizer):
             final_score, final_accuracy, final_computation_overload = \
                 self.calculate_threshold_score(threshold_state=threshold)
             scores.append(final_score)
+        # Step 3: Build the first dataset for the Gaussian Process Regressor.
+        X = np.copy(initial_thresholds)
+        y = np.array(scores)
+        # Step 4: The Bayesian optimization framework
+        gaussian_process_regressor = GaussianProcessRegressor(kernel=self.gpKernel, alpha=self.noiseLevel,
+                                                              n_restarts_optimizer=10)
+        for iteration_id in range(self.maxIterations):
+            print("X")
         print("X")
