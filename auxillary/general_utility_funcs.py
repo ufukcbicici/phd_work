@@ -4,6 +4,7 @@ import tensorflow as tf
 from os import listdir
 from os.path import isfile, join
 import itertools
+from datetime import datetime
 
 from auxillary.parameters import DecayingParameter, FixedParameter
 from simple_tf.global_params import GlobalConstants
@@ -22,6 +23,14 @@ class UtilityFuncs:
     def compare_floats(f1, f2, eps=1e-10):
         abs_dif = abs(f1 - f2)
         return abs_dif <= eps
+
+    @staticmethod
+    def get_timestamp():
+        date_obj = datetime.now()
+        timestamp_str = "{0}_{1}_{2}_{3}_{4}".format(date_obj.date().year, date_obj.date().month,
+                                                     date_obj.date().day, date_obj.time().hour,
+                                                     date_obj.time().minute)
+        return timestamp_str
 
     @staticmethod
     def set_tuple_element(target_tuple, target_index, value):

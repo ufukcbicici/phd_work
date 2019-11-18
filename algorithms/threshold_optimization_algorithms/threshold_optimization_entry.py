@@ -5,6 +5,7 @@ from algorithms.threshold_optimization_algorithms.simulated_annealing_thread_run
     SimulatedAnnealingThreadRunner
 from algorithms.threshold_optimization_algorithms.simulated_annealing_uniform_optimizer import \
     SimulatedAnnealingUniformOptimizer
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
@@ -13,7 +14,7 @@ from multiprocessing import Pool
 
 run_id = 67
 # network_name = "Cifar100_CIGN_Sampling"
-network_name = "None"
+network_name = "Cifar100_CIGN_BatchSize500_[64,64,64]"
 iterations = [119100]
 max_num_of_iterations = 10000
 balance_coefficient = 1.0
@@ -36,7 +37,17 @@ def bayesian_process_runner(param_tpl):
         balance_coefficient=accuracy_computation_balance, xi=xi,
         use_weighted_scoring=use_weighted, initial_sample_count=1000,
         verbose=True)
-    bayesian_optimizer.run()
+    results = bayesian_optimizer.run()
+    timestamp = UtilityFuncs.get_timestamp()
+    db_rows = []
+    # result = (iteration_id, new_score, new_accuracy, new_computation_overload)
+    for result in results:
+        score = result[1]
+        accuracy = result[2]
+        overload = result[3]
+        db_rows.append((run_id, network_name, iterations[0], accuracy_computation_balance,
+                        int(use_weighted), score, accuracy, overload, "Bayesian Optimization", xi, timestamp))
+    return db_rows
 
 
 def main():
@@ -86,6 +97,7 @@ def main():
                                                                           network_list,
                                                                           calculator_list])
     pool = Pool(processes=8)
-    pool.map(bayesian_process_runner, cartesian_product)
-
+    all_results = pool.map(bayesian_process_runner, cartesian_product)
+    for db_rows in all_results:
+        DbLogger.write_into_table(rows=all_results, table=DbLogger.threshold_optimization, col_count=len(db_rows[0]))
     print("X")
