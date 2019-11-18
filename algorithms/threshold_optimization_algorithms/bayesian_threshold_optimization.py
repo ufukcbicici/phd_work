@@ -58,7 +58,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         curr_max_score = np.max(y)
         all_results = []
         for iteration_id in range(self.maxIterations):
-            print("Process:{0} Iteration:{1}".format(multiprocessing.current_process(), iteration_id))
+            # print("Process:{0} Iteration:{1}".format(multiprocessing.current_process(), iteration_id))
             gpr = GaussianProcessRegressor(kernel=self.gpKernel, alpha=self.noiseLevel, n_restarts_optimizer=10)
             gpr.fit(X, y)
             best_score, best_threshold = self.propose_thresholds(gpr=gpr, max_score=curr_max_score,
@@ -82,6 +82,7 @@ class BayesianOptimizer(ThresholdOptimizer):
                     best_result[3]))
             X = np.vstack((X, np.expand_dims(best_threshold, axis=0)))
             y = np.concatenate([y, np.array([new_score])])
+        print("Process:{0} ends.".format(multiprocessing.current_process()))
         return all_results
 
     def expected_improvement(self, X, **kwargs):

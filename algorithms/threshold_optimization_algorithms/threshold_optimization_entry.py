@@ -47,8 +47,8 @@ def bayesian_process_runner(param_tpl):
     bayesian_optimizer = BayesianOptimizer(
         run_id=run_id, network=network, multipath_score_calculators=multipath_calculators,
         balance_coefficient=accuracy_computation_balance, xi=xi,
-        use_weighted_scoring=use_weighted, initial_sample_count=100,
-        max_iter=10, verbose=True)
+        use_weighted_scoring=use_weighted, initial_sample_count=1000,
+        max_iter=10000, verbose=True)
     results = bayesian_optimizer.run()
     timestamp = UtilityFuncs.get_timestamp()
     db_rows = []
