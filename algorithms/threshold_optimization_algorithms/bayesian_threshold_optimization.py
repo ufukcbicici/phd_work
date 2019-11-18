@@ -37,6 +37,7 @@ class BayesianOptimizer(ThresholdOptimizer):
                 self.thresholdBounds.append(bounds)
 
     def run(self):
+        print("Process:{0} starts.".format(multiprocessing.current_process()))
         # Step 1: Sample a certain amount of random thresholds in order to train the Gaussian Process Regressor.
         random_thresholds = []
         for idx in range(self.initialSampleCount):
@@ -57,6 +58,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         curr_max_score = np.max(y)
         all_results = []
         for iteration_id in range(self.maxIterations):
+            print("Process:{0} Iteration:{1}".format(multiprocessing.current_process(), iteration_id))
             gpr = GaussianProcessRegressor(kernel=self.gpKernel, alpha=self.noiseLevel, n_restarts_optimizer=10)
             gpr.fit(X, y)
             best_score, best_threshold = self.propose_thresholds(gpr=gpr, max_score=curr_max_score,
@@ -74,10 +76,10 @@ class BayesianOptimizer(ThresholdOptimizer):
             if new_score > curr_max_score:
                 curr_max_score = new_score
                 best_result = result
-                print("Process Id:{0} Best result so far at iteration {1}:{2},{3},{4]".format(
+                print("Process Id:{0} Best result so far at iteration {1}:{2},{3},{4}".format(
                     multiprocessing.current_process(), iteration_id,
-                    best_result[0], best_result[1],
-                    best_result[2]))
+                    best_result[1], best_result[2],
+                    best_result[3]))
             X = np.vstack((X, np.expand_dims(best_threshold, axis=0)))
             y = np.concatenate([y, np.array([new_score])])
         return all_results
