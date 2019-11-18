@@ -3,6 +3,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ConstantKernel, Matern
 from scipy.stats import norm
 from scipy.optimize import minimize
+import multiprocessing
 from algorithms.coordinate_ascent_optimizer import CoordinateAscentOptimizer
 from algorithms.threshold_optimization_algorithms.threshold_optimizer import ThresholdOptimizer
 
@@ -17,7 +18,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         self.initialSampleCount = initial_sample_count
         self.gpKernel = ConstantKernel(1.0) * Matern(length_scale=1.0, nu=2.5)
         self.xi = xi
-        self.noiseLevel = 1e-10 # 0.0
+        self.noiseLevel = 1e-10  # 0.0
         self.coordAscentSampleCount = 10000
         self.maxIterations = max_iter
         self.thresholdBounds = []
@@ -54,7 +55,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         y = np.copy(outputs[:, 0])
         # Step 4: The Bayesian optimization framework
         curr_max_score = np.max(y)
-        best_result = []
+        all_results = []
         for iteration_id in range(self.maxIterations):
             gpr = GaussianProcessRegressor(kernel=self.gpKernel, alpha=self.noiseLevel, n_restarts_optimizer=10)
             gpr.fit(X, y)
@@ -63,19 +64,23 @@ class BayesianOptimizer(ThresholdOptimizer):
             best_threshold_as_dict = self.numpy_to_threshold_dict(thresholds_arr=best_threshold)
             new_score, new_accuracy, new_computation_overload = \
                 self.calculate_threshold_score(threshold_state=best_threshold_as_dict)
-            print("Bayesian Optimization Iteration Id:{0}".format(iteration_id))
-            print("Proposed thresholds:{0}".format(best_threshold))
-            print("Predicted score at the proposal:{0}".format(best_score))
-            print("Actual score at the proposal:{0}".format(new_score))
-            print("Actual computation load at the proposal:{0}".format(new_computation_overload))
+            result = (iteration_id, new_score, new_accuracy, new_computation_overload)
+            all_results.append(result)
+            # print("Bayesian Optimization Iteration Id:{0}".format(iteration_id))
+            # print("Proposed thresholds:{0}".format(best_threshold))
+            # print("Predicted score at the proposal:{0}".format(best_score))
+            # print("Actual score at the proposal:{0}".format(new_score))
+            # print("Actual computation load at the proposal:{0}".format(new_computation_overload))
             if new_score > curr_max_score:
                 curr_max_score = new_score
-                best_result = (new_score, new_accuracy, new_computation_overload)
-                print("Best result so far:{0},{1},{2}".format(best_result[0], best_result[1], best_result[2]))
+                best_result = result
+                print("Process Id:{0} Best result so far at iteration {1}:{2},{3},{4]".format(
+                    multiprocessing.current_process(), iteration_id,
+                    best_result[0], best_result[1],
+                    best_result[2]))
             X = np.vstack((X, np.expand_dims(best_threshold, axis=0)))
             y = np.concatenate([y, np.array([new_score])])
-            print("X")
-        print("X")
+        return all_results
 
     def expected_improvement(self, X, **kwargs):
         gpr = kwargs["gpr"]
