@@ -6,11 +6,13 @@ from scipy.optimize import minimize
 import multiprocessing
 from algorithms.coordinate_ascent_optimizer import CoordinateAscentOptimizer
 from algorithms.threshold_optimization_algorithms.threshold_optimizer import ThresholdOptimizer
+from auxillary.db_logger import DbLogger
+from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class BayesianOptimizer(ThresholdOptimizer):
     def __init__(self, run_id, network, multipath_score_calculators, balance_coefficient,
-                 use_weighted_scoring,
+                 use_weighted_scoring, lock,
                  verbose, xi=0.01, max_iter=10000, initial_sample_count=10000):
         super().__init__(run_id, network, multipath_score_calculators, balance_coefficient,
                          use_weighted_scoring, verbose)
@@ -22,6 +24,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         self.coordAscentSampleCount = 10000
         self.maxIterations = max_iter
         self.thresholdBounds = []
+        self.lock = lock
         bounds_dict = {}
         for node in self.network.topologicalSortedNodes:
             if node.isLeaf:
@@ -57,8 +60,9 @@ class BayesianOptimizer(ThresholdOptimizer):
         # Step 4: The Bayesian optimization framework
         curr_max_score = np.max(y)
         all_results = []
+        print("Process:{0} GP iterations start.".format(multiprocessing.current_process()))
         for iteration_id in range(self.maxIterations):
-            # print("Process:{0} Iteration:{1}".format(multiprocessing.current_process(), iteration_id))
+            print("Process:{0} Iteration:{1}".format(multiprocessing.current_process(), iteration_id))
             gpr = GaussianProcessRegressor(kernel=self.gpKernel, alpha=self.noiseLevel, n_restarts_optimizer=10)
             gpr.fit(X, y)
             best_score, best_threshold = self.propose_thresholds(gpr=gpr, max_score=curr_max_score,
@@ -83,7 +87,8 @@ class BayesianOptimizer(ThresholdOptimizer):
             X = np.vstack((X, np.expand_dims(best_threshold, axis=0)))
             y = np.concatenate([y, np.array([new_score])])
         print("Process:{0} ends.".format(multiprocessing.current_process()))
-        return all_results
+        self.write_to_db(results=all_results)
+        # return all_results
 
     def expected_improvement(self, X, **kwargs):
         gpr = kwargs["gpr"]
@@ -134,3 +139,20 @@ class BayesianOptimizer(ThresholdOptimizer):
         #     proposals.append((0.0, new_best_thr))
         # sorted_proposals = sorted(proposals, key=lambda prop: prop[0], reverse=True)
         return best_score, best_threshold
+
+    def write_to_db(self, results):
+        timestamp = UtilityFuncs.get_timestamp()
+        db_rows = []
+        # result = (iteration_id, new_score, new_accuracy, new_computation_overload)
+        for result in results:
+            score = result[1]
+            accuracy = result[2]
+            overload = result[3]
+            db_rows.append((self.runId, self.network.networkName,
+                            list(self.multipathScoreCalculators.keys())[0],
+                            self.balanceCoefficient,
+                            int(self.useWeightedScoring), score, accuracy, overload,
+                            "Bayesian Optimization", self.xi, timestamp))
+        self.lock.acquire()
+        DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)
+        self.lock.release()

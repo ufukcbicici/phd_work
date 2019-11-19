@@ -9,7 +9,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from multiprocessing import Pool
+from multiprocessing import Pool, Lock
 
 
 # Initial Operations
@@ -39,6 +39,8 @@ for iteration in iterations:
                                                  activations=activations_dict, posterior_probs=posterior_probs_dict)
     multipath_calculators[iteration] = multipath_calculator
 
+multiprocess_lock = Lock()
+
 
 def bayesian_process_runner(param_tpl):
     xi = param_tpl[0]
@@ -46,20 +48,10 @@ def bayesian_process_runner(param_tpl):
     accuracy_computation_balance = param_tpl[2]
     bayesian_optimizer = BayesianOptimizer(
         run_id=run_id, network=network, multipath_score_calculators=multipath_calculators,
-        balance_coefficient=accuracy_computation_balance, xi=xi,
-        use_weighted_scoring=use_weighted, initial_sample_count=1000,
-        max_iter=10000, verbose=True)
-    results = bayesian_optimizer.run()
-    timestamp = UtilityFuncs.get_timestamp()
-    db_rows = []
-    # result = (iteration_id, new_score, new_accuracy, new_computation_overload)
-    for result in results:
-        score = result[1]
-        accuracy = result[2]
-        overload = result[3]
-        db_rows.append((run_id, network_name, iterations[0], accuracy_computation_balance,
-                        int(use_weighted), score, accuracy, overload, "Bayesian Optimization", xi, timestamp))
-    return db_rows
+        balance_coefficient=accuracy_computation_balance, lock=multiprocess_lock, xi=xi,
+        use_weighted_scoring=use_weighted, initial_sample_count=10,
+        max_iter=10, verbose=True)
+    bayesian_optimizer.run()
 
 
 def main():
@@ -85,15 +77,15 @@ def main():
     #                                    thread_count=1, verbose=True, batch_size=10000)
     # bf_optimizer.run()
 
-    xi_list = [0.01] * 2
+    xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.0001] * 200
     weighted_score_list = [False]
     balance_list = [1.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[xi_list,
                                                                           weighted_score_list,
                                                                           balance_list])
-    pool = Pool(processes=2)
-    all_results = pool.map(bayesian_process_runner, cartesian_product)
-    for db_rows in all_results:
-        DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)
+    pool = Pool(processes=20)
+    pool.map(bayesian_process_runner, cartesian_product)
+    # for db_rows in all_results:
+    #     DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)
     # bayesian_process_runner(cartesian_product[0])
-    print("X")
+    # print("X")
