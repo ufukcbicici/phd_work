@@ -1,3 +1,7 @@
+import numpy as np
+from sklearn.model_selection import train_test_split
+
+
 class BranchingInfo:
     def __init__(self, branching_probs, routing_matrix, path_probs):
         self.branchingProbs = branching_probs
@@ -23,3 +27,34 @@ class RoutingDataset:
         self.branchProbs = branch_probs
         self.activations = activations
         self.posteriorProbs = posterior_probs
+
+    def apply_validation_test_split(self, test_ratio):
+        indices = np.array(range(self.labelList.shape[0]))
+        val_indices, test_indices = train_test_split(indices, test_size=test_ratio)
+        split_sets = []
+
+        def get_subset_of_dict(data_dict, _i):
+            subset_dict = {}
+            for node_id, arr in data_dict.items():
+                new_arr = np.copy(arr[_i])
+                subset_dict[node_id] = new_arr
+            return subset_dict
+
+        for idx in [val_indices, test_indices]:
+            labels_dict = get_subset_of_dict(data_dict=self.labelsDict, _i=idx)
+            labels_list = np.copy(self.labelList[idx])
+            branch_probs = get_subset_of_dict(data_dict=self.branchProbs, _i=idx)
+            activations = get_subset_of_dict(data_dict=self.activations, _i=idx)
+            posterior_probs = get_subset_of_dict(data_dict=self.posteriorProbs, _i=idx)
+            routing_data = RoutingDataset(labels_dict_for_leaves=labels_dict, label_list=labels_list,
+                                          branch_probs=branch_probs, activations=activations,
+                                          posterior_probs=posterior_probs)
+            split_sets.append(routing_data)
+
+        val_data = split_sets[0]
+        test_data = split_sets[1]
+        return val_data, test_data
+
+
+
+
