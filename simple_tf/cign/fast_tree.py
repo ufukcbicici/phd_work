@@ -7,6 +7,7 @@ import os
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
+from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers import RoutingDataset
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.tree import TreeNetwork
@@ -685,7 +686,11 @@ class FastTreeNetwork(TreeNetwork):
         # Activations
         npz_file_name = os.path.abspath(os.path.join(directory_path, "activations"))
         activations_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
-        return leaf_true_labels_dict, branch_probs_dict, posterior_probs_dict, activations_dict
+        label_list = list(leaf_true_labels_dict.values())[0]
+        routing_data = RoutingDataset(labels_dict_for_leaves=leaf_true_labels_dict,
+                                      label_list=label_list, branch_probs=branch_probs_dict,
+                                      posterior_probs=posterior_probs_dict, activations=activations_dict)
+        return routing_data
 
     # Unit Test
     @staticmethod

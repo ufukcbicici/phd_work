@@ -11,12 +11,12 @@ from auxillary.parameters import DecayingParameter
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from multiprocessing import Pool, Lock
 
-
 # Initial Operations
 run_id = 67
 # network_name = "Cifar100_CIGN_Sampling"
 network_name = "Cifar100_CIGN_BatchSize500_[64,64,64]"
 iterations = [119100]
+routing_data_dict = {}
 max_num_of_iterations = 10000
 balance_coefficient = 1.0
 sa_sample_count = 100
@@ -29,14 +29,9 @@ node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754
 network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
 multipath_calculators = {}
 for iteration in iterations:
-    leaf_true_labels_dict, branch_probs_dict, posterior_probs_dict, activations_dict = \
-        FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration)
-    label_list = list(leaf_true_labels_dict.values())[0]
-    sample_count = label_list.shape[0]
-    multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network,
-                                                 sample_count=sample_count,
-                                                 label_list=label_list, branch_probs=branch_probs_dict,
-                                                 activations=activations_dict, posterior_probs=posterior_probs_dict)
+    routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration)
+    routing_data_dict[iteration] = routing_data
+    multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
     multipath_calculators[iteration] = multipath_calculator
 
 multiprocess_lock = Lock()
@@ -47,10 +42,11 @@ def bayesian_process_runner(param_tpl):
     use_weighted = param_tpl[1]
     accuracy_computation_balance = param_tpl[2]
     bayesian_optimizer = BayesianOptimizer(
-        run_id=run_id, network=network, multipath_score_calculators=multipath_calculators,
+        run_id=run_id, network=network, routing_data_dict=routing_data_dict,
+        multipath_score_calculators=multipath_calculators,
         balance_coefficient=accuracy_computation_balance, lock=multiprocess_lock, xi=xi,
         use_weighted_scoring=use_weighted, initial_sample_count=10,
-        max_iter=10, verbose=True)
+        max_iter=200, verbose=True)
     bayesian_optimizer.run()
 
 
@@ -77,13 +73,11 @@ def main():
     #                                    thread_count=1, verbose=True, batch_size=10000)
     # bf_optimizer.run()
 
-    xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.0001] * 200
+    xi_list = [0.01]  # [0.01, 0.02, 0.05, 0.1, 0.001, 0.0001] * 200
     weighted_score_list = [False]
     balance_list = [1.0]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[xi_list,
-                                                                          weighted_score_list,
-                                                                          balance_list])
-    pool = Pool(processes=20)
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[xi_list, weighted_score_list, balance_list])
+    pool = Pool(processes=1)
     pool.map(bayesian_process_runner, cartesian_product)
     # for db_rows in all_results:
     #     DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)

@@ -2,10 +2,11 @@ import numpy as np
 
 
 class ThresholdOptimizer:
-    def __init__(self, run_id, network, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
+    def __init__(self, run_id, network, routing_data_dict, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
                  verbose):
         self.runId = run_id
         self.network = network
+        self.routingDataDict = routing_data_dict
         self.multipathScoreCalculators = multipath_score_calculators
         self.iterations = str(list(self.multipathScoreCalculators.keys()))
         self.balanceCoefficient = balance_coefficient
@@ -51,12 +52,14 @@ class ThresholdOptimizer:
             return self.thresholds_to_numpy(thresholds=[threshold_state])
         return threshold_state
 
-    def calculate_threshold_score(self, threshold_state):
+    def calculate_threshold_score(self, threshold_state, routing_data_dict):
         scores = []
         accuracies = []
         computation_overloads = []
-        for scorer in self.multipathScoreCalculators.values():
-            res_method_0, res_method_1 = scorer.calculate_for_threshold(thresholds_dict=threshold_state)
+        for iteration, scorer in self.multipathScoreCalculators.items():
+            routing_data = routing_data_dict[iteration]
+            res_method_0, res_method_1 = scorer.calculate_for_threshold(thresholds_dict=threshold_state,
+                                                                        routing_data=routing_data)
             result = res_method_1 if self.useWeightedScoring else res_method_0
             accuracy_gain = self.balanceCoefficient * result.accuracy
             computation_overload_loss = (1.0 - self.balanceCoefficient) * result.computationOverload

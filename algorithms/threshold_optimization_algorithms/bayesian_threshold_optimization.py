@@ -11,10 +11,10 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class BayesianOptimizer(ThresholdOptimizer):
-    def __init__(self, run_id, network, multipath_score_calculators, balance_coefficient,
+    def __init__(self, run_id, network, routing_data_dict, multipath_score_calculators, balance_coefficient,
                  use_weighted_scoring, lock,
                  verbose, xi=0.01, max_iter=10000, initial_sample_count=10000):
-        super().__init__(run_id, network, multipath_score_calculators, balance_coefficient,
+        super().__init__(run_id, network, routing_data_dict, multipath_score_calculators, balance_coefficient,
                          use_weighted_scoring, verbose)
         self.network = network
         self.initialSampleCount = initial_sample_count
@@ -51,7 +51,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         outputs = []
         for threshold in random_thresholds:
             final_score, final_accuracy, final_computation_overload = \
-                self.calculate_threshold_score(threshold_state=threshold)
+                self.calculate_threshold_score(threshold_state=threshold, routing_data_dict=self.routingDataDict)
             outputs.append(np.array([final_score, final_accuracy, final_computation_overload]))
         # Step 3: Build the first dataset for the Gaussian Process Regressor.
         outputs = np.stack(outputs, axis=0)
@@ -69,7 +69,8 @@ class BayesianOptimizer(ThresholdOptimizer):
                                                                  number_of_trials=100)
             best_threshold_as_dict = self.numpy_to_threshold_dict(thresholds_arr=best_threshold)
             new_score, new_accuracy, new_computation_overload = \
-                self.calculate_threshold_score(threshold_state=best_threshold_as_dict)
+                self.calculate_threshold_score(threshold_state=best_threshold_as_dict,
+                                               routing_data_dict=self.routingDataDict)
             result = (iteration_id, new_score, new_accuracy, new_computation_overload)
             all_results.append(result)
             # print("Bayesian Optimization Iteration Id:{0}".format(iteration_id))
