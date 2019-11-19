@@ -1027,7 +1027,7 @@ ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
 16.11.2019 - TRUBA dblogger_cign.db
 -[2, 3] Resnet-50 CIGN
--Resnet-50 CIFAR-100 CIGN, Info Gain Balance Coefficient: [1.0]
+-Resnet-50 CIFAR-100 CIGN, Info Gain Balance Coefficient: [2.0]
 -Wd: classification_wd = [0.00015, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
 -Batch Size:750
 -2 GPU
@@ -1064,4 +1064,22 @@ FROM
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
 
+***************************************************************************************************************
+
+***************************************************************************************************************
+19.11.2019 - TRUBA dblogger6_cign.db
+-RunID:67
+-Network Name:Cifar100_CIGN_BatchSize500_[64,64,64]
+-Iteration:119100
+-Bayesian Optimization for the Thresholds
+
+SELECT AVG(ValScore), AVG(ValComputationOverload), AVG(TestScore), AVG(TestComputationOverload), COUNT(1) FROM
+(
+	SELECT * FROM threshold_optimization WHERE TimeStamp = "2019_11_19_17_21" ORDER BY ValScore DESC LIMIT 10
+)
+
+
+SELECT AVG(ValScore), AVG(ValComputationOverload), AVG(TestScore), AVG(TestComputationOverload)
+FROM threshold_optimization WHERE TimeStamp = "2019_11_19_17_21"
+ORDER BY ValScore DESC
 ***************************************************************************************************************

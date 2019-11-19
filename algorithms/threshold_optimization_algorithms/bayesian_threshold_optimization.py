@@ -164,5 +164,5 @@ class BayesianOptimizer(ThresholdOptimizer):
                             test_score, test_accuracy, test_overload,
                             "Bayesian Optimization", self.xi, timestamp))
         self.lock.acquire()
-        DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)
+        DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=14)
         self.lock.release()
