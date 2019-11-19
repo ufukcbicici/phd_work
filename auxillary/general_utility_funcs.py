@@ -27,9 +27,10 @@ class UtilityFuncs:
     @staticmethod
     def get_timestamp():
         date_obj = datetime.now()
-        timestamp_str = "{0}_{1}_{2}_{3}_{4}".format(date_obj.date().year, date_obj.date().month,
-                                                     date_obj.date().day, date_obj.time().hour,
-                                                     date_obj.time().minute)
+        timestamp_str = "{0}_{1}_{2}_{3}_{4}_{5}_{6}" \
+            .format(date_obj.date().year, date_obj.date().month,
+                    date_obj.date().day, date_obj.time().hour,
+                    date_obj.time().minute, date_obj.time().second, date_obj.time().microsecond)
         return timestamp_str
 
     @staticmethod
@@ -144,7 +145,7 @@ class UtilityFuncs:
             # E = height_of_output_map
             # F = width_of_output_map
             U = convolution_stride
-            E = (H - R + U)/U
+            E = (H - R + U) / U
             F = (W - S + U) / U
             cost = M * F * E * R * S * C
             # for m in range(M):
