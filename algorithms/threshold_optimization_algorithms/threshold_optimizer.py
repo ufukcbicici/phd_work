@@ -2,16 +2,25 @@ import numpy as np
 
 
 class ThresholdOptimizer:
-    def __init__(self, run_id, network, routing_data_dict, multipath_score_calculators, balance_coefficient, use_weighted_scoring,
+    def __init__(self, run_id, network, routing_data_dict, multipath_score_calculators, balance_coefficient,
+                 test_ratio,
+                 use_weighted_scoring,
                  verbose):
         self.runId = run_id
         self.network = network
+        self.testRatio = test_ratio
         self.routingDataDict = routing_data_dict
         self.multipathScoreCalculators = multipath_score_calculators
         self.iterations = str(list(self.multipathScoreCalculators.keys()))
         self.balanceCoefficient = balance_coefficient
+        self.testRatio = test_ratio
         self.useWeightedScoring = use_weighted_scoring
         self.verbose = verbose
+        self.validationDataDict = {}
+        self.testDataDict = {}
+        for iteration, routing_data in self.routingDataDict.items():
+            self.validationDataDict[iteration], self.testDataDict[iteration] = \
+                routing_data.apply_validation_test_split(test_ratio=self.testRatio)
 
     def thresholds_to_numpy(self, thresholds):
         sorted_indices = sorted([node.index for node in self.network.topologicalSortedNodes if not node.isLeaf])

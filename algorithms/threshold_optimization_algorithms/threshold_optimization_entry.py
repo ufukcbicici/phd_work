@@ -46,7 +46,7 @@ def bayesian_process_runner(param_tpl):
         multipath_score_calculators=multipath_calculators,
         balance_coefficient=accuracy_computation_balance, lock=multiprocess_lock, xi=xi,
         use_weighted_scoring=use_weighted, initial_sample_count=10,
-        max_iter=200, verbose=True)
+        test_ratio=0.5, max_iter=200, verbose=True)
     bayesian_optimizer.run()
 
 
@@ -77,8 +77,10 @@ def main():
     weighted_score_list = [False]
     balance_list = [1.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[xi_list, weighted_score_list, balance_list])
-    pool = Pool(processes=1)
-    pool.map(bayesian_process_runner, cartesian_product)
+    bayesian_process_runner(cartesian_product[0])
+
+    # pool = Pool(processes=1)
+    # pool.map(bayesian_process_runner, cartesian_product)
     # for db_rows in all_results:
     #     DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)
     # bayesian_process_runner(cartesian_product[0])

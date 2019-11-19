@@ -12,10 +12,10 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 class BayesianOptimizer(ThresholdOptimizer):
     def __init__(self, run_id, network, routing_data_dict, multipath_score_calculators, balance_coefficient,
-                 use_weighted_scoring, lock,
-                 verbose, xi=0.01, max_iter=10000, initial_sample_count=10000):
+                 use_weighted_scoring, lock, verbose, xi=0.01, max_iter=10000, initial_sample_count=10000,
+                 test_ratio=0.5):
         super().__init__(run_id, network, routing_data_dict, multipath_score_calculators, balance_coefficient,
-                         use_weighted_scoring, verbose)
+                         test_ratio, use_weighted_scoring, verbose)
         self.network = network
         self.initialSampleCount = initial_sample_count
         self.gpKernel = ConstantKernel(1.0) * Matern(length_scale=1.0, nu=2.5)
@@ -51,7 +51,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         outputs = []
         for threshold in random_thresholds:
             final_score, final_accuracy, final_computation_overload = \
-                self.calculate_threshold_score(threshold_state=threshold, routing_data_dict=self.routingDataDict)
+                self.calculate_threshold_score(threshold_state=threshold, routing_data_dict=self.validationDataDict)
             outputs.append(np.array([final_score, final_accuracy, final_computation_overload]))
         # Step 3: Build the first dataset for the Gaussian Process Regressor.
         outputs = np.stack(outputs, axis=0)
@@ -70,8 +70,13 @@ class BayesianOptimizer(ThresholdOptimizer):
             best_threshold_as_dict = self.numpy_to_threshold_dict(thresholds_arr=best_threshold)
             new_score, new_accuracy, new_computation_overload = \
                 self.calculate_threshold_score(threshold_state=best_threshold_as_dict,
-                                               routing_data_dict=self.routingDataDict)
-            result = (iteration_id, new_score, new_accuracy, new_computation_overload)
+                                               routing_data_dict=self.validationDataDict)
+            test_score, test_accuracy, test_computation_overload = \
+                self.calculate_threshold_score(threshold_state=best_threshold_as_dict,
+                                               routing_data_dict=self.testDataDict)
+            result = (iteration_id,
+                      new_score, new_accuracy, new_computation_overload,
+                      test_score, test_accuracy, test_computation_overload)
             all_results.append(result)
             # print("Bayesian Optimization Iteration Id:{0}".format(iteration_id))
             # print("Proposed thresholds:{0}".format(best_threshold))
@@ -81,10 +86,10 @@ class BayesianOptimizer(ThresholdOptimizer):
             if new_score > curr_max_score:
                 curr_max_score = new_score
                 best_result = result
-                print("Process Id:{0} Best result so far at iteration {1}:{2},{3},{4}".format(
-                    multiprocessing.current_process(), iteration_id,
-                    best_result[1], best_result[2],
-                    best_result[3]))
+                print("Process Id:{0} Best result so far at iteration {1} - Validation: {2},{3},{4} Test: {5},{6},{7}"
+                      .format(multiprocessing.current_process(), iteration_id,
+                              best_result[1], best_result[2], best_result[3],
+                              best_result[4], best_result[5], best_result[6]))
             X = np.vstack((X, np.expand_dims(best_threshold, axis=0)))
             y = np.concatenate([y, np.array([new_score])])
         print("Process:{0} ends.".format(multiprocessing.current_process()))
@@ -146,13 +151,17 @@ class BayesianOptimizer(ThresholdOptimizer):
         db_rows = []
         # result = (iteration_id, new_score, new_accuracy, new_computation_overload)
         for result in results:
-            score = result[1]
-            accuracy = result[2]
-            overload = result[3]
+            val_score = result[1]
+            val_accuracy = result[2]
+            val_overload = result[3]
+            test_score = result[4]
+            test_accuracy = result[5]
+            test_overload = result[6]
             db_rows.append((self.runId, self.network.networkName,
                             list(self.multipathScoreCalculators.keys())[0],
                             self.balanceCoefficient,
-                            int(self.useWeightedScoring), score, accuracy, overload,
+                            int(self.useWeightedScoring), val_score, val_accuracy, val_overload,
+                            test_score, test_accuracy, test_overload,
                             "Bayesian Optimization", self.xi, timestamp))
         self.lock.acquire()
         DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)
