@@ -2,15 +2,14 @@ import tensorflow as tf
 import numpy as np
 
 
-
 class RoutingAccumulator:
-    def __init__(self, network, routing_data, routingDecisions, leaf_index_dict, feature_dim=20,
+    def __init__(self, network, routing_data, routing_decisions, leaf_index_dict, feature_dim=20,
                  use_posteriors_as_feature=True):
         self.network = network
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
         self.routingData = routing_data
-        self.routingDecisions = routingDecisions
+        self.routingDecisions = routing_decisions
         self.leafIndexDict = leaf_index_dict
         self.featureDim = feature_dim
         self.usePosteriorsAsFeature = use_posteriors_as_feature
@@ -36,11 +35,3 @@ class RoutingAccumulator:
             feature_parts.append(feature_part)
         feature_vector = tf.concat(feature_parts, axis=1)
         #
-
-
-
-
-
-
-
-
