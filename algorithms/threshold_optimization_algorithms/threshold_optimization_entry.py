@@ -5,6 +5,7 @@ from algorithms.threshold_optimization_algorithms.simulated_annealing_thread_run
     SimulatedAnnealingThreadRunner
 from algorithms.threshold_optimization_algorithms.simulated_annealing_uniform_optimizer import \
     SimulatedAnnealingUniformOptimizer
+from algorithms.threshold_optimization_algorithms.thresholding_accuracy_measurement import ThresholdAccuracyMeasurement
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter
@@ -79,8 +80,11 @@ def main():
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[xi_list, weighted_score_list, balance_list])
     # bayesian_process_runner(cartesian_product[0])
 
-    pool = Pool(processes=3)
-    pool.map(bayesian_process_runner, cartesian_product)
+    # pool = Pool(processes=3)
+    # pool.map(bayesian_process_runner, cartesian_product)
+
+    ThresholdAccuracyMeasurement.calculate_accuracy(run_id=67, iteration=119100, max_overload=10.0, max_limit=1)
+    print("X")
     # for db_rows in all_results:
     #     DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)
     # bayesian_process_runner(cartesian_product[0])
