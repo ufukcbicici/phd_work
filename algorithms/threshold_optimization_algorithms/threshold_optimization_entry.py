@@ -74,16 +74,20 @@ def main():
     #                                    thread_count=1, verbose=True, batch_size=10000)
     # bf_optimizer.run()
 
-    xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 120
+    # xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 120
+    # weighted_score_list = [False]
+    # balance_list = [1.0]
+
+    xi_list = [0.01]
     weighted_score_list = [False]
     balance_list = [1.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[xi_list, weighted_score_list, balance_list])
-    # bayesian_process_runner(cartesian_product[0])
+    bayesian_process_runner(cartesian_product[0])
 
     # pool = Pool(processes=3)
     # pool.map(bayesian_process_runner, cartesian_product)
 
-    ThresholdAccuracyMeasurement.calculate_accuracy(run_id=67, iteration=119100, max_overload=10.0, max_limit=1)
+    # ThresholdAccuracyMeasurement.calculate_accuracy(run_id=67, iteration=119100, max_overload=10.0, max_limit=1)
     print("X")
     # for db_rows in all_results:
     #     DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=11)

@@ -79,7 +79,7 @@ class ThresholdOptimizer:
         final_score = np.mean(np.array(scores))
         final_accuracy = np.mean(np.array(accuracies))
         final_computation_overload = np.mean(np.array(computation_overloads))
-        return final_score, final_accuracy, final_computation_overload
+        return final_score, final_accuracy, final_computation_overload, result
 
     def run(self):
         pass

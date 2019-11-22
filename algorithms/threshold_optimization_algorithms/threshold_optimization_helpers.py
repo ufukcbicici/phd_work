@@ -16,6 +16,8 @@ class MultipathResult:
         self.accuracy = result_tuple[2]
         self.totalLeavesEvaluated = result_tuple[3]
         self.computationOverload = result_tuple[4]
+        self.routingMatrix = result_tuple[5]
+        self.posteriors  = result_tuple[6]
         # res_method_0 = (0, thresholds_dict, accuracy_simple_avg, total_leaves_evaluated, computation_overload)
         # res_method_1 = (1, thresholds_dict, accuracy_weighted_avg, total_leaves_evaluated, computation_overload)
 

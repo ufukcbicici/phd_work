@@ -50,7 +50,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         # variables.
         outputs = []
         for threshold in random_thresholds:
-            final_score, final_accuracy, final_computation_overload = \
+            final_score, final_accuracy, final_computation_overload, result_obj = \
                 self.calculate_threshold_score(threshold_state=threshold, routing_data_dict=self.validationDataDict)
             outputs.append(np.array([final_score, final_accuracy, final_computation_overload]))
         # Step 3: Build the first dataset for the Gaussian Process Regressor.
@@ -68,15 +68,15 @@ class BayesianOptimizer(ThresholdOptimizer):
             best_score, best_threshold = self.propose_thresholds(gpr=gpr, max_score=curr_max_score,
                                                                  number_of_trials=100)
             best_threshold_as_dict = self.numpy_to_threshold_dict(thresholds_arr=best_threshold)
-            new_score, new_accuracy, new_computation_overload = \
+            new_score, new_accuracy, new_computation_overload, val_result_obj = \
                 self.calculate_threshold_score(threshold_state=best_threshold_as_dict,
                                                routing_data_dict=self.validationDataDict)
-            test_score, test_accuracy, test_computation_overload = \
+            test_score, test_accuracy, test_computation_overload, test_result_obj = \
                 self.calculate_threshold_score(threshold_state=best_threshold_as_dict,
                                                routing_data_dict=self.testDataDict)
             result = (iteration_id,
                       new_score, new_accuracy, new_computation_overload,
-                      test_score, test_accuracy, test_computation_overload)
+                      test_score, test_accuracy, test_computation_overload, val_result_obj, test_result_obj)
             all_results.append(result)
             # print("Bayesian Optimization Iteration Id:{0}".format(iteration_id))
             # print("Proposed thresholds:{0}".format(best_threshold))

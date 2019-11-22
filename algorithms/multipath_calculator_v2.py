@@ -15,6 +15,8 @@ class MultipathCalculatorV2:
         self.network = network
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
+        self.innerNodes = sorted(self.innerNodes, key=lambda node: node.index)
+        self.leafNodes = sorted(self.leafNodes, key=lambda node: node.index)
         # self.labelList = label_list
         # self.branchProbs = branch_probs
         # self.activations = activations
@@ -117,16 +119,16 @@ class MultipathCalculatorV2:
         posterior_matrices_list = []
         routing_decisions_list = []
         path_probability_list = []
-        leaf_index_dict = {}
         for curr_node in self.leafNodes:
             reaches_to_this_node_vector, path_probability = \
                 self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict,
                                                   routing_data=routing_data)
             posteriors = np.expand_dims(routing_data.posteriorProbs[curr_node.index], axis=2)
             posterior_matrices_list.append(posteriors)
-            leaf_index_dict[len(routing_decisions_list)] = curr_node.index
+            assert len(reaches_to_this_node_vector.shape) == 1
+            assert len(path_probability)
             routing_decisions_list.append(np.expand_dims(reaches_to_this_node_vector, axis=1))
-            path_probability_list.append(np.expand_dims(path_probability, axis=2))
+            path_probability_list.append(np.expand_dims(path_probability, axis=1))
         posteriors_matrix = np.concatenate(posterior_matrices_list, axis=2)
         routing_decisions_matrix = np.concatenate(routing_decisions_list, axis=1).astype(np.float32)
         path_probabilities_matrix = np.concatenate(path_probability_list, axis=1)
@@ -156,8 +158,10 @@ class MultipathCalculatorV2:
         # Entry 4: Computation Overload
         res_method_0 = MultipathResult(result_tuple=(0, thresholds_dict, accuracy_simple_avg,
                                                      total_leaves_evaluated,
-                                                     computation_overload))
+                                                     computation_overload,
+                                                     routing_decisions_matrix, posteriors_averaged))
         res_method_1 = MultipathResult(result_tuple=(1, thresholds_dict, accuracy_weighted_avg,
                                                      total_leaves_evaluated,
-                                                     computation_overload))
+                                                     computation_overload,
+                                                     routing_decisions_matrix, posteriors_weighted_averaged))
         return res_method_0, res_method_1

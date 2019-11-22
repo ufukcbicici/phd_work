@@ -29,7 +29,7 @@ class RoutingAccumulator:
         # Build the feature vector from activations and optionally with the posteriors
         feature_parts = []
         for tpl in conditional_inputs:
-            if tpl[1] == False:
+            if not tpl[1]:
                 continue
             feature_part = tf.layers.dense(inputs=tpl[0], units=self.featureDim, activation=tf.nn.relu)
             feature_parts.append(feature_part)
