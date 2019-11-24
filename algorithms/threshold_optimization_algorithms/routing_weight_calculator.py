@@ -1,4 +1,8 @@
 import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
 
 
 class RoutingWeightCalculator:
@@ -27,11 +31,13 @@ class RoutingWeightCalculator:
                                               dtype=np.int32)
         return parent_node_routing_vector
 
-    def create_features_and_labels(self):
+    def run(self):
         # Create Feature Sets from Activation and Posterior Vectors
-        features_list = []
-        for routing_matrix, data in zip([self.validationRoutingMatrix, self.testRoutingMatrix],
-                                        [self.validationData, self.testData]):
+        features_dict = {}
+        targets_dict = {}
+        for routing_matrix, data, data_type in zip([self.validationRoutingMatrix, self.testRoutingMatrix],
+                                        [self.validationData, self.testData],
+                                        ["validation", "test"]):
             posterior_features = []
             routing_activation_features = []
             targets = []
@@ -69,9 +75,11 @@ class RoutingWeightCalculator:
                 res = np.linalg.lstsq(sparse_posteriors_matrix, label_vector, rcond=None)
                 alpha_lst_squares = res[0]
                 posterior_feature_vector = \
-                    np.reshape(sparse_posteriors_matrix.T, newshape=(posterior_matrix.shape[0] * posterior_matrix.shape[1], ))
+                    np.reshape(sparse_posteriors_matrix.T,
+                               newshape=(sparse_posteriors_matrix.T.shape[0] * sparse_posteriors_matrix.T.shape[1], ))
                 activation_feature_vector = \
-                    np.reshape(sparse_activations_matrix.T, newshape=(activations_matrix.shape[0] * activations_matrix.shape[1], ))
+                    np.reshape(sparse_activations_matrix.T,
+                               newshape=(sparse_activations_matrix.T.shape[0] * sparse_activations_matrix.T.shape[1], ))
                 target_vector = alpha_lst_squares
                 posterior_features.append(posterior_feature_vector)
                 routing_activation_features.append(activation_feature_vector)
@@ -85,3 +93,37 @@ class RoutingWeightCalculator:
                                               / routing_matrix.shape[0]
             print("Simple Mean Avg Accuracy:{0}".format(multi_path_accuracy_simple_avg))
             print("Least Squares Avg Accuracy:{0}".format(multi_path_accuracy_lst_squares))
+            posterior_features_matrix = np.stack(posterior_features, axis=0)
+            activation_features_matrix = np.stack(routing_activation_features, axis=0)
+            weights_target_matrix = np.stack(targets, axis=0)
+            features_dict[data_type] = [posterior_features_matrix, activation_features_matrix]
+            targets_dict[data_type] = [weights_target_matrix]
+
+        # Modelling
+        x_train = features_dict["validation"][0]
+        y_train = targets_dict["validation"]
+
+        # RDF
+        feature_dim = x_train.shape[1]
+        pca = PCA()
+        rdf = RandomForestRegressor(criterion="mse")
+        pipe = Pipeline(steps=[('pca', pca), ('rdf', rdf)])
+        step = max(1, int((feature_dim - 5) / 10))
+        # Hyperparameter grid
+        pca__n_components = [d for d in range(5, feature_dim, step)]
+        pca__n_components.append(feature_dim)
+        param_grid = {
+            'pca__n_components': pca__n_components,
+            'rdf__n_estimators': [100],
+            'rdf__max_depth': [5, 10, 15, 20, 25, 30],
+            'rdf__bootstrap': [False, True],
+            'rdf__oob_score': [False, True],
+            'rdf__min_samples_leaf': [1, 2, 3, 4, 5, 10]
+        }
+        grid_search = GridSearchCV(pipe, param_grid, iid=False, cv=5, n_jobs=8, refit=True, verbose=0)
+        grid_search.fit(X=x_train, y=y_train)
+        best_model = grid_search.best_estimator_
+        print("Best parameter (CV score=%0.3f):" % grid_search.best_score_)
+        print(grid_search.best_params_)
+        print("X")
+
