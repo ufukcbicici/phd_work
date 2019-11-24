@@ -106,7 +106,7 @@ class BayesianOptimizer(ThresholdOptimizer):
                                                             validation_data=list(self.validationDataDict.values())[0],
                                                             test_data=list(self.testDataDict.values())[0])
         routing_weight_calculator.run()
-        self.write_to_db(results=all_results)
+        # self.write_to_db(results=all_results)
         # return all_results
 
     # def routing_performance_analysis(self, best_result):
