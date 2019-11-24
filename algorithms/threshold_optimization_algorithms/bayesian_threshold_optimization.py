@@ -5,6 +5,7 @@ from scipy.stats import norm
 from scipy.optimize import minimize
 import multiprocessing
 from algorithms.coordinate_ascent_optimizer import CoordinateAscentOptimizer
+from algorithms.threshold_optimization_algorithms.routing_weight_calculator import RoutingWeightCalculator
 from algorithms.threshold_optimization_algorithms.threshold_optimizer import ThresholdOptimizer
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -60,6 +61,7 @@ class BayesianOptimizer(ThresholdOptimizer):
         # Step 4: The Bayesian optimization framework
         curr_max_score = np.max(y)
         all_results = []
+        best_result = None
         print("Process:{0} GP iterations start.".format(multiprocessing.current_process()))
         for iteration_id in range(self.maxIterations):
             print("Process:{0} Iteration:{1}".format(multiprocessing.current_process(), iteration_id))
@@ -93,8 +95,96 @@ class BayesianOptimizer(ThresholdOptimizer):
             X = np.vstack((X, np.expand_dims(best_threshold, axis=0)))
             y = np.concatenate([y, np.array([new_score])])
         print("Process:{0} ends.".format(multiprocessing.current_process()))
+        # self.routing_performance_analysis(best_result=best_result)
+        val_result_obj = best_result[-2]
+        test_result_obj = best_result[-1]
+        val_routing_matrix = val_result_obj.routingMatrix
+        test_routing_matrix = test_result_obj.routingMatrix
+        routing_weight_calculator = RoutingWeightCalculator(network=self.network,
+                                                            validation_routing_matrix=val_routing_matrix,
+                                                            test_routing_matrix=test_routing_matrix,
+                                                            validation_data=list(self.validationDataDict.values())[0],
+                                                            test_data=list(self.testDataDict.values())[0])
+        routing_weight_calculator.create_features_and_labels()
         self.write_to_db(results=all_results)
         # return all_results
+
+    # def routing_performance_analysis(self, best_result):
+    #     if best_result is None:
+    #         return
+    #     val_result_obj = best_result[-2]
+    #     test_result_obj = best_result[-1]
+    #     val_routing_matrix = val_result_obj.routingMatrix
+    #     test_routing_matrix = test_result_obj.routingMatrix
+    #     val_data = self.validationDataDict[119100]
+    #     test_data = self.testDataDict[119100]
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #     posteriors = val_result_obj.posteriors
+    #     predicted_labels = np.argmax(posteriors, axis=1)
+    #     true_labels = self.validationDataDict[119100].labelList
+    #     comparison_vector = predicted_labels == true_labels
+    #     single_path_indices = np.nonzero(np.sum(val_routing_matrix, axis=1) == 1)[0]
+    #     multi_path_indices = np.nonzero(np.sum(val_routing_matrix, axis=1) > 1)[0]
+    #     single_path_accuracy = np.mean(comparison_vector[single_path_indices])
+    #     multi_path_accuracy = np.mean(comparison_vector[multi_path_indices])
+    #     posteriors_per_leaf = sorted([(k, v) for k, v in self.validationDataDict[119100].posteriorProbs.items()],
+    #                                  key=lambda tpl: tpl[0])
+    #     posteriors_tensor = np.stack([tpl[1] for tpl in posteriors_per_leaf], axis=1)
+    #     # Unit test for least squares weight calculation
+    #     simple_average_correct_count = 0
+    #     least_squares_correct_count = 0
+    #     alpha_values = []
+    #     # posterior_features =
+    #     for idx in multi_path_indices:
+    #         list_of_posteriors = []
+    #         routing_list = val_routing_matrix[idx]
+    #         for i in range(routing_list.shape[0]):
+    #             if routing_list[i] == 1:
+    #                 list_of_posteriors.append(posteriors_tensor[idx, i])
+    #             else:
+    #                 list_of_posteriors.append(np.zeros_like(posteriors_tensor[idx, i]))
+    #         mean_posterior = np.mean(np.stack(list_of_posteriors, axis=0), axis=0)
+    #         predicted_label = np.argmax(mean_posterior)
+    #         true_label = true_labels[idx]
+    #         if predicted_label == true_label:
+    #             simple_average_correct_count += 1
+    #         A = np.stack(list_of_posteriors, axis=1)
+    #         b = np.zeros_like(A[:, 0])
+    #         b[true_label] = 1
+    #         res = np.linalg.lstsq(A, b, rcond=None)
+    #         alpha_lst_squares = res[0]
+    #         alpha_values.append(alpha_lst_squares)
+    #         lst_squares_posterior = A @ alpha_lst_squares
+    #         lst_squares_predicted_label = np.argmax(lst_squares_posterior)
+    #         if lst_squares_predicted_label == true_label:
+    #             least_squares_correct_count += 1
+    #     multi_path_accuracy_manual = simple_average_correct_count / multi_path_indices.shape[0]
+    #     multi_path_accuracy_lst_squares = least_squares_correct_count / multi_path_indices.shape[0]
+    #     corrected_accuracy = (np.sum(comparison_vector[single_path_indices]) + least_squares_correct_count) / \
+    #                             true_labels.shape[0]
+    #     print("Corrected Accuracy:{0}".format(corrected_accuracy))
+    #     assert np.allclose(multi_path_accuracy_manual, multi_path_accuracy)
+    #     #
+    #     print("X")
 
     def expected_improvement(self, X, **kwargs):
         gpr = kwargs["gpr"]
