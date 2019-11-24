@@ -114,35 +114,110 @@ class RoutingWeightCalculator:
         def get_feature_vectors(data_type_):
             posterior_vecs = features_dict[data_type_][0]
             activation_vecs = features_dict[data_type_][1]
-            x_train = np.concatenate([posterior_vecs, activation_vecs], axis=1)
-            return x_train
+            x_ = np.concatenate([posterior_vecs, activation_vecs], axis=1)
+            return x_
 
         x_train = get_feature_vectors("validation")
         y_train = targets_dict["validation"][0]
+        validation_routing_matrix = np.copy(
+            routing_matrices_dict["validation"][multi_path_indices_dict["validation"], :])
 
+        # Model with single Regressor multiple output
         # RDF
-        feature_dim = x_train.shape[1]
-        pca = PCA()
-        rdf = RandomForestRegressor(criterion="mse")
-        pipe = Pipeline(steps=[('pca', pca), ('rdf', rdf)])
-        step = max(1, int((feature_dim - 5) / 50))
-        # Hyperparameter grid
-        # pca__n_components = [d for d in range(5, feature_dim, step)]
-        # pca__n_components.append(feature_dim)
-        pca__n_components = [50]
-        param_grid = {
-            'pca__n_components': pca__n_components,
-            'rdf__n_estimators': [1000],
-            'rdf__max_depth': [5, 10, 15, 20, 25, 30],
-            'rdf__bootstrap': [False, True],
-            'rdf__min_samples_leaf': [1, 2, 3, 4, 5, 10]
-        }
-        grid_search = GridSearchCV(pipe, param_grid, iid=False, cv=5, n_jobs=8, refit=True, verbose=10)
-        grid_search.fit(X=x_train, y=y_train)
-        best_model = grid_search.best_estimator_
-        print("Best parameter (CV score=%0.3f):" % grid_search.best_score_)
-        print(grid_search.best_params_)
+        # feature_dim = x_train.shape[1]
+        # pca = PCA()
+        # rdf = RandomForestRegressor(criterion="mse")
+        # pipe = Pipeline(steps=[('pca', pca), ('rdf', rdf)])
+        # step = max(1, int((feature_dim - 5) / 50))
+        # # Hyperparameter grid
+        # # pca__n_components = [d for d in range(5, feature_dim, step)]
+        # # pca__n_components.append(feature_dim)
+        # pca__n_components = [50]
+        # param_grid = {
+        #     'pca__n_components': pca__n_components,
+        #     'rdf__n_estimators': [100],
+        #     'rdf__max_depth': [5, 10, 15, 20, 25, 30],
+        #     'rdf__bootstrap': [False, True],
+        #     'rdf__min_samples_leaf': [1, 2, 3, 4, 5, 10]
+        # }
+        # grid_search = GridSearchCV(pipe, param_grid, iid=False, cv=5, n_jobs=8, refit=True, verbose=10)
+        # grid_search.fit(X=x_train, y=y_train)
+        # best_model = grid_search.best_estimator_
+        # print("Best parameter (CV score=%0.3f):" % grid_search.best_score_)
+        # print(grid_search.best_params_)
+        #
+        # # Predicting with the regressed weights
+        # for data_type in ["validation", "test"]:
+        #     correct_count = 0
+        #     real_least_squares_correct_count = 0
+        #     posterior_features = features_dict[data_type][0]
+        #     activation_features = features_dict[data_type][1]
+        #     lst_weights = targets_dict[data_type][0]
+        #     feature_vectors = get_feature_vectors(data_type)
+        #     weights_predicted = best_model.predict(X=feature_vectors)
+        #     routing_matrix = routing_matrices_dict[data_type]
+        #     posteriors_tensor = posterior_tensors_dict[data_type]
+        #     multi_path_indices_ = multi_path_indices_dict[data_type]
+        #     data_obj = data_objects_dict[data_type]
+        #     for idx, multi_path_idx in enumerate(multi_path_indices_):
+        #         true_label = data_obj.labelList[multi_path_idx]
+        #         routing_vector = routing_matrix[multi_path_idx]
+        #         posterior_matrix = posteriors_tensor[multi_path_idx, :, :]
+        #         weights = weights_predicted[idx, :]
+        #         lst_weights_ = lst_weights[idx, :]
+        #         sparse_posteriors_matrix = posterior_matrix * np.expand_dims(routing_vector, axis=0)
+        #         lst_squares_posterior_regressed = sparse_posteriors_matrix @ weights
+        #         lst_squares_regressor_predicted_label = np.argmax(lst_squares_posterior_regressed)
+        #         correct_count += int(lst_squares_regressor_predicted_label == true_label)
+        #         lst_squares_posterior = sparse_posteriors_matrix @ lst_weights_
+        #         lst_squares_predicted_label = np.argmax(lst_squares_posterior)
+        #         real_least_squares_correct_count += int(lst_squares_predicted_label == true_label)
+        #     multi_path_accuracy_lst_squares_regression = (single_path_correct_counts_dict[data_type] + correct_count) \
+        #                                                  / routing_matrix.shape[0]
+        #     multi_path_accuracy_lst_squares = (single_path_correct_counts_dict[
+        #                                            data_type] + real_least_squares_correct_count) \
+        #                                       / routing_matrix.shape[0]
+        #     print("Regression Result DataType:{0} Accuracy:{1}".format(data_type,
+        #                                                                multi_path_accuracy_lst_squares_regression))
+        #     print("Actual Least Squares Result DataType:{0} Accuracy:{1}".format(data_type,
+        #                                                                          multi_path_accuracy_lst_squares))
+        # print("X")
 
+        # Model each weight with different regressors
+        models = []
+        for leaf_idx, leaf_node in enumerate(self.leafNodes):
+            print("TRAINING FOR LEAF:{0}".format(leaf_idx))
+            routed_to_leaf_indicator_vector = validation_routing_matrix[:, leaf_idx]
+            positive_indices = np.nonzero(routed_to_leaf_indicator_vector == 1)[0]
+            # Get feature vectors
+            x_leaf_train = x_train[positive_indices, :]
+            # Get target_variable
+            y_leaf_train = y_train[positive_indices, leaf_idx]
+            # Fit the regressor now
+            feature_dim = x_leaf_train.shape[1]
+            pca = PCA()
+            rdf = RandomForestRegressor(criterion="mse")
+            pipe = Pipeline(steps=[('pca', pca), ('rdf', rdf)])
+            step = max(1, int((feature_dim - 5) / 50))
+            # Hyperparameter grid
+            # pca__n_components = [d for d in range(5, feature_dim, step)]
+            # pca__n_components.append(feature_dim)
+            pca__n_components = [50]
+            param_grid = {
+                'pca__n_components': pca__n_components,
+                'rdf__n_estimators': [100],
+                'rdf__max_depth': [5, 10, 15, 20, 25, 30],
+                'rdf__bootstrap': [False, True],
+                'rdf__min_samples_leaf': [1, 2, 3, 4, 5, 10]
+            }
+            grid_search = GridSearchCV(pipe, param_grid, iid=False, cv=5, n_jobs=8, refit=True, verbose=10)
+            grid_search.fit(X=x_leaf_train, y=y_leaf_train)
+            best_model = grid_search.best_estimator_
+            models.append(best_model)
+            print("Best parameter (CV score=%0.3f):" % grid_search.best_score_)
+            print(grid_search.best_params_)
+
+        # Evaluate the models
         # Predicting with the regressed weights
         for data_type in ["validation", "test"]:
             correct_count = 0
@@ -151,7 +226,6 @@ class RoutingWeightCalculator:
             activation_features = features_dict[data_type][1]
             lst_weights = targets_dict[data_type][0]
             feature_vectors = get_feature_vectors(data_type)
-            weights_predicted = best_model.predict(X=feature_vectors)
             routing_matrix = routing_matrices_dict[data_type]
             posteriors_tensor = posterior_tensors_dict[data_type]
             multi_path_indices_ = multi_path_indices_dict[data_type]
@@ -160,10 +234,18 @@ class RoutingWeightCalculator:
                 true_label = data_obj.labelList[multi_path_idx]
                 routing_vector = routing_matrix[multi_path_idx]
                 posterior_matrix = posteriors_tensor[multi_path_idx, :, :]
-                weights = weights_predicted[idx, :]
+                feature_vector = feature_vectors[idx]
                 lst_weights_ = lst_weights[idx, :]
+                weights_predicted = []
+                for leaf_id in range(len(self.leafNodes)):
+                    if routing_vector[leaf_id] == 0:
+                        weights_predicted.append(0.0)
+                        continue
+                    weight = models[leaf_id].predict(X=np.expand_dims(feature_vector, axis=0))
+                    weights_predicted.append(weight)
+                weights_predicted = np.array(weights_predicted)
                 sparse_posteriors_matrix = posterior_matrix * np.expand_dims(routing_vector, axis=0)
-                lst_squares_posterior_regressed = sparse_posteriors_matrix @ weights
+                lst_squares_posterior_regressed = sparse_posteriors_matrix @ weights_predicted
                 lst_squares_regressor_predicted_label = np.argmax(lst_squares_posterior_regressed)
                 correct_count += int(lst_squares_regressor_predicted_label == true_label)
                 lst_squares_posterior = sparse_posteriors_matrix @ lst_weights_
@@ -179,5 +261,3 @@ class RoutingWeightCalculator:
             print("Actual Least Squares Result DataType:{0} Accuracy:{1}".format(data_type,
                                                                                  multi_path_accuracy_lst_squares))
         print("X")
-
-    # def model_for_separate_leaves(self):
