@@ -871,7 +871,6 @@ class FastTreeNetwork(TreeNetwork):
             dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
             print("*************Epoch {0}*************".format(epoch_id))
             total_time = 0.0
-            leaf_info_rows = []
             while True:
                 print("Iteration:{0}".format(iteration_counter))
                 start_time = time.time()

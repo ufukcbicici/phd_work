@@ -2,25 +2,22 @@ import numpy as np
 
 
 class ThresholdOptimizer:
-    def __init__(self, run_id, network, routing_data_dict, multipath_score_calculators, balance_coefficient,
+    def __init__(self, run_id, network, routing_data, score_calculator, balance_coefficient,
                  test_ratio,
                  use_weighted_scoring,
                  verbose):
         self.runId = run_id
         self.network = network
         self.testRatio = test_ratio
-        self.routingDataDict = routing_data_dict
-        self.multipathScoreCalculators = multipath_score_calculators
-        self.iterations = str(list(self.multipathScoreCalculators.keys()))
+        self.routingData = routing_data
+        self.multipathScoreCalculator = score_calculator
         self.balanceCoefficient = balance_coefficient
         self.testRatio = test_ratio
         self.useWeightedScoring = use_weighted_scoring
         self.verbose = verbose
-        self.validationDataDict = {}
-        self.testDataDict = {}
-        for iteration, routing_data in self.routingDataDict.items():
-            self.validationDataDict[iteration], self.testDataDict[iteration] = \
-                routing_data.apply_validation_test_split(test_ratio=self.testRatio)
+        self.validationData = None
+        self.testData = None
+        self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=self.testRatio)
 
     def thresholds_to_numpy(self, thresholds):
         sorted_indices = sorted([node.index for node in self.network.topologicalSortedNodes if not node.isLeaf])
@@ -61,25 +58,15 @@ class ThresholdOptimizer:
             return self.thresholds_to_numpy(thresholds=[threshold_state])
         return threshold_state
 
-    def calculate_threshold_score(self, threshold_state, routing_data_dict):
-        scores = []
-        accuracies = []
-        computation_overloads = []
-        for iteration, scorer in self.multipathScoreCalculators.items():
-            routing_data = routing_data_dict[iteration]
-            res_method_0, res_method_1 = scorer.calculate_for_threshold(thresholds_dict=threshold_state,
-                                                                        routing_data=routing_data)
-            result = res_method_1 if self.useWeightedScoring else res_method_0
-            accuracy_gain = self.balanceCoefficient * result.accuracy
-            computation_overload_loss = (1.0 - self.balanceCoefficient) * result.computationOverload
-            score = accuracy_gain - computation_overload_loss
-            accuracies.append(result.accuracy)
-            computation_overloads.append(result.computationOverload)
-            scores.append(score)
-        final_score = np.mean(np.array(scores))
-        final_accuracy = np.mean(np.array(accuracies))
-        final_computation_overload = np.mean(np.array(computation_overloads))
-        return final_score, final_accuracy, final_computation_overload, result
+    def calculate_threshold_score(self, threshold_state, routing_data):
+        res_method_0, res_method_1 = self.multipathScoreCalculator.calculate_for_threshold(
+            thresholds_dict=threshold_state,
+            routing_data=routing_data)
+        result = res_method_1 if self.useWeightedScoring else res_method_0
+        accuracy_gain = self.balanceCoefficient * result.accuracy
+        computation_overload_loss = (1.0 - self.balanceCoefficient) * result.computationOverload
+        score = accuracy_gain - computation_overload_loss
+        return score, result
 
     def run(self):
         pass
