@@ -542,7 +542,7 @@ class FastTreeNetwork(TreeNetwork):
         for output_name in inner_node_collections_names:
             inner_node_collections[output_name] = {}
         while True:
-            results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=use_masking)
+            results, minibatch = self.eval_network(sess=sess, dataset=dataset, use_masking=use_masking)
             if results is not None:
                 for node in self.topologicalSortedNodes:
                     if not node.isLeaf:
@@ -555,6 +555,10 @@ class FastTreeNetwork(TreeNetwork):
                                                              output_names=leaf_node_collection_names,
                                                              node=node,
                                                              results=results)
+                # Add the input data as well.
+                if "original_samples" in set(inner_node_collections_names):
+                    UtilityFuncs.concat_to_np_array_dict(dct=inner_node_collections["original_samples"], key=0,
+                                                         array=minibatch.samples)
             if dataset.isNewEpoch:
                 break
         return leaf_node_collections, inner_node_collections
@@ -686,6 +690,7 @@ class FastTreeNetwork(TreeNetwork):
         os.mkdir(directory_path)
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         inner_node_outputs = GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT
+        inner_node_outputs.append("original_samples")
         leaf_node_outputs = GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT
         leaf_node_collections, inner_node_collections = \
             self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
