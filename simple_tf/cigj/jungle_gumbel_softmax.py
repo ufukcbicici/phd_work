@@ -102,8 +102,8 @@ class JungleGumbelSoftmax(JungleNoStitch):
             #         if UtilityFuncs.get_variable_name(name="activations", node=node) in node.evalDict:
             #             activation = node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)]
             #             activations_list.append(activation)
-            #         if UtilityFuncs.get_variable_name(name="p(n|x)", node=node) in node.evalDict:
-            #             prob = node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)]
+            #         if UtilityFuncs.get_variable_name(name="branch_probs", node=node) in node.evalDict:
+            #             prob = node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)]
             #             probs_list.append(prob)
             #         if UtilityFuncs.get_variable_name(name="z_samples", node=node) in node.evalDict:
             #             z_samples = node.evalDict[UtilityFuncs.get_variable_name(name="z_samples", node=node)]
@@ -169,8 +169,8 @@ class JungleGumbelSoftmax(JungleNoStitch):
             node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
             node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
             node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-            node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
-            node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)_corrected", node=node)] = p_F_given_x_corrected
+            node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)] = p_F_given_x
+            node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs_corrected", node=node)] = p_F_given_x_corrected
             node.evalDict[
                 UtilityFuncs.get_variable_name(name="z_samples", node=node)] = z_samples
             node.evalDict[
@@ -245,7 +245,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
         # activation_grads = results[-6]
         # activation_grads_decision = results[-5]
         # activation_grads_classification = results[-4]
-        # zero_count = np.sum(results[-1]["Node1_p(n|x)"] == 0.0)
+        # zero_count = np.sum(results[-1]["Node1_branch_probs"] == 0.0)
         # if zero_count > 0:
         #     print("We have zero!!!")
         # for grads in activation_grads_decision:

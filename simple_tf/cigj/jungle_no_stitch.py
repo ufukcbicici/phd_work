@@ -60,7 +60,7 @@ class JungleNoStitch(Jungle):
             node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
             node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
             node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-            node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
+            node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)] = p_F_given_x
             node.evalDict[
                 UtilityFuncs.get_variable_name(name="sampled_indices", node=node)] = sampled_indices
             node.evalDict[
@@ -202,7 +202,7 @@ class JungleNoStitch(Jungle):
                         if node_degree == 1:
                             continue
                         info_gain = results[self.get_variable_name(name="info_gain", node=node)]
-                        branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
+                        branch_prob = results[self.get_variable_name(name="branch_probs", node=node)]
                         arg_max_indices = results[UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)]
                         UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index, array=branch_prob)
                         UtilityFuncs.concat_to_np_array_dict(dct=arg_max_indices_dict, key=node.index,

@@ -45,6 +45,8 @@ class RoutingWeightCalculator:
         for routing_matrix, data, data_type in zip([self.validationRoutingMatrix, self.testRoutingMatrix],
                                                    [self.validationData, self.testData],
                                                    ["validation", "test"]):
+            posterior_probs_dict = data.get_dict("posterior_probs")
+            activations_dict = data.get_dict("activations")
             posterior_features = []
             routing_activation_features = []
             targets = []
@@ -54,10 +56,10 @@ class RoutingWeightCalculator:
             single_path_indices_ = np.nonzero(np.sum(routing_matrix, axis=1) == 1)[0]
             multi_path_indices_ = np.nonzero(np.sum(routing_matrix, axis=1) > 1)[0]
             multi_path_indices_dict[data_type] = multi_path_indices_
-            posteriors_per_leaf = sorted([(k, v) for k, v in data.posteriorProbs.items()], key=lambda tpl: tpl[0])
+            posteriors_per_leaf = sorted([(k, v) for k, v in posterior_probs_dict.items()], key=lambda tpl: tpl[0])
             posteriors_tensor = np.stack([tpl[1] for tpl in posteriors_per_leaf], axis=2)
             posterior_tensors_dict[data_type] = posteriors_tensor
-            activations_per_inner_node = sorted([(k, v) for k, v in data.activations.items()], key=lambda tpl: tpl[0])
+            activations_per_inner_node = sorted([(k, v) for k, v in activations_dict.items()], key=lambda tpl: tpl[0])
             activations_tensor = np.stack([tpl[1] for tpl in activations_per_inner_node], axis=2)
             activation_tensors_dict[data_type] = activations_tensor
             for idx in range(routing_matrix.shape[0]):

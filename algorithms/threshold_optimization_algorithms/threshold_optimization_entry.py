@@ -15,7 +15,7 @@ from multiprocessing import Pool, Lock
 # Initial Operations
 run_id = 67
 # network_name = "Cifar100_CIGN_Sampling"
-network_name = "Cifar100_CIGN_BatchSize500_[64,64,64]"
+network_name = "None"
 iterations = [119100]
 routing_data_dict = {}
 max_num_of_iterations = 10000

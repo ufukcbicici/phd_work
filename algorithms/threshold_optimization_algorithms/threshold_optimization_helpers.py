@@ -69,3 +69,6 @@ class RoutingDataset:
         val_data = split_sets[0]
         test_data = split_sets[1]
         return val_data, test_data
+
+    def get_dict(self, output_name):
+        return self.dictionaryOfRoutingData[output_name]

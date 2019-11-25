@@ -70,7 +70,7 @@ class MultipathCalculatorV2:
         reaches_to_this_node_vector, path_probability = \
             self.get_routing_info_from_parent(curr_node=curr_node,
                                               branching_info_dict=branching_info_dict)
-        p_n_given_x = self.branchProbs
+        p_n_given_x = self.branchProbs[curr_node.index]
         thresholds_matrix = np.zeros_like(p_n_given_x)
         child_nodes = self.network.dagObject.children(node=curr_node)
         child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
@@ -96,8 +96,8 @@ class MultipathCalculatorV2:
         return leaf_reachability_dict
 
     def calculate_for_threshold(self, thresholds_dict, routing_data):
-        self.branchProbs = routing_data["p(n|x)"]
-        self.posteriors = routing_data["posterior_probs"]
+        self.branchProbs = routing_data.get_dict("branch_probs")
+        self.posteriors = routing_data.get_dict("posterior_probs")
         self.labelList = routing_data.labelList
 
         branching_info_dict = {}

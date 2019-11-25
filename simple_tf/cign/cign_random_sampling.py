@@ -51,7 +51,7 @@ class CignRandomSample(CignWithSampling):
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-        node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
+        node.evalDict[self.get_variable_name(name="branch_probs", node=node)] = p_n_given_x
         node.evalDict[self.get_variable_name(name="uniform_probs", node=node)] = uniform_probs
         node.evalDict[self.get_variable_name(name="chosen_indices", node=node)] = chosen_indices
         # Step 4: Apply partitioning for corresponding F nodes in the same layer.

@@ -309,9 +309,9 @@ def tensorboard_func(network):
     for node in network.topologicalSortedNodes:
         if not node.isLeaf:
             info_gain_name = network.get_variable_name(name="info_gain", node=node)
-            branch_prob_name = network.get_variable_name(name="p(n|x)", node=node)
+            branch_prob_name = network.get_variable_name(name="branch_probs", node=node)
             info_gain_output = network.evalDict[network.get_variable_name(name="info_gain", node=node)]
-            branch_prob_output = network.evalDict[network.get_variable_name(name="p(n|x)", node=node)]
+            branch_prob_output = network.evalDict[network.get_variable_name(name="branch_probs", node=node)]
             network.decisionPathSummaries.append(tf.summary.scalar(info_gain_name, info_gain_output))
             network.decisionPathSummaries.append(tf.summary.histogram(branch_prob_name, branch_prob_output))
     # Hyperplane norms

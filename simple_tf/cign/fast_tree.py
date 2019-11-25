@@ -115,7 +115,8 @@ class FastTreeNetwork(TreeNetwork):
     @staticmethod
     def get_mock_tree(degree_list, network_name, node_costs):
         tree = FastTreeNetwork(node_build_funcs=None, grad_func=None, hyperparameter_func=None,
-                               residue_func=None, summary_func=None, degree_list=degree_list, dataset=None)
+                               residue_func=None, summary_func=None, degree_list=degree_list, dataset=None,
+                               network_name=network_name)
         # Build the tree topologically and create the Tensorflow placeholders
         tree.build_tree()
         # Build symbolic networks
@@ -278,7 +279,7 @@ class FastTreeNetwork(TreeNetwork):
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-        node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
+        node.evalDict[self.get_variable_name(name="branch_probs", node=node)] = p_n_given_x
         arg_max_indices = tf.argmax(p_n_given_x, axis=1)
         child_nodes = self.dagObject.children(node=node)
         child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
@@ -352,8 +353,8 @@ class FastTreeNetwork(TreeNetwork):
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-        node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
-        node.evalDict[self.get_variable_name(name="p(n|x)_masked", node=node)] = p_n_given_x_masked
+        node.evalDict[self.get_variable_name(name="branch_probs", node=node)] = p_n_given_x
+        node.evalDict[self.get_variable_name(name="branch_probs_masked", node=node)] = p_n_given_x_masked
         node.evalDict[self.get_variable_name(name="p(c|x)", node=node)] = p_c_given_x
         node.evalDict[self.get_variable_name(name="p(c|x)_masked", node=node)] = p_c_given_x_masked
         arg_max_indices = tf.argmax(p_n_given_x, axis=1)
@@ -800,7 +801,7 @@ class FastTreeNetwork(TreeNetwork):
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration):
         kv_rows = []
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        inner_node_outputs = ["info_gain", "p(n|x)", "activations"]
+        inner_node_outputs = ["info_gain", "branch_probs", "activations"]
         leaf_node_outputs = ["posterior_probs", "label_tensor"]
         t0 = time.time()
         leaf_node_collections, inner_node_collections = \
@@ -811,7 +812,7 @@ class FastTreeNetwork(TreeNetwork):
         t1 = time.time()
         print(t1 - t0)
         info_gain_dict = inner_node_collections["info_gain"]
-        branch_probs_dict = inner_node_collections["p(n|x)"]
+        branch_probs_dict = inner_node_collections["branch_probs"]
         leaf_true_labels_dict = leaf_node_collections["label_tensor"]
         posteriors_dict = leaf_node_collections["posterior_probs"]
         # Measure Information Gain

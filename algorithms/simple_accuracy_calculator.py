@@ -13,7 +13,7 @@ class SimpleAccuracyCalculator:
     @staticmethod
     def calculate_accuracy_multipath(network, sess, dataset, dataset_type, run_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        inner_node_outputs = ["p(n|x)", "activations"]
+        inner_node_outputs = ["branch_probs", "activations"]
         leaf_node_outputs = ["posterior_probs", "label_tensor"]
         leaf_node_collections, inner_node_collections = \
             network.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
@@ -21,7 +21,7 @@ class SimpleAccuracyCalculator:
                                                       leaf_node_collection_names=leaf_node_outputs,
                                                       inner_node_collections_names=inner_node_outputs)
         leaf_true_labels_dict = leaf_node_collections["label_tensor"]
-        branch_probs_dict = inner_node_collections["p(n|x)"]
+        branch_probs_dict = inner_node_collections["branch_probs"]
         posterior_probs_dict = leaf_node_collections["posterior_probs"]
         activations_dict = inner_node_collections["activations"]
         # SimpleAccuracyCalculator.test_save_load(network=network, run_id=run_id, iteration=iteration,

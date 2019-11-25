@@ -102,7 +102,7 @@ class AccuracyCalculator:
                 for node in self.network.topologicalSortedNodes:
                     if not node.isLeaf:
                         info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
-                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="branch_probs", node=node)]
                         if GlobalConstants.USE_SAMPLING_CIGN:
                             chosen_indices = results[self.network.get_variable_name(name="chosen_indices", node=node)]
                             UtilityFuncs.concat_to_np_array_dict(dct=chosen_indices_dict, key=node.index,
@@ -237,7 +237,7 @@ class AccuracyCalculator:
                 for node in self.network.topologicalSortedNodes:
                     if not node.isLeaf:
                         # info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
-                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="branch_probs", node=node)]
                         UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index,
                                                              array=branch_prob)
                         # if node.index not in info_gain_dict:
@@ -402,7 +402,7 @@ class AccuracyCalculator:
                 for node in self.network.topologicalSortedNodes:
                     if not node.isLeaf:
                         info_gain = results[self.network.get_variable_name(name="info_gain", node=node)]
-                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="branch_probs", node=node)]
                         UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict_mask_on, key=node.index,
                                                              array=branch_prob)
                         if node.index not in info_gain_dict:
@@ -446,7 +446,7 @@ class AccuracyCalculator:
             if results is not None:
                 for node in self.network.topologicalSortedNodes:
                     if not node.isLeaf:
-                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="branch_probs", node=node)]
                         activations = results[self.network.get_variable_name(name="activations", node=node)]
                         UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
                                                              array=branch_prob)
@@ -518,7 +518,7 @@ class AccuracyCalculator:
             if results is not None:
                 for node in self.network.topologicalSortedNodes:
                     if not node.isLeaf:
-                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="branch_probs", node=node)]
                         UtilityFuncs.concat_to_np_array_dict(dct=branch_probs, key=node.index,
                                                              array=branch_prob)
                     else:
@@ -654,7 +654,7 @@ class AccuracyCalculator:
             if results is not None:
                 for node in self.network.topologicalSortedNodes:
                     if not node.isLeaf:
-                        branch_prob = results[self.network.get_variable_name(name="p(n|x)", node=node)]
+                        branch_prob = results[self.network.get_variable_name(name="branch_probs", node=node)]
                         UtilityFuncs.concat_to_np_array_dict(dct=leaf_posterior_probs_dict, key=node.index,
                                                              array=branch_prob)
                     else:

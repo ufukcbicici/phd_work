@@ -20,7 +20,7 @@ class CignMixtureOfExperts(FastTreeNetwork):
             raise Exception("This is the root node.")
         assert len(parent_nodes) == 1
         parent_node = parent_nodes[0]
-        p_n_given_x = parent_node.evalDict[self.get_variable_name(name="p(n|x)", node=parent_node)]
+        p_n_given_x = parent_node.evalDict[self.get_variable_name(name="branch_probs", node=parent_node)]
         child_nodes = self.dagObject.children(node=parent_node)
         child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
         route_probs = None
@@ -63,7 +63,7 @@ class CignMixtureOfExperts(FastTreeNetwork):
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
         node.evalDict[self.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
         node.evalDict[self.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-        node.evalDict[self.get_variable_name(name="p(n|x)", node=node)] = p_n_given_x
+        node.evalDict[self.get_variable_name(name="branch_probs", node=node)] = p_n_given_x
         node.evalDict[self.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
         node.evalDict[self.get_variable_name(name="routing_probs", node=node)] = routing_probs
 

@@ -290,7 +290,7 @@ class Jungle(FastTreeNetwork):
             node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
             node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
             node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-            node.evalDict[UtilityFuncs.get_variable_name(name="p(n|x)", node=node)] = p_F_given_x
+            node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)] = p_F_given_x
             node.evalDict[UtilityFuncs.get_variable_name(name="condition_indices", node=node)] = node.conditionIndices
             node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = node.labelTensor
             node.evalDict[UtilityFuncs.get_variable_name(name="indices_tensor", node=node)] = indices_tensor
@@ -466,7 +466,7 @@ class Jungle(FastTreeNetwork):
                         if node_degree == 1:
                             continue
                         info_gain = results[self.get_variable_name(name="info_gain", node=node)]
-                        branch_prob = results[self.get_variable_name(name="p(n|x)", node=node)]
+                        branch_prob = results[self.get_variable_name(name="branch_probs", node=node)]
                         UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index, array=branch_prob)
                         if node.index not in info_gain_dict:
                             info_gain_dict[node.index] = []
