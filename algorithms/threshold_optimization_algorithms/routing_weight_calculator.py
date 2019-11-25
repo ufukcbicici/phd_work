@@ -32,6 +32,27 @@ class RoutingWeightCalculator:
                                               dtype=np.int32)
         return parent_node_routing_vector
 
+    @staticmethod
+    def format_routing_data(routing_data):
+        formatted_data_dict = {}
+        # Posteriors
+        posterior_probs_dict = routing_data.get_dict("posterior_probs")
+        posteriors_per_leaf = sorted([(k, v) for k, v in posterior_probs_dict.items()], key=lambda tpl: tpl[0])
+        posteriors_tensor = np.stack([tpl[1] for tpl in posteriors_per_leaf], axis=2)
+        formatted_data_dict["posterior_probs"] = posteriors_tensor
+        # Branching Activations
+        activations_dict = routing_data.get_dict("activations")
+        activations_per_inner_node = sorted([(k, v) for k, v in activations_dict.items()], key=lambda tpl: tpl[0])
+        activations_tensor = np.stack([tpl[1] for tpl in activations_per_inner_node], axis=2)
+        formatted_data_dict["activations"] = activations_tensor
+        return formatted_data_dict
+
+    @staticmethod
+    def get_one_hot_label_vector(label, dim):
+        label_vec = np.zeros((dim, ))
+        label_vec[label] = 1.0
+        return label_vec
+
     def run(self):
         # Create Feature Sets from Activation and Posterior Vectors
         features_dict = {}
@@ -117,7 +138,8 @@ class RoutingWeightCalculator:
         def get_feature_vectors(data_type_):
             posterior_vecs = features_dict[data_type_][0]
             activation_vecs = features_dict[data_type_][1]
-            x_ = np.concatenate([posterior_vecs, activation_vecs], axis=1)
+            # x_ = np.concatenate([posterior_vecs, activation_vecs], axis=1)
+            x_ = activation_vecs
             return x_
 
         def get_rdf_regressor():
@@ -226,7 +248,7 @@ class RoutingWeightCalculator:
             # Hyperparameter grid
             # pca__n_components = [d for d in range(5, feature_dim, step)]
             # pca__n_components.append(feature_dim)
-            pca__n_components = [32]
+            pca__n_components = [feature_dim]
             param_grid["pca__n_components"] = pca__n_components
             grid_search = GridSearchCV(pipe, param_grid, iid=False, cv=5, n_jobs=8, refit=True, verbose=10)
             grid_search.fit(X=x_leaf_train, y=y_leaf_train)
