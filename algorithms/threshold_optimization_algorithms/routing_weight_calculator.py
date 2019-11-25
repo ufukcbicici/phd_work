@@ -131,10 +131,10 @@ class RoutingWeightCalculator:
         def get_mlp_regressor():
             mlp = MLPRegressor()
             params = {
-                'mlp__hidden_layer_sizes': [(100,), (500,), (1000,)],
+                'mlp__hidden_layer_sizes': [(200, 100)],
                 'mlp__activation': ["relu", "tanh"],
                 'mlp__solver': ["lbfgs"],
-                'mlp__alpha': [0.0, 0.0001, 0.0002, 0.0003, 0.0004, 0.0005, 0.001, 0.0002],
+                'mlp__alpha': [0.0, 0.0001, 0.0002, 0.0003, 0.0004, 0.0005, 0.001, 0.002],
                 'mlp__max_iter': [10000]
             }
             return ("mlp", mlp), params
@@ -219,12 +219,12 @@ class RoutingWeightCalculator:
             feature_dim = x_leaf_train.shape[1]
             pca = PCA()
             regressor_tpl, param_grid = get_mlp_regressor()
-            pipe = Pipeline(steps=[('pca', pca), regressor_tpl])
+            pipe = Pipeline(steps=[("pca", pca), regressor_tpl])
             step = max(1, int((feature_dim - 5) / 50))
             # Hyperparameter grid
             # pca__n_components = [d for d in range(5, feature_dim, step)]
             # pca__n_components.append(feature_dim)
-            pca__n_components = [50]
+            pca__n_components = [32]
             param_grid["pca__n_components"] = pca__n_components
             grid_search = GridSearchCV(pipe, param_grid, iid=False, cv=5, n_jobs=8, refit=True, verbose=10)
             grid_search.fit(X=x_leaf_train, y=y_leaf_train)
