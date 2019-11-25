@@ -28,12 +28,8 @@ brute_force_sample_count = 1000000
 node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
 
 network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
-multipath_calculators = {}
-for iteration in iterations:
-    routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration)
-    routing_data_dict[iteration] = routing_data
-    multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
-    multipath_calculators[iteration] = multipath_calculator
+routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=119100)
+multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
 
 multiprocess_lock = Lock()
 
@@ -43,8 +39,8 @@ def bayesian_process_runner(param_tpl):
     use_weighted = param_tpl[1]
     accuracy_computation_balance = param_tpl[2]
     bayesian_optimizer = BayesianOptimizer(
-        run_id=run_id, network=network, routing_data_dict=routing_data_dict,
-        multipath_score_calculators=multipath_calculators,
+        run_id=run_id, network=network, iteration=119100, routing_data=routing_data,
+        multipath_score_calculator=multipath_calculator,
         balance_coefficient=accuracy_computation_balance, lock=multiprocess_lock, xi=xi,
         use_weighted_scoring=use_weighted, initial_sample_count=10,
         test_ratio=0.5, max_iter=125, verbose=True)

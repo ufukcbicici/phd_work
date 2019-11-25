@@ -653,12 +653,13 @@ class FastTreeNetwork(TreeNetwork):
         checkpoint_path = os.path.abspath(os.path.join(directory_path, "model.ckpt"))
         return directory_path, checkpoint_path
 
-    def get_routing_info_path(self, run_id, iteration):
+    @staticmethod
+    def get_routing_info_path(network_name, run_id, iteration):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}".format(self.networkName,
-                                                                                         run_id, iteration)))
+                                                      "{0}_run_{1}_iteration_{2}".format(network_name, run_id,
+                                                                                         iteration)))
         return directory_path
 
     def save_model(self, sess, run_id, iteration):
@@ -679,7 +680,8 @@ class FastTreeNetwork(TreeNetwork):
 
     def save_routing_info(self, sess, run_id, iteration, dataset, dataset_type):
         dict_of_data_dicts = {}
-        directory_path = self.get_routing_info_path(run_id=run_id, iteration=iteration)
+        directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
+                                                               run_id=run_id, iteration=iteration)
         os.mkdir(directory_path)
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         inner_node_outputs = GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT
@@ -705,12 +707,14 @@ class FastTreeNetwork(TreeNetwork):
         routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
         return routing_data
 
-    def load_routing_info(self, run_id, iteration):
-        directory_path = self.get_routing_info_path(run_id=run_id, iteration=iteration)
+    @staticmethod
+    def load_routing_info(network, run_id, iteration):
+        directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
+                                                               network_name=network.networkName)
         # Assert that the tree architecture is compatible with the loaded info
         npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
         degree_list = UtilityFuncs.load_npz(file_name=npz_file_name)
-        assert np.array_equal(np.array(self.degreeList), degree_list["tree_type"])
+        assert np.array_equal(np.array(network.degreeList), degree_list["tree_type"])
         all_output_names = list(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
         all_output_names.extend(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
         dict_of_data_dicts = {}
