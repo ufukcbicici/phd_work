@@ -23,36 +23,49 @@ class MultipathResult:
 
 
 class RoutingDataset:
-    def __init__(self, labels_dict_for_leaves, label_list, branch_probs, activations, posterior_probs):
-        self.labelsDict = labels_dict_for_leaves
+    def __init__(self, label_list, dict_of_data_dicts):
         self.labelList = label_list
-        self.branchProbs = branch_probs
-        self.activations = activations
-        self.posteriorProbs = posterior_probs
+        self.dictionaryOfRoutingData = dict_of_data_dicts
+
+    def __eq__(self, other):
+        if not np.array_equal(self.labelList, other.labelList):
+            return False
+        if not len(self.dictionaryOfRoutingData) == len(self.dictionaryOfRoutingData):
+            return False
+        for k, dict_arr in self.dictionaryOfRoutingData.items():
+            if k not in other.dictionaryOfRoutingData:
+                return False
+            other_dict_arr = other.dictionaryOfRoutingData[k]
+            if not len(dict_arr) == len(other_dict_arr):
+                return False
+            for _k, _v in dict_arr.items():
+                if _k not in other_dict_arr:
+                    return False
+                if not np.array_equal(_v, other_dict_arr[_k]):
+                    return False
+        return True
 
     def apply_validation_test_split(self, test_ratio):
         indices = np.array(range(self.labelList.shape[0]))
         val_indices, test_indices = train_test_split(indices, test_size=test_ratio)
         split_sets = []
 
-        def get_subset_of_dict(data_dict, _i):
-            subset_dict = {}
-            for node_id, arr in data_dict.items():
+        def get_subset_of_dict(data_dict_, _i):
+            subset_dict_ = {}
+            for node_id, arr in data_dict_.items():
                 new_arr = np.copy(arr[_i])
-                subset_dict[node_id] = new_arr
-            return subset_dict
+                subset_dict_[node_id] = new_arr
+            return subset_dict_
 
         for idx in [val_indices, test_indices]:
-            labels_dict = get_subset_of_dict(data_dict=self.labelsDict, _i=idx)
-            labels_list = np.copy(self.labelList[idx])
-            branch_probs = get_subset_of_dict(data_dict=self.branchProbs, _i=idx)
-            activations = get_subset_of_dict(data_dict=self.activations, _i=idx)
-            posterior_probs = get_subset_of_dict(data_dict=self.posteriorProbs, _i=idx)
-            routing_data = RoutingDataset(labels_dict_for_leaves=labels_dict, label_list=labels_list,
-                                          branch_probs=branch_probs, activations=activations,
-                                          posterior_probs=posterior_probs)
+            split_labels_list = np.copy(self.labelList[idx])
+            dict_of_split_data = {}
+            for data_name, data_dict in self.dictionaryOfRoutingData.items():
+                assert data_dict.__class__ == dict().__class__
+                subset_dict = get_subset_of_dict(data_dict_=data_dict, _i=idx)
+                dict_of_split_data[data_name] = subset_dict
+            routing_data = RoutingDataset(label_list=split_labels_list, dict_of_data_dicts=dict_of_split_data)
             split_sets.append(routing_data)
-
         val_data = split_sets[0]
         test_data = split_sets[1]
         return val_data, test_data

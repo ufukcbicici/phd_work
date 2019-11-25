@@ -16,20 +16,22 @@ from algorithms.info_gain import InfoGainLoss
 from simple_tf.uncategorized.node import Node
 from auxillary.constants import DatasetTypes
 from sklearn.metrics import confusion_matrix
+from tensorflow.contrib.framework.python.framework import checkpoint_utils
 
 
 class FastTreeNetwork(TreeNetwork):
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                 dataset):
+                 dataset, network_name):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                          dataset)
         self.learningRate = None
         self.optimizer = None
         self.infoGainDicts = None
         self.extra_update_ops = None
-        self.networkName = None
         self.nodeCosts = {}
+        self.networkName = network_name
         self.dbName = None
+        self.saver = None
 
     @staticmethod
     def conv_layer(x, kernel, strides, node, bias=None, padding='SAME'):
@@ -436,6 +438,7 @@ class FastTreeNetwork(TreeNetwork):
         node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature)
         logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node)
+        node.evalDict[self.get_variable_name(name="logits", node=node)] = logits
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
         pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
@@ -641,82 +644,93 @@ class FastTreeNetwork(TreeNetwork):
         selected_indices = tf.cast(tf.argmax(gumbel_max, axis=1), tf.int32)
         return selected_indices
 
-    @staticmethod
-    def save_routing_info(network, run_id, iteration,
-                          leaf_true_labels_dict, branch_probs_dict,
-                          posterior_probs_dict, activations_dict):
+    def get_checkpoint_path(self, run_id, iteration):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}".format(network.dbName,
-                                                                                         run_id, iteration)))
-        os.mkdir(directory_path)
-        arr_dict = {"tree_type": {"tree_type": np.array(network.degreeList)},
-                    "label_tensor": leaf_true_labels_dict,
-                    "branch_probs": branch_probs_dict,
-                    "posterior_probs": posterior_probs_dict,
-                    "activations": activations_dict}
-        for arr_name, _dict in arr_dict.items():
-            npz_file_name = os.path.abspath(os.path.join(directory_path, arr_name))
-            _string_dict = {}
-            for k, v in _dict.items():
-                _string_dict["{0}".format(k)] = v
-            UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=_string_dict)
+                                                      "checkpoint_{0}_run_{1}_iteration_{2}".format(self.networkName,
+                                                                                                    run_id, iteration)))
+        checkpoint_path = os.path.abspath(os.path.join(directory_path, "model.ckpt"))
+        return directory_path, checkpoint_path
 
-    @staticmethod
-    def load_routing_info(network, run_id, iteration):
+    def get_routing_info_path(self, run_id, iteration):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}".format(network.dbName,
+                                                      "{0}_run_{1}_iteration_{2}".format(self.networkName,
                                                                                          run_id, iteration)))
+        return directory_path
+
+    def save_model(self, sess, run_id, iteration):
+        directory_path, checkpoint_path = self.get_checkpoint_path(run_id=run_id, iteration=iteration)
+        os.mkdir(directory_path)
+        self.saver.save(sess, checkpoint_path)
+
+    def load_model(self, sess, run_id, iteration):
+        _, checkpoint_path = self.get_checkpoint_path(run_id=run_id, iteration=iteration)
+        saved_vars = checkpoint_utils.list_variables(checkpoint_dir=checkpoint_path)
+        all_vars = tf.global_variables()
+        for var in all_vars:
+            if "Adam" in var.name:
+                continue
+            source_array = checkpoint_utils.load_variable(checkpoint_dir=checkpoint_path, name=var.name)
+            tf.assign(var, source_array).eval(session=sess)
+        print("X")
+
+    def save_routing_info(self, sess, run_id, iteration, dataset, dataset_type):
+        dict_of_data_dicts = {}
+        directory_path = self.get_routing_info_path(run_id=run_id, iteration=iteration)
+        os.mkdir(directory_path)
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        inner_node_outputs = GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT
+        leaf_node_outputs = GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT
+        leaf_node_collections, inner_node_collections = \
+            self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
+                                                   use_masking=False,
+                                                   leaf_node_collection_names=leaf_node_outputs,
+                                                   inner_node_collections_names=inner_node_outputs)
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
+        UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict={"tree_type": np.array(self.degreeList)})
+        for output_names, collection in zip([inner_node_outputs, leaf_node_outputs],
+                                            [inner_node_collections, leaf_node_collections]):
+            for output_name in output_names:
+                arr_dict = collection[output_name]
+                dict_of_data_dicts[output_name] = arr_dict
+                string_arr_dict = {"{0}".format(k): v for k, v in arr_dict.items()}
+                npz_file_name = os.path.abspath(os.path.join(directory_path, output_name))
+                UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=string_arr_dict)
+        label_data = dict_of_data_dicts["label_tensor"]
+        label_list = list(label_data.values())[0]
+        assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
+        routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
+        return routing_data
+
+    def load_routing_info(self, run_id, iteration):
+        directory_path = self.get_routing_info_path(run_id=run_id, iteration=iteration)
         # Assert that the tree architecture is compatible with the loaded info
         npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
         degree_list = UtilityFuncs.load_npz(file_name=npz_file_name)
-        assert np.array_equal(np.array(network.degreeList), degree_list["tree_type"])
-        # True labels
-        npz_file_name = os.path.abspath(os.path.join(directory_path, "label_tensor"))
-        leaf_true_labels_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
-        # Branch probabilities
-        npz_file_name = os.path.abspath(os.path.join(directory_path, "branch_probs"))
-        branch_probs_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
-        # Posterior probabilities
-        npz_file_name = os.path.abspath(os.path.join(directory_path, "posterior_probs"))
-        posterior_probs_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
-        # Activations
-        npz_file_name = os.path.abspath(os.path.join(directory_path, "activations"))
-        activations_dict = {int(k): v for k, v in UtilityFuncs.load_npz(file_name=npz_file_name).items()}
-        label_list = list(leaf_true_labels_dict.values())[0]
-        routing_data = RoutingDataset(labels_dict_for_leaves=leaf_true_labels_dict,
-                                      label_list=label_list, branch_probs=branch_probs_dict,
-                                      posterior_probs=posterior_probs_dict, activations=activations_dict)
+        assert np.array_equal(np.array(self.degreeList), degree_list["tree_type"])
+        all_output_names = list(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
+        all_output_names.extend(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
+        dict_of_data_dicts = {}
+        for output_name in all_output_names:
+            npz_file_name = os.path.abspath(os.path.join(directory_path, output_name))
+            dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)
+            data_dict = {int(k): v for k, v in dict_read.items()}
+            dict_of_data_dicts[output_name] = data_dict
+        label_data = dict_of_data_dicts["label_tensor"]
+        label_list = list(label_data.values())[0]
+        assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
+        routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
         return routing_data
 
     # Unit Test
-    @staticmethod
-    def test_save_load(network, run_id, iteration,
-                       leaf_true_labels_dict, branch_probs_dict,
-                       posterior_probs_dict, activations_dict):
-        FastTreeNetwork.save_routing_info(network=network, run_id=run_id, iteration=iteration,
-                                          leaf_true_labels_dict=leaf_true_labels_dict,
-                                          branch_probs_dict=branch_probs_dict,
-                                          posterior_probs_dict=posterior_probs_dict,
-                                          activations_dict=activations_dict)
-
-        r_leaf_true_labels_dict, r_branch_probs_dict, r_posterior_probs_dict, r_activations_dict = \
-            FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration)
-        assert len(leaf_true_labels_dict) == len(r_leaf_true_labels_dict)
-        assert len(branch_probs_dict) == len(r_branch_probs_dict)
-        assert len(posterior_probs_dict) == len(r_posterior_probs_dict)
-        assert len(activations_dict) == len(r_activations_dict)
-        for k, v in leaf_true_labels_dict.items():
-            assert np.array_equal(v, r_leaf_true_labels_dict[k])
-        for k, v in branch_probs_dict.items():
-            assert np.array_equal(v, r_branch_probs_dict[k])
-        for k, v in posterior_probs_dict.items():
-            assert np.array_equal(v, r_posterior_probs_dict[k])
-        for k, v in activations_dict.items():
-            assert np.array_equal(v, r_activations_dict[k])
+    def test_save_load(self, sess, run_id, iteration, dataset, dataset_type):
+        routing_data_save = self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                                                   dataset=dataset, dataset_type=dataset_type)
+        routing_data_load = self.load_routing_info(run_id=run_id, iteration=iteration)
+        assert routing_data_save == routing_data_load
 
     @staticmethod
     def calculate_information_gain(info_gain_dict, kv_rows, dataset_type, run_id, iteration):
@@ -849,102 +863,9 @@ class FastTreeNetwork(TreeNetwork):
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return total_accuracy, cm
 
-    def calculate_accuracy_multipath(self, sess, dataset, dataset_type, run_id, iteration):
-        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        inner_node_outputs = ["p(n|x)", "activations"]
-        leaf_node_outputs = ["posterior_probs", "label_tensor"]
-        leaf_node_collections, inner_node_collections = \
-            self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
-                                                   use_masking=False,
-                                                   leaf_node_collection_names=leaf_node_outputs,
-                                                   inner_node_collections_names=inner_node_outputs)
-        leaf_true_labels_dict = leaf_node_collections["label_tensor"]
-        branch_probs_dict = inner_node_collections["p(n|x)"]
-        posterior_probs_dict = leaf_node_collections["posterior_probs"]
-        activations_dict = inner_node_collections["activations"]
-        # SimpleAccuracyCalculator.test_save_load(network=network, run_id=run_id, iteration=iteration,
-        #                                         leaf_true_labels_dict=leaf_true_labels_dict,
-        #                                         branch_probs_dict=branch_probs_dict,
-        #                                         posterior_probs_dict=posterior_probs_dict,
-        #                                         activations_dict=activations_dict)
-        # # Save the the info from this iteration
-        if GlobalConstants.SAVE_PATH_INFO_TO_HD:
-            FastTreeNetwork.save_routing_info(network=self, run_id=run_id, iteration=iteration,
-                                              leaf_true_labels_dict=leaf_true_labels_dict,
-                                              branch_probs_dict=branch_probs_dict,
-                                              posterior_probs_dict=posterior_probs_dict,
-                                              activations_dict=activations_dict)
-        thresholds = []
-        for threshold in GlobalConstants.MULTIPATH_SCHEDULES:
-            t_dict = {}
-            for node in self.topologicalSortedNodes:
-                if not node.isLeaf:
-                    child_count = len(self.dagObject.children(node=node))
-                    t_dict[node.index] = threshold * np.ones(shape=(child_count,))
-            thresholds.append(t_dict)
-        leaf_labels = list(leaf_true_labels_dict.values())
-        assert all([np.array_equal(leaf_labels[0], leaf_labels[i]) for i in range(len(leaf_labels))])
-        label_list = leaf_labels[0]
-        sample_count = label_list.shape[0]
-        multipath_calculator = MultipathCalculatorV2(thresholds_list=thresholds, network=self,
-                                                     sample_count=sample_count, label_list=label_list,
-                                                     branch_probs=branch_probs_dict,
-                                                     activations=activations_dict,
-                                                     posterior_probs=posterior_probs_dict)
-        results = multipath_calculator.run()
-        kv_rows = []
-        for result in results:
-            # Tuple: Entry 0: Method Entry 1: Thresholds Entry 2: Accuracy Entry 3: Num of leaves evaluated
-            # Entry 4: Computation Overload
-            method = result.methodType
-            path_threshold = result.thresholdsDict[0][0]
-            accuracy = result.accuracy
-            total_leaves_evaluated = result.totalLeavesEvaluated
-            kv_rows.append((run_id, iteration, method, path_threshold, accuracy, total_leaves_evaluated))
-        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.multipath_results_table_v2, col_count=6)
-
-    def calculate_model_performance(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
-        # Delete this in future
-        if not self.modeTracker.isCompressed:
-            if calculation_type == AccuracyCalcType.regular:
-                # accuracy, confusion = self.accuracyCalculator.calculate_accuracy(sess=sess, dataset=dataset,
-                #                                                                  dataset_type=dataset_type,
-                #                                                                  run_id=run_id,
-                #                                                                  iteration=iteration)
-                accuracy, confusion = self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=dataset_type,
-                                                              run_id=run_id,
-                                                              iteration=iteration)
-                return accuracy, confusion
-            elif calculation_type == AccuracyCalcType.route_correction:
-                accuracy_corrected, marginal_corrected = \
-                    self.accuracyCalculator.calculate_accuracy_with_route_correction(
-                        sess=sess, dataset=dataset,
-                        dataset_type=dataset_type)
-                return accuracy_corrected, marginal_corrected
-            elif calculation_type == AccuracyCalcType.with_residue_network:
-                self.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                                dataset_type=dataset_type)
-            elif calculation_type == AccuracyCalcType.multi_path:
-                # Outdated
-                # self.accuracyCalculator.calculate_accuracy_multipath(sess=sess, dataset=dataset,
-                #                                                      dataset_type=dataset_type, run_id=run_id,
-                #                                                      iteration=iteration)
-                self.calculate_accuracy_multipath(sess=sess,
-                                                  dataset=dataset,
-                                                  dataset_type=dataset_type,
-                                                  run_id=run_id,
-                                                  iteration=iteration)
-            else:
-                raise NotImplementedError()
-        else:
-            best_leaf_accuracy, residue_corrected_accuracy = \
-                self.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
-                                                                             dataset_type=dataset_type,
-                                                                             run_id=run_id, iteration=iteration)
-            return best_leaf_accuracy, residue_corrected_accuracy
-
     def train(self, sess, dataset, run_id):
         iteration_counter = 0
+        self.saver = tf.train.Saver()
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
             dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
@@ -973,77 +894,26 @@ class FastTreeNetwork(TreeNetwork):
                         epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING
                     if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
                         print("Epoch Time={0}".format(total_time))
-                        if not self.modeTracker.isCompressed:
-                            training_accuracy, training_confusion = \
-                                self.calculate_model_performance(sess=sess, dataset=dataset,
-                                                                 dataset_type=DatasetTypes.training,
-                                                                 run_id=run_id, iteration=iteration_counter,
-                                                                 calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy, validation_confusion = \
-                                self.calculate_model_performance(sess=sess, dataset=dataset,
-                                                                 dataset_type=DatasetTypes.test,
-                                                                 run_id=run_id, iteration=iteration_counter,
-                                                                 calculation_type=AccuracyCalcType.regular)
-                            if not self.isBaseline:
-                                validation_accuracy_corrected, validation_marginal_corrected = \
-                                    self.calculate_model_performance(sess=sess, dataset=dataset,
-                                                                     dataset_type=DatasetTypes.test,
-                                                                     run_id=run_id,
-                                                                     iteration=iteration_counter,
-                                                                     calculation_type=
-                                                                     AccuracyCalcType.route_correction)
-                                if is_evaluation_epoch_before_ending:
-                                    self.calculate_model_performance(sess=sess, dataset=dataset,
-                                                                     dataset_type=DatasetTypes.test,
-                                                                     run_id=run_id,
-                                                                     iteration=iteration_counter,
-                                                                     calculation_type=
-                                                                     AccuracyCalcType.multi_path)
-                            else:
-                                validation_accuracy_corrected = 0.0
-                                validation_marginal_corrected = 0.0
-                            DbLogger.write_into_table(
-                                rows=[(run_id, iteration_counter, epoch_id, training_accuracy,
-                                       validation_accuracy, validation_accuracy_corrected,
-                                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
-                            # DbLogger.write_into_table(
-                            #     rows=[(run_id, iteration_counter, epoch_id, training_accuracy2,
-                            #            validation_accuracy2, validation_accuracy_corrected,
-                            #            0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
-                            # DbLogger.write_into_table(rows=leaf_info_rows, table=DbLogger.leafInfoTable, col_count=4)
-                            if GlobalConstants.SAVE_CONFUSION_MATRICES:
-                                DbLogger.write_into_table(rows=training_confusion, table=DbLogger.confusionTable,
-                                                          col_count=7)
-                                DbLogger.write_into_table(rows=validation_confusion, table=DbLogger.confusionTable,
-                                                          col_count=7)
-                        else:
-                            training_accuracy_best_leaf, training_confusion_residue = \
-                                self.calculate_model_performance(sess=sess, dataset=dataset,
-                                                                 dataset_type=DatasetTypes.training,
-                                                                 run_id=run_id, iteration=iteration_counter,
-                                                                 calculation_type=AccuracyCalcType.regular)
-                            validation_accuracy_best_leaf, validation_confusion_residue = \
-                                self.calculate_model_performance(sess=sess, dataset=dataset,
-                                                                 dataset_type=DatasetTypes.test,
-                                                                 run_id=run_id, iteration=iteration_counter,
-                                                                 calculation_type=AccuracyCalcType.regular)
-                            DbLogger.write_into_table(rows=[(run_id, iteration_counter, epoch_id,
-                                                             training_accuracy_best_leaf,
-                                                             validation_accuracy_best_leaf,
-                                                             validation_confusion_residue,
-                                                             0.0, 0.0, "XXX")], table=DbLogger.logsTable,
-                                                      col_count=9)
-                        leaf_info_rows = []
+                        training_accuracy, training_confusion = \
+                            self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
+                                                    run_id=run_id,
+                                                    iteration=iteration_counter)
+                        validation_accuracy, validation_confusion = \
+                            self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                                    run_id=run_id,
+                                                    iteration=iteration_counter)
+                        validation_accuracy_corrected = 0.0
+                        if not self.isBaseline:
+                            validation_accuracy_corrected, validation_marginal_corrected = \
+                                self.accuracyCalculator.calculate_accuracy_with_route_correction(
+                                    sess=sess, dataset=dataset,
+                                    dataset_type=DatasetTypes.test)
+                            if is_evaluation_epoch_before_ending:
+                                self.save_model(sess=sess, run_id=run_id, iteration=iteration_counter)
+                                self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration_counter,
+                                                       dataset=dataset, dataset_type=DatasetTypes.test)
+                        DbLogger.write_into_table(
+                            rows=[(run_id, iteration_counter, epoch_id, training_accuracy,
+                                   validation_accuracy, validation_accuracy_corrected,
+                                   0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
                     break
-            # # Compress softmax classifiers
-            # if GlobalConstants.USE_SOFTMAX_DISTILLATION:
-            #     do_compress = network.check_for_compression(dataset=dataset, run_id=experiment_id,
-            #                                                 iteration=iteration_counter, epoch=epoch_id)
-            #     if do_compress:
-            #         print("**********************Compressing the network**********************")
-            #         network.softmaxCompresser.compress_network_softmax(sess=sess)
-            #         print("**********************Compressing the network**********************")
-        # except Exception as e:
-        #     print(e)
-        #     print("ERROR!!!!")
-        # Reset the computation graph

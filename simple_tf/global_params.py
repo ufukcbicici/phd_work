@@ -284,6 +284,9 @@ class GlobalConstants:
                                        first_conv_filter_size=3, relu_leakiness=0.1,
                                        strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
+    INNER_NODE_OUTPUTS_TO_COLLECT = ["p(n|x)", "activations", "branching_feature"]
+    LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits"]
+
     RESNET_DECISION_DIMENSION = 128
 
     RESNET_SOFTMAX_DECAY_INITIAL = 25.0
