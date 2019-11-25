@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV
 
@@ -117,6 +118,27 @@ class RoutingWeightCalculator:
             x_ = np.concatenate([posterior_vecs, activation_vecs], axis=1)
             return x_
 
+        def get_rdf_regressor():
+            rdf = RandomForestRegressor(criterion="mse")
+            params = {
+                'rdf__n_estimators': [1000],
+                'rdf__max_depth': [5, 10, 15, 20, 25, 30, 40, 50],
+                'rdf__bootstrap': [False, True],
+                'rdf__min_samples_leaf': [1]
+            }
+            return ("rdf", rdf), params
+
+        def get_mlp_regressor():
+            mlp = MLPRegressor()
+            params = {
+                'mlp__hidden_layer_sizes': [(100,), (500,), (1000,)],
+                'mlp__activation': ["relu", "tanh"],
+                'mlp__solver': ["lbfgs"],
+                'mlp__alpha': [0.0, 0.0001, 0.0002, 0.0003, 0.0004, 0.0005, 0.001, 0.0002],
+                'mlp__max_iter': [10000]
+            }
+            return ("mlp", mlp), params
+
         x_train = get_feature_vectors("validation")
         y_train = targets_dict["validation"][0]
         validation_routing_matrix = np.copy(
@@ -196,20 +218,14 @@ class RoutingWeightCalculator:
             # Fit the regressor now
             feature_dim = x_leaf_train.shape[1]
             pca = PCA()
-            rdf = RandomForestRegressor(criterion="mse")
-            pipe = Pipeline(steps=[('pca', pca), ('rdf', rdf)])
+            regressor_tpl, param_grid = get_mlp_regressor()
+            pipe = Pipeline(steps=[('pca', pca), regressor_tpl])
             step = max(1, int((feature_dim - 5) / 50))
             # Hyperparameter grid
             # pca__n_components = [d for d in range(5, feature_dim, step)]
             # pca__n_components.append(feature_dim)
             pca__n_components = [50]
-            param_grid = {
-                'pca__n_components': pca__n_components,
-                'rdf__n_estimators': [100],
-                'rdf__max_depth': [5, 10, 15, 20, 25, 30],
-                'rdf__bootstrap': [False, True],
-                'rdf__min_samples_leaf': [1, 2, 3, 4, 5, 10]
-            }
+            param_grid["pca__n_components"] = pca__n_components
             grid_search = GridSearchCV(pipe, param_grid, iid=False, cv=5, n_jobs=8, refit=True, verbose=10)
             grid_search.fit(X=x_leaf_train, y=y_leaf_train)
             best_model = grid_search.best_estimator_
@@ -242,7 +258,7 @@ class RoutingWeightCalculator:
                         weights_predicted.append(0.0)
                         continue
                     weight = models[leaf_id].predict(X=np.expand_dims(feature_vector, axis=0))
-                    weights_predicted.append(weight)
+                    weights_predicted.append(weight[0])
                 weights_predicted = np.array(weights_predicted)
                 sparse_posteriors_matrix = posterior_matrix * np.expand_dims(routing_vector, axis=0)
                 lst_squares_posterior_regressed = sparse_posteriors_matrix @ weights_predicted
