@@ -6,9 +6,9 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
 class FashionCignLite(FastTreeNetwork):
-    def __init__(self, degree_list, dataset):
+    def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func, FashionCignLite.leaf_func]
-        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset)
+        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name)
 
     @staticmethod
     def apply_heavy_router_transform(network, net, node, decision_feature_size):

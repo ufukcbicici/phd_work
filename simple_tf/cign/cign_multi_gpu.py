@@ -9,12 +9,12 @@ from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 class CignMultiGpu(FastTreeNetwork):
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                 dataset):
+                 dataset, network_name):
         GlobalConstants.USE_MULTI_GPU = True
         # placeholders = [op for op in tf.get_default_graph().get_operations() if op.type == "Placeholder"]
         with tf.name_scope("main_network"):
             super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                             dataset)
+                             dataset, network_name)
         # Each element contains a (device_str, network) pair.
         self.towerNetworks = []
         self.grads = []

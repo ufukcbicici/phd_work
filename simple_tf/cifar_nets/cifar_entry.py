@@ -19,17 +19,21 @@ use_random_sampling = False
 use_baseline = False
 
 
-def get_network(dataset):
+def get_network(dataset, network_name):
     if not use_multi_gpu and not use_sampling and not use_random_sampling and not use_baseline:
-        network = Cifar100_Cign(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
+        network = Cifar100_Cign(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
+                                network_name=network_name)
     elif use_multi_gpu:
-        network = Cifar100_MultiGpuCign(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
+        network = Cifar100_MultiGpuCign(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
+                                        network_name=network_name)
     elif use_sampling:
-        network = Cifar100_CignSampling(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
+        network = Cifar100_CignSampling(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
+                                        network_name=network_name)
     elif use_random_sampling:
-        network = Cifar100_CignRandomSampling(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset)
+        network = Cifar100_CignRandomSampling(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
+                                              network_name=network_name)
     elif use_baseline:
-        network = Cifar100_Baseline(dataset=dataset)
+        network = Cifar100_Baseline(dataset=dataset, network_name=network_name)
     else:
         raise NotImplementedError()
     return network
@@ -38,6 +42,7 @@ def get_network(dataset):
 def cifar_100_training():
     import sys
     print(sys.version)
+    network_name = "Cifar100_MultiGpu_Cign_[2,3]_[64,64,64]_IG2.0"
     # classification_wd = [0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003, 0.00035, 0.0004] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd.extend([0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
@@ -68,7 +73,7 @@ def cifar_100_training():
             sess = tf.Session()
         dataset = CifarDataSet(session=sess, validation_sample_count=0, load_validation_from=None)
         dataset.set_curr_session(sess=sess)
-        network = get_network(dataset=dataset)
+        network = get_network(dataset=dataset, network_name=network_name)
         network.set_training_parameters()
         network.build_network()
         init = tf.global_variables_initializer()

@@ -8,9 +8,9 @@ from algorithms.resnet.resnet_generator import ResnetGenerator
 
 
 class Cifar100_Baseline(FastTreeNetwork):
-    def __init__(self, dataset):
+    def __init__(self, dataset, network_name):
         node_build_funcs = [Cifar100_Baseline.baseline]
-        super().__init__(node_build_funcs, None, None, None, None, [], dataset)
+        super().__init__(node_build_funcs, None, None, None, None, [], dataset, network_name)
 
     @staticmethod
     def baseline(network, node):

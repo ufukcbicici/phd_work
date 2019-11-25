@@ -13,9 +13,10 @@ from auxillary.constants import DatasetTypes
 use_moe = False
 
 
-def get_network(dataset):
+def get_network(dataset, network_name):
     if not use_moe:
-        network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
+        network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
+                                  network_name=network_name)
     elif use_moe:
         network = FashionCignMoeLogits(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
     else:
@@ -24,6 +25,7 @@ def get_network(dataset):
 
 
 def fashion_net_training():
+    network_name = "FashionNet_CIGN_Lite"
     dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
     dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
     classification_wd = [0.0]
@@ -49,7 +51,7 @@ def fashion_net_training():
             sess = tf.Session(config=config)
         else:
             sess = tf.Session()
-        network = get_network(dataset=dataset)
+        network = get_network(dataset=dataset, network_name=network_name)
         network.set_training_parameters()
         network.build_network()
         init = tf.global_variables_initializer()

@@ -8,9 +8,9 @@ from algorithms.info_gain import InfoGainLoss
 
 class CignWithSampling(FastTreeNetwork):
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                 dataset):
+                 dataset, network_name):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                         dataset)
+                         dataset, network_name)
         GlobalConstants.USE_UNIFIED_BATCH_NORM = False
 
     def mask_input_nodes(self, node):

@@ -8,9 +8,9 @@ from simple_tf.global_params import GlobalConstants
 
 
 class Cifar100_CignRandomSampling(CignRandomSample):
-    def __init__(self, degree_list, dataset):
+    def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = [Cifar100_Cign.cign_block_func] * (len(degree_list) + 1)
-        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset)
+        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name)
 
     def get_explanation_string(self):
         total_param_count = 0

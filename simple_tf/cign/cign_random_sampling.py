@@ -10,9 +10,9 @@ from simple_tf.cign.cign_with_sampling import CignWithSampling
 
 class CignRandomSample(CignWithSampling):
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                 dataset):
+                 dataset, network_name):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                         dataset)
+                         dataset, network_name)
 
     def apply_decision(self, node, branching_feature):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
