@@ -739,7 +739,7 @@ class FastTreeNetwork(TreeNetwork):
     def test_save_load(self, sess, run_id, iteration, dataset, dataset_type):
         routing_data_save = self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                                    dataset=dataset, dataset_type=dataset_type)
-        routing_data_load = self.load_routing_info(run_id=run_id, iteration=iteration)
+        routing_data_load = FastTreeNetwork.load_routing_info(network=self, run_id=run_id, iteration=iteration)
         assert routing_data_save == routing_data_load
 
     @staticmethod
@@ -873,6 +873,39 @@ class FastTreeNetwork(TreeNetwork):
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return total_accuracy, cm
 
+    def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
+        # moving_results_1 = sess.run(moving_stat_vars)
+        is_evaluation_epoch_at_report_period = \
+            epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING \
+            and (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0
+        is_evaluation_epoch_before_ending = \
+            epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING
+        if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
+            training_accuracy, training_confusion = \
+                self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
+                                        run_id=run_id,
+                                        iteration=iteration)
+            validation_accuracy, validation_confusion = \
+                self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                        run_id=run_id,
+                                        iteration=iteration)
+            validation_accuracy_corrected = 0.0
+            if not self.isBaseline:
+                validation_accuracy_corrected, validation_marginal_corrected = \
+                    self.accuracyCalculator.calculate_accuracy_with_route_correction(
+                        sess=sess, dataset=dataset,
+                        dataset_type=DatasetTypes.test)
+                if is_evaluation_epoch_before_ending:
+                    self.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                    self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                                           dataset=dataset, dataset_type=DatasetTypes.test)
+                    self.test_save_load(sess=sess, run_id=run_id, iteration=iteration,
+                                        dataset=dataset, dataset_type=DatasetTypes.test)
+            DbLogger.write_into_table(
+                rows=[(run_id, iteration, epoch_id, training_accuracy,
+                       validation_accuracy, validation_accuracy_corrected,
+                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+
     def train(self, sess, dataset, run_id):
         iteration_counter = 0
         self.saver = tf.train.Saver()
@@ -895,34 +928,7 @@ class FastTreeNetwork(TreeNetwork):
                     self.print_iteration_info(iteration_counter=iteration_counter, update_results=update_results)
                     iteration_counter += 1
                 if dataset.isNewEpoch:
-                    # moving_results_1 = sess.run(moving_stat_vars)
-                    is_evaluation_epoch_at_report_period = \
-                        epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING \
-                        and (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0
-                    is_evaluation_epoch_before_ending = \
-                        epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING
-                    if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
-                        print("Epoch Time={0}".format(total_time))
-                        training_accuracy, training_confusion = \
-                            self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
-                                                    run_id=run_id,
-                                                    iteration=iteration_counter)
-                        validation_accuracy, validation_confusion = \
-                            self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
-                                                    run_id=run_id,
-                                                    iteration=iteration_counter)
-                        validation_accuracy_corrected = 0.0
-                        if not self.isBaseline:
-                            validation_accuracy_corrected, validation_marginal_corrected = \
-                                self.accuracyCalculator.calculate_accuracy_with_route_correction(
-                                    sess=sess, dataset=dataset,
-                                    dataset_type=DatasetTypes.test)
-                            if is_evaluation_epoch_before_ending:
-                                self.save_model(sess=sess, run_id=run_id, iteration=iteration_counter)
-                                self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration_counter,
-                                                       dataset=dataset, dataset_type=DatasetTypes.test)
-                        DbLogger.write_into_table(
-                            rows=[(run_id, iteration_counter, epoch_id, training_accuracy,
-                                   validation_accuracy, validation_accuracy_corrected,
-                                   0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+                    print("Epoch Time={0}".format(total_time))
+                    self.calculate_model_performance(sess=sess, dataset=dataset, run_id=run_id, epoch_id=epoch_id,
+                                                     iteration=iteration_counter)
                     break

@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
+from auxillary.constants import DatasetTypes
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
@@ -69,7 +71,8 @@ class CignMultiGpu(FastTreeNetwork):
                                 residue_func=None,
                                 summary_func=None,
                                 degree_list=self.degreeList,
-                                dataset=self.dataset)
+                                dataset=self.dataset,
+                                network_name=self.networkName)
                             tower_cign.build_network()
                             print("Built network for tower {0}".format(tower_id))
                             self.towerNetworks.append((device_str, tower_cign))
@@ -369,36 +372,34 @@ class CignMultiGpu(FastTreeNetwork):
         explanation += "Mac Cost per Nodes:{0}\n".format(network.nodeCosts)
         return explanation
 
-    # TODO: At sometime in the future, we should implement multi gpu accuracy calculation as well.
-    #  But not now (31.05.2019)
-    def calculate_model_performance(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
+    def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
         network = self.towerNetworks[0][1]
-        if not network.modeTracker.isCompressed:
-            if calculation_type == AccuracyCalcType.regular:
-                accuracy, confusion = network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=dataset_type,
-                                                                 run_id=run_id,
-                                                                 iteration=iteration)
-                return accuracy, confusion
-            elif calculation_type == AccuracyCalcType.route_correction:
-                accuracy_corrected, marginal_corrected = \
-                    network.accuracyCalculator.calculate_accuracy_with_route_correction(
-                        sess=sess, dataset=dataset,
-                        dataset_type=dataset_type)
-                return accuracy_corrected, marginal_corrected
-            elif calculation_type == AccuracyCalcType.with_residue_network:
-                network.accuracyCalculator.calculate_accuracy_with_residue_network(sess=sess, dataset=dataset,
-                                                                                   dataset_type=dataset_type)
-            elif calculation_type == AccuracyCalcType.multi_path:
-                network.calculate_accuracy_multipath(sess=sess,
-                                                     dataset=dataset,
-                                                     dataset_type=dataset_type,
-                                                     run_id=run_id,
-                                                     iteration=iteration)
-            else:
-                raise NotImplementedError()
-        else:
-            best_leaf_accuracy, residue_corrected_accuracy = \
-                network.accuracyCalculator.calculate_accuracy_after_compression(sess=sess, dataset=dataset,
-                                                                                dataset_type=dataset_type,
-                                                                                run_id=run_id, iteration=iteration)
-            return best_leaf_accuracy, residue_corrected_accuracy
+        # moving_results_1 = sess.run(moving_stat_vars)
+        is_evaluation_epoch_at_report_period = \
+            epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING \
+            and (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0
+        is_evaluation_epoch_before_ending = \
+            epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING
+        if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
+            training_accuracy, training_confusion = \
+                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
+                                           run_id=run_id,
+                                           iteration=iteration)
+            validation_accuracy, validation_confusion = \
+                network.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                           run_id=run_id,
+                                           iteration=iteration)
+            validation_accuracy_corrected, validation_marginal_corrected = \
+                network.accuracyCalculator.calculate_accuracy_with_route_correction(
+                    sess=sess, dataset=dataset,
+                    dataset_type=DatasetTypes.test)
+            if is_evaluation_epoch_before_ending:
+                network.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                network.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                                          dataset=dataset, dataset_type=DatasetTypes.test)
+                network.test_save_load(sess=sess, run_id=run_id, iteration=iteration,
+                                       dataset=dataset, dataset_type=DatasetTypes.test)
+            DbLogger.write_into_table(
+                rows=[(run_id, iteration, epoch_id, training_accuracy,
+                       validation_accuracy, validation_accuracy_corrected,
+                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)

@@ -81,7 +81,7 @@ class GlobalConstants:
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 250
     USE_MULTI_GPU = False
-    USE_CPU_AS_DEVICE = False
+    USE_CPU_AS_DEVICE = True
 
     # 1 GPU Setting Random Sampling
     # TOTAL_EPOCH_COUNT = 240
@@ -261,7 +261,7 @@ class GlobalConstants:
     FASHION_F_RESIDUE_LAYER_COUNT = 1
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
-    TREE_DEGREE_LIST = [2, 3]
+    TREE_DEGREE_LIST = [2, 2]
 
     # Resnet Params
     # RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 16, 0], use_bottleneck=True,
@@ -284,10 +284,10 @@ class GlobalConstants:
                                        first_conv_filter_size=3, relu_leakiness=0.1,
                                        strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
-    # INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "branching_feature"]
-    # LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits"]
-    INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations"]
-    LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor"]
+    INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "branching_feature"]
+    LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits"]
+    # INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations"]
+    # LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor"]
 
     RESNET_DECISION_DIMENSION = 128
 
@@ -300,7 +300,7 @@ class GlobalConstants:
     # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]
     # MULTIPATH_SCHEDULES.extend([i*0.001 for i in range(50)])
     SAVE_PATH_INFO_TO_HD = True
-    EVALUATION_EPOCHS_BEFORE_ENDING = 10
+    EVALUATION_EPOCHS_BEFORE_ENDING = 1800
     MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15,
                            0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.025, 0.02, 0.01,
                            0.009, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.0025, 0.002, 0.001,

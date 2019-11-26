@@ -42,7 +42,7 @@ def get_network(dataset, network_name):
 def cifar_100_training():
     import sys
     print(sys.version)
-    network_name = "Cifar100_MultiGpu_Cign_[2,3]_[64,64,64]_IG2.0"
+    network_name = "Cifar100_MultiGpu_Cign_[2,2]_[64,64,64]_IG1.0"
     # classification_wd = [0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003, 0.00035, 0.0004] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd.extend([0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
@@ -53,7 +53,7 @@ def cifar_100_training():
     # classification_wd = [0.0001, 0.00015, 0.0002] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
-    info_gain_balance_coeffs = [2.0]
+    info_gain_balance_coeffs = [1.0]
     classification_dropout_probs = [0.0]
     decision_dropout_probs = [0.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
