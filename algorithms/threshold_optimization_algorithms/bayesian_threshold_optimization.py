@@ -6,6 +6,8 @@ from scipy.optimize import minimize
 import multiprocessing
 from algorithms.coordinate_ascent_optimizer import CoordinateAscentOptimizer
 from algorithms.threshold_optimization_algorithms.routing_weight_calculator import RoutingWeightCalculator
+from algorithms.threshold_optimization_algorithms.routing_weights_finder_with_least_squares import \
+    RoutingWeightsFinderWithLeastSquares
 from algorithms.threshold_optimization_algorithms.threshold_optimizer import ThresholdOptimizer
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -102,11 +104,17 @@ class BayesianOptimizer(ThresholdOptimizer):
         test_result_obj = best_result[-1]
         val_routing_matrix = val_result_obj.routingMatrix
         test_routing_matrix = test_result_obj.routingMatrix
-        routing_weight_calculator = RoutingWeightCalculator(network=self.network,
-                                                            validation_routing_matrix=val_routing_matrix,
-                                                            test_routing_matrix=test_routing_matrix,
-                                                            validation_data=self.validationData,
-                                                            test_data=self.testData)
+        # routing_weight_calculator = RoutingWeightCalculator(network=self.network,
+        #                                                     validation_routing_matrix=val_routing_matrix,
+        #                                                     test_routing_matrix=test_routing_matrix,
+        #                                                     validation_data=self.validationData,
+        #                                                     test_data=self.testData)
+        routing_weight_calculator = RoutingWeightsFinderWithLeastSquares(network=self.network,
+                                                                         validation_routing_matrix=val_routing_matrix,
+                                                                         test_routing_matrix=test_routing_matrix,
+                                                                         validation_data=self.validationData,
+                                                                         test_data=self.testData,
+                                                                         min_data_cluster_ratio=10)
         routing_weight_calculator.run()
         # self.write_to_db(results=all_results)
         # return all_results
