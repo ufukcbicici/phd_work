@@ -52,10 +52,15 @@ class RoutingWeightsFinderWithLeastSquares(RoutingWeightCalculator):
         # data_objects_dict = {"validation": self.validationData, "test": self.testData}
         # routing_matrices_dict = {"validation": self.validationRoutingMatrix, "test": self.testRoutingMatrix}
         for route_vector in self.routingCombinations:
+            route_vector_as_tuple = tuple(route_vector.tolist())
             if np.sum(route_vector) <= 1:
                 continue
             element_wise_compliance = self.validationRoutingMatrix == route_vector
             valid_samples_indicator_vector = np.all(element_wise_compliance, axis=1)
+            if np.sum(valid_samples_indicator_vector) == 0:
+                self.routingCombinationClusterWeightsDict[route_vector_as_tuple] = \
+                    [(1.0/np.sum(route_vector)) * route_vector]
+                continue
             posteriors_tensor = np.copy(
                 self.featuresDict["validation"]["posterior_probs"][valid_samples_indicator_vector, :])
             activations_tensor = np.copy(
@@ -79,12 +84,13 @@ class RoutingWeightsFinderWithLeastSquares(RoutingWeightCalculator):
             kmeans = KMeans(n_clusters=cluster_count, random_state=0)
             kmeans.fit(X)
             cluster_labels = kmeans.predict(X)
-            route_vector_as_tuple = tuple(route_vector.tolist())
             self.routingCombinationClustersDict[route_vector_as_tuple] = kmeans
             self.routingCombinationClusterWeightsDict[route_vector_as_tuple] = []
             # Least Squares fitting
             for cluster_id in range(cluster_count):
                 i_vec = cluster_labels == cluster_id
+                if np.sum(i_vec) == 0:
+                    continue
                 sparse_posteriors_tensor_cluster = sparse_posteriors_tensor[i_vec, :]
                 y_cluster = y[i_vec]
                 dim = sparse_posteriors_tensor.shape[1]
@@ -100,11 +106,14 @@ class RoutingWeightsFinderWithLeastSquares(RoutingWeightCalculator):
                 self.routingCombinationClusterWeightsDict[route_vector_as_tuple].append(alpha_weights)
         #         print("X")
         # print("X")
-        self.estimate_accuracy(data_type="validation", routing_matrix=self.validationRoutingMatrix)
-        self.estimate_accuracy(data_type="test", routing_matrix=self.testRoutingMatrix)
+        self.estimate_accuracy(data_type="validation", label_list=self.validationData.labelList,
+                               routing_matrix=self.validationRoutingMatrix)
+        self.estimate_accuracy(data_type="test", label_list=self.testData.labelList,
+                               routing_matrix=self.testRoutingMatrix)
 
-    def estimate_accuracy(self, data_type, routing_matrix):
+    def estimate_accuracy(self, data_type, label_list, routing_matrix):
         correct_count = 0
+        correct_with_simple_averaging = 0
         data = self.featuresDict[data_type]
         for idx in range(routing_matrix.shape[0]):
             routing_vector = routing_matrix[idx, :]
@@ -117,13 +126,19 @@ class RoutingWeightsFinderWithLeastSquares(RoutingWeightCalculator):
             sparse_posteriors_tensor = sparse_posteriors_tensor[0, :]
             if np.sum(routing_vector) == 1:
                 weights = routing_vector
+            elif route_vector_as_tuple not in self.routingCombinationClustersDict:
+                weights = self.routingCombinationClusterWeightsDict[route_vector_as_tuple][0]
             else:
                 kmeans = self.routingCombinationClustersDict[route_vector_as_tuple]
-                cluster_id = kmeans.predict(x)
-                weights = self.routingCombinationClusterWeightsDict[cluster_id]
+                cluster_id = kmeans.predict(x)[0]
+                weights = self.routingCombinationClusterWeightsDict[route_vector_as_tuple][cluster_id]
             least_squares_posterior = sparse_posteriors_tensor @ weights
             predicted_label = np.argmax(least_squares_posterior)
-            true_label = data.labelList[idx]
+            true_label = label_list[idx]
             correct_count += int(predicted_label == true_label)
+            predicted_label_simple_avg = np.argmax(np.mean(sparse_posteriors_tensor, axis=1))
+            correct_with_simple_averaging += int(predicted_label_simple_avg == true_label)
         accuracy = correct_count / routing_matrix.shape[0]
+        accuracy_simple_avg = correct_with_simple_averaging / routing_matrix.shape[0]
         print("{0} accuracy is:{1}".format(data_type, accuracy))
+        print("{0} accuracy is:{1}".format(data_type, accuracy_simple_avg))

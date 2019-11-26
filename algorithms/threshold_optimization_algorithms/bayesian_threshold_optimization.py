@@ -109,13 +109,16 @@ class BayesianOptimizer(ThresholdOptimizer):
         #                                                     test_routing_matrix=test_routing_matrix,
         #                                                     validation_data=self.validationData,
         #                                                     test_data=self.testData)
-        routing_weight_calculator = RoutingWeightsFinderWithLeastSquares(network=self.network,
-                                                                         validation_routing_matrix=val_routing_matrix,
-                                                                         test_routing_matrix=test_routing_matrix,
-                                                                         validation_data=self.validationData,
-                                                                         test_data=self.testData,
-                                                                         min_cluster_size=10)
-        routing_weight_calculator.run()
+        for i in range(101):
+            print("Cluster Size:{0}".format(i + 1))
+            routing_weight_calculator = RoutingWeightsFinderWithLeastSquares(network=self.network,
+                                                                             validation_routing_matrix=val_routing_matrix,
+                                                                             test_routing_matrix=test_routing_matrix,
+                                                                             validation_data=self.validationData,
+                                                                             test_data=self.testData,
+                                                                             min_cluster_size=i + 1)
+            routing_weight_calculator.run()
+        print("X")
         # self.write_to_db(results=all_results)
         # return all_results
 
