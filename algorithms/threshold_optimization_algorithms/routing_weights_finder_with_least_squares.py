@@ -38,7 +38,7 @@ class RoutingWeightsFinderWithLeastSquares(RoutingWeightCalculator):
             sparse_activations_tensor.shape[0],
             sparse_activations_tensor.shape[1] * sparse_activations_tensor.shape[2]))
         # Only activations
-        X = activation_features
+        X = np.concatenate([posterior_features, activation_features], axis=1)
         return X, sparse_posteriors_tensor
 
     def run(self):
