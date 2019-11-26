@@ -21,6 +21,9 @@ class RoutingWeightsFinderWithLeastSquares(RoutingWeightCalculator):
         self.routingCombinationClustersDict = {}
         self.routingCombinationClusterWeightsDict = {}
         self.minClusterSize = min_cluster_size
+        formatted_data_validation = RoutingWeightCalculator.format_routing_data(routing_data=self.validationData)
+        formatted_data_test = RoutingWeightCalculator.format_routing_data(routing_data=self.testData)
+        self.featuresDict = {"validation": formatted_data_validation, "test": formatted_data_test}
 
     def get_feature_vectors(self, routing_vector, **kwargs):
         posterior_tensor = kwargs["posterior_probs"]
@@ -48,35 +51,31 @@ class RoutingWeightsFinderWithLeastSquares(RoutingWeightCalculator):
         # activation_tensors_dict = {}
         # data_objects_dict = {"validation": self.validationData, "test": self.testData}
         # routing_matrices_dict = {"validation": self.validationRoutingMatrix, "test": self.testRoutingMatrix}
-        all_feature_names = list(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
-        all_feature_names.extend(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
-        formatted_data_validation = RoutingWeightCalculator.format_routing_data(routing_data=self.validationData)
-        formatted_data_test = RoutingWeightCalculator.format_routing_data(routing_data=self.testData)
-        features_dict = {"validation": formatted_data_validation, "test": formatted_data_test}
         for route_vector in self.routingCombinations:
             if np.sum(route_vector) <= 1:
                 continue
             element_wise_compliance = self.validationRoutingMatrix == route_vector
             valid_samples_indicator_vector = np.all(element_wise_compliance, axis=1)
             posteriors_tensor = np.copy(
-                features_dict["validation"]["posterior_probs"][valid_samples_indicator_vector, :])
-            activations_tensor = np.copy(features_dict["validation"]["activations"][valid_samples_indicator_vector, :])
+                self.featuresDict["validation"]["posterior_probs"][valid_samples_indicator_vector, :])
+            activations_tensor = np.copy(
+                self.featuresDict["validation"]["activations"][valid_samples_indicator_vector, :])
             X, sparse_posteriors_tensor = self.get_feature_vectors(routing_vector=route_vector,
                                                                    posterior_probs=posteriors_tensor,
                                                                    activations=activations_tensor)
             y = self.validationData.labelList[valid_samples_indicator_vector]
             cluster_count = max(int(X.shape[0] / self.minClusterSize), 1)
-            while True:
-                kmeans = KMeans(n_clusters=cluster_count, random_state=0)
-                kmeans.fit(X)
-                cluster_labels = kmeans.predict(X)
-                counter = Counter(cluster_labels)
-                least_freq = counter.most_common()[-1][1]
-                if least_freq >= self.minClusterSize:
-                    break
-                cluster_count -= 1
-                if cluster_count == 1:
-                    break
+            # while True:
+            #     kmeans = KMeans(n_clusters=cluster_count, random_state=0)
+            #     kmeans.fit(X)
+            #     cluster_labels = kmeans.predict(X)
+            #     counter = Counter(cluster_labels)
+            #     least_freq = counter.most_common()[-1][1]
+            #     if least_freq >= self.minClusterSize:
+            #         break
+            #     cluster_count -= 1
+            #     if cluster_count == 1:
+            #         break
             kmeans = KMeans(n_clusters=cluster_count, random_state=0)
             kmeans.fit(X)
             cluster_labels = kmeans.predict(X)
@@ -99,5 +98,32 @@ class RoutingWeightsFinderWithLeastSquares(RoutingWeightCalculator):
                 res = np.linalg.lstsq(A, b, rcond=None)
                 alpha_weights = res[0]
                 self.routingCombinationClusterWeightsDict[route_vector_as_tuple].append(alpha_weights)
-                print("X")
-        print("X")
+        #         print("X")
+        # print("X")
+        self.estimate_accuracy(data_type="validation", routing_matrix=self.validationRoutingMatrix)
+        self.estimate_accuracy(data_type="test", routing_matrix=self.testRoutingMatrix)
+
+    def estimate_accuracy(self, data_type, routing_matrix):
+        correct_count = 0
+        data = self.featuresDict[data_type]
+        for idx in range(routing_matrix.shape[0]):
+            routing_vector = routing_matrix[idx, :]
+            route_vector_as_tuple = tuple(routing_vector.tolist())
+            posteriors = np.expand_dims(data["posterior_probs"][idx, :], axis=0)
+            activations = np.expand_dims(data["activations"][idx, :], axis=0)
+            x, sparse_posteriors_tensor = self.get_feature_vectors(routing_vector=routing_vector,
+                                                                   posterior_probs=posteriors,
+                                                                   activations=activations)
+            sparse_posteriors_tensor = sparse_posteriors_tensor[0, :]
+            if np.sum(routing_vector) == 1:
+                weights = routing_vector
+            else:
+                kmeans = self.routingCombinationClustersDict[route_vector_as_tuple]
+                cluster_id = kmeans.predict(x)
+                weights = self.routingCombinationClusterWeightsDict[cluster_id]
+            least_squares_posterior = sparse_posteriors_tensor @ weights
+            predicted_label = np.argmax(least_squares_posterior)
+            true_label = data.labelList[idx]
+            correct_count += int(predicted_label == true_label)
+        accuracy = correct_count / routing_matrix.shape[0]
+        print("{0} accuracy is:{1}".format(data_type, accuracy))
