@@ -524,6 +524,8 @@ class FastTreeNetwork(TreeNetwork):
 
     def collect_outputs_into_collection(self, collection, output_names, node, results):
         for output_name in output_names:
+            if "original_samples" == output_name:
+                continue
             output_arr = results[self.get_variable_name(name=output_name, node=node)]
             UtilityFuncs.concat_to_np_array_dict(dct=collection[output_name], key=node.index, array=output_arr)
 

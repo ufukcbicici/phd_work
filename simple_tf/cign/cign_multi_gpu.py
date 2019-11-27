@@ -394,7 +394,7 @@ class CignMultiGpu(FastTreeNetwork):
                     sess=sess, dataset=dataset,
                     dataset_type=DatasetTypes.test)
             if is_evaluation_epoch_before_ending:
-                network.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                self.save_model(sess=sess, run_id=run_id, iteration=iteration)
                 network.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                           dataset=dataset, dataset_type=DatasetTypes.test)
                 network.test_save_load(sess=sess, run_id=run_id, iteration=iteration,

@@ -27,11 +27,11 @@ brute_force_sample_count = 1000000
 # node_costs = {i: 1 for i in range(7)}
 node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
 
-network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
-routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=119100)
-multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
-
-multiprocess_lock = Lock()
+# network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
+# routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=119100)
+# multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
+#
+# multiprocess_lock = Lock()
 
 
 def bayesian_process_runner(param_tpl):
