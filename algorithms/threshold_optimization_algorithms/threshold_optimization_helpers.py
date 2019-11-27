@@ -71,4 +71,6 @@ class RoutingDataset:
         return val_data, test_data
 
     def get_dict(self, output_name):
+        if output_name not in self.dictionaryOfRoutingData:
+            return None
         return self.dictionaryOfRoutingData[output_name]

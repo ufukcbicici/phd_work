@@ -287,6 +287,8 @@ class GlobalConstants:
     INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "branching_feature"]
     LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits"]
 
+    SELECTED_FEATURES_FOR_WEIGHT_REGRESSION = ["branch_probs"]
+
     # INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations"]
     # LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor"]
 

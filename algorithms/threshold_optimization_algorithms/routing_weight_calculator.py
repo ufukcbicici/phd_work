@@ -40,6 +40,9 @@ class RoutingWeightCalculator:
                 nodes = self.leafNodes if feature_name in leaf_features else self.innerNodes
                 routing_matrix = leaf_routing_matrix if feature_name in leaf_features else inner_routing_matrix
                 matrix_list = [data.get_dict(feature_name)[node.index] for node in nodes]
+                if any([matrix is None for matrix in matrix_list]):
+                    print("Skipping feature {0} since it is missing.".format(feature_name))
+                    continue
                 feature_matrix = np.concatenate(matrix_list, axis=1)
                 feature_dim = matrix_list[0].shape[1]
                 routing_matrix_rpt = np.repeat(routing_matrix, axis=1, repeats=feature_dim)

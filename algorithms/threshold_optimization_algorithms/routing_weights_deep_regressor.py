@@ -20,4 +20,8 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
         self.routingCombinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(self.leafNodes))
         self.routingCombinations = [np.array(route_vec) for route_vec in self.routingCombinations]
         self.modelsDict = {}
+        self.validation_X, self.validation_Y, self.test_X, self.test_Y = \
+            self.build_data_sets(selected_features=GlobalConstants.SELECTED_FEATURES_FOR_WEIGHT_REGRESSION)
 
+    def run(self):
+        print("X")
