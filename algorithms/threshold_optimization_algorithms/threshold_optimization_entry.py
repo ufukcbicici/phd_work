@@ -52,7 +52,7 @@ def main():
             multipath_score_calculator=multipath_calculator,
             balance_coefficient=accuracy_computation_balance, lock=multiprocess_lock, xi=xi,
             use_weighted_scoring=use_weighted, initial_sample_count=10,
-            test_ratio=0.5, max_iter=125, verbose=True)
+            test_ratio=0.5, max_iter=50, verbose=True)
         bayesian_optimizer.run()
 
     xi_list = [0.01]

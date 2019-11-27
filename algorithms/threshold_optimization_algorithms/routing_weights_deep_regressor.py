@@ -22,6 +22,7 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
         self.input_t = tf.placeholder(dtype=tf.float32, shape=[None, self.validation_Y.shape[1]], name='input_t')
         self.predicted_t = None
         self.layers = layers
+        self.sampleWiseErrors = None
         self.regressionMeanSquaredError = None
         self.l2Loss = None
         self.totalLoss = None
@@ -55,7 +56,8 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
             # MSE Loss
             squared_diff = tf.squared_difference(self.predicted_t, self.input_t)
             sample_wise_sum = tf.reduce_sum(squared_diff, axis=1)
-            self.regressionMeanSquaredError = tf.reduce_mean(sample_wise_sum)
+            self.sampleWiseErrors = sample_wise_sum
+            self.regressionMeanSquaredError = tf.reduce_mean(self.sampleWiseErrors)
             # L2 Loss
             tvars = tf.trainable_variables()
             self.l2Loss = tf.constant(0.0)
@@ -96,6 +98,10 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
         self.sess.run(tf.global_variables_initializer())
         iteration = 0
         losses = []
+        val_mse = self.eval_mse(X_=self.validation_X, Y_=self.validation_Y)
+        test_mse = self.eval_mse(X_=self.test_X, Y_=self.test_Y)
+        print("val_mse:{0}".format(val_mse))
+        print("test_mse:{0}".format(test_mse))
         for x_, y_ in data_generator:
             # print("******************************************************************")
             feed_dict = {self.input_x: x_, self.input_t: y_}
@@ -107,7 +113,7 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
             if iteration % 10 == 0:
                 print("Iteration:{0} Main_loss={1}".format(iteration, np.mean(np.array(losses))))
                 losses = []
-            if iteration % 100:
+            if iteration % 100 == 0:
                 val_mse = self.eval_mse(X_=self.validation_X, Y_=self.validation_Y)
                 test_mse = self.eval_mse(X_=self.test_X, Y_=self.test_Y)
                 print("val_mse:{0}".format(val_mse))
@@ -119,7 +125,8 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
 
     def eval_mse(self, X_, Y_):
         feed_dict = {self.input_x: X_, self.input_t: Y_}
-        results = self.sess.run([self.regressionMeanSquaredError], feed_dict=feed_dict)
+        results = self.sess.run([self.regressionMeanSquaredError, self.sampleWiseErrors, self.predicted_t],
+                                feed_dict=feed_dict)
         mse = results[0]
         return mse
 
