@@ -13,6 +13,8 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 from multiprocessing import Pool, Lock
 
 # Initial Operations
+from simple_tf.global_params import GlobalConstants
+
 run_id = 67
 # network_name = "Cifar100_CIGN_Sampling"
 network_name = "None"
@@ -26,6 +28,11 @@ use_weighted_scoring = False
 brute_force_sample_count = 1000000
 # node_costs = {i: 1 for i in range(7)}
 node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
+
+
+GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations"]
+GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor"]
+
 
 # network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
 # routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=119100)
