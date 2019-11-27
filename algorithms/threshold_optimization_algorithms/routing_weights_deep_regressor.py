@@ -1,11 +1,5 @@
 import numpy as np
-
 import tensorflow as tf
-from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.neural_network import MLPRegressor
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
 
 from algorithms.threshold_optimization_algorithms.routing_weight_calculator import RoutingWeightCalculator
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -16,7 +10,7 @@ feature_names = ["posterior_probs"]
 
 class RoutingWeightDeepRegressor(RoutingWeightCalculator):
     def __init__(self, network, validation_routing_matrix, test_routing_matrix, validation_data, test_data,
-                 layers, l2_lambda):
+                 layers, l2_lambda, batch_size, max_iteration):
         super().__init__(network, validation_routing_matrix, test_routing_matrix, validation_data, test_data)
         self.routingCombinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(self.leafNodes))
         self.routingCombinations = [np.array(route_vec) for route_vec in self.routingCombinations]
@@ -24,7 +18,6 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
         self.validation_X, self.validation_Y, self.test_X, self.test_Y = \
             self.build_data_sets(selected_features=GlobalConstants.SELECTED_FEATURES_FOR_WEIGHT_REGRESSION)
         # Network entry points
-        self.batch_size = tf.placeholder(dtype=tf.int32, shape=[], name='batch_size')
         self.input_x = tf.placeholder(dtype=tf.float32, shape=[None, self.validation_X.shape[1]], name='input_x')
         self.input_t = tf.placeholder(dtype=tf.float32, shape=[None, self.validation_Y.shape[1]], name='input_t')
         self.predicted_t = None
@@ -33,9 +26,12 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
         self.l2Loss = None
         self.totalLoss = None
         self.l2Lambda = l2_lambda
+        self.batchSize = batch_size
+        self.maxIteration = max_iteration
         self.paramL2Norms = {}
         self.globalStep = None
         self.optimizer = None
+        self.sess = tf.Session()
 
     def build_network(self):
         x = self.input_x
@@ -74,5 +70,61 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
             self.globalStep = tf.Variable(0, name='global_step', trainable=False)
             self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
 
+    def get_train_batch(self):
+        iter_count = 0
+        while True:
+            chosen_indices = np.random.choice(self.validation_X.shape[0], self.batchSize, replace=False)
+            chosen_X = self.validation_X[chosen_indices]
+            chosen_Y = self.validation_Y[chosen_indices]
+            yield (chosen_X, chosen_Y)
+            iter_count += 1
+            if iter_count == self.maxIteration:
+                break
+
+    def get_eval_batch(self, X_, Y_):
+        sample_count = 0
+        while True:
+            chosen_X = X_[sample_count:sample_count + self.batchSize]
+            chosen_Y = Y_[sample_count:sample_count + self.batchSize]
+            yield (chosen_X, chosen_Y)
+            sample_count += self.batchSize
+            if sample_count >= self.test_X.shape[0]:
+                break
+
+    def train(self):
+        data_generator = self.get_train_batch()
+        self.sess.run(tf.global_variables_initializer())
+        iteration = 0
+        losses = []
+        for x_, y_ in data_generator:
+            # print("******************************************************************")
+            feed_dict = {self.input_x: x_, self.input_t: y_}
+            run_ops = [self.optimizer, self.totalLoss]
+            results = self.sess.run(run_ops, feed_dict=feed_dict)
+            # print(results[1])
+            iteration += 1
+            losses.append(results[1])
+            if iteration % 10 == 0:
+                print("Iteration:{0} Main_loss={1}".format(iteration, np.mean(np.array(losses))))
+                losses = []
+            if iteration % 100:
+                val_mse = self.eval_mse(X_=self.validation_X, Y_=self.validation_Y)
+                test_mse = self.eval_mse(X_=self.test_X, Y_=self.test_Y)
+                print("val_mse:{0}".format(val_mse))
+                print("test_mse:{0}".format(test_mse))
+        val_mse = self.eval_mse(X_=self.validation_X, Y_=self.validation_Y)
+        test_mse = self.eval_mse(X_=self.test_X, Y_=self.test_Y)
+        print("val_mse:{0}".format(val_mse))
+        print("test_mse:{0}".format(test_mse))
+
+    def eval_mse(self, X_, Y_):
+        feed_dict = {self.input_x: X_, self.input_t: Y_}
+        results = self.sess.run([self.regressionMeanSquaredError], feed_dict=feed_dict)
+        mse = results[0]
+        return mse
+
     def run(self):
-        print("X")
+        self.build_network()
+        self.build_loss()
+        self.build_optimizer()
+        self.train()
