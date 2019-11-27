@@ -5,6 +5,8 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV
 
+from simple_tf.global_params import GlobalConstants
+
 
 class RoutingWeightCalculator:
     def __init__(self, network, validation_routing_matrix, test_routing_matrix, validation_data, test_data):
@@ -15,8 +17,60 @@ class RoutingWeightCalculator:
         self.leafNodes = sorted(self.leafNodes, key=lambda node: node.index)
         self.validationRoutingMatrix = validation_routing_matrix
         self.testRoutingMatrix = test_routing_matrix
+        self.validationInnerRoutingMatrix = np.apply_along_axis(self.get_visited_parent_nodes, axis=1,
+                                                                arr=self.validationRoutingMatrix)
+        self.testInnerRoutingMatrix = np.apply_along_axis(self.get_visited_parent_nodes, axis=1,
+                                                          arr=self.testRoutingMatrix)
         self.validationData = validation_data
         self.testData = test_data
+
+    def build_data_sets(self, selected_features):
+        inner_features = set(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
+        leaf_features = set(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
+        X_list = []
+        Y_list = []
+        for inner_routing_matrix, leaf_routing_matrix, data in \
+                zip([self.validationInnerRoutingMatrix, self.testInnerRoutingMatrix],
+                    [self.validationRoutingMatrix, self.testRoutingMatrix],
+                    [self.validationData, self.testData]):
+            # Build feature matrix (X)
+            feature_matrices = []
+            for feature_name in selected_features:
+                assert feature_name in inner_features or feature_name in leaf_features
+                nodes = self.leafNodes if feature_name in leaf_features else self.innerNodes
+                routing_matrix = leaf_routing_matrix if feature_name in leaf_features else inner_routing_matrix
+                matrix_list = [data.get_dict(feature_name)[node.index] for node in nodes]
+                feature_matrix = np.concatenate(matrix_list, axis=1)
+                feature_dim = matrix_list[0].shape[1]
+                routing_matrix_rpt = np.repeat(routing_matrix, axis=1, repeats=feature_dim)
+                assert feature_matrix.shape == routing_matrix_rpt.shape
+                sparse_feature_matrix = routing_matrix_rpt * feature_matrix
+                feature_matrices.append(sparse_feature_matrix)
+            X = np.concatenate(feature_matrices, axis=1)
+            X_list.append(X)
+            # Build target matrix (Y)
+            label_list = data.labelList
+            posteriors_list = [np.expand_dims(data.get_dict("posterior_probs")[node.index], axis=2)
+                               for node in self.leafNodes]
+            posteriors_tensor = np.concatenate(posteriors_list, axis=2)
+            y_list = []
+            for idx in range(leaf_routing_matrix.shape[0]):
+                route_vector = leaf_routing_matrix[idx]
+                posteriors_matrix = posteriors_tensor[idx, :]
+                sparse_posterior_matrix = posteriors_matrix * np.expand_dims(route_vector, axis=0)
+                target_label = label_list[idx]
+                A = sparse_posterior_matrix
+                b = self.get_one_hot_label_vector(target_label, dim=A.shape[0])
+                res = np.linalg.lstsq(A, b, rcond=None)
+                y = res[0]
+                y_list.append(y)
+            Y = np.stack(y_list, axis=0)
+            Y_list.append(Y)
+        validation_X = X_list[0]
+        validation_Y = Y_list[0]
+        test_X = X_list[1]
+        test_Y = Y_list[1]
+        return validation_X, validation_Y, test_X, test_Y
 
     def get_visited_parent_nodes(self, routing_vector):
         assert len(routing_vector) == len(self.leafNodes)
@@ -49,7 +103,7 @@ class RoutingWeightCalculator:
 
     @staticmethod
     def get_one_hot_label_vector(label, dim):
-        label_vec = np.zeros((dim, ))
+        label_vec = np.zeros((dim,))
         label_vec[label] = 1.0
         return label_vec
 
