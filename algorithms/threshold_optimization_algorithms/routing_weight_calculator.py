@@ -23,12 +23,15 @@ class RoutingWeightCalculator:
                                                           arr=self.testRoutingMatrix)
         self.validationData = validation_data
         self.testData = test_data
+        self.validationSparsePosteriors = None
+        self.testSparsePosteriors = None
 
     def build_data_sets(self, selected_features):
         inner_features = set(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
         leaf_features = set(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
         X_list = []
         Y_list = []
+        sparse_posteriors = []
         for inner_routing_matrix, leaf_routing_matrix, data in \
                 zip([self.validationInnerRoutingMatrix, self.testInnerRoutingMatrix],
                     [self.validationRoutingMatrix, self.testRoutingMatrix],
@@ -64,11 +67,14 @@ class RoutingWeightCalculator:
             posteriors_list = [np.expand_dims(data.get_dict("posterior_probs")[node.index], axis=2)
                                for node in self.leafNodes]
             posteriors_tensor = np.concatenate(posteriors_list, axis=2)
+            sparse_posteriors_tensor = posteriors_tensor * np.expand_dims(leaf_routing_matrix, axis=1)
+            sparse_posteriors.append(sparse_posteriors_tensor)
             y_list = []
             for idx in range(leaf_routing_matrix.shape[0]):
                 route_vector = leaf_routing_matrix[idx]
                 posteriors_matrix = posteriors_tensor[idx, :]
                 sparse_posterior_matrix = posteriors_matrix * np.expand_dims(route_vector, axis=0)
+                assert np.array_equal(sparse_posterior_matrix, sparse_posteriors_tensor[idx, :])
                 target_label = label_list[idx]
                 A = sparse_posterior_matrix
                 b = self.get_one_hot_label_vector(target_label, dim=A.shape[0])
@@ -79,8 +85,10 @@ class RoutingWeightCalculator:
             Y_list.append(Y)
         validation_X = X_list[0]
         validation_Y = Y_list[0]
+        self.validationSparsePosteriors = sparse_posteriors[0]
         test_X = X_list[1]
         test_Y = Y_list[1]
+        self.testSparsePosteriors = sparse_posteriors[1]
         return validation_X, validation_Y, test_X, test_Y
 
     def get_visited_parent_nodes(self, routing_vector):

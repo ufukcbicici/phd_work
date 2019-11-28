@@ -29,6 +29,7 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
         # Network entry points
         self.input_x = tf.placeholder(dtype=tf.float32, shape=[None, self.validation_X.shape[1]], name='input_x')
         self.input_t = tf.placeholder(dtype=tf.float32, shape=[None, self.validation_Y.shape[1]], name='input_t')
+        self.networkOutput = None
         self.predicted_t = None
         self.layers = layers
         self.sampleWiseErrors = None
@@ -58,22 +59,26 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
             net_shape = x.get_shape().as_list()
             fc_w = tf.get_variable('fc_w', shape=[net_shape[-1], output_dim], dtype=tf.float32)
             fc_b = tf.get_variable('fc_b', shape=[output_dim], dtype=tf.float32)
-            self.predicted_t = tf.matmul(x, fc_w) + fc_b
+            self.networkOutput = tf.matmul(x, fc_w) + fc_b
+
+    def get_l2_loss(self):
+        # L2 Loss
+        tvars = tf.trainable_variables()
+        self.l2Loss = tf.constant(0.0)
+        for tv in tvars:
+            if 'fc_w' in tv.name:
+                self.l2Loss += self.l2Lambda * tf.nn.l2_loss(tv)
+            self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
 
     def build_loss(self):
         with tf.name_scope("loss"):
             # MSE Loss
+            self.predicted_t = self.networkOutput
             squared_diff = tf.squared_difference(self.predicted_t, self.input_t)
             sample_wise_sum = tf.reduce_sum(squared_diff, axis=1)
             self.sampleWiseErrors = sample_wise_sum
             self.regressionMeanSquaredError = tf.reduce_mean(self.sampleWiseErrors)
-            # L2 Loss
-            tvars = tf.trainable_variables()
-            self.l2Loss = tf.constant(0.0)
-            for tv in tvars:
-                if 'fc_w' in tv.name:
-                    self.l2Loss += self.l2Lambda * tf.nn.l2_loss(tv)
-                self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
+            self.get_l2_loss()
             self.totalLoss = self.regressionMeanSquaredError + self.l2Loss
 
     def build_optimizer(self):
