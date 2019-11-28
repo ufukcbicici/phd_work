@@ -86,10 +86,23 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                                  self.sampleWiseSum],
                                 feed_dict=feed_dict)
         mse = results[0]
+
         predicted_posteriors = results[3]
-        predicted_labels = np.argmax(predicted_posteriors, axis=1)
-        comparison_vector = labels == predicted_labels
-        accuracy = np.sum(comparison_vector) / X.shape[0]
+        leaf_eval_counts = np.sum(route_matrix, axis=1)
+        single_path_indices = np.nonzero(leaf_eval_counts == 1)[0]
+        multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
+        assert single_path_indices.shape[0] + multi_path_indices.shape[0] == labels.shape[0]
+        single_path_posteriors = sparse_posteriors[single_path_indices, :]
+        single_path_posteriors = np.sum(single_path_posteriors, axis=2)
+        single_path_predicted_labels = np.argmax(single_path_posteriors, axis=1)
+        single_path_labels = labels[single_path_indices]
+        single_path_correct_count = np.sum(single_path_predicted_labels == single_path_labels)
+
+        multi_path_predicted_posteriors = predicted_posteriors[multi_path_indices, :]
+        predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
+        multi_path_labels = labels[multi_path_indices]
+        multi_path_correct_count = np.sum(multi_path_labels == predicted_multi_path_labels)
+        accuracy = np.sum(single_path_correct_count + multi_path_correct_count) / X.shape[0]
         return mse, accuracy
 
     def eval_datasets(self):
