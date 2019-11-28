@@ -147,7 +147,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             # print(results[1])
             iteration += 1
             losses.append(results[1])
-            if (iteration + 1) % 1 == 0:
+            if (iteration + 1) % 100 == 0:
                 print("Iteration:{0} Main_loss={1}".format(iteration, np.mean(np.array(losses))))
                 losses = []
             if (iteration + 1) % 500 == 0:
