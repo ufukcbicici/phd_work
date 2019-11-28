@@ -11,7 +11,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                  l2_lambda, batch_size, max_iteration):
         super().__init__(network, validation_routing_matrix, test_routing_matrix, validation_data, test_data, layers,
                          l2_lambda, batch_size, max_iteration, leaf_index=None)
-        self.posteriorDim = validation_data.get_dict("posterior_probs")[0].shape[1]
+        self.posteriorDim = self.validationSparsePosteriors.shape[1]
         leaf_count = len(self.leafNodes)
         self.inputPosteriors = tf.placeholder(dtype=tf.float32, shape=[None, self.posteriorDim, leaf_count],
                                               name='inputPosteriors')
@@ -66,24 +66,18 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             if sample_count >= self.test_X.shape[0]:
                 break
 
-    def eval_mse(self, **kwargs):
+    def eval_performance(self, **kwargs):
         X = kwargs["X"]
         route_matrix = kwargs["route_matrix"]
         labels = kwargs["labels"]
         sparse_posteriors = kwargs["sparse_posteriors"]
-        one_hot_labels = np.zeros(shape=(self.batchSize, self.posteriorDim))
-        one_hot_labels[np.arange(self.batchSize), labels] = 1.0
+        one_hot_labels = np.zeros(shape=(X.shape[0], self.posteriorDim))
+        one_hot_labels[np.arange(X.shape[0]), labels] = 1.0
+        assert np.array_equal(route_matrix, (np.sum(sparse_posteriors, axis=1) != 0.0).astype(np.float32))
         feed_dict = {self.input_x: X,
                      self.inputPosteriors: sparse_posteriors,
                      self.labelMatrix: one_hot_labels,
                      self.inputRouteMatrix: route_matrix}
-
-        self.weights = self.networkOutput
-        self.weightedPosteriors = tf.expand_dims(self.weights, axis=1) * self.inputPosteriors
-        self.finalPosterior = tf.reduce_sum(self.weightedPosteriors, axis=2)
-        self.squaredDiff = tf.squared_difference(self.finalPosterior, self.labelMatrix)
-        self.sampleWiseSum = tf.reduce_sum(self.squaredDiff, axis=1)
-        self.regressionMeanSquaredError = tf.reduce_mean(self.sampleWiseSum)
         results = self.sess.run([self.regressionMeanSquaredError,
                                  self.weights,
                                  self.weightedPosteriors,
@@ -92,21 +86,55 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                                  self.sampleWiseSum],
                                 feed_dict=feed_dict)
         mse = results[0]
-        return mse
+        predicted_posteriors = results[3]
+        predicted_labels = np.argmax(predicted_posteriors, axis=1)
+        comparison_vector = labels == predicted_labels
+        accuracy = np.sum(comparison_vector) / X.shape[0]
+        return mse, accuracy
 
     def eval_datasets(self):
-        val_mse = self.eval_mse(X=self.validation_X, route_matrix=self.validationRoutingMatrix,
-                                labels=self.validationData.labelList, sparse_posteriors=self.validationSparsePosteriors)
-        test_mse = self.eval_mse(X=self.test_X, route_matrix=self.testRoutingMatrix,
-                                 labels=self.testData.labelList, sparse_posteriors=self.testSparsePosteriors)
-        print("val_mse:{0}".format(val_mse))
-        print("test_mse:{0}".format(test_mse))
+        val_mse, val_accuracy = self.eval_performance(X=self.validation_X, route_matrix=self.validationRoutingMatrix,
+                                                      labels=self.validationData.labelList,
+                                                      sparse_posteriors=self.validationSparsePosteriors)
+        test_mse, test_accuracy = self.eval_performance(X=self.test_X, route_matrix=self.testRoutingMatrix,
+                                                        labels=self.testData.labelList,
+                                                        sparse_posteriors=self.testSparsePosteriors)
+        print("val_mse:{0} val_accuracy:{1}".format(val_mse, val_accuracy))
+        print("test_mse:{0} test_accuracy:{1}".format(test_mse, test_accuracy))
+
+    def get_ideal_performances(self, sparse_posteriors_tensor, ideal_weights, labels):
+        label_matrix = np.zeros(shape=(sparse_posteriors_tensor.shape[0], self.posteriorDim))
+        label_matrix[np.arange(sparse_posteriors_tensor.shape[0]), labels] = 1.0
+        ideal_posteriors_arr = []
+        for idx in range(sparse_posteriors_tensor.shape[0]):
+            A = sparse_posteriors_tensor[idx, :]
+            b = ideal_weights[idx, :]
+            p = A @ b
+            ideal_posteriors_arr.append(p)
+        P = np.stack(ideal_posteriors_arr, axis=0)
+        diff_arr = label_matrix - P
+        squared_diff_arr = np.square(diff_arr)
+        se = np.sum(squared_diff_arr, axis=1)
+        ideal_mse = np.mean(se)
+        predicted_labels = np.argmax(P, axis=1)
+        comparison_vector = labels == predicted_labels
+        ideal_accuracy = np.sum(comparison_vector) / labels.shape[0]
+        return ideal_mse, ideal_accuracy
 
     def train(self):
         data_generator = self.get_train_batch()
         self.sess.run(tf.global_variables_initializer())
         iteration = 0
         losses = []
+        ideal_val_mse, ideal_val_accuracy = self.get_ideal_performances(
+            sparse_posteriors_tensor=self.validationSparsePosteriors,
+            ideal_weights=self.validation_Y, labels=self.validationData.labelList)
+        ideal_test_mse, ideal_test_accuracy = self.get_ideal_performances(
+            sparse_posteriors_tensor=self.testSparsePosteriors,
+            ideal_weights=self.test_Y, labels=self.testData.labelList)
+        print("ideal_val_mse={0} ideal_val_accuracy={1}".format(ideal_val_mse, ideal_val_accuracy))
+        print("ideal_test_mse={0} ideal_test_accuracy={1}".format(ideal_test_mse, ideal_test_accuracy))
+        # Ideal
         self.eval_datasets()
         for chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors in data_generator:
             # print("******************************************************************")
@@ -119,7 +147,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             # print(results[1])
             iteration += 1
             losses.append(results[1])
-            if (iteration + 1) % 10 == 0:
+            if (iteration + 1) % 1 == 0:
                 print("Iteration:{0} Main_loss={1}".format(iteration, np.mean(np.array(losses))))
                 losses = []
             if (iteration + 1) % 500 == 0:

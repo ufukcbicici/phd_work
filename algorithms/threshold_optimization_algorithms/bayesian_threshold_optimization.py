@@ -7,6 +7,8 @@ import multiprocessing
 from algorithms.coordinate_ascent_optimizer import CoordinateAscentOptimizer
 from algorithms.threshold_optimization_algorithms.routing_weight_calculator import RoutingWeightCalculator
 from algorithms.threshold_optimization_algorithms.routing_weights_deep_regressor import RoutingWeightDeepRegressor
+from algorithms.threshold_optimization_algorithms.routing_weights_deep_softmax_regressor import \
+    RoutingWeightDeepSoftmaxRegressor
 from algorithms.threshold_optimization_algorithms.routing_weights_finder_with_least_squares import \
     RoutingWeightsFinderWithLeastSquares
 from algorithms.threshold_optimization_algorithms.threshold_optimizer import ThresholdOptimizer
@@ -119,16 +121,25 @@ class BayesianOptimizer(ThresholdOptimizer):
         #                                                                      test_data=self.testData,
         #                                                                      min_cluster_size=i + 1)
         #     routing_weight_calculator.run()
-        routing_weight_calculator = RoutingWeightDeepRegressor(network=self.network,
-                                                               validation_routing_matrix=val_routing_matrix,
-                                                               test_routing_matrix=test_routing_matrix,
-                                                               validation_data=self.validationData,
-                                                               test_data=self.testData,
-                                                               layers=[200, 100],
-                                                               l2_lambda=0.0,
-                                                               batch_size=50,
-                                                               max_iteration=100000,
-                                                               leaf_index=0)
+        # routing_weight_calculator = RoutingWeightDeepRegressor(network=self.network,
+        #                                                        validation_routing_matrix=val_routing_matrix,
+        #                                                        test_routing_matrix=test_routing_matrix,
+        #                                                        validation_data=self.validationData,
+        #                                                        test_data=self.testData,
+        #                                                        layers=[200, 100],
+        #                                                        l2_lambda=0.0,
+        #                                                        batch_size=50,
+        #                                                        max_iteration=100000,
+        #                                                        leaf_index=0)
+        routing_weight_calculator = RoutingWeightDeepSoftmaxRegressor(network=self.network,
+                                                                      validation_routing_matrix=val_routing_matrix,
+                                                                      test_routing_matrix=test_routing_matrix,
+                                                                      validation_data=self.validationData,
+                                                                      test_data=self.testData,
+                                                                      layers=[200, 100],
+                                                                      l2_lambda=0.0,
+                                                                      batch_size=5000,
+                                                                      max_iteration=100000)
         routing_weight_calculator.run()
         print("X")
         # self.write_to_db(results=all_results)
