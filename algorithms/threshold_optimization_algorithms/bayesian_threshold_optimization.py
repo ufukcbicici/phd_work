@@ -126,8 +126,9 @@ class BayesianOptimizer(ThresholdOptimizer):
                                                                test_data=self.testData,
                                                                layers=[200, 100],
                                                                l2_lambda=0.0,
-                                                               batch_size=100,
-                                                               max_iteration=100000)
+                                                               batch_size=50,
+                                                               max_iteration=100000,
+                                                               leaf_index=0)
         routing_weight_calculator.run()
         print("X")
         # self.write_to_db(results=all_results)
