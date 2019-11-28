@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from algorithms.threshold_optimization_algorithms.routing_weights_deep_regressor import RoutingWeightDeepRegressor
+from sklearn.decomposition import PCA
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
 
@@ -25,6 +26,12 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.sampleWiseSum = None
         # self.logQ = None
         # self.crossEntropyMatrix = None
+
+    def preprocess_data(self):
+        pca = PCA(n_components=self.validation_X.shape[1])
+        pca.fit(self.validation_X)
+        self.validation_X = pca.transform(self.validation_X)
+        self.test_X = pca.transform(self.test_X)
 
     def build_loss(self):
         with tf.name_scope("loss"):
@@ -135,6 +142,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         return ideal_mse, ideal_accuracy
 
     def train(self):
+        self.preprocess_data()
         data_generator = self.get_train_batch()
         self.sess.run(tf.global_variables_initializer())
         iteration = 0
