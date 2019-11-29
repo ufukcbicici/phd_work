@@ -689,7 +689,8 @@ class FastTreeNetwork(TreeNetwork):
         dict_of_data_dicts = {}
         directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
                                                                run_id=run_id, iteration=iteration)
-        os.mkdir(directory_path)
+        if not os.path.exists(directory_path):
+            os.mkdir(directory_path)
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         inner_node_outputs = GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT
         inner_node_outputs.append("original_samples")

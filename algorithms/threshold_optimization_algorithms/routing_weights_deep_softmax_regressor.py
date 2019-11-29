@@ -7,9 +7,17 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
 
 
+class NetworkInput:
+    def __init__(self, _x, _y, routing_matrix, sparse_posteriors):
+        self.X = _x
+        self.y = _y
+        self.routingMatrix = routing_matrix
+        self.sparsePosteriors = sparse_posteriors
+
+
 class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
     def __init__(self, network, validation_routing_matrix, test_routing_matrix, validation_data, test_data, layers,
-                 l2_lambda, batch_size, max_iteration):
+                 l2_lambda, batch_size, max_iteration, use_multi_path_only=False):
         super().__init__(network, validation_routing_matrix, test_routing_matrix, validation_data, test_data, layers,
                          l2_lambda, batch_size, max_iteration, leaf_index=None)
         self.posteriorDim = self.validationSparsePosteriors.shape[1]
@@ -24,12 +32,72 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.finalPosterior = None
         self.squaredDiff = None
         self.sampleWiseSum = None
+        self.useMultiPathOnly = use_multi_path_only
+        self.fullDataDict = {"validation": NetworkInput(_x=self.validation_X, _y=self.validationData.labelList,
+                                                        routing_matrix=self.validationRoutingMatrix,
+                                                        sparse_posteriors=self.validationSparsePosteriors),
+                             "test": NetworkInput(_x=self.test_X, _y=self.testData.labelList,
+                                                  routing_matrix=self.testRoutingMatrix,
+                                                  sparse_posteriors=self.testSparsePosteriors)}
+        self.multiPathDataDict = {}
+        # Validation
+        leaf_eval_counts_val = np.sum(self.validationRoutingMatrix, axis=1)
+        single_path_indices_val = np.nonzero(leaf_eval_counts_val == 1)[0]
+        multi_path_indices_val = np.nonzero(leaf_eval_counts_val > 1)[0]
+        self.multiPathDataDict["validation"] = NetworkInput(
+            _x=self.validation_X[multi_path_indices_val],
+            _y=self.validationData.labelList[multi_path_indices_val],
+            routing_matrix=self.validationRoutingMatrix[multi_path_indices_val],
+            sparse_posteriors=self.validationSparsePosteriors[multi_path_indices_val])
+        # Test
+        leaf_eval_counts_test = np.sum(self.testRoutingMatrix, axis=1)
+        single_path_indices_test = np.nonzero(leaf_eval_counts_test == 1)[0]
+        multi_path_indices_test = np.nonzero(leaf_eval_counts_test > 1)[0]
+        self.multiPathDataDict["test"] = NetworkInput(
+            _x=self.test_X[multi_path_indices_test],
+            _y=self.testData.labelList[multi_path_indices_test],
+            routing_matrix=self.testRoutingMatrix[multi_path_indices_test],
+            sparse_posteriors=self.testSparsePosteriors[multi_path_indices_test])
+        self.fullDataCount = {"validation": self.validation_X.shape[0], "test": self.test_X.shape[0]}
+
+
+        # if self.useMultiPathOnly:
+        #     # Validation
+        #     self.validation_X = self.validation_X[multi_path_indices_val]
+        #     self.validationLabels = self.validationData.labelList[multi_path_indices_val]
+        #     self.validationRoutingMatrix = self.validationRoutingMatrix[multi_path_indices_val]
+        #     self.validationSparsePosteriors = self.validationSparsePosteriors[multi_path_indices_val]
+        #     # Test
+        #     self.test_X = self.test_X[multi_path_indices_test]
+        #     self.testLabels = self.testData.labelList[multi_path_indices_test]
+        #     self.testRoutingMatrix = self.testRoutingMatrix[multi_path_indices_test]
+        #     self.testSparsePosteriors = self.testSparsePosteriors[multi_path_indices_test]
+        # else:
+        #     self.validationLabels = self.validationData.labelList
+        #     self.testLabels = self.testData.labelList
+        # # Calculate single route samples' performance only at the beginning.
+        # predicted_posteriors = results[3]
+        # leaf_eval_counts = np.sum(route_matrix, axis=1)
+        # single_path_indices = np.nonzero(leaf_eval_counts == 1)[0]
+        # multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
+        # assert single_path_indices.shape[0] + multi_path_indices.shape[0] == labels.shape[0]
+        # single_path_posteriors = sparse_posteriors[single_path_indices, :]
+        # single_path_posteriors = np.sum(single_path_posteriors, axis=2)
+        # single_path_predicted_labels = np.argmax(single_path_posteriors, axis=1)
+        # single_path_labels = labels[single_path_indices]
+        # single_path_correct_count = np.sum(single_path_predicted_labels == single_path_labels)
+
         # self.logQ = None
         # self.crossEntropyMatrix = None
 
     def preprocess_data(self):
         pca = PCA(n_components=self.validation_X.shape[1])
-        pca.fit(self.validation_X)
+        if not self.useMultiPathOnly:
+            pca.fit(self.validation_X)
+        else:
+            leaf_eval_counts = np.sum(self.validationRoutingMatrix, axis=1)
+            multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
+            pca.fit(self.validation_X[multi_path_indices])
         self.validation_X = pca.transform(self.validation_X)
         self.test_X = pca.transform(self.test_X)
 
@@ -46,32 +114,21 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
 
     def get_train_batch(self):
         while True:
-            chosen_indices = np.random.choice(self.validation_X.shape[0], self.batchSize, replace=False)
+            if not self.useMultiPathOnly:
+                chosen_indices = np.random.choice(self.validation_X.shape[0], self.batchSize, replace=False)
+                batch_size = self.batchSize
+            else:
+                leaf_eval_counts = np.sum(self.validationRoutingMatrix, axis=1)
+                multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
+                batch_size = min(multi_path_indices.shape[0], self.batchSize)
+                chosen_indices = np.random.choice(multi_path_indices, batch_size, replace=False)
             chosen_X = self.validation_X[chosen_indices]
             chosen_labels = self.validationData.labelList[chosen_indices]
-            one_hot_labels = np.zeros(shape=(self.batchSize, self.posteriorDim))
-            one_hot_labels[np.arange(self.batchSize), chosen_labels] = 1.0
+            one_hot_labels = np.zeros(shape=(batch_size, self.posteriorDim))
+            one_hot_labels[np.arange(batch_size), chosen_labels] = 1.0
             route_matrix = self.validationRoutingMatrix[chosen_indices]
             chosen_sparse_posteriors = self.validationSparsePosteriors[chosen_indices]
             yield (chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors)
-
-    def get_eval_batch(self, **kwargs):
-        sample_count = 0
-        while True:
-            X = kwargs["X"]
-            route_matrix = kwargs["route_matrix"]
-            labels = kwargs["labels"]
-            sparse_posteriors = kwargs["sparse_posteriors"]
-            chosen_X = X[sample_count:sample_count + self.batchSize]
-            chosen_route_matrix = route_matrix[sample_count:sample_count + self.batchSize]
-            chosen_sparse_posteriors = sparse_posteriors[sample_count:sample_count + self.batchSize]
-            chosen_labels = labels[sample_count:sample_count + self.batchSize]
-            one_hot_labels = np.zeros(shape=(self.batchSize, self.posteriorDim))
-            one_hot_labels[np.arange(self.batchSize), chosen_labels] = 1.0
-            yield (chosen_X, one_hot_labels, chosen_route_matrix, chosen_sparse_posteriors)
-            sample_count += self.batchSize
-            if sample_count >= self.test_X.shape[0]:
-                break
 
     def eval_performance(self, **kwargs):
         X = kwargs["X"]

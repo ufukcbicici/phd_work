@@ -59,6 +59,7 @@ class RoutingWeightCalculator:
                 sparse_feature_matrix = feature_matrix * np.expand_dims(routing_matrix, axis=1)
                 feature_matrix = np.mean(sparse_feature_matrix, axis=2)
                 feature_matrices.append(feature_matrix)
+
             X = np.concatenate(feature_matrices, axis=1)
             X = np.concatenate([X, leaf_routing_matrix], axis=1)
             X_list.append(X)

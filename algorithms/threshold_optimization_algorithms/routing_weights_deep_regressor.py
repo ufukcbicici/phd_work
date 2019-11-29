@@ -42,6 +42,7 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
         self.paramL2Norms = {}
         self.globalStep = None
         self.optimizer = None
+        self.learningRate = None
         self.sess = tf.Session()
 
     def build_network(self):
@@ -52,7 +53,7 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
                 fc_w = tf.get_variable('fc_w', shape=[net_shape[-1], hidden_dim], dtype=tf.float32)
                 fc_b = tf.get_variable('fc_b', shape=[hidden_dim], dtype=tf.float32)
                 x = tf.matmul(x, fc_w) + fc_b
-                x = tf.nn.relu(x)
+                x = tf.nn.tanh(x)
         # Output layer
         with tf.variable_scope('output_layer'):
             output_dim = self.validation_Y.shape[1]
@@ -85,7 +86,10 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
         with tf.variable_scope("optimizer"):
             self.globalStep = tf.Variable(0, name='global_step', trainable=False)
             #    self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
+            boundaries = [25000, 50000, 100000]
+            values = [0.01, 0.001, 0.0001, 0.00001]
+            self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
+            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate).minimize(
                 self.totalLoss, global_step=self.globalStep)
 
     def get_train_batch(self):
