@@ -115,6 +115,11 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         mse = results[0]
 
         multi_path_predicted_posteriors = results[3]
+        # Convert to probability
+        min_scores = np.min(multi_path_predicted_posteriors, axis=1, keepdims=True)
+        multi_path_predicted_posteriors = multi_path_predicted_posteriors + np.abs(min_scores)
+        sums = np.sum(multi_path_predicted_posteriors, axis=1, keepdims=True)
+        multi_path_predicted_posteriors = multi_path_predicted_posteriors / sums
         predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
         multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
         accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
