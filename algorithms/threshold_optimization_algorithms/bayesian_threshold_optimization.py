@@ -7,6 +7,8 @@ import multiprocessing
 from algorithms.coordinate_ascent_optimizer import CoordinateAscentOptimizer
 from algorithms.threshold_optimization_algorithms.routing_weight_calculator import RoutingWeightCalculator
 from algorithms.threshold_optimization_algorithms.routing_weight_deep_classifier import RoutingWeightDeepClassifier
+from algorithms.threshold_optimization_algorithms.routing_weight_deep_classifier_ensemble import \
+    RoutingWeightDeepClassifierEnsemble
 from algorithms.threshold_optimization_algorithms.routing_weight_non_deep_classifier import \
     RoutingWeightNonDeepClassifier
 from algorithms.threshold_optimization_algorithms.routing_weights_deep_regressor import RoutingWeightDeepRegressor
@@ -137,16 +139,27 @@ class BayesianOptimizer(ThresholdOptimizer):
         # l2_lambda_list = [0.00001*i for i in range(21)] * 5
         # l2_lambda_list = sorted(l2_lambda_list)
         # for l2_lambda in l2_lambda_list:
-        routing_weight_calculator = RoutingWeightDeepClassifier(network=self.network,
-                                                                validation_routing_matrix=val_routing_matrix,
-                                                                test_routing_matrix=test_routing_matrix,
-                                                                validation_data=self.validationData,
-                                                                test_data=self.testData,
-                                                                layers=[400, 200],
-                                                                l2_lambda=0.0,
-                                                                batch_size=5000,
-                                                                max_iteration=1000000,
-                                                                use_multi_path_only=True)
+        # routing_weight_calculator = RoutingWeightDeepClassifier(network=self.network,
+        #                                                         validation_routing_matrix=val_routing_matrix,
+        #                                                         test_routing_matrix=test_routing_matrix,
+        #                                                         validation_data=self.validationData,
+        #                                                         test_data=self.testData,
+        #                                                         layers=[400, 200],
+        #                                                         l2_lambda=0.0,
+        #                                                         batch_size=5000,
+        #                                                         max_iteration=1000000,
+        #                                                         use_multi_path_only=True)
+        routing_weight_calculator = RoutingWeightDeepClassifierEnsemble(network=self.network,
+                                                                        validation_routing_matrix=val_routing_matrix,
+                                                                        test_routing_matrix=test_routing_matrix,
+                                                                        validation_data=self.validationData,
+                                                                        test_data=self.testData,
+                                                                        layers=[100, 50],
+                                                                        l2_lambda=0.0,
+                                                                        batch_size=5000,
+                                                                        max_iteration=1000000,
+                                                                        use_multi_path_only=True,
+                                                                        ensemble_count=1)
         routing_weight_calculator.run()
         # print("X")
         # self.write_to_db(results=all_results)

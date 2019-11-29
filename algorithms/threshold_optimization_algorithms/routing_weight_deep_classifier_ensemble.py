@@ -6,7 +6,7 @@ import numpy as np
 from auxillary.db_logger import DbLogger
 
 
-class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
+class RoutingWeightDeepClassifierEnsemble(RoutingWeightDeepSoftmaxRegressor):
     def __init__(self, network, validation_routing_matrix, test_routing_matrix, validation_data, test_data, layers,
                  l2_lambda, batch_size, max_iteration, ensemble_count, use_multi_path_only=False):
         super().__init__(network, validation_routing_matrix, test_routing_matrix, validation_data, test_data, layers,
