@@ -115,7 +115,8 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         multi_path_predicted_posteriors = results[3]
         predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
         multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
-        accuracy = np.sum(self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / data.X.shape[0]
+        accuracy = np.sum(self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
+                   self.fullDataDict[data_type].X.shape[0]
         return mse, accuracy
 
     def eval_datasets(self):
@@ -124,23 +125,25 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         print("val_mse:{0} val_accuracy:{1}".format(val_mse, val_accuracy))
         print("test_mse:{0} test_accuracy:{1}".format(test_mse, test_accuracy))
 
-    def get_ideal_performances(self, sparse_posteriors_tensor, ideal_weights, labels):
-        label_matrix = np.zeros(shape=(sparse_posteriors_tensor.shape[0], self.posteriorDim))
-        label_matrix[np.arange(sparse_posteriors_tensor.shape[0]), labels] = 1.0
+    def get_ideal_performances(self, data_type):
+        data = self.multiPathDataDict[data_type]
         ideal_posteriors_arr = []
-        for idx in range(sparse_posteriors_tensor.shape[0]):
-            A = sparse_posteriors_tensor[idx, :]
-            b = ideal_weights[idx, :]
-            p = A @ b
+        for idx in range(data.sparsePosteriors.shape[0]):
+            A = data.sparsePosteriors[idx, :]
+            b = data.y_one_hot[idx, :]
+            w = np.linalg.lstsq(A, b, rcond=None)[0]
+            p = A @ w
             ideal_posteriors_arr.append(p)
         P = np.stack(ideal_posteriors_arr, axis=0)
-        diff_arr = label_matrix - P
+        assert data.y_one_hot.shape == P.shape
+        diff_arr = data.y_one_hot - P
         squared_diff_arr = np.square(diff_arr)
         se = np.sum(squared_diff_arr, axis=1)
         ideal_mse = np.mean(se)
         predicted_labels = np.argmax(P, axis=1)
-        comparison_vector = labels == predicted_labels
-        ideal_accuracy = np.sum(comparison_vector) / labels.shape[0]
+        comparison_vector = data.y == predicted_labels
+        ideal_accuracy = (self.singlePathCorrectCounts[data_type] + np.sum(comparison_vector)) / \
+                         self.fullDataDict[data_type].X.shape[0]
         return ideal_mse, ideal_accuracy
 
     def train(self):
