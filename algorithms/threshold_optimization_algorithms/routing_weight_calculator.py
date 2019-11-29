@@ -47,18 +47,18 @@ class RoutingWeightCalculator:
                     print("Skipping feature {0} since it is missing.".format(feature_name))
                     continue
                 # Sparse - Concatenate
-                # feature_matrix = np.concatenate(matrix_list, axis=1)
-                # feature_dim = matrix_list[0].shape[1]
-                # routing_matrix_rpt = np.repeat(routing_matrix, axis=1, repeats=feature_dim)
-                # assert feature_matrix.shape == routing_matrix_rpt.shape
-                # sparse_feature_matrix = routing_matrix_rpt * feature_matrix
-                # feature_matrices.append(sparse_feature_matrix)
+                feature_matrix = np.concatenate(matrix_list, axis=1)
+                feature_dim = matrix_list[0].shape[1]
+                routing_matrix_rpt = np.repeat(routing_matrix, axis=1, repeats=feature_dim)
+                assert feature_matrix.shape == routing_matrix_rpt.shape
+                sparse_feature_matrix = routing_matrix_rpt * feature_matrix
+                feature_matrices.append(sparse_feature_matrix)
 
                 # Mean
-                feature_matrix = np.stack(matrix_list, axis=2)
-                sparse_feature_matrix = feature_matrix * np.expand_dims(routing_matrix, axis=1)
-                feature_matrix = np.mean(sparse_feature_matrix, axis=2)
-                feature_matrices.append(feature_matrix)
+                # feature_matrix = np.stack(matrix_list, axis=2)
+                # sparse_feature_matrix = feature_matrix * np.expand_dims(routing_matrix, axis=1)
+                # feature_matrix = np.mean(sparse_feature_matrix, axis=2)
+                # feature_matrices.append(feature_matrix)
 
             X = np.concatenate(feature_matrices, axis=1)
             X = np.concatenate([X, leaf_routing_matrix], axis=1)

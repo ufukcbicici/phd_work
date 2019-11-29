@@ -62,14 +62,15 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             self.singlePathCorrectCounts[data_type] = single_path_correct_count
 
     def preprocess_data(self):
-        pca = PCA(n_components=self.validation_X.shape[1])
-        if not self.useMultiPathOnly:
-            data_dict = self.fullDataDict
-        else:
-            data_dict = self.multiPathDataDict
-        pca.fit(data_dict["validation"].X)
-        data_dict["validation"].X = pca.transform(data_dict["validation"].X)
-        data_dict["test"].X = pca.transform(data_dict["test"].X)
+        pass
+        # pca = PCA(n_components=self.validation_X.shape[1])
+        # if not self.useMultiPathOnly:
+        #     data_dict = self.fullDataDict
+        # else:
+        #     data_dict = self.multiPathDataDict
+        # pca.fit(data_dict["validation"].X)
+        # data_dict["validation"].X = pca.transform(data_dict["validation"].X)
+        # data_dict["test"].X = pca.transform(data_dict["test"].X)
 
     def build_loss(self):
         with tf.name_scope("loss"):
