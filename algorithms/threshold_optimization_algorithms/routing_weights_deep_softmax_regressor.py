@@ -72,6 +72,18 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         # data_dict["validation"].X = pca.transform(data_dict["validation"].X)
         # data_dict["test"].X = pca.transform(data_dict["test"].X)
 
+    def get_simple_average_results(self, data_type):
+        data = self.multiPathDataDict[data_type]
+        sum_posteriors = np.sum(data.sparsePosteriors, axis=2)
+        leaf_counts = np.sum(data.routingMatrix, axis=1)
+        reciprocal_leaf_counts = np.expand_dims(np.reciprocal(leaf_counts), axis=1)
+        mean_posteriors = sum_posteriors * reciprocal_leaf_counts
+        simple_average_predicted_labels = np.argmax(mean_posteriors, axis=1)
+        simple_average_correct_count = np.sum(data.y == simple_average_predicted_labels)
+        simple_average_accuracy = (self.singlePathCorrectCounts[data_type] + simple_average_correct_count) / \
+                                  self.fullDataDict[data_type].X.shape[0]
+        return simple_average_accuracy, mean_posteriors
+
     def build_loss(self):
         with tf.name_scope("loss"):
             self.weights = self.networkOutput

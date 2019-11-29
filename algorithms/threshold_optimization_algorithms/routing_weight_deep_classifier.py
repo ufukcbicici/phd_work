@@ -68,14 +68,7 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
         classifier_accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
                               self.fullDataDict[data_type].X.shape[0]
         # Accuracy of the simple average result
-        sum_posteriors = np.sum(data.sparsePosteriors, axis=2)
-        leaf_counts = np.sum(data.routingMatrix, axis=1)
-        reciprocal_leaf_counts = np.expand_dims(np.reciprocal(leaf_counts), axis=1)
-        mean_posteriors = sum_posteriors * reciprocal_leaf_counts
-        simple_average_predicted_labels = np.argmax(mean_posteriors, axis=1)
-        simple_average_correct_count = np.sum(data.y == simple_average_predicted_labels)
-        simple_average_accuracy = (self.singlePathCorrectCounts[data_type] + simple_average_correct_count) / \
-                                  self.fullDataDict[data_type].X.shape[0]
+        simple_average_accuracy, mean_posteriors = self.get_simple_average_results(data_type=data_type)
         # Ensemble of the two
         ensemble_posteriors = np.stack([multi_path_predicted_posteriors, mean_posteriors], axis=2)
         ensemble_posteriors = np.mean(ensemble_posteriors, axis=2)
@@ -83,7 +76,7 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
         ensemble_correct_count = np.sum(data.y == enemble_predicted_labels)
         ensemble_average_accuracy = (self.singlePathCorrectCounts[data_type] + ensemble_correct_count) / \
                                     self.fullDataDict[data_type].X.shape[0]
-        return total_loss, classifier_accuracy, simple_average_accuracy, ensemble_average_accuracy
+        return ce_loss, classifier_accuracy, simple_average_accuracy, ensemble_average_accuracy
 
     def eval_datasets(self):
         val_cee, val_accuracy_classifier, val_accuracy_simple_avg, val_accuracy_ensemble = \
