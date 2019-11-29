@@ -13,6 +13,8 @@ class NetworkInput:
         self.y = _y
         self.routingMatrix = routing_matrix
         self.sparsePosteriors = sparse_posteriors
+        self.y_one_hot = np.zeros(shape=(_y.shape[0], self.sparsePosteriors.shape[1]))
+        self.y_one_hot[np.arange(_y.shape[0]), self.y] = 1.0
 
 
 class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
@@ -40,66 +42,34 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                                                   routing_matrix=self.testRoutingMatrix,
                                                   sparse_posteriors=self.testSparsePosteriors)}
         self.multiPathDataDict = {}
-        # Validation
-        leaf_eval_counts_val = np.sum(self.validationRoutingMatrix, axis=1)
-        single_path_indices_val = np.nonzero(leaf_eval_counts_val == 1)[0]
-        multi_path_indices_val = np.nonzero(leaf_eval_counts_val > 1)[0]
-        self.multiPathDataDict["validation"] = NetworkInput(
-            _x=self.validation_X[multi_path_indices_val],
-            _y=self.validationData.labelList[multi_path_indices_val],
-            routing_matrix=self.validationRoutingMatrix[multi_path_indices_val],
-            sparse_posteriors=self.validationSparsePosteriors[multi_path_indices_val])
-        # Test
-        leaf_eval_counts_test = np.sum(self.testRoutingMatrix, axis=1)
-        single_path_indices_test = np.nonzero(leaf_eval_counts_test == 1)[0]
-        multi_path_indices_test = np.nonzero(leaf_eval_counts_test > 1)[0]
-        self.multiPathDataDict["test"] = NetworkInput(
-            _x=self.test_X[multi_path_indices_test],
-            _y=self.testData.labelList[multi_path_indices_test],
-            routing_matrix=self.testRoutingMatrix[multi_path_indices_test],
-            sparse_posteriors=self.testSparsePosteriors[multi_path_indices_test])
-        self.fullDataCount = {"validation": self.validation_X.shape[0], "test": self.test_X.shape[0]}
-
-
-        # if self.useMultiPathOnly:
-        #     # Validation
-        #     self.validation_X = self.validation_X[multi_path_indices_val]
-        #     self.validationLabels = self.validationData.labelList[multi_path_indices_val]
-        #     self.validationRoutingMatrix = self.validationRoutingMatrix[multi_path_indices_val]
-        #     self.validationSparsePosteriors = self.validationSparsePosteriors[multi_path_indices_val]
-        #     # Test
-        #     self.test_X = self.test_X[multi_path_indices_test]
-        #     self.testLabels = self.testData.labelList[multi_path_indices_test]
-        #     self.testRoutingMatrix = self.testRoutingMatrix[multi_path_indices_test]
-        #     self.testSparsePosteriors = self.testSparsePosteriors[multi_path_indices_test]
-        # else:
-        #     self.validationLabels = self.validationData.labelList
-        #     self.testLabels = self.testData.labelList
-        # # Calculate single route samples' performance only at the beginning.
-        # predicted_posteriors = results[3]
-        # leaf_eval_counts = np.sum(route_matrix, axis=1)
-        # single_path_indices = np.nonzero(leaf_eval_counts == 1)[0]
-        # multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
-        # assert single_path_indices.shape[0] + multi_path_indices.shape[0] == labels.shape[0]
-        # single_path_posteriors = sparse_posteriors[single_path_indices, :]
-        # single_path_posteriors = np.sum(single_path_posteriors, axis=2)
-        # single_path_predicted_labels = np.argmax(single_path_posteriors, axis=1)
-        # single_path_labels = labels[single_path_indices]
-        # single_path_correct_count = np.sum(single_path_predicted_labels == single_path_labels)
-
-        # self.logQ = None
-        # self.crossEntropyMatrix = None
+        self.singlePathCorrectCounts = {}
+        # Create multi path data
+        for data_type in ["validation", "test"]:
+            data = self.fullDataDict[data_type]
+            leaf_eval_counts = np.sum(data.routingMatrix, axis=1)
+            single_path_indices = np.nonzero(leaf_eval_counts == 1)[0]
+            multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
+            self.multiPathDataDict[data_type] = NetworkInput(
+                _x=data.X[multi_path_indices],
+                _y=data.y[multi_path_indices],
+                routing_matrix=data.routingMatrix[multi_path_indices],
+                sparse_posteriors=data.sparsePosteriors[multi_path_indices])
+            single_path_posteriors = data.sparsePosteriors[single_path_indices, :]
+            single_path_posteriors = np.sum(single_path_posteriors, axis=2)
+            single_path_predicted_labels = np.argmax(single_path_posteriors, axis=1)
+            single_path_labels = data.y[single_path_indices]
+            single_path_correct_count = np.sum(single_path_predicted_labels == single_path_labels)
+            self.singlePathCorrectCounts[data_type] = single_path_correct_count
 
     def preprocess_data(self):
         pca = PCA(n_components=self.validation_X.shape[1])
         if not self.useMultiPathOnly:
-            pca.fit(self.validation_X)
+            data_dict = self.fullDataDict
         else:
-            leaf_eval_counts = np.sum(self.validationRoutingMatrix, axis=1)
-            multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
-            pca.fit(self.validation_X[multi_path_indices])
-        self.validation_X = pca.transform(self.validation_X)
-        self.test_X = pca.transform(self.test_X)
+            data_dict = self.multiPathDataDict
+        pca.fit(data_dict["validation"].X)
+        data_dict["validation"].X = pca.transform(data_dict["validation"].X)
+        data_dict["test"].X = pca.transform(data_dict["test"].X)
 
     def build_loss(self):
         with tf.name_scope("loss"):
@@ -113,35 +83,26 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             self.totalLoss = self.regressionMeanSquaredError + self.l2Loss
 
     def get_train_batch(self):
+        if not self.useMultiPathOnly:
+            data = self.fullDataDict["validation"]
+        else:
+            data = self.multiPathDataDict["validation"]
+        batch_size = min(data.X.shape[0], self.batchSize)
         while True:
-            if not self.useMultiPathOnly:
-                chosen_indices = np.random.choice(self.validation_X.shape[0], self.batchSize, replace=False)
-                batch_size = self.batchSize
-            else:
-                leaf_eval_counts = np.sum(self.validationRoutingMatrix, axis=1)
-                multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
-                batch_size = min(multi_path_indices.shape[0], self.batchSize)
-                chosen_indices = np.random.choice(multi_path_indices, batch_size, replace=False)
-            chosen_X = self.validation_X[chosen_indices]
-            chosen_labels = self.validationData.labelList[chosen_indices]
-            one_hot_labels = np.zeros(shape=(batch_size, self.posteriorDim))
-            one_hot_labels[np.arange(batch_size), chosen_labels] = 1.0
-            route_matrix = self.validationRoutingMatrix[chosen_indices]
-            chosen_sparse_posteriors = self.validationSparsePosteriors[chosen_indices]
+            chosen_indices = np.random.choice(data.X.shape[0], batch_size, replace=False)
+            chosen_X = data.X[chosen_indices]
+            one_hot_labels = data.y_one_hot[chosen_indices]
+            route_matrix = data.routingMatrix[chosen_indices]
+            chosen_sparse_posteriors = data.sparsePosteriors[chosen_indices]
             yield (chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors)
 
-    def eval_performance(self, **kwargs):
-        X = kwargs["X"]
-        route_matrix = kwargs["route_matrix"]
-        labels = kwargs["labels"]
-        sparse_posteriors = kwargs["sparse_posteriors"]
-        one_hot_labels = np.zeros(shape=(X.shape[0], self.posteriorDim))
-        one_hot_labels[np.arange(X.shape[0]), labels] = 1.0
-        assert np.array_equal(route_matrix, (np.sum(sparse_posteriors, axis=1) != 0.0).astype(np.float32))
-        feed_dict = {self.input_x: X,
-                     self.inputPosteriors: sparse_posteriors,
-                     self.labelMatrix: one_hot_labels,
-                     self.inputRouteMatrix: route_matrix}
+    def eval_performance(self, data_type):
+        data = self.multiPathDataDict[data_type]
+        assert np.array_equal(data.routingMatrix, (np.sum(data.sparsePosteriors, axis=1) != 0.0).astype(np.float32))
+        feed_dict = {self.input_x: data.X,
+                     self.inputPosteriors: data.sparsePosteriors,
+                     self.labelMatrix: data.y_one_hot,
+                     self.inputRouteMatrix: data.routingMatrix}
         results = self.sess.run([self.regressionMeanSquaredError,
                                  self.weights,
                                  self.weightedPosteriors,
@@ -151,31 +112,15 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                                 feed_dict=feed_dict)
         mse = results[0]
 
-        predicted_posteriors = results[3]
-        leaf_eval_counts = np.sum(route_matrix, axis=1)
-        single_path_indices = np.nonzero(leaf_eval_counts == 1)[0]
-        multi_path_indices = np.nonzero(leaf_eval_counts > 1)[0]
-        assert single_path_indices.shape[0] + multi_path_indices.shape[0] == labels.shape[0]
-        single_path_posteriors = sparse_posteriors[single_path_indices, :]
-        single_path_posteriors = np.sum(single_path_posteriors, axis=2)
-        single_path_predicted_labels = np.argmax(single_path_posteriors, axis=1)
-        single_path_labels = labels[single_path_indices]
-        single_path_correct_count = np.sum(single_path_predicted_labels == single_path_labels)
-
-        multi_path_predicted_posteriors = predicted_posteriors[multi_path_indices, :]
+        multi_path_predicted_posteriors = results[3]
         predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
-        multi_path_labels = labels[multi_path_indices]
-        multi_path_correct_count = np.sum(multi_path_labels == predicted_multi_path_labels)
-        accuracy = np.sum(single_path_correct_count + multi_path_correct_count) / X.shape[0]
+        multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
+        accuracy = np.sum(self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / data.X.shape[0]
         return mse, accuracy
 
     def eval_datasets(self):
-        val_mse, val_accuracy = self.eval_performance(X=self.validation_X, route_matrix=self.validationRoutingMatrix,
-                                                      labels=self.validationData.labelList,
-                                                      sparse_posteriors=self.validationSparsePosteriors)
-        test_mse, test_accuracy = self.eval_performance(X=self.test_X, route_matrix=self.testRoutingMatrix,
-                                                        labels=self.testData.labelList,
-                                                        sparse_posteriors=self.testSparsePosteriors)
+        val_mse, val_accuracy = self.eval_performance(data_type="validation")
+        test_mse, test_accuracy = self.eval_performance(data_type="test")
         print("val_mse:{0} val_accuracy:{1}".format(val_mse, val_accuracy))
         print("test_mse:{0} test_accuracy:{1}".format(test_mse, test_accuracy))
 
@@ -204,6 +149,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.sess.run(tf.global_variables_initializer())
         iteration = 0
         losses = []
+        # Ideal
         ideal_val_mse, ideal_val_accuracy = self.get_ideal_performances(
             sparse_posteriors_tensor=self.validationSparsePosteriors,
             ideal_weights=self.validation_Y, labels=self.validationData.labelList)
@@ -212,7 +158,6 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             ideal_weights=self.test_Y, labels=self.testData.labelList)
         print("ideal_val_mse={0} ideal_val_accuracy={1}".format(ideal_val_mse, ideal_val_accuracy))
         print("ideal_test_mse={0} ideal_test_accuracy={1}".format(ideal_test_mse, ideal_test_accuracy))
-        # Ideal
         self.eval_datasets()
         for chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors in data_generator:
             # print("******************************************************************")
