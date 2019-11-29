@@ -104,8 +104,8 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
              "test_accuracy_simple_avg": test_accuracy_simple_avg,
              "test_accuracy_ensemble": test_accuracy_ensemble}
         rows = [(self.runId, self.iteration, val_accuracy_classifier, val_accuracy_simple_avg,
-                 val_accuracy_ensemble, val_cee, test_accuracy_classifier, test_accuracy_simple_avg,
-                 test_accuracy_ensemble, test_cee, self.l2Lambda)]
+                 val_accuracy_ensemble, np.asscalar(val_cee), test_accuracy_classifier, test_accuracy_simple_avg,
+                 test_accuracy_ensemble, np.asscalar(test_cee), self.l2Lambda)]
         DbLogger.write_into_table(rows=rows, table="multipath_classification",
                                   col_count=len(rows[0]))
         return result_dict
