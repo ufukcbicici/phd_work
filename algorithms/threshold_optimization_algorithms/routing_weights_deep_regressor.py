@@ -85,12 +85,12 @@ class RoutingWeightDeepRegressor(RoutingWeightCalculator):
     def build_optimizer(self):
         with tf.variable_scope("optimizer"):
             self.globalStep = tf.Variable(0, name='global_step', trainable=False)
-            #    self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
-            boundaries = [25000, 50000, 100000]
-            values = [0.001, 0.0001, 0.000025, 0.00001]
-            self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate).minimize(
-                self.totalLoss, global_step=self.globalStep)
+            self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+            # boundaries = [100000, 200000]
+            # values = [0.001, 0.0001, 0.00001]
+            # self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
+            # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate).minimize(
+            #     self.totalLoss, global_step=self.globalStep)
 
     def get_train_batch(self):
         iter_count = 0

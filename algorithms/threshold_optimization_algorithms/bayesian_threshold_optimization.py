@@ -6,6 +6,9 @@ from scipy.optimize import minimize
 import multiprocessing
 from algorithms.coordinate_ascent_optimizer import CoordinateAscentOptimizer
 from algorithms.threshold_optimization_algorithms.routing_weight_calculator import RoutingWeightCalculator
+from algorithms.threshold_optimization_algorithms.routing_weight_deep_classifier import RoutingWeightDeepClassifier
+from algorithms.threshold_optimization_algorithms.routing_weight_non_deep_classifier import \
+    RoutingWeightNonDeepClassifier
 from algorithms.threshold_optimization_algorithms.routing_weights_deep_regressor import RoutingWeightDeepRegressor
 from algorithms.threshold_optimization_algorithms.routing_weights_deep_softmax_regressor import \
     RoutingWeightDeepSoftmaxRegressor
@@ -131,16 +134,16 @@ class BayesianOptimizer(ThresholdOptimizer):
         #                                                        batch_size=50,
         #                                                        max_iteration=100000,
         #                                                        leaf_index=0)
-        routing_weight_calculator = RoutingWeightDeepSoftmaxRegressor(network=self.network,
-                                                                      validation_routing_matrix=val_routing_matrix,
-                                                                      test_routing_matrix=test_routing_matrix,
-                                                                      validation_data=self.validationData,
-                                                                      test_data=self.testData,
-                                                                      layers=[400, 200],
-                                                                      l2_lambda=0.0,
-                                                                      batch_size=5000,
-                                                                      max_iteration=100000,
-                                                                      use_multi_path_only=True)
+        routing_weight_calculator = RoutingWeightNonDeepClassifier(network=self.network,
+                                                                   validation_routing_matrix=val_routing_matrix,
+                                                                   test_routing_matrix=test_routing_matrix,
+                                                                   validation_data=self.validationData,
+                                                                   test_data=self.testData,
+                                                                   layers=[400, 200],
+                                                                   l2_lambda=0.0,
+                                                                   batch_size=50,
+                                                                   max_iteration=100000,
+                                                                   use_multi_path_only=True)
         routing_weight_calculator.run()
         print("X")
         # self.write_to_db(results=all_results)

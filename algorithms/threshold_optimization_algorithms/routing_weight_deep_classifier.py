@@ -14,18 +14,30 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
         self.ceVector = None
         self.ceLoss = None
         self.finalPosterior = None
-        self.labelsVector = tf.placeholder(dtype=tf.float32, shape=[None, ], name='labelsVector')
+        self.labelsVector = tf.placeholder(dtype=tf.int64, shape=[None, ], name='labelsVector')
 
-    def build_loss(self):
-        with tf.name_scope("loss"):
-            x = self.networkOutput
+    def build_network(self):
+        x = self.input_x
+        for layer_id, hidden_dim in enumerate(self.layers):
+            with tf.variable_scope('layer_{0}'.format(layer_id)):
+                net_shape = x.get_shape().as_list()
+                fc_w = tf.get_variable('fc_w', shape=[net_shape[-1], hidden_dim], dtype=tf.float32)
+                fc_b = tf.get_variable('fc_b', shape=[hidden_dim], dtype=tf.float32)
+                x = tf.matmul(x, fc_w) + fc_b
+                x = tf.nn.leaky_relu(x)
+        # Output layer
+        with tf.variable_scope('output_layer'):
             net_shape = x.get_shape().as_list()
             fc_w = tf.get_variable('fc_w', shape=[net_shape[-1], self.classCount], dtype=tf.float32)
             fc_b = tf.get_variable('fc_b', shape=[self.classCount], dtype=tf.float32)
-            self.logits = tf.matmul(x, fc_w) + fc_b
+            self.networkOutput = tf.matmul(x, fc_w) + fc_b
+
+    def build_loss(self):
+        with tf.name_scope("loss"):
+            self.logits = self.networkOutput
             self.finalPosterior = tf.nn.softmax(self.logits)
             self.ceVector = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labelsVector, logits=self.logits)
-            self.ceLoss = tf.reduce_mean(self.ceLoss)
+            self.ceLoss = tf.reduce_mean(self.ceVector)
             self.get_l2_loss()
             self.totalLoss = self.ceLoss + self.l2Loss
 
@@ -104,5 +116,7 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
             if (iteration + 1) % 500 == 0:
                 print("Iteration:{0}".format(iteration))
                 self.eval_datasets()
+            if iteration == self.maxIteration:
+                break
         self.eval_datasets()
 
