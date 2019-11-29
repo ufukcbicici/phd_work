@@ -28,7 +28,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                                               name='inputPosteriors')
         self.inputRouteMatrix = tf.placeholder(dtype=tf.int32, shape=[None, leaf_count],
                                                name='inputRouteMatrix')
-        self.labelMatrix = tf.placeholder(dtype=tf.float32, shape=[None, self.posteriorDim], name='labelVector')
+        self.labelMatrix = tf.placeholder(dtype=tf.float32, shape=[None, self.posteriorDim], name='labelMatrix')
         self.weights = None
         self.weightedPosteriors = None
         self.finalPosterior = None
@@ -92,10 +92,11 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         while True:
             chosen_indices = np.random.choice(data.X.shape[0], batch_size, replace=False)
             chosen_X = data.X[chosen_indices]
+            chosen_Y = data.y[chosen_indices]
             one_hot_labels = data.y_one_hot[chosen_indices]
             route_matrix = data.routingMatrix[chosen_indices]
             chosen_sparse_posteriors = data.sparsePosteriors[chosen_indices]
-            yield (chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors)
+            yield (chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors, chosen_Y)
 
     def eval_performance(self, data_type):
         data = self.multiPathDataDict[data_type]
@@ -116,7 +117,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         multi_path_predicted_posteriors = results[3]
         predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
         multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
-        accuracy = np.sum(self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
+        accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
                    self.fullDataDict[data_type].X.shape[0]
         return mse, accuracy
 
@@ -159,7 +160,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         print("ideal_val_mse={0} ideal_val_accuracy={1}".format(ideal_val_mse, ideal_val_accuracy))
         print("ideal_test_mse={0} ideal_test_accuracy={1}".format(ideal_test_mse, ideal_test_accuracy))
         self.eval_datasets()
-        for chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors in data_generator:
+        for chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors, chosen_Y in data_generator:
             # print("******************************************************************")
             feed_dict = {self.input_x: chosen_X,
                          self.inputPosteriors: chosen_sparse_posteriors,
