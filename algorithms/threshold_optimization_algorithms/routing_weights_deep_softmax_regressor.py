@@ -153,12 +153,8 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         iteration = 0
         losses = []
         # Ideal
-        ideal_val_mse, ideal_val_accuracy = self.get_ideal_performances(
-            sparse_posteriors_tensor=self.validationSparsePosteriors,
-            ideal_weights=self.validation_Y, labels=self.validationData.labelList)
-        ideal_test_mse, ideal_test_accuracy = self.get_ideal_performances(
-            sparse_posteriors_tensor=self.testSparsePosteriors,
-            ideal_weights=self.test_Y, labels=self.testData.labelList)
+        ideal_val_mse, ideal_val_accuracy = self.get_ideal_performances(data_type="validation")
+        ideal_test_mse, ideal_test_accuracy = self.get_ideal_performances(data_type="test")
         print("ideal_val_mse={0} ideal_val_accuracy={1}".format(ideal_val_mse, ideal_val_accuracy))
         print("ideal_test_mse={0} ideal_test_accuracy={1}".format(ideal_test_mse, ideal_test_accuracy))
         self.eval_datasets()
