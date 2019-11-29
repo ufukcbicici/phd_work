@@ -3,6 +3,8 @@ from algorithms.threshold_optimization_algorithms.routing_weights_deep_softmax_r
 import tensorflow as tf
 import numpy as np
 
+from auxillary.db_logger import DbLogger
+
 
 class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
     def __init__(self, network, validation_routing_matrix, test_routing_matrix, validation_data, test_data, layers,
@@ -15,6 +17,8 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
         self.ceLoss = None
         self.finalPosterior = None
         self.labelsVector = tf.placeholder(dtype=tf.int64, shape=[None, ], name='labelsVector')
+        self.runId = None
+        self.iteration = 0
 
     def build_network(self):
         x = self.input_x
@@ -62,7 +66,7 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
         predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
         multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
         classifier_accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
-                   self.fullDataDict[data_type].X.shape[0]
+                              self.fullDataDict[data_type].X.shape[0]
         # Accuracy of the simple average result
         sum_posteriors = np.sum(data.sparsePosteriors, axis=2)
         leaf_counts = np.sum(data.routingMatrix, axis=1)
@@ -71,14 +75,14 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
         simple_average_predicted_labels = np.argmax(mean_posteriors, axis=1)
         simple_average_correct_count = np.sum(data.y == simple_average_predicted_labels)
         simple_average_accuracy = (self.singlePathCorrectCounts[data_type] + simple_average_correct_count) / \
-                   self.fullDataDict[data_type].X.shape[0]
+                                  self.fullDataDict[data_type].X.shape[0]
         # Ensemble of the two
         ensemble_posteriors = np.stack([multi_path_predicted_posteriors, mean_posteriors], axis=2)
         ensemble_posteriors = np.mean(ensemble_posteriors, axis=2)
         enemble_predicted_labels = np.argmax(ensemble_posteriors, axis=1)
         ensemble_correct_count = np.sum(data.y == enemble_predicted_labels)
         ensemble_average_accuracy = (self.singlePathCorrectCounts[data_type] + ensemble_correct_count) / \
-                   self.fullDataDict[data_type].X.shape[0]
+                                    self.fullDataDict[data_type].X.shape[0]
         return total_loss, classifier_accuracy, simple_average_accuracy, ensemble_average_accuracy
 
     def eval_datasets(self):
@@ -90,12 +94,36 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
               .format(val_cee, val_accuracy_classifier, val_accuracy_simple_avg, val_accuracy_ensemble))
         print("test_cee:{0} test_accuracy_classifier:{1}, test_accuracy_simple_avg:{2} test_accuracy_ensemble:{3}"
               .format(test_cee, test_accuracy_classifier, test_accuracy_simple_avg, test_accuracy_ensemble))
+        result_dict = \
+            {"val_cee": val_cee,
+             "val_accuracy_classifier": val_accuracy_classifier,
+             "val_accuracy_simple_avg": val_accuracy_simple_avg,
+             "val_accuracy_ensemble": val_accuracy_ensemble,
+             "test_cee": test_cee,
+             "test_accuracy_classifier": test_accuracy_classifier,
+             "test_accuracy_simple_avg": test_accuracy_simple_avg,
+             "test_accuracy_ensemble": test_accuracy_ensemble}
+        rows = [(self.runId, self.iteration, val_accuracy_classifier, val_accuracy_simple_avg,
+                 val_accuracy_ensemble, val_cee, test_accuracy_classifier, test_accuracy_simple_avg,
+                 test_accuracy_ensemble, test_cee, self.l2Lambda)]
+        DbLogger.write_into_table(rows=rows, table="multipath_classification",
+                                  col_count=len(rows[0]))
+        return result_dict
+
+    def get_explanation(self):
+        exp_string = ""
+        exp_string += "l2_lambda={0}".format(self.l2Lambda)
+        exp_string += "layers={0}".format(self.layers)
+        exp_string += "batch_size={0}".format(self.batchSize)
+        return exp_string
 
     def train(self):
+        self.runId = DbLogger.get_run_id()
+        exp_string = self.get_explanation()
+        DbLogger.write_into_table(rows=[(self.runId, exp_string)], table=DbLogger.runMetaData, col_count=2)
         self.preprocess_data()
         data_generator = self.get_train_batch()
         self.sess.run(tf.global_variables_initializer())
-        iteration = 0
         losses = []
         self.eval_datasets()
         for chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors, chosen_Y in data_generator:
@@ -108,15 +136,14 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
             run_ops = [self.optimizer, self.totalLoss]
             results = self.sess.run(run_ops, feed_dict=feed_dict)
             # print(results[1])
-            iteration += 1
+            self.iteration += 1
             losses.append(results[1])
-            if (iteration + 1) % 100 == 0:
-                print("Iteration:{0} Main_loss={1}".format(iteration, np.mean(np.array(losses))))
+            if (self.iteration + 1) % 100 == 0:
+                print("Iteration:{0} Main_loss={1}".format(self.iteration, np.mean(np.array(losses))))
                 losses = []
-            if (iteration + 1) % 500 == 0:
-                print("Iteration:{0}".format(iteration))
+            if (self.iteration + 1) % 1000 == 0:
+                print("Iteration:{0}".format(self.iteration))
                 self.eval_datasets()
-            if iteration == self.maxIteration:
+            if self.iteration == self.maxIteration:
                 break
         self.eval_datasets()
-

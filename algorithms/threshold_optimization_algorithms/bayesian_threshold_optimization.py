@@ -134,17 +134,20 @@ class BayesianOptimizer(ThresholdOptimizer):
         #                                                        batch_size=50,
         #                                                        max_iteration=100000,
         #                                                        leaf_index=0)
-        routing_weight_calculator = RoutingWeightNonDeepClassifier(network=self.network,
-                                                                   validation_routing_matrix=val_routing_matrix,
-                                                                   test_routing_matrix=test_routing_matrix,
-                                                                   validation_data=self.validationData,
-                                                                   test_data=self.testData,
-                                                                   layers=[400, 200],
-                                                                   l2_lambda=0.0,
-                                                                   batch_size=50,
-                                                                   max_iteration=100000,
-                                                                   use_multi_path_only=True)
-        routing_weight_calculator.run()
+        l2_lambda_list = [0.00001*i for i in range(21)] * 5
+        l2_lambda_list = sorted(l2_lambda_list)
+        for l2_lambda in l2_lambda_list:
+            routing_weight_calculator = RoutingWeightDeepClassifier(network=self.network,
+                                                                    validation_routing_matrix=val_routing_matrix,
+                                                                    test_routing_matrix=test_routing_matrix,
+                                                                    validation_data=self.validationData,
+                                                                    test_data=self.testData,
+                                                                    layers=[400, 200],
+                                                                    l2_lambda=l2_lambda,
+                                                                    batch_size=64,
+                                                                    max_iteration=100000,
+                                                                    use_multi_path_only=True)
+            routing_weight_calculator.run()
         print("X")
         # self.write_to_db(results=all_results)
         # return all_results

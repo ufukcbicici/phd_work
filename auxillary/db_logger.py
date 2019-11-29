@@ -31,10 +31,10 @@ class DbLogger:
     # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger3.db"
 
     # Home
-    log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//dblogger.db"
+    # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//dblogger.db"
 
     # Idea GPU
-    # log_db_path = "C://Users//ufuk.bicici.IDEATEKNOLOJI//Desktop//phd_work//simple_tf//dblogger.db"
+    log_db_path = "C://Users//ufuk.bicici.IDEATEKNOLOJI//Desktop//phd_work//simple_tf//dblogger.db"
 
     # Idea
     # log_db_path = "C://Users//ufuk.bicici//Desktop//PHD//phd_work//simple_tf//bnnlogger.db"
@@ -83,14 +83,14 @@ class DbLogger:
         print("Exit print_log")
 
     @staticmethod
-    def get_run_id():
+    def get_run_id(table_name=runMetaData):
         print("Enter get_run_id")
         DbLogger.lock.acquire()
         con = lite.connect(DbLogger.log_db_path)
         curr_id = None
         with con:
             cur = con.cursor()
-            cur.execute("SELECT MAX(RunId) + 1 AS CurrId FROM {0}".format(DbLogger.runMetaData))
+            cur.execute("SELECT MAX(RunId) + 1 AS CurrId FROM {0}".format(table_name))
             rows = cur.fetchall()
             for row in rows:
                 if row[0] is None:
