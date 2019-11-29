@@ -112,9 +112,9 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
 
     def get_explanation(self):
         exp_string = ""
-        exp_string += "l2_lambda={0}".format(self.l2Lambda)
-        exp_string += "layers={0}".format(self.layers)
-        exp_string += "batch_size={0}".format(self.batchSize)
+        exp_string += "l2_lambda={0}\n".format(self.l2Lambda)
+        exp_string += "layers={0}\n".format(self.layers)
+        exp_string += "batch_size={0}\n".format(self.batchSize)
         return exp_string
 
     def train(self):
@@ -147,3 +147,4 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
             if self.iteration == self.maxIteration:
                 break
         self.eval_datasets()
+        tf.reset_default_graph()
