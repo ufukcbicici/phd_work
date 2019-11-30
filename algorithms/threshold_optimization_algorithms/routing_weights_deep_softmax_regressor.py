@@ -3,6 +3,7 @@ import numpy as np
 
 from algorithms.threshold_optimization_algorithms.routing_weights_deep_regressor import RoutingWeightDeepRegressor
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -34,6 +35,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.weights = None
         self.weightedPosteriors = None
         self.finalPosterior = None
+        self.finalPosteriorCalibrated = None
         self.squaredDiff = None
         self.sampleWiseSum = None
         self.runId = None
@@ -67,7 +69,19 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             self.singlePathCorrectCounts[data_type] = single_path_correct_count
 
     def preprocess_data(self):
-        pass
+        # pass
+        if not self.useMultiPathOnly:
+            data_dict = self.fullDataDict
+        else:
+            data_dict = self.multiPathDataDict
+            
+        # Z-Scaler
+        z_scaler = StandardScaler()
+        z_scaler.fit(data_dict["validation"].X)
+        data_dict["validation"].X = z_scaler.transform(data_dict["validation"].X)
+        data_dict["test"].X = z_scaler.transform(data_dict["test"].X)
+
+        # PCA
         # pca = PCA(n_components=self.validation_X.shape[1])
         # if not self.useMultiPathOnly:
         #     data_dict = self.fullDataDict
@@ -94,6 +108,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             self.weights = self.networkOutput
             self.weightedPosteriors = tf.expand_dims(self.weights, axis=1) * self.inputPosteriors
             self.finalPosterior = tf.reduce_sum(self.weightedPosteriors, axis=2)
+            self.finalPosteriorCalibrated = tf.nn.softmax(self.finalPosterior)
             self.squaredDiff = tf.squared_difference(self.finalPosterior, self.labelMatrix)
             self.sampleWiseSum = tf.reduce_sum(self.squaredDiff, axis=1)
             self.regressionMeanSquaredError = tf.reduce_mean(self.sampleWiseSum)
@@ -127,16 +142,18 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                                  self.weightedPosteriors,
                                  self.finalPosterior,
                                  self.squaredDiff,
-                                 self.sampleWiseSum],
+                                 self.sampleWiseSum,
+                                 self.finalPosteriorCalibrated],
                                 feed_dict=feed_dict)
         mse = results[0]
 
         multi_path_predicted_posteriors = results[3]
-        # Convert to probability
-        min_scores = np.min(multi_path_predicted_posteriors, axis=1, keepdims=True)
-        multi_path_predicted_posteriors = multi_path_predicted_posteriors + np.abs(min_scores)
-        sums = np.sum(multi_path_predicted_posteriors, axis=1, keepdims=True)
-        multi_path_predicted_posteriors = multi_path_predicted_posteriors / sums
+        # # Convert to probability
+        # min_scores = np.min(multi_path_predicted_posteriors, axis=1, keepdims=True)
+        # multi_path_predicted_posteriors = multi_path_predicted_posteriors + np.abs(min_scores)
+        # sums = np.sum(multi_path_predicted_posteriors, axis=1, keepdims=True)
+        # multi_path_predicted_posteriors = multi_path_predicted_posteriors / sums
+        multi_path_predicted_posteriors = results[-1]
         predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
         multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
         regressor_accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
@@ -217,7 +234,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             # boundaries = [15000, 30000, 45000]
             # values = [0.01, 0.001, 0.0001, 0.00001]
             # self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.0001).minimize(
+            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
                 self.totalLoss, global_step=self.globalStep)
 
     def train(self):
