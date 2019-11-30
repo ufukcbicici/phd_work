@@ -19,6 +19,7 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
         self.labelsVector = tf.placeholder(dtype=tf.int64, shape=[None, ], name='labelsVector')
         self.runId = None
         self.iteration = 0
+        self.dbRows = []
 
     def build_network(self):
         x = self.input_x
@@ -96,11 +97,14 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
              "test_accuracy_classifier": test_accuracy_classifier,
              "test_accuracy_simple_avg": test_accuracy_simple_avg,
              "test_accuracy_ensemble": test_accuracy_ensemble}
-        rows = [(self.runId, self.iteration, val_accuracy_classifier, val_accuracy_simple_avg,
-                 val_accuracy_ensemble, np.asscalar(val_cee), test_accuracy_classifier, test_accuracy_simple_avg,
-                 test_accuracy_ensemble, np.asscalar(test_cee), self.l2Lambda)]
-        DbLogger.write_into_table(rows=rows, table="multipath_classification",
-                                  col_count=len(rows[0]))
+        row = (self.runId, self.iteration, val_accuracy_classifier, val_accuracy_simple_avg,
+               val_accuracy_ensemble, np.asscalar(val_cee), test_accuracy_classifier, test_accuracy_simple_avg,
+               test_accuracy_ensemble, np.asscalar(test_cee), self.l2Lambda)
+        self.dbRows.append(row)
+        if len(self.dbRows) >= 1000:
+            DbLogger.write_into_table(rows=self.dbRows, table="multipath_classification",
+                                      col_count=len(self.dbRows[0]))
+            self.dbRows = []
         return result_dict
 
     def get_explanation(self):
