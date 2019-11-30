@@ -3,6 +3,8 @@ import numpy as np
 
 from algorithms.threshold_optimization_algorithms.routing_weights_deep_regressor import RoutingWeightDeepRegressor
 from sklearn.decomposition import PCA
+
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.global_params import GlobalConstants
 
@@ -34,6 +36,9 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.finalPosterior = None
         self.squaredDiff = None
         self.sampleWiseSum = None
+        self.runId = None
+        self.iteration = 0
+        self.dbRows = []
         self.useMultiPathOnly = use_multi_path_only
         self.fullDataDict = {"validation": NetworkInput(_x=self.validation_X, _y=self.validationData.labelList,
                                                         routing_matrix=self.validationRoutingMatrix,
@@ -134,15 +139,48 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         multi_path_predicted_posteriors = multi_path_predicted_posteriors / sums
         predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
         multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
-        accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
+        regressor_accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
                    self.fullDataDict[data_type].X.shape[0]
-        return mse, accuracy
+
+        # Simple Average Accuracy
+        simple_average_accuracy, simple_average_mean_posteriors = self.get_simple_average_results(data_type=data_type)
+
+        # Ensemble of the two
+        ensemble_posteriors = np.stack([multi_path_predicted_posteriors, simple_average_mean_posteriors], axis=2)
+        ensemble_posteriors = np.mean(ensemble_posteriors, axis=2)
+        ensemble_predicted_labels = np.argmax(ensemble_posteriors, axis=1)
+        ensemble_correct_count = np.sum(data.y == ensemble_predicted_labels)
+        ensemble_average_accuracy = (self.singlePathCorrectCounts[data_type] + ensemble_correct_count) / \
+                                    self.fullDataDict[data_type].X.shape[0]
+        return mse, regressor_accuracy, simple_average_accuracy, ensemble_average_accuracy
 
     def eval_datasets(self):
-        val_mse, val_accuracy = self.eval_performance(data_type="validation")
-        test_mse, test_accuracy = self.eval_performance(data_type="test")
-        print("val_mse:{0} val_accuracy:{1}".format(val_mse, val_accuracy))
-        print("test_mse:{0} test_accuracy:{1}".format(test_mse, test_accuracy))
+        val_mse, val_accuracy_regressor, val_accuracy_simple_avg, val_accuracy_ensemble = \
+            self.eval_performance(data_type="validation")
+        test_mse, test_accuracy_regressor, test_accuracy_simple_avg, test_accuracy_ensemble = \
+            self.eval_performance(data_type="test")
+        print("val_mse:{0} val_accuracy_regressor:{1}, val_accuracy_simple_avg:{2} val_accuracy_ensemble:{3}"
+              .format(val_mse, val_accuracy_regressor, val_accuracy_simple_avg, val_accuracy_ensemble))
+        print("test_mse:{0} test_accuracy_regressor:{1}, test_accuracy_simple_avg:{2} test_accuracy_ensemble:{3}"
+              .format(test_mse, test_accuracy_regressor, test_accuracy_simple_avg, test_accuracy_ensemble))
+        result_dict = \
+            {"val_mse": val_mse,
+             "val_accuracy_regressor": val_accuracy_regressor,
+             "val_accuracy_simple_avg": val_accuracy_simple_avg,
+             "val_accuracy_ensemble": val_accuracy_ensemble,
+             "test_mse": test_mse,
+             "test_accuracy_regressor": test_accuracy_regressor,
+             "test_accuracy_simple_avg": test_accuracy_simple_avg,
+             "test_accuracy_ensemble": test_accuracy_ensemble}
+        row = (self.runId, self.iteration, val_accuracy_regressor, val_accuracy_simple_avg,
+               val_accuracy_ensemble, np.asscalar(val_mse), test_accuracy_regressor, test_accuracy_simple_avg,
+               test_accuracy_ensemble, np.asscalar(test_mse), self.l2Lambda)
+        self.dbRows.append(row)
+        if len(self.dbRows) >= 1000:
+            DbLogger.write_into_table(rows=self.dbRows, table="multipath_regression",
+                                      col_count=len(self.dbRows[0]))
+            self.dbRows = []
+        return result_dict
 
     def get_ideal_performances(self, data_type):
         data = self.multiPathDataDict[data_type]
@@ -165,17 +203,31 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                          self.fullDataDict[data_type].X.shape[0]
         return ideal_mse, ideal_accuracy
 
+    def get_explanation(self):
+        exp_string = ""
+        exp_string += "l2_lambda={0}\n".format(self.l2Lambda)
+        exp_string += "layers={0}\n".format(self.layers)
+        exp_string += "batch_size={0}\n".format(self.batchSize)
+        return exp_string
+
+    def build_optimizer(self):
+        with tf.variable_scope("optimizer"):
+            self.globalStep = tf.Variable(0, name='global_step', trainable=False)
+            # self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+            # boundaries = [15000, 30000, 45000]
+            # values = [0.01, 0.001, 0.0001, 0.00001]
+            # self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
+            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.0001).minimize(
+                self.totalLoss, global_step=self.globalStep)
+
     def train(self):
+        self.runId = DbLogger.get_run_id()
+        exp_string = self.get_explanation()
+        DbLogger.write_into_table(rows=[(self.runId, exp_string)], table=DbLogger.runMetaData, col_count=2)
         self.preprocess_data()
         data_generator = self.get_train_batch()
         self.sess.run(tf.global_variables_initializer())
-        iteration = 0
         losses = []
-        # Ideal
-        ideal_val_mse, ideal_val_accuracy = self.get_ideal_performances(data_type="validation")
-        ideal_test_mse, ideal_test_accuracy = self.get_ideal_performances(data_type="test")
-        print("ideal_val_mse={0} ideal_val_accuracy={1}".format(ideal_val_mse, ideal_val_accuracy))
-        print("ideal_test_mse={0} ideal_test_accuracy={1}".format(ideal_test_mse, ideal_test_accuracy))
         self.eval_datasets()
         for chosen_X, one_hot_labels, route_matrix, chosen_sparse_posteriors, chosen_Y in data_generator:
             # print("******************************************************************")
@@ -186,12 +238,15 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             run_ops = [self.optimizer, self.totalLoss]
             results = self.sess.run(run_ops, feed_dict=feed_dict)
             # print(results[1])
-            iteration += 1
+            self.iteration += 1
             losses.append(results[1])
-            if (iteration + 1) % 100 == 0:
-                print("Iteration:{0} Main_loss={1}".format(iteration, np.mean(np.array(losses))))
+            if (self.iteration + 1) % 1 == 0:
+                print("Iteration:{0} Main_loss={1}".format(self.iteration, np.mean(np.array(losses))))
                 losses = []
-            if (iteration + 1) % 500 == 0:
-                print("Iteration:{0}".format(iteration))
+            if (self.iteration + 1) % 1 == 0:
+                print("Iteration:{0}".format(self.iteration))
                 self.eval_datasets()
+            if self.iteration == self.maxIteration:
+                break
         self.eval_datasets()
+        tf.reset_default_graph()

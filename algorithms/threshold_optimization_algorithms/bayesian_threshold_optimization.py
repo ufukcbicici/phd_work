@@ -149,17 +149,16 @@ class BayesianOptimizer(ThresholdOptimizer):
         #                                                         batch_size=5000,
         #                                                         max_iteration=1000000,
         #                                                         use_multi_path_only=True)
-        routing_weight_calculator = RoutingWeightDeepClassifierEnsemble(network=self.network,
-                                                                        validation_routing_matrix=val_routing_matrix,
-                                                                        test_routing_matrix=test_routing_matrix,
-                                                                        validation_data=self.validationData,
-                                                                        test_data=self.testData,
-                                                                        layers=[200, 100],
-                                                                        l2_lambda=0.0,
-                                                                        batch_size=5000,
-                                                                        max_iteration=1000000,
-                                                                        use_multi_path_only=True,
-                                                                        ensemble_count=2)
+        routing_weight_calculator = RoutingWeightDeepSoftmaxRegressor(network=self.network,
+                                                                      validation_routing_matrix=val_routing_matrix,
+                                                                      test_routing_matrix=test_routing_matrix,
+                                                                      validation_data=self.validationData,
+                                                                      test_data=self.testData,
+                                                                      layers=[200, 100],
+                                                                      l2_lambda=0.0,
+                                                                      batch_size=5000,
+                                                                      max_iteration=1000000,
+                                                                      use_multi_path_only=True)
         routing_weight_calculator.run()
         # print("X")
         # self.write_to_db(results=all_results)

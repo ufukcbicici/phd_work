@@ -17,9 +17,6 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
         self.ceLoss = None
         self.finalPosterior = None
         self.labelsVector = tf.placeholder(dtype=tf.int64, shape=[None, ], name='labelsVector')
-        self.runId = None
-        self.iteration = 0
-        self.dbRows = []
 
     def build_network(self):
         x = self.input_x
@@ -106,13 +103,6 @@ class RoutingWeightDeepClassifier(RoutingWeightDeepSoftmaxRegressor):
                                       col_count=len(self.dbRows[0]))
             self.dbRows = []
         return result_dict
-
-    def get_explanation(self):
-        exp_string = ""
-        exp_string += "l2_lambda={0}\n".format(self.l2Lambda)
-        exp_string += "layers={0}\n".format(self.layers)
-        exp_string += "batch_size={0}\n".format(self.batchSize)
-        return exp_string
 
     def train(self):
         self.runId = DbLogger.get_run_id()

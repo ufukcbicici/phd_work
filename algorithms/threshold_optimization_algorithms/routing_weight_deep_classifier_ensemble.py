@@ -78,6 +78,28 @@ class RoutingWeightDeepClassifierEnsemble(RoutingWeightDeepClassifier):
                                 feed_dict=feed_dict)
         sum_ce_loss = results[0]
         mean_ce_loss = sum_ce_loss / self.ensembleCount
+        # P_result = 1/(EnsembleCount + 1) (Sum(EnsembleMembers) + SimpleAvg)
+        # Specific expert classifier for multi path
+        # list_of_predicted_posteriors = results[2]
+        # predicted_posteriors_tensor = np.stack(list_of_predicted_posteriors, axis=2)
+        # predicted_ensemble_posterior = np.mean(predicted_posteriors_tensor, axis=2)
+        # predicted_multi_path_labels = np.argmax(predicted_ensemble_posterior, axis=1)
+        # multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
+        # classifier_accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
+        #                       self.fullDataDict[data_type].X.shape[0]
+        # # Accuracy of the simple average result
+        # simple_average_accuracy, mean_posteriors = self.get_simple_average_results(data_type=data_type)
+        # # Ensemble
+        # ensemble_posteriors = np.concatenate([predicted_posteriors_tensor, np.expand_dims(mean_posteriors, axis=2)],
+        #                                      axis=2)
+        # ensemble_posteriors = np.mean(ensemble_posteriors, axis=2)
+        # ensemble_predicted_labels = np.argmax(ensemble_posteriors, axis=1)
+        # ensemble_correct_count = np.sum(data.y == ensemble_predicted_labels)
+        # ensemble_average_accuracy = (self.singlePathCorrectCounts[data_type] + ensemble_correct_count) / \
+        #                             self.fullDataDict[data_type].X.shape[0]
+        # return mean_ce_loss, classifier_accuracy, simple_average_accuracy, ensemble_average_accuracy
+
+        # P_result = 0.5*Ensemble + 0.5*SimpleAvg
         # Specific expert classifier for multi path
         list_of_predicted_posteriors = results[2]
         predicted_posteriors_tensor = np.stack(list_of_predicted_posteriors, axis=2)
