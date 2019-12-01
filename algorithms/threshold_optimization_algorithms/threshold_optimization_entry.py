@@ -1,5 +1,5 @@
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
-from algorithms.threshold_optimization_algorithms.bayesian_threshold_optimization import BayesianOptimizer
+from algorithms.threshold_optimization_algorithms.bayesian_threshold_optimization import BayesianThresholdOptimizer
 from algorithms.threshold_optimization_algorithms.brute_force_threshold_optimizer import BruteForceOptimizer
 from algorithms.threshold_optimization_algorithms.simulated_annealing_thread_runner import \
     SimulatedAnnealingThreadRunner
@@ -47,7 +47,7 @@ def main():
         xi = param_tpl[0]
         use_weighted = param_tpl[1]
         accuracy_computation_balance = param_tpl[2]
-        bayesian_optimizer = BayesianOptimizer(
+        bayesian_optimizer = BayesianThresholdOptimizer(
             run_id=run_id, network=network, iteration=119100, routing_data=routing_data,
             multipath_score_calculator=multipath_calculator,
             balance_coefficient=accuracy_computation_balance, lock=multiprocess_lock, xi=xi,
