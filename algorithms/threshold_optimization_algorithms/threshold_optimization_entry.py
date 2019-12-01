@@ -1,5 +1,6 @@
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
-from algorithms.threshold_optimization_algorithms.bayesian_threshold_optimization import BayesianThresholdOptimizer
+from algorithms.threshold_optimization_algorithms.bayesian_threshold_optimization import BayesianOptimizer, \
+    BayesianThresholdOptimizer
 from algorithms.threshold_optimization_algorithms.brute_force_threshold_optimizer import BruteForceOptimizer
 from algorithms.threshold_optimization_algorithms.simulated_annealing_thread_runner import \
     SimulatedAnnealingThreadRunner
