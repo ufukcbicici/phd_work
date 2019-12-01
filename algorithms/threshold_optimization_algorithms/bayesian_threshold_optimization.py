@@ -61,14 +61,14 @@ class BayesianThresholdOptimizer(ThresholdOptimizer):
         random_state = self.pick_fully_random_state(as_numpy=True)[0, :]
         return random_state
 
-    def calculate_threshold_score_val(self, threshold_as_numpy):
-        best_threshold_as_dict = self.numpy_to_threshold_dict(thresholds_arr=threshold_as_numpy)
+    def calculate_threshold_score_val(self, x):
+        best_threshold_as_dict = self.numpy_to_threshold_dict(thresholds_arr=x)
         score, result_obj = \
             self.calculate_threshold_score(threshold_state=best_threshold_as_dict, routing_data=self.validationData)
         return score, result_obj
 
-    def calculate_threshold_score_test(self, threshold_as_numpy):
-        best_threshold_as_dict = self.numpy_to_threshold_dict(thresholds_arr=threshold_as_numpy)
+    def calculate_threshold_score_test(self, x):
+        best_threshold_as_dict = self.numpy_to_threshold_dict(thresholds_arr=x)
         score, result_obj = \
             self.calculate_threshold_score(threshold_state=best_threshold_as_dict, routing_data=self.testData)
         return score, result_obj

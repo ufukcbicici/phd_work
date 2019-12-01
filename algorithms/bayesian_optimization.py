@@ -89,8 +89,8 @@ class BayesianOptimizer:
             _y, result_obj = self.f_val(x=_x)
             initial_y.append(_y)
         # Step 3: Build the first dataset for the Gaussian Process Regressor.
-        X = np.concatenate(initial_X, axis=0)
-        y = np.concatenate(initial_y, axis=0)
+        X = np.stack(initial_X, axis=0)
+        y = np.array(initial_y)
         curr_max_score = np.max(y)
         all_results = []
         best_result = None
@@ -107,6 +107,8 @@ class BayesianOptimizer:
                                                 test_result_obj=test_result_obj)
             all_results.append(result)
             if val_score > curr_max_score:
+                print("Process Id:{0} Best result so far at iteration {1} - Validation: {2} Test: {3}"
+                      .format(multiprocessing.current_process(), iteration_id, val_score, test_score))
                 curr_max_score = val_score
                 best_result = result
             X = np.vstack((X, np.expand_dims(best_x, axis=0)))
