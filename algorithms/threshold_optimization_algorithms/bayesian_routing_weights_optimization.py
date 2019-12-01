@@ -29,7 +29,3 @@ class RoutingWeightBayesianOptimizer(RoutingWeightCalculator):
             if np.sum(valid_samples_indicator_vector) == 0:
                 self.optimalWeightsDict[route_vector_as_tuple] = (1.0 / np.sum(route_vector)) * route_vector
                 continue
-            bayesian_optimizer = BayesianOptimizer(xi=0.01, bounds=self.thresholdBounds,
-                                                       random_state_func=self.random_state_sampler,
-                                                       score_func_val=self.calculate_threshold_score_val,
-                                                       score_func_test=self.calculate_threshold_score_test)
