@@ -32,7 +32,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.inputRouteMatrix = tf.placeholder(dtype=tf.int32, shape=[None, leaf_count],
                                                name='inputRouteMatrix')
         self.labelMatrix = tf.placeholder(dtype=tf.float32, shape=[None, self.posteriorDim], name='labelMatrix')
-        self.passiveWeight = 1e-300
+        self.passiveWeight = -1e+100
         self.weights = None
         self.weightedPosteriors = None
         self.finalPosterior = None
@@ -40,6 +40,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.squaredDiff = None
         self.sampleWiseSum = None
         self.runId = None
+        self.gradsOp = None
         self.iteration = 0
         self.dbRows = []
         self.useMultiPathOnly = use_multi_path_only
@@ -115,7 +116,9 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                 self.finalPosterior = tf.reduce_sum(self.weightedPosteriors, axis=2)
                 self.finalPosteriorCalibrated = tf.nn.softmax(self.finalPosterior)
             else:
-                self.sparseWeights = tf.where(self.inputRouteMatrix == 1, self.weights, self.passiveWeight)
+                passive_weights_matrix = tf.ones_like(self.weights) * self.passiveWeight
+                self.sparseWeights = tf.where(tf.cast(self.inputRouteMatrix, tf.bool),
+                                              self.weights, passive_weights_matrix)
                 self.sparseWeightsSoftmax = tf.nn.softmax(self.sparseWeights)
                 self.weightedPosteriors = tf.expand_dims(self.sparseWeightsSoftmax, axis=1) * self.inputPosteriors
                 self.finalPosterior = tf.reduce_sum(self.weightedPosteriors, axis=2)
@@ -125,6 +128,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             self.regressionMeanSquaredError = tf.reduce_mean(self.sampleWiseSum)
             self.get_l2_loss()
             self.totalLoss = self.regressionMeanSquaredError + self.l2Loss
+            self.gradsOp = tf.gradients(self.totalLoss, self.weights)
 
     def get_train_batch(self):
         if not self.useMultiPathOnly:
@@ -155,6 +159,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                    self.squaredDiff,
                    self.sampleWiseSum]
         if self.useSparseSoftmax:
+            run_ops.append(self.gradsOp)
             run_ops.append(self.sparseWeights)
             run_ops.append(self.sparseWeightsSoftmax)
         run_ops.append(self.finalPosteriorCalibrated)
@@ -242,12 +247,12 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
     def build_optimizer(self):
         with tf.variable_scope("optimizer"):
             self.globalStep = tf.Variable(0, name='global_step', trainable=False)
-            # self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+            self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
             # boundaries = [15000, 30000, 45000]
             # values = [0.01, 0.001, 0.0001, 0.00001]
             # self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
-            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
-                self.totalLoss, global_step=self.globalStep)
+            # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
+            #     self.totalLoss, global_step=self.globalStep)
 
     def train(self):
         self.runId = DbLogger.get_run_id()
