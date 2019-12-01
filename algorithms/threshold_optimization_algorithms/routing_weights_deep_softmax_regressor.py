@@ -22,7 +22,7 @@ class NetworkInput:
 
 class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
     def __init__(self, network, validation_routing_matrix, test_routing_matrix, validation_data, test_data, layers,
-                 l2_lambda, batch_size, max_iteration, use_multi_path_only=False):
+                 l2_lambda, batch_size, max_iteration, use_multi_path_only=False, use_sparse_softmax=False):
         super().__init__(network, validation_routing_matrix, test_routing_matrix, validation_data, test_data, layers,
                          l2_lambda, batch_size, max_iteration, leaf_index=None)
         self.posteriorDim = self.validationSparsePosteriors.shape[1]
@@ -32,6 +32,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.inputRouteMatrix = tf.placeholder(dtype=tf.int32, shape=[None, leaf_count],
                                                name='inputRouteMatrix')
         self.labelMatrix = tf.placeholder(dtype=tf.float32, shape=[None, self.posteriorDim], name='labelMatrix')
+        self.passiveWeight = 1e-300
         self.weights = None
         self.weightedPosteriors = None
         self.finalPosterior = None
@@ -42,12 +43,15 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         self.iteration = 0
         self.dbRows = []
         self.useMultiPathOnly = use_multi_path_only
+        self.useSparseSoftmax = use_sparse_softmax
         self.fullDataDict = {"validation": NetworkInput(_x=self.validation_X, _y=self.validationData.labelList,
                                                         routing_matrix=self.validationRoutingMatrix,
                                                         sparse_posteriors=self.validationSparsePosteriors),
                              "test": NetworkInput(_x=self.test_X, _y=self.testData.labelList,
                                                   routing_matrix=self.testRoutingMatrix,
                                                   sparse_posteriors=self.testSparsePosteriors)}
+        self.sparseWeights = None
+        self.sparseWeightsSoftmax = None
         self.multiPathDataDict = {}
         self.singlePathCorrectCounts = {}
         # Create multi path data
@@ -74,7 +78,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
             data_dict = self.fullDataDict
         else:
             data_dict = self.multiPathDataDict
-            
+
         # Z-Scaler
         z_scaler = StandardScaler()
         z_scaler.fit(data_dict["validation"].X)
@@ -106,9 +110,16 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
     def build_loss(self):
         with tf.name_scope("loss"):
             self.weights = self.networkOutput
-            self.weightedPosteriors = tf.expand_dims(self.weights, axis=1) * self.inputPosteriors
-            self.finalPosterior = tf.reduce_sum(self.weightedPosteriors, axis=2)
-            self.finalPosteriorCalibrated = tf.nn.softmax(self.finalPosterior)
+            if not self.useSparseSoftmax:
+                self.weightedPosteriors = tf.expand_dims(self.weights, axis=1) * self.inputPosteriors
+                self.finalPosterior = tf.reduce_sum(self.weightedPosteriors, axis=2)
+                self.finalPosteriorCalibrated = tf.nn.softmax(self.finalPosterior)
+            else:
+                self.sparseWeights = tf.where(self.inputRouteMatrix == 1, self.weights, self.passiveWeight)
+                self.sparseWeightsSoftmax = tf.nn.softmax(self.sparseWeights)
+                self.weightedPosteriors = tf.expand_dims(self.sparseWeightsSoftmax, axis=1) * self.inputPosteriors
+                self.finalPosterior = tf.reduce_sum(self.weightedPosteriors, axis=2)
+                self.finalPosteriorCalibrated = tf.identity(self.finalPosterior)
             self.squaredDiff = tf.squared_difference(self.finalPosterior, self.labelMatrix)
             self.sampleWiseSum = tf.reduce_sum(self.squaredDiff, axis=1)
             self.regressionMeanSquaredError = tf.reduce_mean(self.sampleWiseSum)
@@ -137,17 +148,18 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
                      self.inputPosteriors: data.sparsePosteriors,
                      self.labelMatrix: data.y_one_hot,
                      self.inputRouteMatrix: data.routingMatrix}
-        results = self.sess.run([self.regressionMeanSquaredError,
-                                 self.weights,
-                                 self.weightedPosteriors,
-                                 self.finalPosterior,
-                                 self.squaredDiff,
-                                 self.sampleWiseSum,
-                                 self.finalPosteriorCalibrated],
-                                feed_dict=feed_dict)
+        run_ops = [self.regressionMeanSquaredError,
+                   self.weights,
+                   self.weightedPosteriors,
+                   self.finalPosterior,
+                   self.squaredDiff,
+                   self.sampleWiseSum]
+        if self.useSparseSoftmax:
+            run_ops.append(self.sparseWeights)
+            run_ops.append(self.sparseWeightsSoftmax)
+        run_ops.append(self.finalPosteriorCalibrated)
+        results = self.sess.run(run_ops, feed_dict=feed_dict)
         mse = results[0]
-
-        multi_path_predicted_posteriors = results[3]
         # # Convert to probability
         # min_scores = np.min(multi_path_predicted_posteriors, axis=1, keepdims=True)
         # multi_path_predicted_posteriors = multi_path_predicted_posteriors + np.abs(min_scores)
@@ -157,7 +169,7 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
         predicted_multi_path_labels = np.argmax(multi_path_predicted_posteriors, axis=1)
         multi_path_correct_count = np.sum(data.y == predicted_multi_path_labels)
         regressor_accuracy = (self.singlePathCorrectCounts[data_type] + multi_path_correct_count) / \
-                   self.fullDataDict[data_type].X.shape[0]
+                             self.fullDataDict[data_type].X.shape[0]
 
         # Simple Average Accuracy
         simple_average_accuracy, simple_average_mean_posteriors = self.get_simple_average_results(data_type=data_type)
