@@ -85,8 +85,8 @@ class BayesianThresholdOptimizer(ThresholdOptimizer):
                                            validation_routing_matrix=val_routing_matrix,
                                            test_routing_matrix=test_routing_matrix,
                                            validation_data=self.validationData,
-                                           test_data=self.testData, min_weight=-10.0,
-                                           max_weight=10.0,
+                                           test_data=self.testData, min_weight=0.0,
+                                           max_weight=1.0,
                                            best_val_accuracy=best_result.valResultObj.accuracy,
                                            best_test_accuracy=best_result.testResultObj.accuracy)
         routing_weight_calculator.run()

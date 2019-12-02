@@ -8,12 +8,13 @@ from sklearn.gaussian_process.kernels import ConstantKernel, Matern
 
 
 class BayesianOptimizationResult:
-    def __init__(self, iteration_id, val_score, test_score, val_result_obj, test_result_obj):
+    def __init__(self, iteration_id, val_score, test_score, val_result_obj, test_result_obj, _x):
         self.iterationId = iteration_id
         self.valScore = val_score
         self.testScore = test_score
         self.valResultObj = val_result_obj
         self.testResultObj = test_result_obj
+        self.x = _x
 
 
 class BayesianOptimizer:
@@ -104,8 +105,9 @@ class BayesianOptimizer:
             test_score, test_result_obj = self.f_test(x=best_x)
             result = BayesianOptimizationResult(iteration_id=iteration_id, val_score=val_score,
                                                 test_score=test_score, val_result_obj=val_result_obj,
-                                                test_result_obj=test_result_obj)
+                                                test_result_obj=test_result_obj, _x = best_x)
             all_results.append(result)
+            print("Current val_score:{0} Current max_score:{1}".format(val_score, curr_max_score))
             if val_score > curr_max_score:
                 print("Process Id:{0} Best result so far at iteration {1} - Validation: {2} Test: {3}"
                       .format(multiprocessing.current_process(), iteration_id, val_score, test_score))
