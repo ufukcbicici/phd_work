@@ -6,26 +6,30 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from simple_tf.fashion_net.fashion_cign_moe_logits import FashionCignMoeLogits
+from simple_tf.fashion_net.fashion_net_baseline import FashionNetBaseline
 from simple_tf.global_params import GlobalConstants
 from auxillary.constants import DatasetTypes
 
 
 use_moe = False
+use_sampling = False
+use_random_sampling = False
+use_baseline = False
 
 
 def get_network(dataset, network_name):
-    if not use_moe:
+    if not use_baseline:
         network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                   network_name=network_name)
-    elif use_moe:
-        network = FashionCignMoeLogits(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST)
+    elif use_baseline:
+        network = FashionNetBaseline(dataset=dataset, network_name=network_name)
     else:
         raise NotImplementedError()
     return network
 
 
 def fashion_net_training():
-    network_name = "FashionNet_CIGN_Lite"
+    network_name = "FashionNet_CIGN_Baseline"
     dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
     dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
     classification_wd = [0.0]

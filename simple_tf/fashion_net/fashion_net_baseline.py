@@ -23,7 +23,7 @@ class FashionNetBaseline(FastTreeNetwork):
         for idx in range(len(GlobalConstants.FASHION_NET_BASELINE_CONV_FEATURE_MAPS) - 1):
             f_map_count_0 = GlobalConstants.FASHION_NET_BASELINE_CONV_FEATURE_MAPS[idx]
             f_map_count_1 = GlobalConstants.FASHION_NET_BASELINE_CONV_FEATURE_MAPS[idx + 1]
-            filter_sizes = GlobalConstants.FASHION_NET_BASELINE_CONV_FEATURE_MAPS[idx]
+            filter_sizes = GlobalConstants.FASHION_NET_BASELINE_CONV_FILTER_SIZES[idx]
             conv_W = tf.Variable(
                 tf.truncated_normal([filter_sizes, filter_sizes, f_map_count_0, f_map_count_1], stddev=0.1,
                                     seed=GlobalConstants.SEED,
@@ -98,7 +98,6 @@ class FashionNetBaseline(FastTreeNetwork):
         explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
         explanation += "Classification Dropout Probability:{0}\n".format(
             GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
-        explanation += "Decision Dropout Probability:{0}\n".format(self.decisionDropoutKeepProbCalculator.value)
         explanation += "TRAINING PARAMETERS:\n"
         explanation += super().get_explanation_string()
         return explanation

@@ -397,8 +397,8 @@ class CignMultiGpu(FastTreeNetwork):
                 self.save_model(sess=sess, run_id=run_id, iteration=iteration)
                 network.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                           dataset=dataset, dataset_type=DatasetTypes.test)
-                network.test_save_load(sess=sess, run_id=run_id, iteration=iteration,
-                                       dataset=dataset, dataset_type=DatasetTypes.test)
+                # network.test_save_load(sess=sess, run_id=run_id, iteration=iteration,
+                #                        dataset=dataset, dataset_type=DatasetTypes.test)
             DbLogger.write_into_table(
                 rows=[(run_id, iteration, epoch_id, training_accuracy,
                        validation_accuracy, validation_accuracy_corrected,
