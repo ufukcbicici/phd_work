@@ -103,6 +103,7 @@ class EarlyExitTree(FastTreeNetwork):
                 self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
                                         run_id=run_id,
                                         iteration=iteration)
+            validation_accuracy_late = 0.0
             if not self.isBaseline:
                 validation_accuracy_late, validation_confusion_late = \
                     self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
