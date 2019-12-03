@@ -36,8 +36,16 @@ class EarlyExitTree(FastTreeNetwork):
         self.lateExitLosses = {}
         self.lateExitWeight = None
 
-        self.sumEarlyExits = None
-        self.sumLateExits = None
+        self.sumEarlyExits = tf.placeholder("early_exit_loss_weight")
+        self.sumLateExits = tf.placeholder("late_exit_loss_weight")
+
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
+        feed_dict = super().prepare_feed_dict(minibatch=minibatch, iteration=iteration,
+                                              use_threshold=use_threshold, is_train=is_train,
+                                              use_masking=use_masking)
+        feed_dict[self.earlyExitWeight] = GlobalConstants.EARLY_EXIT_WEIGHT
+        feed_dict[self.lateExitWeight] = GlobalConstants.LATE_EXIT_WEIGHT
+        return feed_dict
 
     def make_loss(self, node, logits):
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,

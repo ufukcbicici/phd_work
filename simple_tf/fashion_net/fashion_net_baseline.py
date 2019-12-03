@@ -63,7 +63,8 @@ class FashionNetBaseline(FastTreeNetwork):
             fc_weights.append(fc_W)
             fc_biases.append(fc_b)
             if not is_last_layer:
-                net = tf.nn.relu(tf.matmul(net, fc_W) + fc_b)
+                net = FastTreeNetwork.fc_layer(x=net, W=fc_W, b=fc_b, node=node)
+                net = tf.nn.relu(net)
                 net = tf.nn.dropout(net, network.classificationDropoutKeepProb)
         # Loss
         final_feature, logits = network.apply_loss(node=node, final_feature=net,

@@ -29,12 +29,13 @@ class FastTreeNetwork(TreeNetwork):
         self.infoGainDicts = None
         self.extra_update_ops = None
         self.nodeCosts = {}
+        self.opCosts = {}
         self.networkName = network_name
         self.dbName = None
         self.saver = None
 
     @staticmethod
-    def conv_layer(x, kernel, strides, node, bias=None, padding='SAME'):
+    def conv_layer(x, kernel, strides, node, bias=None, padding='SAME', name="conv_op"):
         assert len(x.get_shape().as_list()) == 4
         assert len(kernel.get_shape().as_list()) == 4
         assert kernel.get_shape().as_list()[2] == x.get_shape().as_list()[3]
@@ -55,13 +56,20 @@ class FastTreeNetwork(TreeNetwork):
         )
         if node is not None:
             node.macCost += cost
+            op_id = 0
+            while True:
+                if "{0}_{1}".format(name, op_id) in node.opMacCostsDict:
+                    op_id += 1
+                    continue
+                break
+            node.opMacCostsDict["{0}_{1}".format(name, op_id)] = cost
         x_hat = tf.nn.conv2d(x, kernel, strides, padding=padding)
         if bias is not None:
             x_hat = tf.nn.bias_add(x_hat, bias)
         return x_hat
 
     @staticmethod
-    def fc_layer(x, W, b, node):
+    def fc_layer(x, W, b, node, name="fc_op"):
         assert len(x.get_shape().as_list()) == 2
         assert len(W.get_shape().as_list()) == 2
         x_hat = tf.matmul(x, W) + b
@@ -77,6 +85,13 @@ class FastTreeNetwork(TreeNetwork):
                                                          type="fc")
         if node is not None:
             node.macCost += cost
+            op_id = 0
+            while True:
+                if "{0}_{1}".format(name, op_id) in node.opMacCostsDict:
+                    op_id += 1
+                    continue
+                break
+            node.opMacCostsDict["{0}_{1}".format(name, op_id)] = cost
         return x_hat
 
     # OK for MultiGPU

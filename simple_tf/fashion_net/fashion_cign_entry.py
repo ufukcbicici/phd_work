@@ -14,7 +14,7 @@ from auxillary.constants import DatasetTypes
 use_moe = False
 use_sampling = False
 use_random_sampling = False
-use_baseline = False
+use_baseline = True
 
 
 def get_network(dataset, network_name):

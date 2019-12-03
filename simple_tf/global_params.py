@@ -115,6 +115,8 @@ class GlobalConstants:
     LR_COEFF = 1.0
     DECAY_STEP = 15000
     DECAY_RATE = 0.5  # INITIAL_LR/EPOCH_COUNT
+    EARLY_EXIT_WEIGHT = None
+    LATE_EXIT_WEIGHT = None
     # LEARNING_RATE_CALCULATOR = DecayingParameterV2(name="lr_calculator", value=INITIAL_LR,
     #                                                decay=DECAY_RATE)
     # LEARNING_RATE_CALCULATOR = DecayingParameter(name="lr_calculator", value=INITIAL_LR, decay=DECAY_RATE,
@@ -231,7 +233,7 @@ class GlobalConstants:
     # Baseline
     FASHION_NET_BASELINE_CONV_FEATURE_MAPS = [1, 32, 64, 128]
     FASHION_NET_BASELINE_CONV_FILTER_SIZES = [5, 5, 1]
-    FASHION_NET_BASELINE_FC_DIMENSIONS = [1028, 512]
+    FASHION_NET_BASELINE_FC_DIMENSIONS = [1024, 512]
     FASHION_NUM_FILTERS_1 = 32
     FASHION_NUM_FILTERS_2 = 64
     FASHION_NUM_FILTERS_3 = 64
