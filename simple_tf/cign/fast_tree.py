@@ -661,12 +661,12 @@ class FastTreeNetwork(TreeNetwork):
         return directory_path, checkpoint_path
 
     @staticmethod
-    def get_routing_info_path(network_name, run_id, iteration):
+    def get_routing_info_path(network_name, run_id, iteration, data_type):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
                                                       "{0}_run_{1}_iteration_{2}".format(network_name, run_id,
-                                                                                         iteration)))
+                                                                                         iteration, data_type)))
         return directory_path
 
     def save_model(self, sess, run_id, iteration):
@@ -687,8 +687,10 @@ class FastTreeNetwork(TreeNetwork):
 
     def save_routing_info(self, sess, run_id, iteration, dataset, dataset_type):
         dict_of_data_dicts = {}
+        data_type = "test" if dataset_type == DatasetTypes.test else "training"
         directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
-                                                               run_id=run_id, iteration=iteration)
+                                                               run_id=run_id, iteration=iteration,
+                                                               data_type=data_type)
         if not os.path.exists(directory_path):
             os.mkdir(directory_path)
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
@@ -717,9 +719,10 @@ class FastTreeNetwork(TreeNetwork):
         return routing_data
 
     @staticmethod
-    def load_routing_info(network, run_id, iteration):
+    def load_routing_info(network, run_id, iteration, data_type):
         directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
-                                                               network_name=network.networkName)
+                                                               network_name=network.networkName,
+                                                               data_type=data_type)
         # Assert that the tree architecture is compatible with the loaded info
         npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
         degree_list = UtilityFuncs.load_npz(file_name=npz_file_name)
@@ -740,9 +743,11 @@ class FastTreeNetwork(TreeNetwork):
 
     # Unit Test
     def test_save_load(self, sess, run_id, iteration, dataset, dataset_type):
+        data_type = "test" if dataset_type == DatasetTypes.test else "training"
         routing_data_save = self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                                    dataset=dataset, dataset_type=dataset_type)
-        routing_data_load = FastTreeNetwork.load_routing_info(network=self, run_id=run_id, iteration=iteration)
+        routing_data_load = FastTreeNetwork.load_routing_info(network=self, run_id=run_id, iteration=iteration,
+                                                              data_type=data_type)
         assert routing_data_save == routing_data_load
 
     @staticmethod
@@ -900,6 +905,8 @@ class FastTreeNetwork(TreeNetwork):
                         dataset_type=DatasetTypes.test)
                 if is_evaluation_epoch_before_ending:
                     self.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                    self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                                           dataset=dataset, dataset_type=DatasetTypes.training)
                     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                            dataset=dataset, dataset_type=DatasetTypes.test)
                     # self.test_save_load(sess=sess, run_id=run_id, iteration=iteration,

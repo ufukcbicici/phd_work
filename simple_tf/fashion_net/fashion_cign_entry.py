@@ -36,7 +36,7 @@ def fashion_net_training():
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     # classification_dropout_probs = [0.15]
-    classification_dropout_probs = [0.05, 0.1, 0.15, 0.2, 0.25] * 15
+    classification_dropout_probs = [0.05]
     classification_dropout_probs = sorted(classification_dropout_probs)
     decision_dropout_probs = \
         [0.0]

@@ -16,32 +16,32 @@ from multiprocessing import Pool, Lock
 # Initial Operations
 from simple_tf.global_params import GlobalConstants
 
-run_id = 1235
-# network_name = "Cifar100_CIGN_Sampling"
-network_name = "FashionNet_Lite"
-iteration = 43680
-routing_data_dict = {}
-max_num_of_iterations = 10000
-balance_coefficient = 1.0
-sa_sample_count = 100
-
-use_weighted_scoring = False
-brute_force_sample_count = 1000000
-# node_costs = {i: 1 for i in range(7)}
-# node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
-node_costs = {0: 465152.0, 2: 2564352.0, 6: 124544.0, 5: 124544.0, 1: 2564352.0, 4: 124544.0, 3: 124544.0}
-
-GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations"]
-GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor"]
-
-# GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "branching_feature"]
-# GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits"]
-
-network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
-routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration)
-multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
-
-multiprocess_lock = Lock()
+# run_id = 1235
+# # network_name = "Cifar100_CIGN_Sampling"
+# network_name = "FashionNet_Lite"
+# iteration = 43680
+# routing_data_dict = {}
+# max_num_of_iterations = 10000
+# balance_coefficient = 1.0
+# sa_sample_count = 100
+#
+# use_weighted_scoring = False
+# brute_force_sample_count = 1000000
+# # node_costs = {i: 1 for i in range(7)}
+# # node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
+# node_costs = {0: 465152.0, 2: 2564352.0, 6: 124544.0, 5: 124544.0, 1: 2564352.0, 4: 124544.0, 3: 124544.0}
+#
+# GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations"]
+# GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor"]
+#
+# # GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "branching_feature"]
+# # GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits"]
+#
+# network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
+# routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration, data_type="test")
+# multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
+#
+# multiprocess_lock = Lock()
 
 
 def bayesian_process_runner(param_tpl):
