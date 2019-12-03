@@ -97,8 +97,11 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
                     fc_layers=FashionCignLiteEarlyExit.EARLY_EXIT_FC_LAYERS,
                     conv_name="early_exit_conv_op",
                     fc_name="early_exit_fc_op")
-            network.apply_loss(node=node, final_feature=early_exit_features, softmax_weights=early_exit_softmax_weights,
-                               softmax_biases=early_exit_softmax_biases)
+            final_feature_early, logits_early = \
+                network.apply_loss(node=node, final_feature=early_exit_features,
+                                   softmax_weights=early_exit_softmax_weights,
+                                   softmax_biases=early_exit_softmax_biases)
+            node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits_early)
         with tf.variable_scope("late_exit"):
             late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases = \
                 FashionCignLiteEarlyExit.build_lenet_structure(
@@ -108,9 +111,10 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
                     fc_layers=FashionCignLiteEarlyExit.LATE_EXIT_FC_LAYERS,
                     conv_name="late_exit_conv_op",
                     fc_name="late_exit_fc_op")
-            network.apply_late_loss(node=node, final_feature=late_exit_features,
-                                    softmax_weights=late_exit_softmax_weights,
-                                    softmax_biases=late_exit_softmax_biases)
+            final_feature_late, logits_late = network.apply_late_loss(node=node, final_feature=late_exit_features,
+                                                                      softmax_weights=late_exit_softmax_weights,
+                                                                      softmax_biases=late_exit_softmax_biases)
+            node.evalDict[network.get_variable_name(name="posterior_probs_late", node=node)] = tf.nn.softmax(logits_late)
 
     def get_explanation_string(self):
         total_param_count = 0
@@ -223,7 +227,8 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
         explanation += "EARLY EXIT PARAMETERS:\n"
         # Early Exit - Late Exit Parameters
         explanation += "EARLY_EXIT_CONV_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.EARLY_EXIT_CONV_LAYERS)
-        explanation += "EARLY_EXIT_CONV_FILTER_SIZES:{0}:\n".format(FashionCignLiteEarlyExit.EARLY_EXIT_CONV_FILTER_SIZES)
+        explanation += "EARLY_EXIT_CONV_FILTER_SIZES:{0}:\n".format(
+            FashionCignLiteEarlyExit.EARLY_EXIT_CONV_FILTER_SIZES)
         explanation += "EARLY_EXIT_FC_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.EARLY_EXIT_FC_LAYERS)
         explanation += "LATE_EXIT_CONV_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_CONV_LAYERS)
         explanation += "LATE_EXIT_CONV_FILTER_SIZES:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_CONV_FILTER_SIZES)

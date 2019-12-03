@@ -28,7 +28,8 @@ def get_network(dataset, network_name):
     elif use_early_exit:
         network = FashionCignLiteEarlyExit(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                            network_name=network_name)
-        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(["final_feature_late_exit", "logits_late_exit"])
+        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(
+            ["final_feature_late_exit", "logits_late_exit", "posterior_probs_late"])
     else:
         raise NotImplementedError()
     return network

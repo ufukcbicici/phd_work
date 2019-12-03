@@ -826,11 +826,12 @@ class FastTreeNetwork(TreeNetwork):
                 kv_rows.append((run_id, iteration, "{0} Leaf:{1} True Label:{2}".
                                 format(dataset_type, node.index, l), np.asscalar(label_distribution[l])))
 
-    def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration):
+    def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration,
+                           posterior_entry_name="posterior_probs"):
         kv_rows = []
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         inner_node_outputs = ["info_gain", "branch_probs", "activations"]
-        leaf_node_outputs = ["posterior_probs", "label_tensor"]
+        leaf_node_outputs = [posterior_entry_name, "label_tensor"]
         t0 = time.time()
         leaf_node_collections, inner_node_collections = \
             self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
@@ -842,7 +843,7 @@ class FastTreeNetwork(TreeNetwork):
         info_gain_dict = inner_node_collections["info_gain"]
         branch_probs_dict = inner_node_collections["branch_probs"]
         leaf_true_labels_dict = leaf_node_collections["label_tensor"]
-        posteriors_dict = leaf_node_collections["posterior_probs"]
+        posteriors_dict = leaf_node_collections[posterior_entry_name]
         # Measure Information Gain
         FastTreeNetwork.calculate_information_gain(info_gain_dict=info_gain_dict, kv_rows=kv_rows,
                                                    dataset_type=dataset_type, run_id=run_id, iteration=iteration)
