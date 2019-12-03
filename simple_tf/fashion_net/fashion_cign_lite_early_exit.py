@@ -29,10 +29,13 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
         conv_weights = []
         conv_biases = []
         assert len(parent_F.get_shape().as_list()) == 4
+        conv_layers = list(conv_layers)
+        conv_layers.insert(0, parent_F.get_shape().as_list()[-1])
         assert len(conv_layers) == len(conv_filters) + 1
         net = parent_F
         # Conv Layers
         for idx in range(len(conv_layers) - 1):
+            is_last_layer = idx == len(conv_layers) - 2
             f_map_count_0 = conv_layers[idx]
             f_map_count_1 = conv_layers[idx + 1]
             filter_sizes = conv_filters[idx]
@@ -50,7 +53,8 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
             net = FastTreeNetwork.conv_layer(x=net, kernel=conv_W, strides=[1, 1, 1, 1], padding='SAME', bias=conv_b,
                                              node=node, name=conv_name)
             net = tf.nn.relu(net)
-            net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+            if is_last_layer:
+                net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
             node.fOpsList.extend([net])
         # FC Layers
         net = tf.contrib.layers.flatten(net)
@@ -113,7 +117,7 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "Fashion Net - Multipath Bayesian Optimization\n"
+        explanation = "Fashion Net - Early Exit\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)

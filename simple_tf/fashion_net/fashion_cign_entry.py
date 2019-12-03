@@ -20,7 +20,7 @@ use_early_exit = True
 
 
 def get_network(dataset, network_name):
-    if not use_baseline:
+    if not (use_baseline or use_early_exit):
         network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                   network_name=network_name)
     elif use_baseline:
@@ -35,7 +35,7 @@ def get_network(dataset, network_name):
 
 
 def fashion_net_training():
-    network_name = "FashionNetLite_CIGN"
+    network_name = "FashionNetLite_EarlyExitCIGN"
     dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
     dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
     classification_wd = [0.0]

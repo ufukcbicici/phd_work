@@ -29,15 +29,15 @@ class EarlyExitTree(FastTreeNetwork):
         self.earlyExitFeatures = {}
         self.earlyExitLogits = {}
         self.earlyExitLosses = {}
-        self.earlyExitWeight = None
+        self.earlyExitWeight = tf.placeholder(name="early_exit_loss_weight", dtype=tf.float32)
 
         self.lateExitFeatures = {}
         self.lateExitLogits = {}
         self.lateExitLosses = {}
-        self.lateExitWeight = None
+        self.lateExitWeight = tf.placeholder(name="late_exit_loss_weight", dtype=tf.float32)
 
-        self.sumEarlyExits = tf.placeholder("early_exit_loss_weight")
-        self.sumLateExits = tf.placeholder("late_exit_loss_weight")
+        self.sumEarlyExits = None
+        self.sumLateExits = None
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         feed_dict = super().prepare_feed_dict(minibatch=minibatch, iteration=iteration,
