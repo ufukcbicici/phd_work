@@ -5,6 +5,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
+from simple_tf.fashion_net.fashion_cign_lite_early_exit import FashionCignLiteEarlyExit
 from simple_tf.fashion_net.fashion_cign_moe_logits import FashionCignMoeLogits
 from simple_tf.fashion_net.fashion_net_baseline import FashionNetBaseline
 from simple_tf.global_params import GlobalConstants
@@ -14,7 +15,8 @@ from auxillary.constants import DatasetTypes
 use_moe = False
 use_sampling = False
 use_random_sampling = False
-use_baseline = True
+use_baseline = False
+use_early_exit = True
 
 
 def get_network(dataset, network_name):
@@ -23,6 +25,10 @@ def get_network(dataset, network_name):
                                   network_name=network_name)
     elif use_baseline:
         network = FashionNetBaseline(dataset=dataset, network_name=network_name)
+    elif use_early_exit:
+        network = FashionCignLiteEarlyExit(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
+                                           network_name=network_name)
+        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(["final_feature_late_exit", "logits_late_exit"])
     else:
         raise NotImplementedError()
     return network
@@ -40,11 +46,15 @@ def fashion_net_training():
     classification_dropout_probs = sorted(classification_dropout_probs)
     decision_dropout_probs = \
         [0.0]
+    early_exit_weights = [1.0]
+    late_exit_weights = [1.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_probs,
-                                                                          decision_dropout_probs])
+                                                                          decision_dropout_probs,
+                                                                          early_exit_weights,
+                                                                          late_exit_weights])
     run_id = 0
     for tpl in cartesian_product:
         # try:
@@ -64,7 +74,9 @@ def fashion_net_training():
                                     decision_weight_decay_coefficient=tpl[1],
                                     info_gain_balance_coefficient=tpl[2],
                                     classification_keep_probability=1.0 - tpl[3],
-                                    decision_keep_probability=1.0 - tpl[4])
+                                    decision_keep_probability=1.0 - tpl[4],
+                                    early_exit_weight=tpl[5],
+                                    late_exit_weight=tpl[6])
         experiment_id = DbLogger.get_run_id()
         explanation = network.get_explanation_string()
         series_id = int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
