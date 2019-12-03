@@ -247,12 +247,12 @@ class RoutingWeightDeepSoftmaxRegressor(RoutingWeightDeepRegressor):
     def build_optimizer(self):
         with tf.variable_scope("optimizer"):
             self.globalStep = tf.Variable(0, name='global_step', trainable=False)
-            self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
-            # boundaries = [15000, 30000, 45000]
-            # values = [0.01, 0.001, 0.0001, 0.00001]
-            # self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
-            # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
-            #     self.totalLoss, global_step=self.globalStep)
+            # self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+            boundaries = [15000, 30000, 45000]
+            values = [0.01, 0.001, 0.0001, 0.00001]
+            self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
+            self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
+                self.totalLoss, global_step=self.globalStep)
 
     def train(self):
         self.runId = DbLogger.get_run_id()

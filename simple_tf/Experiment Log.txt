@@ -1159,7 +1159,7 @@ FROM
 		LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
 		WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 90
 		AND
-		Explanation LIKE "%Fashion Net - Multipath Optimization%" AND
+		Explanation LIKE "%Fashion Net - Multipath Bayesian Optimization%" AND
 		Explanation LIKE "%Batch Size:125%"
 	)
 	GROUP BY Explanation

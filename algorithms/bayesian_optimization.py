@@ -79,41 +79,45 @@ class BayesianOptimizer:
         return best_score, best_state
 
     def run(self, max_iterations, initial_sample_count):
-        # Step 1: Sample a certain amount of random states in order to train the Gaussian Process Regressor.
-        initial_X = []
-        initial_y = []
-        for idx in range(initial_sample_count):
-            initial_X.append(self.randomStateFunc())
-        # Step 2: The selected thresholds constitute our hyperparameter samples. Get the performance metrics, the "t"
-        # variables.
-        for _x in initial_X:
-            _y, result_obj = self.f_val(x=_x)
-            initial_y.append(_y)
-        # Step 3: Build the first dataset for the Gaussian Process Regressor.
-        X = np.stack(initial_X, axis=0)
-        y = np.array(initial_y)
-        curr_max_score = np.max(y)
-        all_results = []
-        best_result = None
-        print("Process:{0} GP iterations start.".format(multiprocessing.current_process()))
-        for iteration_id in range(max_iterations):
-            print("Process:{0} Iteration:{1}".format(multiprocessing.current_process(), iteration_id))
-            gpr = GaussianProcessRegressor(kernel=self.gpKernel, alpha=self.noiseLevel, n_restarts_optimizer=10)
-            gpr.fit(X, y)
-            best_score, best_x = self.propose_thresholds(gpr=gpr, max_score=curr_max_score, number_of_trials=100)
-            val_score, val_result_obj = self.f_val(x=best_x)
-            test_score, test_result_obj = self.f_test(x=best_x)
-            result = BayesianOptimizationResult(iteration_id=iteration_id, val_score=val_score,
-                                                test_score=test_score, val_result_obj=val_result_obj,
-                                                test_result_obj=test_result_obj, _x = best_x)
-            all_results.append(result)
-            print("Current val_score:{0} Current max_score:{1}".format(val_score, curr_max_score))
-            if val_score > curr_max_score:
-                print("Process Id:{0} Best result so far at iteration {1} - Validation: {2} Test: {3}"
-                      .format(multiprocessing.current_process(), iteration_id, val_score, test_score))
-                curr_max_score = val_score
-                best_result = result
-            X = np.vstack((X, np.expand_dims(best_x, axis=0)))
-            y = np.concatenate([y, np.array([val_score])])
-        print("Process:{0} ends.".format(multiprocessing.current_process()))
-        return best_result, all_results
+        while True:
+            best_result = None
+            # Step 1: Sample a certain amount of random states in order to train the Gaussian Process Regressor.
+            initial_X = []
+            initial_y = []
+            for idx in range(initial_sample_count):
+                initial_X.append(self.randomStateFunc())
+            # Step 2: The selected thresholds constitute our hyperparameter samples. Get the performance metrics, the "t"
+            # variables.
+            for _x in initial_X:
+                _y, result_obj = self.f_val(x=_x)
+                initial_y.append(_y)
+            # Step 3: Build the first dataset for the Gaussian Process Regressor.
+            X = np.stack(initial_X, axis=0)
+            y = np.array(initial_y)
+            curr_max_score = np.max(y)
+            all_results = []
+            print("Process:{0} GP iterations start.".format(multiprocessing.current_process()))
+            for iteration_id in range(max_iterations):
+                print("Process:{0} Iteration:{1}".format(multiprocessing.current_process(), iteration_id))
+                gpr = GaussianProcessRegressor(kernel=self.gpKernel, alpha=self.noiseLevel, n_restarts_optimizer=10)
+                gpr.fit(X, y)
+                best_score, best_x = self.propose_thresholds(gpr=gpr, max_score=curr_max_score, number_of_trials=100)
+                val_score, val_result_obj = self.f_val(x=best_x)
+                test_score, test_result_obj = self.f_test(x=best_x)
+                result = BayesianOptimizationResult(iteration_id=iteration_id, val_score=val_score,
+                                                    test_score=test_score, val_result_obj=val_result_obj,
+                                                    test_result_obj=test_result_obj, _x = best_x)
+                all_results.append(result)
+                print("Current val_score:{0} Current max_score:{1}".format(val_score, curr_max_score))
+                if val_score > curr_max_score:
+                    print("Process Id:{0} Best result so far at iteration {1} - Validation: {2} Test: {3}"
+                          .format(multiprocessing.current_process(), iteration_id, val_score, test_score))
+                    curr_max_score = val_score
+                    best_result = result
+                X = np.vstack((X, np.expand_dims(best_x, axis=0)))
+                y = np.concatenate([y, np.array([val_score])])
+            if best_result is None:
+                print("Process:{0} restarts.".format(multiprocessing.current_process()))
+                continue
+            print("Process:{0} ends.".format(multiprocessing.current_process()))
+            return best_result, all_results
