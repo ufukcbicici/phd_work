@@ -542,7 +542,7 @@ class FastTreeNetwork(TreeNetwork):
             if "original_samples" == output_name:
                 continue
             output_arr = results[self.get_variable_name(name=output_name, node=node)]
-            UtilityFuncs.concat_to_np_array_dict(dct=collection[output_name], key=node.index, array=output_arr)
+            UtilityFuncs.concat_to_np_array_dict_v2(dct=collection[output_name], key=node.index, array=output_arr)
 
     def collect_eval_results_from_network(self,
                                           sess,
@@ -574,10 +574,16 @@ class FastTreeNetwork(TreeNetwork):
                                                              results=results)
                 # Add the input data as well.
                 if "original_samples" in set(inner_node_collections_names):
-                    UtilityFuncs.concat_to_np_array_dict(dct=inner_node_collections["original_samples"], key=0,
-                                                         array=minibatch.samples)
+                    UtilityFuncs.concat_to_np_array_dict_v2(dct=inner_node_collections["original_samples"], key=0,
+                                                            array=minibatch.samples)
             if dataset.isNewEpoch:
                 break
+        for collections in [leaf_node_collections, inner_node_collections]:
+            for output_name, nodes_arr_dict in collections.items():
+                for node_idx in nodes_arr_dict.keys():
+                    if np.isscalar(nodes_arr_dict[node_idx][0]):
+                        continue
+                    nodes_arr_dict[node_idx] = np.concatenate(nodes_arr_dict[node_idx], axis=0)
         return leaf_node_collections, inner_node_collections
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
@@ -680,8 +686,8 @@ class FastTreeNetwork(TreeNetwork):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}".format(network_name, run_id,
-                                                                                         iteration, data_type)))
+                                                      "{0}_run_{1}_iteration_{2}_{3}".format(network_name, run_id,
+                                                                                             iteration, data_type)))
         return directory_path
 
     def save_model(self, sess, run_id, iteration):
@@ -709,9 +715,9 @@ class FastTreeNetwork(TreeNetwork):
         if not os.path.exists(directory_path):
             os.mkdir(directory_path)
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        inner_node_outputs = GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT
+        inner_node_outputs = list(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
         inner_node_outputs.append("original_samples")
-        leaf_node_outputs = GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT
+        leaf_node_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
         leaf_node_collections, inner_node_collections = \
             self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
                                                    use_masking=False,
@@ -920,11 +926,16 @@ class FastTreeNetwork(TreeNetwork):
                         sess=sess, dataset=dataset,
                         dataset_type=DatasetTypes.test)
                 if is_evaluation_epoch_before_ending:
-                    self.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                    # self.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                    t0 = time.time()
                     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                            dataset=dataset, dataset_type=DatasetTypes.training)
+                    t1 = time.time()
                     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                            dataset=dataset, dataset_type=DatasetTypes.test)
+                    t2 = time.time()
+                    print("t1-t0={0}".format(t1 - t0))
+                    print("t2-t1={0}".format(t2 - t1))
                     # self.test_save_load(sess=sess, run_id=run_id, iteration=iteration,
                     #                     dataset=dataset, dataset_type=DatasetTypes.test)
             DbLogger.write_into_table(

@@ -110,7 +110,7 @@ class EarlyExitTree(FastTreeNetwork):
                                             run_id=run_id,
                                             iteration=iteration, posterior_entry_name="posterior_probs_late")
                 if is_evaluation_epoch_before_ending:
-                    self.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                    # self.save_model(sess=sess, run_id=run_id, iteration=iteration)
                     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                            dataset=dataset, dataset_type=DatasetTypes.training)
                     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
