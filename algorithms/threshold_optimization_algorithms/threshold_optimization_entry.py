@@ -93,7 +93,7 @@ def main():
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[xi_list, weighted_score_list, balance_list])
     # bayesian_process_runner(cartesian_product[0])
 
-    pool = Pool(processes=3)
+    pool = Pool(processes=5)
     pool.map(bayesian_process_runner, cartesian_product)
 
     # ThresholdAccuracyMeasurement.calculate_accuracy(run_id=67, iteration=119100, max_overload=10.0, max_limit=1)
