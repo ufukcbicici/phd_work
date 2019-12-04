@@ -13,7 +13,7 @@ class ThresholdAccuracyMeasurement:
                            "WHERE RunID = {0} AND Iterations = \"{1}\" GROUP BY TimeStamp".format(run_id, iteration)
         time_stamps = DbLogger.read_query(query=time_stamp_query)
 
-        xi_dict = {}
+        params_dict = {}
         xi_matrix_dict = {}
         for time_stamp in time_stamps:
             accuracy_query = "SELECT * FROM threshold_optimization " \
@@ -29,12 +29,13 @@ class ThresholdAccuracyMeasurement:
                 test_computation_overload = accuracy_row[10]
                 if test_accuracy is None or test_computation_overload is None:
                     continue
+                balance_coeff = accuracy_row[3]
                 xi_val = accuracy_row[-2]
                 result_arr = np.array([val_accuracy, val_computation_overload, test_accuracy, test_computation_overload])
-                if xi_val not in xi_dict:
-                    xi_dict[xi_val] = []
-                xi_dict[xi_val].append(result_arr)
-        for xi_val, results in xi_dict.items():
-            xi_matrix_dict[xi_val] = np.stack(results, axis=0)
+                if (balance_coeff, xi_val) not in params_dict:
+                    params_dict[(balance_coeff, xi_val)] = []
+                params_dict[(balance_coeff, xi_val)].append(result_arr)
+        for param_tpl, results in params_dict.items():
+            xi_matrix_dict[param_tpl] = np.stack(results, axis=0)
             print("xi_val={0}".format(xi_val))
             print(np.mean(xi_matrix_dict[xi_val], axis=0))
