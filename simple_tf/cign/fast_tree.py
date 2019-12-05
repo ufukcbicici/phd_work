@@ -686,7 +686,7 @@ class FastTreeNetwork(TreeNetwork):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}_{3}".format(network_name, run_id,
+                                                      "{0}_run_{1}_iteration_{2}".format(network_name, run_id,
                                                                                              iteration, data_type)))
         return directory_path
 

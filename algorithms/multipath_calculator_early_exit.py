@@ -1,43 +1,45 @@
 import numpy as np
 
+from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
 from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers import MultipathResult, BranchingInfo
 from auxillary.general_utility_funcs import UtilityFuncs
 
 
-class MultipathCalculatorV2:
+class MultipathCalculatorEarlyExit(MultipathCalculatorV2):
     def __init__(self, network):
-        # self.thresholdsDict structure: (node_index, thresholds[] -> len(child_nodes) sized array.
-        # Thresholds are sorted according to the child node indices:
-        # i.th child's threshold is at: thresholds[sorted(child_nodes).index_of(child_node[i])]
-        self.network = network
-        self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
-        self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
-        self.innerNodes = sorted(self.innerNodes, key=lambda node: node.index)
-        self.leafNodes = sorted(self.leafNodes, key=lambda node: node.index)
-        # self.labelList = label_list
-        # self.branchProbs = branch_probs
-        # self.activations = activations
-        # self.posteriorProbs = posterior_probs
-        self.routingResultsDict = {}
-        self.networkActivationCosts = {}
-        self.kvRows = []
-        self.baseEvaluationCost = None
-        self.branchProbs = None
-        self.posteriors = None
-        self.labelList = None
-        self.get_evaluation_costs()
+        super().__init__(network)
+        self.posteriorsEarly = None
+        self.posteriorsLate = None
 
     def get_evaluation_costs(self):
         list_of_lists = []
         path_costs = []
         for node in self.leafNodes:
+            path_cost = 0
             list_of_lists.append([0, 1])
             leaf_ancestors = self.network.dagObject.ancestors(node=node)
-            leaf_ancestors.append(node)
-            path_costs.append(sum([self.network.nodeCosts[ancestor.index] for ancestor in leaf_ancestors]))
+            path_cost += sum([self.network.nodeCosts[ancestor.index] for ancestor in leaf_ancestors])
+            assert all(["early_exit" in k or "late_exit" in k for k in node.opMacCostsDict.keys()])
+            leaf_early_exit_cost = sum([node.opMacCostsDict[k] for k in node.opMacCostsDict.keys()
+                                        if "early_exit" in k])
+            path_cost += leaf_early_exit_cost
         self.baseEvaluationCost = np.mean(np.array(path_costs))
+        early_exit_costs_dict = {}
+        late_exit_costs_dict = {}
+        for node in self.leafNodes:
+            if node.isLeaf:
+                leaf_early_exit_cost = sum([node.opMacCostsDict[k] for k in node.opMacCostsDict.keys()
+                                            if "early_exit" in k])
+                leaf_late_exit_cost = sum([node.opMacCostsDict[k] for k in node.opMacCostsDict.keys()
+                                           if "late_exit" in k])
+                early_exit_costs_dict[node.index] = leaf_early_exit_cost
+                late_exit_costs_dict[node.index] = leaf_late_exit_cost
+            else:
+                early_exit_costs_dict[node.index] = self.network.nodeCosts[node.index]
+                late_exit_costs_dict[node.index] = self.network.nodeCosts[node.index]
         all_result_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=list_of_lists)
         for result_tuple in all_result_tuples:
+            cost_dict = early_exit_costs_dict if sum(result_tuple) == 1 else late_exit_costs_dict
             processed_nodes_set = set()
             for node_idx, curr_node in enumerate(self.leafNodes):
                 if result_tuple[node_idx] == 0:
@@ -46,57 +48,13 @@ class MultipathCalculatorV2:
                 leaf_ancestors.append(curr_node)
                 for ancestor in leaf_ancestors:
                     processed_nodes_set.add(ancestor.index)
-            total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
+            total_cost = sum([cost_dict[n_idx] for n_idx in processed_nodes_set])
             self.networkActivationCosts[result_tuple] = total_cost
-
-    def get_routing_info_from_parent(self, curr_node, branching_info_dict):
-        sample_count = self.labelList.shape[0]
-        if curr_node.isRoot:
-            reaches_to_this_node_vector = np.ones(shape=(sample_count,), dtype=np.bool_)
-            path_probability = np.ones(shape=(sample_count,))
-        else:
-            parent_node = self.network.dagObject.parents(node=curr_node)[0]
-            siblings_dict = {sibling_node.index: order_index for order_index, sibling_node in
-                             enumerate(
-                                 sorted(self.network.dagObject.children(node=parent_node),
-                                        key=lambda c_node: c_node.index))}
-            sibling_index = siblings_dict[curr_node.index]
-            reaches_to_this_node_vector = branching_info_dict[parent_node.index].routingMatrix[:, sibling_index]
-            path_probability = branching_info_dict[parent_node.index].pathProbabilities[:, sibling_index]
-        return reaches_to_this_node_vector, path_probability
-
-    def get_inner_node_routing_info(self, curr_node, thresholds_dict, branching_info_dict):
-        reaches_to_this_node_vector, path_probability = \
-            self.get_routing_info_from_parent(curr_node=curr_node,
-                                              branching_info_dict=branching_info_dict)
-        p_n_given_x = self.branchProbs[curr_node.index]
-        thresholds_matrix = np.zeros_like(p_n_given_x)
-        child_nodes = self.network.dagObject.children(node=curr_node)
-        child_nodes_sorted = sorted(child_nodes, key=lambda c_node: c_node.index)
-        for child_index, child_node in enumerate(child_nodes_sorted):
-            thresholds_matrix[:, child_index] = thresholds_dict[curr_node.index][child_index]
-        routing_matrix = p_n_given_x >= thresholds_matrix
-        routing_matrix = np.logical_and(routing_matrix, np.expand_dims(reaches_to_this_node_vector, axis=1))
-        path_probabilities = p_n_given_x * np.expand_dims(path_probability, axis=1)
-        branching_info_dict[curr_node.index] = BranchingInfo(branching_probs=p_n_given_x, routing_matrix=routing_matrix,
-                                                             path_probs=path_probabilities)
-
-    def get_sample_distributions_on_leaf_nodes(self, thresholds_dict, mode_threshold=0.8):
-        branching_info_dict = {}
-        # Calculate path probabilities
-        for curr_node in self.innerNodes:
-            self.get_inner_node_routing_info(curr_node=curr_node, branching_info_dict=branching_info_dict,
-                                             thresholds_dict=thresholds_dict)
-        leaf_reachability_dict = {}
-        for curr_node in self.leafNodes:
-            reaches_to_this_node_vector, path_probability = \
-                self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
-            leaf_reachability_dict[curr_node.index] = reaches_to_this_node_vector
-        return leaf_reachability_dict
 
     def calculate_for_threshold(self, thresholds_dict, routing_data):
         self.branchProbs = routing_data.get_dict("branch_probs")
-        self.posteriors = routing_data.get_dict("posterior_probs")
+        self.posteriorsEarly = routing_data.get_dict("posterior_probs")
+        self.posteriorsLate = routing_data.get_dict("posterior_probs_late")
         self.labelList = routing_data.labelList
 
         branching_info_dict = {}
@@ -110,21 +68,28 @@ class MultipathCalculatorV2:
             self.get_inner_node_routing_info(curr_node=curr_node, branching_info_dict=branching_info_dict,
                                              thresholds_dict=thresholds_dict)
         # Calculate averaged posteriors
-        posterior_matrices_list = []
+        early_posterior_matrices_list = []
+        late_posterior_matrices_list = []
         routing_decisions_list = []
         path_probability_list = []
         for curr_node in self.leafNodes:
             reaches_to_this_node_vector, path_probability = \
                 self.get_routing_info_from_parent(curr_node=curr_node, branching_info_dict=branching_info_dict)
-            posteriors = np.expand_dims(self.posteriors[curr_node.index], axis=2)
-            posterior_matrices_list.append(posteriors)
+            posteriors_early = np.expand_dims(self.posteriorsEarly[curr_node.index], axis=2)
+            early_posterior_matrices_list.append(posteriors_early)
+            posteriors_late = np.expand_dims(self.posteriorsLate[curr_node.index], axis=2)
+            late_posterior_matrices_list.append(posteriors_late)
             assert len(reaches_to_this_node_vector.shape) == 1
             assert len(path_probability)
             routing_decisions_list.append(np.expand_dims(reaches_to_this_node_vector, axis=1))
             path_probability_list.append(np.expand_dims(path_probability, axis=1))
-        posteriors_matrix = np.concatenate(posterior_matrices_list, axis=2)
         routing_decisions_matrix = np.concatenate(routing_decisions_list, axis=1).astype(np.float32)
         path_probabilities_matrix = np.concatenate(path_probability_list, axis=1)
+        posteriors_matrix_early = np.concatenate(early_posterior_matrices_list, axis=2)
+        posteriors_matrix_late = np.concatenate(late_posterior_matrices_list, axis=2)
+        indicator_vec = np.sum(routing_decisions_matrix, axis=1) == 1.0
+        posteriors_matrix = np.where(np.reshape(indicator_vec, (indicator_vec.shape[0], 1, 1)),
+                                     posteriors_matrix_early, posteriors_matrix_late)
         # Method 1: Directly average all valid posteriors
         posteriors_matrix_with_routing = \
             posteriors_matrix * np.expand_dims(routing_decisions_matrix, axis=1)

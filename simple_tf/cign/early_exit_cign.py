@@ -62,7 +62,8 @@ class EarlyExitTree(FastTreeNetwork):
         self.earlyExitFeatures[node.index] = final_feature
         node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature)
-        logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node)
+        logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node,
+                                          name="early_exit_fc_op")
         node.evalDict[self.get_variable_name(name="logits", node=node)] = logits
         self.earlyExitLogits[node.index] = logits
         loss = self.make_loss(node=node, logits=logits)
@@ -74,7 +75,8 @@ class EarlyExitTree(FastTreeNetwork):
         node.evalDict[self.get_variable_name(name="final_feature_late_exit", node=node)] = final_feature
         node.evalDict[self.get_variable_name(name="final_feature_late_exit_mag", node=node)] = \
             tf.nn.l2_loss(final_feature)
-        logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node)
+        logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node,
+                                          name="late_exit_fc_op")
         node.evalDict[self.get_variable_name(name="logits_late_exit", node=node)] = logits
         self.lateExitLogits[node.index] = logits
         loss = self.make_loss(node=node, logits=logits)

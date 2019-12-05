@@ -48,7 +48,7 @@ class SimpleAccuracyCalculator:
         assert all([np.array_equal(leaf_labels[0], leaf_labels[i]) for i in range(len(leaf_labels))])
         label_list = leaf_labels[0]
         sample_count = label_list.shape[0]
-        multipath_calculator = MultipathCalculatorV2(thresholds_list=thresholds, network=network,
+        multipath_calculator = MultipathCalculatorV2(network=network,
                                                      sample_count=sample_count, label_list=label_list,
                                                      branch_probs=branch_probs_dict,
                                                      activations=activations_dict,
