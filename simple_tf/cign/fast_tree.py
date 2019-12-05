@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import os
+import pickle
 
 from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
@@ -736,6 +737,12 @@ class FastTreeNetwork(TreeNetwork):
         label_data = dict_of_data_dicts["label_tensor"]
         label_list = list(label_data.values())[0]
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
+        dict_of_data_dicts["nodeCosts"] = self.nodeCosts
+        pickle.dump(self.nodeCosts, os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")))
+        for node in self.topologicalSortedNodes:
+            pickle.dump(node.opMacCostsDict,
+                        os.path.abspath(os.path.join(directory_path, "node_{0}_opMacCosts.sav".format(node.index))))
+            dict_of_data_dicts["node_{0}_opMacCosts".format(node.index)] = node.opMacCostsDict
         routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
         return routing_data
 
@@ -759,6 +766,13 @@ class FastTreeNetwork(TreeNetwork):
         label_data = dict_of_data_dicts["label_tensor"]
         label_list = list(label_data.values())[0]
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
+        dict_of_data_dicts["nodeCosts"] = pickle.load(open(os.path.abspath(os.path.join(directory_path,
+                                                                                        "nodeCosts.sav")), 'rb'))
+        for node in network.topologicalSortedNodes:
+            node.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
+                                                                                "node_{0}_opMacCosts.sav"
+                                                                                .format(node.index))), 'rb'))
+            dict_of_data_dicts["node_{0}_opMacCosts".format(node.index)] = node.opMacCostsDict
         routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
         return routing_data
 

@@ -18,7 +18,7 @@ from simple_tf.global_params import GlobalConstants
 
 # run_id = 1613
 # # network_name = "Cifar100_CIGN_Sampling"
-# network_name = "FashionNet_Lite"
+network_name = "FashionNet_Lite"
 # iteration = 48000
 # routing_data_dict = {}
 # max_num_of_iterations = 10000
@@ -49,9 +49,16 @@ from simple_tf.global_params import GlobalConstants
 
 
 def bayesian_process_runner(param_tpl):
-    xi = param_tpl[0]
-    use_weighted = param_tpl[1]
-    accuracy_computation_balance = param_tpl[2]
+    run_id = param_tpl[0]
+    iteraiton = param_tpl[1]
+    xi = param_tpl[2]
+    use_weighted = param_tpl[3]
+    accuracy_computation_balance = param_tpl[4]
+    network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
+    routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration, data_type="test")
+    multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
+
+
     bayesian_optimizer = BayesianThresholdOptimizer(
         run_id=run_id, network=network, iteration=iteration, routing_data=routing_data,
         multipath_score_calculator=multipath_calculator,
