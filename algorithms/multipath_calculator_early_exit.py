@@ -23,10 +23,11 @@ class MultipathCalculatorEarlyExit(MultipathCalculatorV2):
             leaf_early_exit_cost = sum([node.opMacCostsDict[k] for k in node.opMacCostsDict.keys()
                                         if "early_exit" in k])
             path_cost += leaf_early_exit_cost
+            path_costs.append(path_cost)
         self.baseEvaluationCost = np.mean(np.array(path_costs))
         early_exit_costs_dict = {}
         late_exit_costs_dict = {}
-        for node in self.leafNodes:
+        for node in self.network.topologicalSortedNodes:
             if node.isLeaf:
                 leaf_early_exit_cost = sum([node.opMacCostsDict[k] for k in node.opMacCostsDict.keys()
                                             if "early_exit" in k])

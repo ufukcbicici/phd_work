@@ -129,7 +129,7 @@ class FastTreeNetwork(TreeNetwork):
                     d.append(child_node)
 
     @staticmethod
-    def get_mock_tree(degree_list, network_name, node_costs):
+    def get_mock_tree(degree_list, network_name):
         tree = FastTreeNetwork(node_build_funcs=None, grad_func=None, hyperparameter_func=None,
                                residue_func=None, summary_func=None, degree_list=degree_list, dataset=None,
                                network_name=network_name)
@@ -138,7 +138,6 @@ class FastTreeNetwork(TreeNetwork):
         # Build symbolic networks
         tree.topologicalSortedNodes = tree.dagObject.get_topological_sort()
         tree.networkName = network_name
-        tree.nodeCosts = node_costs
         return tree
 
     def prepare_evaluation_dictionary(self):
@@ -687,7 +686,7 @@ class FastTreeNetwork(TreeNetwork):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
                                                                    "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}".format(network_name, run_id,
+                                                      "{0}_run_{1}_iteration_{2}_{3}".format(network_name, run_id,
                                                                                              iteration, data_type)))
         return directory_path
 
@@ -738,10 +737,12 @@ class FastTreeNetwork(TreeNetwork):
         label_list = list(label_data.values())[0]
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
         dict_of_data_dicts["nodeCosts"] = self.nodeCosts
-        pickle.dump(self.nodeCosts, os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")))
+        pickle.dump(self.nodeCosts, open(os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")), "wb"))
         for node in self.topologicalSortedNodes:
             pickle.dump(node.opMacCostsDict,
-                        os.path.abspath(os.path.join(directory_path, "node_{0}_opMacCosts.sav".format(node.index))))
+                        open(
+                            os.path.abspath(
+                                os.path.join(directory_path, "node_{0}_opMacCosts.sav".format(node.index))), "wb"))
             dict_of_data_dicts["node_{0}_opMacCosts".format(node.index)] = node.opMacCostsDict
         routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
         return routing_data
@@ -766,8 +767,9 @@ class FastTreeNetwork(TreeNetwork):
         label_data = dict_of_data_dicts["label_tensor"]
         label_list = list(label_data.values())[0]
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
-        dict_of_data_dicts["nodeCosts"] = pickle.load(open(os.path.abspath(os.path.join(directory_path,
+        network.nodeCosts = pickle.load(open(os.path.abspath(os.path.join(directory_path,
                                                                                         "nodeCosts.sav")), 'rb'))
+        dict_of_data_dicts["nodeCosts"] = network.nodeCosts
         for node in network.topologicalSortedNodes:
             node.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
                                                                                 "node_{0}_opMacCosts.sav"

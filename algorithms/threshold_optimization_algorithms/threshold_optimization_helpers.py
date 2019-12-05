@@ -61,6 +61,9 @@ class RoutingDataset:
             split_labels_list = np.copy(self.labelList[idx])
             dict_of_split_data = {}
             for data_name, data_dict in self.dictionaryOfRoutingData.items():
+                if "Costs" in data_name:
+                    dict_of_split_data[data_name] = data_dict
+                    continue
                 assert data_dict.__class__ == dict().__class__
                 subset_dict = get_subset_of_dict(data_dict_=data_dict, _i=idx)
                 dict_of_split_data[data_name] = subset_dict

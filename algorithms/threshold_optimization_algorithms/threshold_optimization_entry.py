@@ -1,3 +1,4 @@
+from algorithms.multipath_calculator_early_exit import MultipathCalculatorEarlyExit
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
 from algorithms.threshold_optimization_algorithms.bayesian_threshold_optimization import BayesianOptimizer, \
     BayesianThresholdOptimizer
@@ -45,20 +46,19 @@ network_name = "FashionNet_Lite"
 # routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration, data_type="test")
 # multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
 #
-# multiprocess_lock = Lock()
+multiprocess_lock = Lock()
 
 
 def bayesian_process_runner(param_tpl):
     run_id = param_tpl[0]
-    iteraiton = param_tpl[1]
+    iteration = param_tpl[1]
     xi = param_tpl[2]
     use_weighted = param_tpl[3]
     accuracy_computation_balance = param_tpl[4]
-    network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name, node_costs=node_costs)
-    routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration, data_type="test")
-    multipath_calculator = MultipathCalculatorV2(thresholds_list=None, network=network)
-
-
+    network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
+    routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration,
+                                                     data_type="test")
+    multipath_calculator = MultipathCalculatorEarlyExit(network=network)
     bayesian_optimizer = BayesianThresholdOptimizer(
         run_id=run_id, network=network, iteration=iteration, routing_data=routing_data,
         multipath_score_calculator=multipath_calculator,
@@ -98,11 +98,14 @@ def main():
     # weighted_score_list = [False]
     # balance_list = [1.0]
 
-    xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 50
+    run_ids = [1630]
+    iterations = [48000]
+    xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 5
     weighted_score_list = [False]
     balance_list = [1.0, 0.99, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[xi_list, weighted_score_list, balance_list])
-    # bayesian_process_runner(cartesian_product[0])
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[run_ids, iterations,
+                                                                          xi_list, weighted_score_list, balance_list])
+    # bayesian_process_runner(cartesian_product)
 
     pool = Pool(processes=5)
     pool.map(bayesian_process_runner, cartesian_product)

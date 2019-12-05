@@ -291,7 +291,8 @@ class GlobalConstants:
                                        strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
     INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "branching_feature"]
-    LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits"]
+    LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits",
+                                    "final_feature_late_exit", "logits_late_exit", "posterior_probs_late"]
 
     SELECTED_FEATURES_FOR_WEIGHT_REGRESSION = ["final_feature_final", "branching_feature"]
 
