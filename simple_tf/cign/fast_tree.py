@@ -213,9 +213,8 @@ class FastTreeNetwork(TreeNetwork):
         # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
         with tf.control_dependencies(self.extra_update_ops):
-            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
-                                                                                         global_step=self.globalCounter)
-            # self.optimizer = tf.train.AdamOptimizer().minimize(self.finalLoss, global_step=self.globalCounter)
+            # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss, global_step=self.globalCounter)
+            self.optimizer = tf.train.AdamOptimizer().minimize(self.finalLoss, global_step=self.globalCounter)
 
     def build_network(self):
         # Build the tree topologically and create the Tensorflow placeholders
@@ -445,6 +444,9 @@ class FastTreeNetwork(TreeNetwork):
                 node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
                 if GlobalConstants.USE_UNIFIED_BATCH_NORM:
                     node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
+            # if GlobalConstants.USE_SCALED_GRADIENTS:
+            #     parent_child_count = len(self.dagObject.children(node=parent_node))
+            #     scale = 1.0 / parent_child_count
             return parent_F, parent_H
 
     # MultiGPU OK
@@ -642,6 +644,7 @@ class FastTreeNetwork(TreeNetwork):
         path_mac_cost = sum([node.macCost for node in root_to_leaf_path])
         explanation += "Mac Cost:{0}\n".format(path_mac_cost)
         explanation += "Mac Cost per Nodes:{0}\n".format(self.nodeCosts)
+        explanation += "Optimizer:{0}".format(self.optimizer)
         return explanation
 
     def print_iteration_info(self, iteration_counter, update_results):
@@ -716,7 +719,7 @@ class FastTreeNetwork(TreeNetwork):
             os.mkdir(directory_path)
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         inner_node_outputs = list(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
-        inner_node_outputs.append("original_samples")
+        # inner_node_outputs.append("original_samples")
         leaf_node_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
         leaf_node_collections, inner_node_collections = \
             self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
