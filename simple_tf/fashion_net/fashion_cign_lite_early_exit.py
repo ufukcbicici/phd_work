@@ -1,5 +1,7 @@
 import tensorflow as tf
 import numpy as np
+
+from algorithms.resnet.resnet_generator import ResnetGenerator
 from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
 from simple_tf.cign.early_exit_cign import EarlyExitTree
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
@@ -16,6 +18,7 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
     LATE_EXIT_CONV_LAYERS = [64, 64]
     LATE_EXIT_CONV_FILTER_SIZES = [1, 1]
     LATE_EXIT_FC_LAYERS = [256, 128]
+    LATE_EXIT_USE_GAP = True
 
     def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func,
@@ -57,7 +60,10 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
                 net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
             node.fOpsList.extend([net])
         # FC Layers
-        net = tf.contrib.layers.flatten(net)
+        if "late_exit" in conv_name and "late_exit" in fc_name and FashionCignLiteEarlyExit.LATE_EXIT_USE_GAP:
+            net = ResnetGenerator.global_avg_pool(x=net)
+        else:
+            net = tf.contrib.layers.flatten(net)
         fc_weights = []
         fc_biases = []
         fc_dimensions = [net.get_shape().as_list()[-1]]
@@ -233,6 +239,7 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
         explanation += "LATE_EXIT_CONV_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_CONV_LAYERS)
         explanation += "LATE_EXIT_CONV_FILTER_SIZES:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_CONV_FILTER_SIZES)
         explanation += "LATE_EXIT_FC_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_FC_LAYERS)
+        explanation += "LATE_EXIT_USE_GAP:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_USE_GAP)
         return explanation
         # Baseline
         # explanation = "Fashion Mnist Baseline. Double Dropout, Discrete learning rate\n"

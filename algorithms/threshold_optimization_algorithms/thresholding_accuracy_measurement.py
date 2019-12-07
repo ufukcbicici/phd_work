@@ -14,7 +14,7 @@ class ThresholdAccuracyMeasurement:
         time_stamps = DbLogger.read_query(query=time_stamp_query)
 
         params_dict = {}
-        xi_matrix_dict = {}
+        param_matrix_dict = {}
         for time_stamp in time_stamps:
             accuracy_query = "SELECT * FROM threshold_optimization " \
                              "WHERE TimeStamp = \"{0}\" ORDER BY ValScore DESC LIMIT {1}".format(time_stamp[0],
@@ -36,6 +36,6 @@ class ThresholdAccuracyMeasurement:
                     params_dict[(balance_coeff, xi_val)] = []
                 params_dict[(balance_coeff, xi_val)].append(result_arr)
         for param_tpl, results in params_dict.items():
-            xi_matrix_dict[param_tpl] = np.stack(results, axis=0)
-            print("xi_val={0}".format(xi_val))
-            print(np.mean(xi_matrix_dict[xi_val], axis=0))
+            param_matrix_dict[param_tpl] = np.stack(results, axis=0)
+            print("lambda_val={0} xi_val={1}".format(param_tpl[0], param_tpl[1]))
+            print(np.mean(param_matrix_dict[param_tpl], axis=0))
