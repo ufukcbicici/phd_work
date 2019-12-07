@@ -1233,7 +1233,8 @@ FROM
 	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 90
 	AND
 	Explanation LIKE "%Fashion Net - Early Exit%" AND
-	Explanation LIKE "%Batch Size:125%"
+	Explanation LIKE "%Batch Size:125%" AND
+	Explanation LIKE "Adam"
 )
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
