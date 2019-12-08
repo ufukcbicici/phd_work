@@ -15,7 +15,7 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
     EARLY_EXIT_CONV_FILTER_SIZES = [1]
     EARLY_EXIT_FC_LAYERS = [128, 64]
     # Late Exit
-    LATE_EXIT_CONV_LAYERS = [96, 64, 32]
+    LATE_EXIT_CONV_LAYERS = [128, 64, 32]
     LATE_EXIT_CONV_FILTER_SIZES = [1, 1, 1]
     LATE_EXIT_FC_LAYERS = [256, 128]
     LATE_EXIT_USE_GAP = True
