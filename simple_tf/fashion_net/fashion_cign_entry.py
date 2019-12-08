@@ -80,10 +80,15 @@ def fashion_net_training():
                                     late_exit_weight=tpl[6])
         experiment_id = DbLogger.get_run_id()
         explanation = network.get_explanation_string()
-        series_id = int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
+        series_id = 0
+        # series_id = int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)
-        network.train(sess=sess, dataset=dataset, run_id=experiment_id)
+        try:
+            network.train(sess=sess, dataset=dataset, run_id=experiment_id)
+        except Exception as e:
+            DbLogger.write_into_table(rows=[(experiment_id, -1, "Error", str(e))], table=DbLogger.runKvStore,
+                                      col_count=4)
         tf.reset_default_graph()
         run_id += 1
