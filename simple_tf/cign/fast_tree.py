@@ -129,7 +129,7 @@ class FastTreeNetwork(TreeNetwork):
                     d.append(child_node)
 
     @staticmethod
-    def get_mock_tree(degree_list, network_name):
+    def get_mock_tree(degree_list, network_name, node_costs):
         tree = FastTreeNetwork(node_build_funcs=None, grad_func=None, hyperparameter_func=None,
                                residue_func=None, summary_func=None, degree_list=degree_list, dataset=None,
                                network_name=network_name)
@@ -138,6 +138,7 @@ class FastTreeNetwork(TreeNetwork):
         # Build symbolic networks
         tree.topologicalSortedNodes = tree.dagObject.get_topological_sort()
         tree.networkName = network_name
+        tree.nodeCosts = node_costs
         return tree
 
     def prepare_evaluation_dictionary(self):
@@ -718,9 +719,9 @@ class FastTreeNetwork(TreeNetwork):
         if not os.path.exists(directory_path):
             os.mkdir(directory_path)
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        inner_node_outputs = list(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
-        # inner_node_outputs.append("original_samples")
-        leaf_node_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
+        inner_node_outputs = set(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
+        # inner_node_outputs.add("original_samples")
+        leaf_node_outputs = set(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
         leaf_node_collections, inner_node_collections = \
             self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
                                                    use_masking=False,

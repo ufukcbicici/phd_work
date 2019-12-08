@@ -15,8 +15,8 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
     EARLY_EXIT_CONV_FILTER_SIZES = [1]
     EARLY_EXIT_FC_LAYERS = [128, 64]
     # Late Exit
-    LATE_EXIT_CONV_LAYERS = [64, 64]
-    LATE_EXIT_CONV_FILTER_SIZES = [1, 1]
+    LATE_EXIT_CONV_LAYERS = [96, 64, 32]
+    LATE_EXIT_CONV_FILTER_SIZES = [1, 1, 1]
     LATE_EXIT_FC_LAYERS = [256, 128]
     LATE_EXIT_USE_GAP = True
 
@@ -29,6 +29,9 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
     def build_lenet_structure(network, node, parent_F, conv_layers, conv_filters, fc_layers,
                               conv_name, fc_name):
         # Convolution Layers
+        is_early_exit = "early_exit" in conv_name and "early_exit" in fc_name
+        is_late_exit = "late_exit" in conv_name and "late_exit" in fc_name
+        assert is_early_exit or is_late_exit
         conv_weights = []
         conv_biases = []
         assert len(parent_F.get_shape().as_list()) == 4
@@ -60,10 +63,12 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
                 net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
             node.fOpsList.extend([net])
         # FC Layers
-        if "late_exit" in conv_name and "late_exit" in fc_name and FashionCignLiteEarlyExit.LATE_EXIT_USE_GAP:
-            net = ResnetGenerator.global_avg_pool(x=net)
-        else:
-            net = tf.contrib.layers.flatten(net)
+        # if is_late_exit and FashionCignLiteEarlyExit.LATE_EXIT_USE_GAP:
+        #     net = ResnetGenerator.global_avg_pool(x=net)
+        #     print("GAP commited.")
+        # else:
+        #     net = tf.contrib.layers.flatten(net)
+        net = tf.contrib.layers.flatten(net)
         fc_weights = []
         fc_biases = []
         fc_dimensions = [net.get_shape().as_list()[-1]]
@@ -127,7 +132,7 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "Fashion Net - Early Exit\n"
+        explanation = "Fashion Net - Early Exit v2.0\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
