@@ -1311,7 +1311,7 @@ FROM
 	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
 	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 90
 	AND
-	Explanation LIKE "%Fashion Net - Early Exit v2.0%" AND
+	Explanation LIKE "%Fashion Net - Early Exit v3.0%" AND
 	Explanation LIKE "%Batch Size:125%" AND
 	Explanation LIKE "%LATE_EXIT_CONV_LAYERS:[128, 64, 32]%"
 )
