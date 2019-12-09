@@ -34,6 +34,7 @@ class Node:
         self.leafCountUnderThisNode = 0
         self.macCost = 0
         self.opMacCostsDict = {}
+        self.batchIndicesTensor = None
         # Indexed by the nodes producing them
         self.activationsDict = {}
         self.proxyLossInputDicts = {}

@@ -3,38 +3,41 @@ import numpy as np
 
 from algorithms.resnet.resnet_generator import ResnetGenerator
 from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
+from simple_tf.cign.cign_single_late_exit import CignSingleLateExit
 from simple_tf.cign.early_exit_cign import EarlyExitTree
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from simple_tf.global_params import GlobalConstants
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
-class FashionCignLiteEarlyExit(EarlyExitTree):
+class FashionNetSingleLateExit(CignSingleLateExit):
     # Early Exit
     EARLY_EXIT_CONV_LAYERS = [32]
     EARLY_EXIT_CONV_FILTER_SIZES = [1]
     EARLY_EXIT_FC_LAYERS = [128, 64]
     # Late Exit
-    LATE_EXIT_CONV_LAYERS = [128, 64, 32]
+    LATE_EXIT_CONV_LAYERS = [128, 128, 64]
     LATE_EXIT_CONV_FILTER_SIZES = [1, 1, 1]
     LATE_EXIT_FC_LAYERS = [256, 128]
-    LATE_EXIT_USE_GAP = True
 
     def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func,
-                            FashionCignLiteEarlyExit.leaf_func]
-        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name)
+                            FashionNetSingleLateExit.leaf_func]
+        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name,
+                         late_exit_build_func=FashionNetSingleLateExit.late_exit_func)
 
     @staticmethod
     def leaf_func(network, node):
         parent_F, parent_H = network.mask_input_nodes(node=node)
+        # Register Node Output
+        network.leafNodeOutputs[node.index] = parent_F
         with tf.variable_scope("early_exit"):
             early_exit_features, early_exit_softmax_weights, early_exit_softmax_biases = \
                 FashionCignLite.build_lenet_structure(
                     network=network, node=node, parent_F=parent_F,
-                    conv_layers=FashionCignLiteEarlyExit.EARLY_EXIT_CONV_LAYERS,
-                    conv_filters=FashionCignLiteEarlyExit.EARLY_EXIT_CONV_FILTER_SIZES,
-                    fc_layers=FashionCignLiteEarlyExit.EARLY_EXIT_FC_LAYERS,
+                    conv_layers=FashionNetSingleLateExit.EARLY_EXIT_CONV_LAYERS,
+                    conv_filters=FashionNetSingleLateExit.EARLY_EXIT_CONV_FILTER_SIZES,
+                    fc_layers=FashionNetSingleLateExit.EARLY_EXIT_FC_LAYERS,
                     conv_name="early_exit_conv_op",
                     fc_name="early_exit_fc_op")
             final_feature_early, logits_early = \
@@ -42,19 +45,10 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
                                    softmax_weights=early_exit_softmax_weights,
                                    softmax_biases=early_exit_softmax_biases)
             node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits_early)
-        with tf.variable_scope("late_exit"):
-            late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases = \
-                FashionCignLite.build_lenet_structure(
-                    network=network, node=node, parent_F=parent_F,
-                    conv_layers=FashionCignLiteEarlyExit.LATE_EXIT_CONV_LAYERS,
-                    conv_filters=FashionCignLiteEarlyExit.LATE_EXIT_CONV_FILTER_SIZES,
-                    fc_layers=FashionCignLiteEarlyExit.LATE_EXIT_FC_LAYERS,
-                    conv_name="late_exit_conv_op",
-                    fc_name="late_exit_fc_op")
-            final_feature_late, logits_late = network.apply_late_loss(node=node, final_feature=late_exit_features,
-                                                                      softmax_weights=late_exit_softmax_weights,
-                                                                      softmax_biases=late_exit_softmax_biases)
-            node.evalDict[network.get_variable_name(name="posterior_probs_late", node=node)] = tf.nn.softmax(logits_late)
+
+    @staticmethod
+    def late_exit_func(network):
+        network.unify_leaf_outputs()
 
     def get_explanation_string(self):
         total_param_count = 0
@@ -166,14 +160,13 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
         explanation += super().get_explanation_string()
         explanation += "EARLY EXIT PARAMETERS:\n"
         # Early Exit - Late Exit Parameters
-        explanation += "EARLY_EXIT_CONV_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.EARLY_EXIT_CONV_LAYERS)
+        explanation += "EARLY_EXIT_CONV_LAYERS:{0}:\n".format(FashionNetSingleLateExit.EARLY_EXIT_CONV_LAYERS)
         explanation += "EARLY_EXIT_CONV_FILTER_SIZES:{0}:\n".format(
-            FashionCignLiteEarlyExit.EARLY_EXIT_CONV_FILTER_SIZES)
-        explanation += "EARLY_EXIT_FC_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.EARLY_EXIT_FC_LAYERS)
-        explanation += "LATE_EXIT_CONV_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_CONV_LAYERS)
-        explanation += "LATE_EXIT_CONV_FILTER_SIZES:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_CONV_FILTER_SIZES)
-        explanation += "LATE_EXIT_FC_LAYERS:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_FC_LAYERS)
-        explanation += "LATE_EXIT_USE_GAP:{0}:\n".format(FashionCignLiteEarlyExit.LATE_EXIT_USE_GAP)
+            FashionNetSingleLateExit.EARLY_EXIT_CONV_FILTER_SIZES)
+        explanation += "EARLY_EXIT_FC_LAYERS:{0}:\n".format(FashionNetSingleLateExit.EARLY_EXIT_FC_LAYERS)
+        explanation += "LATE_EXIT_CONV_LAYERS:{0}:\n".format(FashionNetSingleLateExit.LATE_EXIT_CONV_LAYERS)
+        explanation += "LATE_EXIT_CONV_FILTER_SIZES:{0}:\n".format(FashionNetSingleLateExit.LATE_EXIT_CONV_FILTER_SIZES)
+        explanation += "LATE_EXIT_FC_LAYERS:{0}:\n".format(FashionNetSingleLateExit.LATE_EXIT_FC_LAYERS)
         return explanation
         # Baseline
         # explanation = "Fashion Mnist Baseline. Double Dropout, Discrete learning rate\n"
@@ -251,3 +244,4 @@ class FashionCignLiteEarlyExit(EarlyExitTree):
                                                             decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
                                                             min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
         GlobalConstants.SOFTMAX_TEST_TEMPERATURE = 50.0
+

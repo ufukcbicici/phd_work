@@ -34,6 +34,7 @@ class FastTreeNetwork(TreeNetwork):
         self.networkName = network_name
         self.dbName = None
         self.saver = None
+        self.batchSizeTf = tf.placeholder(dtype=tf.int32, name="batch_size")
 
     @staticmethod
     def conv_layer(x, kernel, strides, node, bias=None, padding='SAME', name="conv_op"):
@@ -172,7 +173,10 @@ class FastTreeNetwork(TreeNetwork):
                     node.oneHotLabelTensor
             if node.filteredMask is not None:
                 self.evalDict[UtilityFuncs.get_variable_name(name="filteredMask", node=node)] = node.filteredMask
-
+            # Batch Indices
+            if node.batchIndicesTensor is not None:
+                self.evalDict[UtilityFuncs.get_variable_name(name="batchIndicesTensor", node=node)] = \
+                    node.batchIndicesTensor
             # # F
             # f_output = node.fOpsList[-1]
             # self.evalDict["Node{0}_F".format(node.index)] = f_output
@@ -397,6 +401,7 @@ class FastTreeNetwork(TreeNetwork):
     # MultiGPU OK
     def mask_input_nodes(self, node):
         if node.isRoot:
+            node.batchIndicesTensor = tf.range(0, self.batchSizeTf, 1)
             node.labelTensor = self.labelTensor
             node.indicesTensor = self.indicesTensor
             node.oneHotLabelTensor = self.oneHotLabelTensor
@@ -434,12 +439,14 @@ class FastTreeNetwork(TreeNetwork):
                 node.activationsDict[k] = tf.boolean_mask(v, mask_tensor)
             if GlobalConstants.USE_MULTI_GPU:
                 with tf.device("/device:CPU:0"):
+                    node.batchIndicesTensor = tf.boolean_mask(parent_node.batchIndicesTensor, mask_tensor)
                     node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
                     node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
                     node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
                     if GlobalConstants.USE_UNIFIED_BATCH_NORM:
                         node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
             else:
+                node.batchIndicesTensor = tf.boolean_mask(parent_node.batchIndicesTensor, mask_tensor)
                 node.labelTensor = tf.boolean_mask(parent_node.labelTensor, mask_tensor)
                 node.indicesTensor = tf.boolean_mask(parent_node.indicesTensor, mask_tensor)
                 node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
@@ -603,7 +610,8 @@ class FastTreeNetwork(TreeNetwork):
                      self.useMasking: int(use_masking),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration,
-                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool)}
+                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool),
+                     self.batchSizeTf: GlobalConstants.CURR_BATCH_SIZE}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             if not self.isBaseline:

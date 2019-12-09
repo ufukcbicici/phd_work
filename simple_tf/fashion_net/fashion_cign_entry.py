@@ -8,6 +8,7 @@ from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from simple_tf.fashion_net.fashion_cign_lite_early_exit import FashionCignLiteEarlyExit
 from simple_tf.fashion_net.fashion_cign_moe_logits import FashionCignMoeLogits
 from simple_tf.fashion_net.fashion_net_baseline import FashionNetBaseline
+from simple_tf.fashion_net.fashion_net_single_late_exit import FashionNetSingleLateExit
 from simple_tf.global_params import GlobalConstants
 from auxillary.constants import DatasetTypes
 
@@ -16,17 +17,23 @@ use_moe = False
 use_sampling = False
 use_random_sampling = False
 use_baseline = False
-use_early_exit = True
+use_early_exit = False
+use_late_exit = True
 
 
 def get_network(dataset, network_name):
-    if not (use_baseline or use_early_exit):
+    if not (use_baseline or use_early_exit or use_late_exit):
         network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                   network_name=network_name)
     elif use_baseline:
         network = FashionNetBaseline(dataset=dataset, network_name=network_name)
     elif use_early_exit:
         network = FashionCignLiteEarlyExit(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
+                                           network_name=network_name)
+        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(
+            ["final_feature_late_exit", "logits_late_exit", "posterior_probs_late"])
+    elif use_late_exit:
+        network = FashionNetSingleLateExit(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                            network_name=network_name)
         GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(
             ["final_feature_late_exit", "logits_late_exit", "posterior_probs_late"])

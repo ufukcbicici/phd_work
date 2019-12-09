@@ -209,6 +209,77 @@ class FashionCignLite(FastTreeNetwork):
         node.evalDict[network.get_variable_name(name="fc_softmax_biases", node=node)] = fc_softmax_biases
         # ***************** F: Convolution Layer *****************
 
+    @staticmethod
+    def build_lenet_structure(network, node, parent_F, conv_layers, conv_filters, fc_layers,
+                              conv_name, fc_name):
+        # Convolution Layers
+        is_early_exit = "early_exit" in conv_name and "early_exit" in fc_name
+        is_late_exit = "late_exit" in conv_name and "late_exit" in fc_name
+        assert is_early_exit or is_late_exit
+        conv_weights = []
+        conv_biases = []
+        assert len(parent_F.get_shape().as_list()) == 4
+        conv_layers = list(conv_layers)
+        conv_layers.insert(0, parent_F.get_shape().as_list()[-1])
+        assert len(conv_layers) == len(conv_filters) + 1
+        net = parent_F
+        # Conv Layers
+        for idx in range(len(conv_layers) - 1):
+            is_last_layer = idx == len(conv_layers) - 2
+            f_map_count_0 = conv_layers[idx]
+            f_map_count_1 = conv_layers[idx + 1]
+            filter_sizes = conv_filters[idx]
+            conv_W = tf.Variable(
+                tf.truncated_normal([filter_sizes, filter_sizes, f_map_count_0, f_map_count_1], stddev=0.1,
+                                    seed=GlobalConstants.SEED,
+                                    dtype=GlobalConstants.DATA_TYPE),
+                name=network.get_variable_name(name="conv{0}_weight".format(idx), node=node))
+            conv_b = tf.Variable(
+                tf.constant(0.1, shape=[f_map_count_1], dtype=GlobalConstants.DATA_TYPE),
+                name=network.get_variable_name(name="conv{0}_biases".format(idx), node=node))
+            conv_weights.append(conv_W)
+            conv_biases.append(conv_b)
+            # Apply conv layers
+            net = FastTreeNetwork.conv_layer(x=net, kernel=conv_W, strides=[1, 1, 1, 1], padding='SAME', bias=conv_b,
+                                             node=node, name=conv_name)
+            net = tf.nn.relu(net)
+            if is_last_layer:
+                net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+            node.fOpsList.extend([net])
+        # FC Layers
+        # if is_late_exit and FashionCignLiteEarlyExit.LATE_EXIT_USE_GAP:
+        #     net = ResnetGenerator.global_avg_pool(x=net)
+        #     print("GAP commited.")
+        # else:
+        #     net = tf.contrib.layers.flatten(net)
+        net = tf.contrib.layers.flatten(net)
+        fc_weights = []
+        fc_biases = []
+        fc_dimensions = [net.get_shape().as_list()[-1]]
+        fc_dimensions.extend(fc_layers)
+        fc_dimensions.append(network.labelCount)
+        for idx in range(len(fc_dimensions) - 1):
+            is_last_layer = idx == len(fc_dimensions) - 2
+            fc_W_name = "fc{0}_weights".format(idx) if not is_last_layer else "fc_softmax_weights"
+            fc_b_name = "fc{0}_b".format(idx) if not is_last_layer else "fc_softmax_b"
+            input_dim = fc_dimensions[idx]
+            output_dim = fc_dimensions[idx + 1]
+            fc_W = tf.Variable(tf.truncated_normal([input_dim, output_dim],
+                                                   stddev=0.1, seed=GlobalConstants.SEED,
+                                                   dtype=GlobalConstants.DATA_TYPE),
+                               name=network.get_variable_name(name=fc_W_name, node=node))
+            fc_b = tf.Variable(tf.constant(0.1, shape=[output_dim], dtype=GlobalConstants.DATA_TYPE),
+                               name=network.get_variable_name(name=fc_b_name, node=node))
+            fc_weights.append(fc_W)
+            fc_biases.append(fc_b)
+            # Apply FC layer
+            node.fOpsList.extend([net])
+            if not is_last_layer:
+                net = FastTreeNetwork.fc_layer(x=net, W=fc_W, b=fc_b, node=node, name=fc_name)
+                net = tf.nn.relu(net)
+                net = tf.nn.dropout(net, network.classificationDropoutKeepProb)
+        return net, fc_weights[-1], fc_biases[-1]
+
     def get_explanation_string(self):
         total_param_count = 0
         for v in tf.trainable_variables():
