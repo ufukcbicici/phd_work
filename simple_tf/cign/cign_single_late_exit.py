@@ -1,23 +1,11 @@
-from collections import deque
-
 import numpy as np
 import tensorflow as tf
-import time
-import os
 
-from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
-from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
-from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers import RoutingDataset
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.cign.tree import TreeNetwork
-from simple_tf.global_params import GlobalConstants, AccuracyCalcType, TrainingUpdateResult
-from algorithms.info_gain import InfoGainLoss
+from simple_tf.global_params import GlobalConstants
 from simple_tf.uncategorized.node import Node
-from auxillary.constants import DatasetTypes
-from sklearn.metrics import confusion_matrix
-from tensorflow.contrib.framework.python.framework import checkpoint_utils
 
 
 class CignSingleLateExit(FastTreeNetwork):
