@@ -40,22 +40,13 @@ class CignSingleLateExit(FastTreeNetwork):
         self.lateExitTrainingOutput = None
         self.lateExitTestOutputsDict = {}
 
-
-
-        # self.earlyExitFeatures = {}
-        # self.earlyExitLogits = {}
-        # self.earlyExitLosses = {}
-        # self.earlyExitWeight = tf.placeholder(name="early_exit_loss_weight", dtype=tf.float32)
-        #
-        # self.leafNodeOutputs = {}
-
-        # self.lateExitFeatures = {}
-        # self.lateExitLogits = {}
-        # self.lateExitLosses = {}
-        # self.lateExitWeight = tf.placeholder(name="late_exit_loss_weight", dtype=tf.float32)
-        #
-        # self.sumEarlyExits = None
-        # self.sumLateExits = None
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
+        feed_dict = super().prepare_feed_dict(minibatch=minibatch, iteration=iteration,
+                                              use_threshold=use_threshold, is_train=is_train,
+                                              use_masking=use_masking)
+        feed_dict[self.earlyExitWeight] = GlobalConstants.EARLY_EXIT_WEIGHT
+        feed_dict[self.lateExitWeight] = GlobalConstants.LATE_EXIT_WEIGHT
+        return feed_dict
 
     def unify_leaf_outputs_train(self):
         leaf_exit_features = []
@@ -98,14 +89,6 @@ class CignSingleLateExit(FastTreeNetwork):
             = logits
         node.evalDict[self.get_variable_name(name="posteriors_late_exit_test_route_{0}".format(route_vector),
                                              node=node)] = posteriors
-
-    def build_main_loss(self):
-        assert self.earlyExitWeight is not None and self.lateExitWeight is not None
-        super().build_main_loss()
-
-        # self.sumEarlyExits = tf.add_n(list(self.earlyExitLosses.values()))
-        # self.sumLateExits = tf.add_n(list(self.lateExitLosses.values()))
-        # self.mainLoss = (self.earlyExitWeight * self.sumEarlyExits) + (self.lateExitWeight * self.sumLateExits)
 
     def build_network(self):
         # Add late exit node explicitly as a separate node.
@@ -161,8 +144,8 @@ class CignSingleLateExit(FastTreeNetwork):
         # Build regularization loss
         self.build_regularization_loss()
         # Final Loss
-        self.finalLoss = (self.earlyExitWeight * self.mainLoss + self.lateExitWeight * self.lateExitLoss)\
-                         + self.regularizationLoss + self.decisionLoss
+        self.finalLoss = (self.earlyExitWeight * self.mainLoss + self.lateExitWeight * self.lateExitLoss) + \
+                            self.regularizationLoss + self.decisionLoss
         if not GlobalConstants.USE_MULTI_GPU:
             self.build_optimizer()
         self.prepare_evaluation_dictionary()
