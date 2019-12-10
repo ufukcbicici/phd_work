@@ -20,7 +20,7 @@ from sklearn.metrics import confusion_matrix
 from tensorflow.contrib.framework.python.framework import checkpoint_utils
 
 
-class EarlyExitTree(FastTreeNetwork):
+class CignEarlyExitTree(FastTreeNetwork):
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                  dataset, network_name):
 
@@ -46,15 +46,6 @@ class EarlyExitTree(FastTreeNetwork):
         feed_dict[self.earlyExitWeight] = GlobalConstants.EARLY_EXIT_WEIGHT
         feed_dict[self.lateExitWeight] = GlobalConstants.LATE_EXIT_WEIGHT
         return feed_dict
-
-    def make_loss(self, node, logits):
-        cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
-                                                                                   logits=logits)
-        pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
-        loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
-        node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
-        node.lossList.append(loss)
-        return loss
 
     def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
         node.residueOutputTensor = final_feature

@@ -4,7 +4,7 @@ import numpy as np
 from algorithms.resnet.resnet_generator import ResnetGenerator
 from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
 from simple_tf.cign.cign_single_late_exit import CignSingleLateExit
-from simple_tf.cign.early_exit_cign import EarlyExitTree
+from simple_tf.cign.cign_early_exit import CignEarlyExitTree
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from simple_tf.global_params import GlobalConstants
 from simple_tf.cign.fast_tree import FastTreeNetwork
@@ -21,35 +21,28 @@ class FashionNetSingleLateExit(CignSingleLateExit):
     LATE_EXIT_FC_LAYERS = [256, 128]
 
     def __init__(self, degree_list, dataset, network_name):
-        node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func,
-                            FashionNetSingleLateExit.leaf_func]
+        node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func, FashionCignLite.leaf_func]
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name,
-                         late_exit_build_func=FashionNetSingleLateExit.late_exit_func)
+                         late_exit_train_func=FashionNetSingleLateExit.late_training_exit_func,
+                         late_exit_test_func=FashionNetSingleLateExit.late_test_exit_func)
 
     @staticmethod
-    def leaf_func(network, node):
-        parent_F, parent_H = network.mask_input_nodes(node=node)
-        # Register Node Output
-        network.leafNodeOutputs[node.index] = parent_F
-        with tf.variable_scope("early_exit"):
-            early_exit_features, early_exit_softmax_weights, early_exit_softmax_biases = \
-                FashionCignLite.build_lenet_structure(
-                    network=network, node=node, parent_F=parent_F,
-                    conv_layers=FashionNetSingleLateExit.EARLY_EXIT_CONV_LAYERS,
-                    conv_filters=FashionNetSingleLateExit.EARLY_EXIT_CONV_FILTER_SIZES,
-                    fc_layers=FashionNetSingleLateExit.EARLY_EXIT_FC_LAYERS,
-                    conv_name="early_exit_conv_op",
-                    fc_name="early_exit_fc_op")
-            final_feature_early, logits_early = \
-                network.apply_loss(node=node, final_feature=early_exit_features,
-                                   softmax_weights=early_exit_softmax_weights,
-                                   softmax_biases=early_exit_softmax_biases)
-            node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits_early)
+    def late_training_exit_func(network, node, x):
+        late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases = \
+            FashionCignLite.build_lenet_structure(
+                network=network, node=node, parent_F=x,
+                conv_layers=FashionNetSingleLateExit.LATE_EXIT_CONV_LAYERS,
+                conv_filters=FashionNetSingleLateExit.LATE_EXIT_CONV_FILTER_SIZES,
+                fc_layers=FashionNetSingleLateExit.LATE_EXIT_FC_LAYERS,
+                conv_name="late_exit_conv_op",
+                fc_name="late_exit_fc_op")
+        return late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases
 
     @staticmethod
-    def late_exit_func(network, x):
-
-        print(x)
+    def late_test_exit_func(network, node, x):
+        late_exit_features, _, _ = \
+            FashionNetSingleLateExit.late_training_exit_func(network=network, node=node, x=x)
+        return late_exit_features
 
     def get_explanation_string(self):
         total_param_count = 0

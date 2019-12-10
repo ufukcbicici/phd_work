@@ -457,6 +457,15 @@ class FastTreeNetwork(TreeNetwork):
             #     scale = 1.0 / parent_child_count
             return parent_F, parent_H
 
+    def make_loss(self, node, logits):
+        cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
+                                                                                   logits=logits)
+        pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
+        loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
+        node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
+        node.lossList.append(loss)
+        return loss
+
     # MultiGPU OK
     def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
         node.residueOutputTensor = final_feature
@@ -465,12 +474,7 @@ class FastTreeNetwork(TreeNetwork):
         node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature)
         logits = FastTreeNetwork.fc_layer(x=final_feature, W=softmax_weights, b=softmax_biases, node=node)
         node.evalDict[self.get_variable_name(name="logits", node=node)] = logits
-        cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
-                                                                                   logits=logits)
-        pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
-        loss = tf.where(tf.is_nan(pre_loss), 0.0, pre_loss)
-        node.fOpsList.extend([cross_entropy_loss_tensor, pre_loss, loss])
-        node.lossList.append(loss)
+        _ = self.make_loss(node=node, logits=logits)
         return final_feature, logits
 
     def get_run_ops(self):

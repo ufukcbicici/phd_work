@@ -3,13 +3,13 @@ import numpy as np
 
 from algorithms.resnet.resnet_generator import ResnetGenerator
 from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
-from simple_tf.cign.early_exit_cign import EarlyExitTree
+from simple_tf.cign.cign_early_exit import CignEarlyExitTree
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from simple_tf.global_params import GlobalConstants
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
-class FashionCignLiteEarlyExit(EarlyExitTree):
+class FashionCignLiteEarlyExit(CignEarlyExitTree):
     # Early Exit
     EARLY_EXIT_CONV_LAYERS = [32]
     EARLY_EXIT_CONV_FILTER_SIZES = [1]
