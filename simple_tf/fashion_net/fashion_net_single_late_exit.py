@@ -47,8 +47,9 @@ class FashionNetSingleLateExit(CignSingleLateExit):
             node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits_early)
 
     @staticmethod
-    def late_exit_func(network):
-        network.unify_leaf_outputs()
+    def late_exit_func(network, x):
+        # network.unify_leaf_outputs_train()
+        print(x)
 
     def get_explanation_string(self):
         total_param_count = 0
