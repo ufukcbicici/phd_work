@@ -13,12 +13,12 @@ class CignSingleLateExit(FastTreeNetwork):
                  dataset, network_name, late_exit_train_func, late_exit_test_func):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                          dataset, network_name)
+        self.leafNodes = sorted([node for node in self.topologicalSortedNodes if node.isLeaf], key=lambda n: n.index)
         self.routingCombinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(self.leafNodes))
         self.routingCombinations = [np.array(route_vec) for route_vec in self.routingCombinations]
         self.lateExitTrainFunc = late_exit_train_func
         self.lateExitTestFunc = late_exit_test_func
         self.leafNodeOutputsToLateExit = {}
-        self.leafNodes = sorted([node for node in self.topologicalSortedNodes if node.isLeaf], key=lambda n: n.index)
         self.lateExitTrainingInput = None
         self.lateExitTestInputsDict = {}
         self.lateExitLoss = None
@@ -81,6 +81,7 @@ class CignSingleLateExit(FastTreeNetwork):
     def build_network(self):
         # Add late exit node explicitly as a separate node.
         self.build_tree()
+        self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         self.lateExitNode = Node(index=max([node.index for node in self.topologicalSortedNodes]) + 1,
                                  depth=max([node.depth for node in self.topologicalSortedNodes]) + 1,
                                  is_root=False,
