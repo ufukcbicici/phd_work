@@ -32,7 +32,7 @@ class CignSingleLateExit(FastTreeNetwork):
         self.leafOutputTraining = None
         self.leafOutputTest = None
         self.lateEvaluationExits = {}
-
+        self.leafNodeOutputs = {}
 
         # self.earlyExitFeatures = {}
         # self.earlyExitLogits = {}
@@ -64,9 +64,9 @@ class CignSingleLateExit(FastTreeNetwork):
         self.leafOutputTraining = tf.concat(leaf_exit_features, axis=-1)
         self.evalDict["leafOutputTraining"] = self.leafOutputTraining
 
-    def unify_leaf_outputs_test(self):
+    def unify_leaf_outputs_test(self, route_vector):
         leaf_exit_features = []
-        for leaf_node in self.leafNodes:
+        for idx, leaf_node in enumerate(self.leafNodes):
             leaf_exit_features.append(self.leafNodeOutputs[leaf_node.index])
         self.leafOutputTest = tf.concat(leaf_exit_features, axis=-1)
         self.evalDict["leafOutputTest"] = self.leafOutputTest
