@@ -48,7 +48,7 @@ class FashionNetSingleLateExit(CignSingleLateExit):
 
     @staticmethod
     def late_exit_func(network, x):
-        # network.unify_leaf_outputs_train()
+
         print(x)
 
     def get_explanation_string(self):

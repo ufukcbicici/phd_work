@@ -1,5 +1,7 @@
 import tensorflow as tf
 import numpy as np
+
+from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter, DecayingParameter, FixedParameter
 from simple_tf.global_params import GlobalConstants
 from simple_tf.cign.fast_tree import FastTreeNetwork
@@ -11,16 +13,35 @@ class FashionCignLite(FastTreeNetwork):
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name)
 
     @staticmethod
+    def get_truncated_normal_initializer(shape):
+        return tf.truncated_normal(shape, stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE)
+
+    @staticmethod
+    def get_constant_initializer(shape):
+        return tf.constant(0.1, shape=shape, dtype=GlobalConstants.DATA_TYPE)
+
+    @staticmethod
+    def get_affine_layer_params(layer_shape, W_name, b_name):
+        conv_W = UtilityFuncs.create_variable(name=W_name,
+                                              shape=layer_shape,
+                                              dtype=tf.float32,
+                                              initializer=FashionCignLite.get_truncated_normal_initializer(
+                                                  shape=layer_shape))
+        conv_b = UtilityFuncs.create_variable(name=b_name,
+                                              shape=[layer_shape[-1]], dtype=tf.float32,
+                                              initializer=
+                                              FashionCignLite.get_constant_initializer(
+                                                  shape=[layer_shape[-1]]))
+        return conv_W, conv_b
+
+    @staticmethod
     def apply_heavy_router_transform(network, net, node, decision_feature_size):
         flat_pool = tf.contrib.layers.flatten(net)
         feature_size = flat_pool.get_shape().as_list()[-1]
-        fc_h_weights = tf.Variable(tf.truncated_normal(
-            [feature_size, decision_feature_size],
-            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_decision_weights", node=node))
-        fc_h_bias = tf.Variable(
-            tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_decision_bias", node=node))
+        fc_h_weights, fc_h_bias = FashionCignLite.get_affine_layer_params(
+            layer_shape=[feature_size, decision_feature_size],
+            W_name="fc_decision_weights",
+            b_name="fc_decision_bias")
         node.variablesSet.add(fc_h_weights)
         node.variablesSet.add(fc_h_bias)
         raw_ig_feature = FastTreeNetwork.fc_layer(x=flat_pool, W=fc_h_weights, b=fc_h_bias, node=node)
@@ -47,13 +68,10 @@ class FashionCignLite(FastTreeNetwork):
         net_shape = h_net.get_shape().as_list()
         h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
         feature_size = h_net.get_shape().as_list()[-1]
-        fc_h_weights = tf.Variable(tf.truncated_normal(
-            [feature_size, decision_feature_size],
-            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_decision_weights", node=node))
-        fc_h_bias = tf.Variable(
-            tf.constant(0.1, shape=[decision_feature_size], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_decision_bias", node=node))
+        fc_h_weights, fc_h_bias = FashionCignLite.get_affine_layer_params(
+            layer_shape=[feature_size, decision_feature_size],
+            W_name="fc_decision_weights",
+            b_name="fc_decision_bias")
         node.variablesSet.add(fc_h_weights)
         node.variablesSet.add(fc_h_bias)
         h_net = FastTreeNetwork.fc_layer(x=h_net, W=fc_h_weights, b=fc_h_bias, node=node)
@@ -72,18 +90,11 @@ class FashionCignLite(FastTreeNetwork):
         # Parameters
         # Convolution 1
         # OK
-        conv1_weights = tf.Variable(
-            tf.truncated_normal([GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_1_SIZE,
-                                 GlobalConstants.NUM_CHANNELS, GlobalConstants.FASHION_F_NUM_FILTERS_1], stddev=0.1,
-                                seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE), name=network.get_variable_name(name="conv1_weight",
-                                                                                                 node=node))
-        # OK
-        conv1_biases = tf.Variable(
-            tf.constant(0.1, shape=[GlobalConstants.FASHION_F_NUM_FILTERS_1], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="conv1_bias",
-                                           node=node))
-
+        conv1_weights, conv1_biases = FashionCignLite.get_affine_layer_params(
+            layer_shape=[GlobalConstants.FASHION_FILTERS_1_SIZE, GlobalConstants.FASHION_FILTERS_1_SIZE,
+                         GlobalConstants.NUM_CHANNELS, GlobalConstants.FASHION_F_NUM_FILTERS_1],
+            W_name="conv1_weight",
+            b_name="conv1_bias")
         node.variablesSet = {conv1_weights, conv1_biases}
         # ***************** F: Convolution Layers *****************
         # First Conv Layer
@@ -105,22 +116,16 @@ class FashionCignLite(FastTreeNetwork):
         # Parameters
         # Convolution 2
         # OK
-        conv_weights = tf.Variable(
-            tf.truncated_normal([GlobalConstants.FASHION_FILTERS_2_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
-                                 GlobalConstants.FASHION_F_NUM_FILTERS_1, GlobalConstants.FASHION_F_NUM_FILTERS_2],
-                                stddev=0.1,
-                                seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="conv2_weight", node=node))
-        # OK
-        conv_biases = tf.Variable(
-            tf.constant(0.1, shape=[GlobalConstants.FASHION_F_NUM_FILTERS_2], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="conv2_bias",
-                                           node=node))
-        node.variablesSet = {conv_weights, conv_biases}
+        conv2_weights, conv2_biases = FashionCignLite.get_affine_layer_params(
+            layer_shape=[GlobalConstants.FASHION_FILTERS_2_SIZE, GlobalConstants.FASHION_FILTERS_2_SIZE,
+                         GlobalConstants.FASHION_F_NUM_FILTERS_1, GlobalConstants.FASHION_F_NUM_FILTERS_2],
+            W_name="conv2_weight",
+            b_name="conv2_bias")
+        node.variablesSet = {conv2_weights, conv2_biases}
         # ***************** F: Convolution Layer *****************
         parent_F, parent_H = network.mask_input_nodes(node=node)
-        net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv_weights, strides=[1, 1, 1, 1],
-                                         padding='SAME', bias=conv_biases, node=node)
+        net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv2_weights, strides=[1, 1, 1, 1],
+                                         padding='SAME', bias=conv2_biases, node=node)
         net = tf.nn.relu(net)
         net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         node.fOpsList.extend([net])
@@ -134,23 +139,17 @@ class FashionCignLite(FastTreeNetwork):
     @staticmethod
     def leaf_func(network, node):
         softmax_input_dim = GlobalConstants.FASHION_F_FC_2
-        conv_weights = tf.Variable(
-            tf.truncated_normal([GlobalConstants.FASHION_FILTERS_3_SIZE, GlobalConstants.FASHION_FILTERS_3_SIZE,
-                                 GlobalConstants.FASHION_F_NUM_FILTERS_2, GlobalConstants.FASHION_F_NUM_FILTERS_3],
-                                stddev=0.1,
-                                seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="conv3_weight", node=node))
-        # OK
-        conv_biases = tf.Variable(
-            tf.constant(0.1, shape=[GlobalConstants.FASHION_F_NUM_FILTERS_3], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="conv3_bias",
-                                           node=node))
-        node.variablesSet = {conv_weights, conv_biases}
+        conv3_weights, conv3_biases = FashionCignLite.get_affine_layer_params(
+            layer_shape=[GlobalConstants.FASHION_FILTERS_3_SIZE, GlobalConstants.FASHION_FILTERS_3_SIZE,
+                         GlobalConstants.FASHION_F_NUM_FILTERS_2, GlobalConstants.FASHION_F_NUM_FILTERS_3],
+            W_name="conv3_weights",
+            b_name="conv3_biases")
+        node.variablesSet = {conv3_weights, conv3_biases}
         # ***************** F: Convolution Layer *****************
         # Conv Layer
         parent_F, parent_H = network.mask_input_nodes(node=node)
-        net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv_weights, strides=[1, 1, 1, 1],
-                                         padding='SAME', bias=conv_biases, node=node)
+        net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv3_weights, strides=[1, 1, 1, 1],
+                                         padding='SAME', bias=conv3_biases, node=node)
         net = tf.nn.relu(net)
         net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
@@ -159,38 +158,22 @@ class FashionCignLite(FastTreeNetwork):
         flattened_F_feature_size = net.get_shape().as_list()[-1]
         # Parameters
         # OK
-        fc_weights_1 = tf.Variable(tf.truncated_normal(
-            [flattened_F_feature_size,
-             GlobalConstants.FASHION_F_FC_1],
-            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_weights_1", node=node))
-        # OK
-        fc_biases_1 = tf.Variable(
-            tf.constant(0.1, shape=[GlobalConstants.FASHION_F_FC_1], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_biases_1", node=node))
-        # OK
-        fc_weights_2 = tf.Variable(tf.truncated_normal(
-            [GlobalConstants.FASHION_F_FC_1,
-             GlobalConstants.FASHION_F_FC_2],
-            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_weights_2", node=node))
-        # OK
-        fc_biases_2 = tf.Variable(
-            tf.constant(0.1, shape=[GlobalConstants.FASHION_F_FC_2], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_biases_2", node=node))
-        # OK
-        fc_softmax_weights = tf.Variable(
-            tf.truncated_normal([softmax_input_dim, GlobalConstants.NUM_LABELS],
-                                stddev=0.1,
-                                seed=GlobalConstants.SEED,
-                                dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_softmax_weights", node=node))
-        # OK
-        fc_softmax_biases = tf.Variable(
-            tf.constant(0.1, shape=[GlobalConstants.NUM_LABELS], dtype=GlobalConstants.DATA_TYPE),
-            name=network.get_variable_name(name="fc_softmax_biases", node=node))
+        fc_weights_1, fc_biases_1 = FashionCignLite.get_affine_layer_params(
+            layer_shape=[flattened_F_feature_size,
+                         GlobalConstants.FASHION_F_FC_1],
+            W_name="fc_weights_1",
+            b_name="fc_biases_1")
+        fc_weights_2, fc_biases_2 = FashionCignLite.get_affine_layer_params(
+            layer_shape=[GlobalConstants.FASHION_F_FC_1,
+                         GlobalConstants.FASHION_F_FC_2],
+            W_name="fc_weights_2",
+            b_name="fc_biases_2")
+        fc_softmax_weights, fc_softmax_biases = FashionCignLite.get_affine_layer_params(
+            layer_shape=[softmax_input_dim, GlobalConstants.NUM_LABELS],
+            W_name="fc_softmax_weights",
+            b_name="fc_softmax_biases")
         node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2, fc_softmax_weights,
-                             fc_softmax_biases}
+                             fc_softmax_biases}.union(node.variablesSet)
         # OPS
         x_hat = FastTreeNetwork.fc_layer(x=net, W=fc_weights_1, b=fc_biases_1, node=node)
         hidden_layer_1 = tf.nn.relu(x_hat)
@@ -229,14 +212,10 @@ class FashionCignLite(FastTreeNetwork):
             f_map_count_0 = conv_layers[idx]
             f_map_count_1 = conv_layers[idx + 1]
             filter_sizes = conv_filters[idx]
-            conv_W = tf.Variable(
-                tf.truncated_normal([filter_sizes, filter_sizes, f_map_count_0, f_map_count_1], stddev=0.1,
-                                    seed=GlobalConstants.SEED,
-                                    dtype=GlobalConstants.DATA_TYPE),
-                name=network.get_variable_name(name="conv{0}_weight".format(idx), node=node))
-            conv_b = tf.Variable(
-                tf.constant(0.1, shape=[f_map_count_1], dtype=GlobalConstants.DATA_TYPE),
-                name=network.get_variable_name(name="conv{0}_biases".format(idx), node=node))
+            conv_W, conv_b = FashionCignLite.get_affine_layer_params(
+                layer_shape=[filter_sizes, filter_sizes, f_map_count_0, f_map_count_1],
+                W_name=network.get_variable_name(name="conv{0}_weight".format(idx), node=node),
+                b_name=network.get_variable_name(name="conv{0}_biases".format(idx), node=node))
             conv_weights.append(conv_W)
             conv_biases.append(conv_b)
             # Apply conv layers
@@ -264,12 +243,10 @@ class FashionCignLite(FastTreeNetwork):
             fc_b_name = "fc{0}_b".format(idx) if not is_last_layer else "fc_softmax_b"
             input_dim = fc_dimensions[idx]
             output_dim = fc_dimensions[idx + 1]
-            fc_W = tf.Variable(tf.truncated_normal([input_dim, output_dim],
-                                                   stddev=0.1, seed=GlobalConstants.SEED,
-                                                   dtype=GlobalConstants.DATA_TYPE),
-                               name=network.get_variable_name(name=fc_W_name, node=node))
-            fc_b = tf.Variable(tf.constant(0.1, shape=[output_dim], dtype=GlobalConstants.DATA_TYPE),
-                               name=network.get_variable_name(name=fc_b_name, node=node))
+            fc_W, fc_b = FashionCignLite.get_affine_layer_params(
+                layer_shape=[input_dim, output_dim],
+                W_name=network.get_variable_name(name=fc_W_name, node=node),
+                b_name=network.get_variable_name(name=fc_b_name, node=node))
             fc_weights.append(fc_W)
             fc_biases.append(fc_b)
             # Apply FC layer

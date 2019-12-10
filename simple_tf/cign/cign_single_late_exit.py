@@ -30,7 +30,7 @@ class CignSingleLateExit(FastTreeNetwork):
         self.routingCombinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(self.leafNodes))
         self.routingCombinations = [np.array(route_vec) for route_vec in self.routingCombinations]
         self.leafOutputTraining = None
-        self.leafOutputTest = None
+        self.leafOutputsTest = {}
         self.lateEvaluationExits = {}
         self.leafNodeOutputs = {}
 
@@ -69,29 +69,9 @@ class CignSingleLateExit(FastTreeNetwork):
         for idx, leaf_node in enumerate(self.leafNodes):
             scaled_output = route_vector[idx] * self.leafNodeOutputs[leaf_node.index]
             leaf_exit_features.append(scaled_output)
-        self.leafOutputTest = tf.concat(leaf_exit_features, axis=-1)
-        self.evalDict["leafOutputTest"] = self.leafOutputTest
-
-
-
-
-
-
-        # leaf_nodes = sorted([node for node in self.topologicalSortedNodes if node.isLeaf], key=lambda n: n.index)
-        # leaf_exit_features = []
-        # leaf_node_exit_shape = list(self.leafNodeOutputs.values())[0].get_shape().as_list()
-        # leaf_node_exit_shape[0] = self.batchSizeTf
-        # leaf_node_exit_shape = tuple(leaf_node_exit_shape)
-        # for leaf_node in leaf_nodes:
-        #     indices = tf.expand_dims(leaf_node.batchIndicesTensor, -1)
-        #     sparse_output = tf.scatter_nd(indices, self.leafNodeOutputs[leaf_node.index], leaf_node_exit_shape)
-        #     self.evalDict[UtilityFuncs.get_variable_name(name="dense_output", node=leaf_node)] = \
-        #         self.leafNodeOutputs[leaf_node.index]
-        #     self.evalDict[UtilityFuncs.get_variable_name(name="sparse_output", node=leaf_node)] = sparse_output
-        #     leaf_exit_features.append(sparse_output)
-        # unified_output = tf.concat(leaf_exit_features, axis=-1)
-        # self.evalDict["unified_output"] = unified_output
-        # return unified_output
+        leaf_test_output_for_route = tf.concat(leaf_exit_features, axis=-1)
+        self.leafOutputsTest[route_vector] = leaf_test_output_for_route
+        self.evalDict["leafOutputTest_for_route_{0}".format(route_vector)] = leaf_test_output_for_route
 
     def build_network(self):
         # Build the tree topologically and create the Tensorflow placeholders
@@ -111,16 +91,16 @@ class CignSingleLateExit(FastTreeNetwork):
         # Build late exit for training and evaluation outputs
         with tf.variable_scope("late_exit"):
             self.unify_leaf_outputs_train()
-            self.unify_leaf_outputs_test()
             # Training Output
             late_exit_output = self.lateExitBuildFunc(network=self, x=self.leafOutputTraining)
             var_scope = tf.get_variable_scope()
             var_scope.reuse_variables()
-            # Evaluation Outputs
+            # Evaluation (Test) Outputs
             for routing_vector in self.routingCombinations:
                 route_vector_as_tuple = tuple(routing_vector.tolist())
-                self.lateEvaluationExits[route_vector_as_tuple] = self.lateExitBuildFunc(network=self,
-                                                                                         x=self.leafOutputTest)
+                self.unify_leaf_outputs_test(route_vector=route_vector_as_tuple)
+                self.lateEvaluationExits[route_vector_as_tuple] = \
+                    self.lateExitBuildFunc(network=self, x=self.leafOutputsTest[route_vector_as_tuple])
         self.dbName = DbLogger.log_db_path[DbLogger.log_db_path.rindex("/") + 1:]
         print(self.dbName)
         self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
