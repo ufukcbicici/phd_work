@@ -83,10 +83,7 @@ class CignSingleLateExit(FastTreeNetwork):
         self.leafNodes = sorted([node for node in self.topologicalSortedNodes if node.isLeaf], key=lambda n: n.index)
         self.routingCombinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(self.leafNodes))
         self.routingCombinations = [np.array(route_vec) for route_vec in self.routingCombinations]
-        for leaf_node in self.leafNodes:
-            self.dagObject.add_edge(parent=leaf_node, child=self.lateExitNode)
         # Build symbolic networks
-        self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         self.isBaseline = len(self.topologicalSortedNodes) == 1
         # Disable some properties if we are using a baseline
         if self.isBaseline:
@@ -98,28 +95,27 @@ class CignSingleLateExit(FastTreeNetwork):
             if node != self.lateExitNode:
                 print("Building Node {0}".format(node.index))
                 self.nodeBuildFuncs[node.depth](network=self, node=node)
-            else:
-                # Build late exit for training and evaluation outputs
-                with tf.variable_scope("late_exit"):
-                    # Training Exit: Loss and Posteriors
-                    self.build_late_exit_inputs()
-                    self.lateExitOutput, late_exit_sm_W, late_exit_sm_b = \
-                        self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTrainingInput)
-                    self.evalDict["lateExitOutput"] = self.lateExitOutput
-                    self.lateExitNode.labelTensor = self.topologicalSortedNodes[0].labelTensor
-                    self.lateExitNode.infoGainLoss = tf.constant(0.0)
-                    self.apply_late_loss(node=self.lateExitNode, final_feature=self.lateExitOutput,
-                                         softmax_weights=late_exit_sm_W, softmax_biases=late_exit_sm_b)
-                    # Test Exit: Only Posteriors
-                    var_scope = tf.get_variable_scope()
-                    var_scope.reuse_variables()
-                    test_output, late_exit_sm_W_test, late_exit_sm_b_test = \
-                        self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTestInput)
-                    assert late_exit_sm_W == late_exit_sm_W_test and late_exit_sm_b == late_exit_sm_b_test
-                    self.lateExitTestLogits = FastTreeNetwork.fc_layer(x=test_output,
-                                                                       W=late_exit_sm_W_test, b=late_exit_sm_b_test,
-                                                                       node=node, name="late_exit_fc_op")
-                    self.lateExitTestPosteriors = tf.nn.softmax(self.lateExitTestLogits)
+        # Build late exit for training and evaluation outputs
+        with tf.variable_scope("late_exit"):
+            # Training Exit: Loss and Posteriors
+            self.build_late_exit_inputs()
+            self.lateExitOutput, late_exit_sm_W, late_exit_sm_b = \
+                self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTrainingInput)
+            self.evalDict["lateExitOutput"] = self.lateExitOutput
+            self.lateExitNode.labelTensor = self.topologicalSortedNodes[0].labelTensor
+            self.lateExitNode.infoGainLoss = tf.constant(0.0)
+            self.apply_late_loss(node=self.lateExitNode, final_feature=self.lateExitOutput,
+                                 softmax_weights=late_exit_sm_W, softmax_biases=late_exit_sm_b)
+            # Test Exit: Only Posteriors
+            var_scope = tf.get_variable_scope()
+            var_scope.reuse_variables()
+            test_output, late_exit_sm_W_test, late_exit_sm_b_test = \
+                self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTestInput)
+            assert late_exit_sm_W == late_exit_sm_W_test and late_exit_sm_b == late_exit_sm_b_test
+            self.lateExitTestLogits = FastTreeNetwork.fc_layer(x=test_output,
+                                                               W=late_exit_sm_W_test, b=late_exit_sm_b_test,
+                                                               node=self.lateExitNode, name="late_exit_fc_op")
+            self.lateExitTestPosteriors = tf.nn.softmax(self.lateExitTestLogits)
         self.dbName = DbLogger.log_db_path[DbLogger.log_db_path.rindex("/") + 1:]
         print(self.dbName)
         self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
@@ -138,18 +134,26 @@ class CignSingleLateExit(FastTreeNetwork):
 
     def calculate_accuracy_late_exit_accuracy(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        leaf_node_collections, inner_node_collections = \
-            self.collect_eval_results_from_network(sess=sess,
-                                                   dataset=dataset,
-                                                   dataset_type=dataset_type,
-                                                   use_masking=True,
-                                                   leaf_node_collection_names=[],
-                                                   inner_node_collections_names=[
-                                                       "posteriors_late_exit", "label_tensor"])
-        assert len(inner_node_collections["posteriors_late_exit"]) == 1
-        assert len(inner_node_collections["label_tensor"]) == 1
-        late_exit_posteriors = inner_node_collections["posteriors_late_exit"][self.lateExitNode.index]
-        labels = inner_node_collections["label_tensor"][self.lateExitNode.index]
+        late_exit_collection = {}
+        while True:
+            results, minibatch = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
+            late_posteriors_arr = results[self.get_variable_name(name="posteriors_late_exit", node=self.lateExitNode)]
+            labels_arr = results[self.get_variable_name(name="label_tensor", node=self.lateExitNode)]
+            UtilityFuncs.concat_to_np_array_dict_v2(dct=late_exit_collection["posteriors_late_exit"],
+                                                    key=self.lateExitNode.index, array=late_posteriors_arr)
+            UtilityFuncs.concat_to_np_array_dict_v2(dct=late_exit_collection["label_tensor"],
+                                                    key=self.lateExitNode.index, array=labels_arr)
+            if dataset.isNewEpoch:
+                break
+        for output_name, nodes_arr_dict in late_exit_collection.items():
+            for node_idx in nodes_arr_dict.keys():
+                if np.isscalar(nodes_arr_dict[node_idx][0]):
+                    continue
+                nodes_arr_dict[node_idx] = np.concatenate(nodes_arr_dict[node_idx], axis=0)
+        assert len(late_exit_collection["posteriors_late_exit"]) == 1
+        assert len(late_exit_collection["label_tensor"]) == 1
+        late_exit_posteriors = late_exit_collection["posteriors_late_exit"][self.lateExitNode.index]
+        labels = late_exit_collection["label_tensor"][self.lateExitNode.index]
         predicted_labels = np.argmax(late_exit_posteriors, axis=1)
         assert labels.shape == predicted_labels.shape
         true_count = np.sum(predicted_labels == labels)
