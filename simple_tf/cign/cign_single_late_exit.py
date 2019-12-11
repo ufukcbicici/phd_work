@@ -198,3 +198,22 @@ class CignSingleLateExit(FastTreeNetwork):
                 rows=[(run_id, iteration, epoch_id, training_accuracy,
                        validation_accuracy, validation_accuracy_late,
                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+
+    # Unit Tests
+    def test_scatter_nd_behavior(self, sess, dataset):
+        dataset.set_current_data_set_type(dataset_type=DatasetTypes.test, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        while True:
+            results, minibatch = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
+            tf_result_arr = np.zeros_like(results["lateExitTrainingInput"])
+            manual_result_arr_shape = list(tf_result_arr.shape)
+            manual_result_arr_shape[-1] = int(manual_result_arr_shape[-1] / len(self.leafNodes))
+            manual_leaf_exits = []
+            for leaf_node in self.leafNodes:
+                leaf_exit = np.zeros(shape=tuple(manual_result_arr_shape))
+                batch_indices = results[UtilityFuncs.get_variable_name(name="batchIndicesTensor", node=leaf_node)]
+                dense_exit = results[UtilityFuncs.get_variable_name(name="dense_output", node=leaf_node)]
+                leaf_exit[batch_indices] = dense_exit
+                manual_leaf_exits.append(leaf_exit)
+            assert np.array_equal(tf_result_arr, np.concatenate(manual_leaf_exits, axis=-1))
+            if dataset.isNewEpoch:
+                break
