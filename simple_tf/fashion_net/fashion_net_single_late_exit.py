@@ -21,7 +21,7 @@ class FashionNetSingleLateExit(CignSingleLateExit):
     LATE_EXIT_FC_LAYERS = [256, 128]
 
     def __init__(self, degree_list, dataset, network_name):
-        node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func, FashionCignLite.leaf_func]
+        node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func, FashionNetSingleLateExit.leaf_func]
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name,
                          late_exit_func=FashionNetSingleLateExit.late_exit_func)
 
