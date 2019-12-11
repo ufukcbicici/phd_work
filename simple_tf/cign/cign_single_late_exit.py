@@ -164,6 +164,7 @@ class CignSingleLateExit(FastTreeNetwork):
 
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
         # moving_results_1 = sess.run(moving_stat_vars)
+        self.test_scatter_nd_behavior(sess=sess, dataset=dataset)
         is_evaluation_epoch_at_report_period = \
             epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING \
             and (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0
@@ -204,7 +205,7 @@ class CignSingleLateExit(FastTreeNetwork):
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.test, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         while True:
             results, minibatch = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
-            tf_result_arr = np.zeros_like(results["lateExitTrainingInput"])
+            tf_result_arr = results["lateExitTrainingInput"]
             manual_result_arr_shape = list(tf_result_arr.shape)
             manual_result_arr_shape[-1] = int(manual_result_arr_shape[-1] / len(self.leafNodes))
             manual_leaf_exits = []
@@ -214,6 +215,7 @@ class CignSingleLateExit(FastTreeNetwork):
                 dense_exit = results[UtilityFuncs.get_variable_name(name="dense_output", node=leaf_node)]
                 leaf_exit[batch_indices] = dense_exit
                 manual_leaf_exits.append(leaf_exit)
-            assert np.array_equal(tf_result_arr, np.concatenate(manual_leaf_exits, axis=-1))
+            np_result_arr = np.concatenate(manual_leaf_exits, axis=-1)
+            assert np.array_equal(tf_result_arr, np_result_arr)
             if dataset.isNewEpoch:
                 break
