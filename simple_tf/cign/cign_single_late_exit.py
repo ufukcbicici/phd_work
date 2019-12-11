@@ -1,11 +1,14 @@
 import numpy as np
 import tensorflow as tf
+import time
 
+from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 from simple_tf.uncategorized.node import Node
+from sklearn.metrics import confusion_matrix
 
 
 class CignSingleLateExit(FastTreeNetwork):
@@ -20,6 +23,7 @@ class CignSingleLateExit(FastTreeNetwork):
         self.lateExitWeight = tf.placeholder(name="late_exit_loss_weight", dtype=tf.float32)
         self.leafNodeOutputsToLateExit = {}
         self.lateExitTrainingInput = None
+        self.lateExitLabelInput = None
         self.lateExitTestInput = None
         self.lateExitNode = None
         self.lateExitOutput = None
@@ -37,11 +41,13 @@ class CignSingleLateExit(FastTreeNetwork):
 
     def build_late_exit_inputs(self):
         leaf_exit_features = []
+        # leaf_exit_labels = []
         leaf_node_exit_shape = list(self.leafNodeOutputsToLateExit.values())[0].get_shape().as_list()
         leaf_node_exit_shape[0] = self.batchSizeTf
         leaf_node_exit_shape = tuple(leaf_node_exit_shape)
         for leaf_node in self.leafNodes:
             indices = tf.expand_dims(leaf_node.batchIndicesTensor, -1)
+            # Features
             sparse_output = tf.scatter_nd(indices, self.leafNodeOutputsToLateExit[leaf_node.index],
                                           leaf_node_exit_shape)
             self.evalDict[UtilityFuncs.get_variable_name(name="dense_output", node=leaf_node)] = \
@@ -63,8 +69,7 @@ class CignSingleLateExit(FastTreeNetwork):
         node.evalDict[self.get_variable_name(name="logits_late_exit", node=node)] = logits
         self.lateExitLoss = self.make_loss(node=node, logits=logits)
         posteriors = tf.nn.softmax(logits)
-        node.evalDict[self.get_variable_name(name="posteriors_late_exit}", node=node)] = posteriors
-
+        node.evalDict[self.get_variable_name(name="posteriors_late_exit", node=node)] = posteriors
 
     def build_network(self):
         # Add late exit node explicitly as a separate node.
@@ -101,6 +106,8 @@ class CignSingleLateExit(FastTreeNetwork):
                     self.lateExitOutput, late_exit_sm_W, late_exit_sm_b = \
                         self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTrainingInput)
                     self.evalDict["lateExitOutput"] = self.lateExitOutput
+                    self.lateExitNode.labelTensor = self.topologicalSortedNodes[0].labelTensor
+                    self.lateExitNode.infoGainLoss = tf.constant(0.0)
                     self.apply_late_loss(node=self.lateExitNode, final_feature=self.lateExitOutput,
                                          softmax_weights=late_exit_sm_W, softmax_biases=late_exit_sm_b)
                     # Test Exit: Only Posteriors
@@ -128,3 +135,62 @@ class CignSingleLateExit(FastTreeNetwork):
         if not GlobalConstants.USE_MULTI_GPU:
             self.build_optimizer()
         self.prepare_evaluation_dictionary()
+
+    def calculate_accuracy_late_exit_accuracy(self, sess, dataset, dataset_type):
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        leaf_node_collections, inner_node_collections = \
+            self.collect_eval_results_from_network(sess=sess,
+                                                   dataset=dataset,
+                                                   dataset_type=dataset_type,
+                                                   use_masking=True,
+                                                   leaf_node_collection_names=[],
+                                                   inner_node_collections_names=[
+                                                       "posteriors_late_exit", "label_tensor"])
+        assert len(inner_node_collections["posteriors_late_exit"]) == 1
+        assert len(inner_node_collections["label_tensor"]) == 1
+        late_exit_posteriors = inner_node_collections["posteriors_late_exit"][self.lateExitNode.index]
+        labels = inner_node_collections["label_tensor"][self.lateExitNode.index]
+        predicted_labels = np.argmax(late_exit_posteriors, axis=1)
+        assert labels.shape == predicted_labels.shape
+        true_count = np.sum(predicted_labels == labels)
+        accuracy = true_count / labels.shape[0]
+        # Prepare the confusion matrix
+        cm = confusion_matrix(y_true=labels, y_pred=predicted_labels)
+        return accuracy, cm
+
+    def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
+        # moving_results_1 = sess.run(moving_stat_vars)
+        is_evaluation_epoch_at_report_period = \
+            epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING \
+            and (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0
+        is_evaluation_epoch_before_ending = \
+            epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING
+        if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
+            training_accuracy, training_confusion = \
+                self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
+                                        run_id=run_id,
+                                        iteration=iteration)
+            validation_accuracy, validation_confusion = \
+                self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                        run_id=run_id,
+                                        iteration=iteration)
+            validation_accuracy_late = 0.0
+            if not self.isBaseline:
+                validation_accuracy_late, validation_confusion_late = \
+                    self.calculate_accuracy_late_exit_accuracy(sess=sess, dataset=dataset,
+                                                               dataset_type=DatasetTypes.test)
+                if is_evaluation_epoch_before_ending:
+                    # self.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                    t0 = time.time()
+                    self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                                           dataset=dataset, dataset_type=DatasetTypes.training)
+                    t1 = time.time()
+                    self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                                           dataset=dataset, dataset_type=DatasetTypes.test)
+                    t2 = time.time()
+                    print("t1-t0={0}".format(t1 - t0))
+                    print("t2-t1={0}".format(t2 - t1))
+            DbLogger.write_into_table(
+                rows=[(run_id, iteration, epoch_id, training_accuracy,
+                       validation_accuracy, validation_accuracy_late,
+                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
