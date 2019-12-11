@@ -23,11 +23,10 @@ class FashionNetSingleLateExit(CignSingleLateExit):
     def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func, FashionCignLite.leaf_func]
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name,
-                         late_exit_train_func=FashionNetSingleLateExit.late_training_exit_func,
-                         late_exit_test_func=FashionNetSingleLateExit.late_test_exit_func)
+                         late_exit_func=FashionNetSingleLateExit.late_exit_func)
 
     @staticmethod
-    def late_training_exit_func(network, node, x):
+    def late_exit_func(network, node, x):
         late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases = \
             FashionCignLite.build_lenet_structure(
                 network=network, node=node, parent_F=x,
@@ -37,12 +36,6 @@ class FashionNetSingleLateExit(CignSingleLateExit):
                 conv_name="late_exit_conv_op",
                 fc_name="late_exit_fc_op")
         return late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases
-
-    @staticmethod
-    def late_test_exit_func(network, node, x):
-        late_exit_features, _, _ = \
-            FashionNetSingleLateExit.late_training_exit_func(network=network, node=node, x=x)
-        return late_exit_features
 
     def get_explanation_string(self):
         total_param_count = 0
