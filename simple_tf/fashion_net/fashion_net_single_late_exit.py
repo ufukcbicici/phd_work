@@ -26,6 +26,63 @@ class FashionNetSingleLateExit(CignSingleLateExit):
                          late_exit_func=FashionNetSingleLateExit.late_exit_func)
 
     @staticmethod
+    def leaf_func(network, node):
+        softmax_input_dim = GlobalConstants.FASHION_F_FC_2
+        conv3_weights, conv3_biases = FashionCignLite.get_affine_layer_params(
+            layer_shape=[GlobalConstants.FASHION_FILTERS_3_SIZE, GlobalConstants.FASHION_FILTERS_3_SIZE,
+                         GlobalConstants.FASHION_F_NUM_FILTERS_2, GlobalConstants.FASHION_F_NUM_FILTERS_3],
+            W_name=network.get_variable_name(name="conv3_weights", node=node),
+            b_name=network.get_variable_name(name="conv3_biases", node=node))
+        node.variablesSet = {conv3_weights, conv3_biases}
+        # ***************** F: Convolution Layer *****************
+        # Conv Layer
+        parent_F, parent_H = network.mask_input_nodes(node=node)
+        network.leafNodeOutputsToLateExit[node.index] = parent_F
+        net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv3_weights, strides=[1, 1, 1, 1],
+                                         padding='SAME', bias=conv3_biases, node=node)
+        net = tf.nn.relu(net)
+        net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+        # FC Layers
+        net = tf.contrib.layers.flatten(net)
+        flattened_F_feature_size = net.get_shape().as_list()[-1]
+        # Parameters
+        # OK
+        fc_weights_1, fc_biases_1 = FashionCignLite.get_affine_layer_params(
+            layer_shape=[flattened_F_feature_size,
+                         GlobalConstants.FASHION_F_FC_1],
+            W_name=network.get_variable_name(name="fc_weights_1", node=node),
+            b_name=network.get_variable_name(name="fc_biases_1", node=node))
+        fc_weights_2, fc_biases_2 = FashionCignLite.get_affine_layer_params(
+            layer_shape=[GlobalConstants.FASHION_F_FC_1,
+                         GlobalConstants.FASHION_F_FC_2],
+            W_name=network.get_variable_name(name="fc_weights_2", node=node),
+            b_name=network.get_variable_name(name="fc_biases_2", node=node))
+        fc_softmax_weights, fc_softmax_biases = FashionCignLite.get_affine_layer_params(
+            layer_shape=[softmax_input_dim, GlobalConstants.NUM_LABELS],
+            W_name=network.get_variable_name(name="fc_softmax_weights", node=node),
+            b_name=network.get_variable_name(name="fc_softmax_biases", node=node))
+        node.variablesSet = {fc_weights_1, fc_biases_1, fc_weights_2, fc_biases_2, fc_softmax_weights,
+                             fc_softmax_biases}.union(node.variablesSet)
+        # OPS
+        x_hat = FastTreeNetwork.fc_layer(x=net, W=fc_weights_1, b=fc_biases_1, node=node)
+        hidden_layer_1 = tf.nn.relu(x_hat)
+        dropped_layer_1 = tf.nn.dropout(hidden_layer_1, network.classificationDropoutKeepProb)
+        x_hat2 = FastTreeNetwork.fc_layer(x=dropped_layer_1, W=fc_weights_2, b=fc_biases_2, node=node)
+        hidden_layer_2 = tf.nn.relu(x_hat2)
+        dropped_layer_2 = tf.nn.dropout(hidden_layer_2, network.classificationDropoutKeepProb)
+        final_feature, logits = network.apply_loss(node=node, final_feature=dropped_layer_2,
+                                                   softmax_weights=fc_softmax_weights, softmax_biases=fc_softmax_biases)
+        node.fOpsList.extend([net])
+        # Evaluation
+        node.evalDict[network.get_variable_name(name="final_eval_feature", node=node)] = final_feature
+        node.evalDict[network.get_variable_name(name="logits", node=node)] = logits
+        node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
+        node.evalDict[network.get_variable_name(name="fc_softmax_weights", node=node)] = fc_softmax_weights
+        node.evalDict[network.get_variable_name(name="fc_softmax_biases", node=node)] = fc_softmax_biases
+        # ***************** F: Convolution Layer *****************
+
+    @staticmethod
     def late_exit_func(network, node, x):
         late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases = \
             FashionCignLite.build_lenet_structure(
