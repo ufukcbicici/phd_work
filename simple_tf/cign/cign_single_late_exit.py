@@ -132,6 +132,11 @@ class CignSingleLateExit(FastTreeNetwork):
             self.build_optimizer()
         self.prepare_evaluation_dictionary()
 
+    def prepare_evaluation_dictionary(self):
+        super().prepare_evaluation_dictionary()
+        for k, v in self.lateExitNode.evalDict.items():
+            self.evalDict[k] = v
+
     def calculate_accuracy_late_exit_accuracy(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         late_exit_collection = {}
@@ -164,7 +169,7 @@ class CignSingleLateExit(FastTreeNetwork):
 
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
         # moving_results_1 = sess.run(moving_stat_vars)
-        self.test_scatter_nd_behavior(sess=sess, dataset=dataset)
+        # self.test_scatter_nd_behavior(sess=sess, dataset=dataset)
         is_evaluation_epoch_at_report_period = \
             epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING \
             and (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0
