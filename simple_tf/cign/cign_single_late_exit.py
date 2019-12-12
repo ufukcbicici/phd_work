@@ -169,6 +169,47 @@ class CignSingleLateExit(FastTreeNetwork):
         cm = confusion_matrix(y_true=labels, y_pred=predicted_labels)
         return accuracy, cm
 
+    def save_routing_info(self, sess, run_id, iteration, dataset, dataset_type):
+        dict_of_data_dicts = {}
+        data_type = "test" if dataset_type == DatasetTypes.test else "training"
+        directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
+                                                               run_id=run_id, iteration=iteration,
+                                                               data_type=data_type)
+        if not os.path.exists(directory_path):
+            os.mkdir(directory_path)
+        dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        inner_node_outputs = set(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
+        # inner_node_outputs.add("original_samples")
+        leaf_node_outputs = set(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
+        leaf_node_collections, inner_node_collections = \
+            self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
+                                                   use_masking=False,
+                                                   leaf_node_collection_names=leaf_node_outputs,
+                                                   inner_node_collections_names=inner_node_outputs)
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
+        UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict={"tree_type": np.array(self.degreeList)})
+        for output_names, collection in zip([inner_node_outputs, leaf_node_outputs],
+                                            [inner_node_collections, leaf_node_collections]):
+            for output_name in output_names:
+                arr_dict = collection[output_name]
+                dict_of_data_dicts[output_name] = arr_dict
+                string_arr_dict = {"{0}".format(k): v for k, v in arr_dict.items()}
+                npz_file_name = os.path.abspath(os.path.join(directory_path, output_name))
+                UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=string_arr_dict)
+        label_data = dict_of_data_dicts["label_tensor"]
+        label_list = list(label_data.values())[0]
+        assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
+        dict_of_data_dicts["nodeCosts"] = self.nodeCosts
+        pickle.dump(self.nodeCosts, open(os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")), "wb"))
+        for node in self.topologicalSortedNodes:
+            pickle.dump(node.opMacCostsDict,
+                        open(
+                            os.path.abspath(
+                                os.path.join(directory_path, "node_{0}_opMacCosts.sav".format(node.index))), "wb"))
+            dict_of_data_dicts["node_{0}_opMacCosts".format(node.index)] = node.opMacCostsDict
+        routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
+        return routing_data
+
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
         # moving_results_1 = sess.run(moving_stat_vars)
         # self.test_scatter_nd_behavior(sess=sess, dataset=dataset)
@@ -207,6 +248,24 @@ class CignSingleLateExit(FastTreeNetwork):
                        validation_accuracy, validation_accuracy_late,
                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
 
+    def get_late_exit_results(self, sess, dataset, data_type):
+        dataset.set_current_data_set_type(dataset_type=DatasetTypes.test, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
+        late_posteriors_dict = {}
+        late_labels_dict = {}
+        for route_vec in self.routingCombinations:
+            route_tpl = tuple(route_vec.as_list())
+            late_posteriors_dict[route_tpl] = []
+        while True:
+            results, minibatch = self.eval_network(sess=sess, dataset=dataset, use_masking=False)
+            for route_vec in self.routingCombinations:
+
+
+
+            if dataset.isNewEpoch:
+                break
+
+
+
     # Unit Tests
     def test_scatter_nd_behavior(self, sess, dataset):
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.test, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
@@ -226,3 +285,4 @@ class CignSingleLateExit(FastTreeNetwork):
             assert np.array_equal(tf_result_arr, np_result_arr)
             if dataset.isNewEpoch:
                 break
+
