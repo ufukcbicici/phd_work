@@ -136,10 +136,12 @@ class CignSingleLateExit(FastTreeNetwork):
         super().prepare_evaluation_dictionary()
         for k, v in self.lateExitNode.evalDict.items():
             self.evalDict[k] = v
+        self.evalDict[UtilityFuncs.get_variable_name(name="label_tensor", node=self.lateExitNode)] \
+            = self.lateExitNode.labelTensor
 
     def calculate_accuracy_late_exit_accuracy(self, sess, dataset, dataset_type):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        late_exit_collection = {}
+        late_exit_collection = {"posteriors_late_exit": {}, "label_tensor": {}}
         while True:
             results, minibatch = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
             late_posteriors_arr = results[self.get_variable_name(name="posteriors_late_exit", node=self.lateExitNode)]
