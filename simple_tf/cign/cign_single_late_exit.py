@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import time
+import os
 
 from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers import RoutingDataset
 from auxillary.constants import DatasetTypes
@@ -179,12 +180,12 @@ class CignSingleLateExit(FastTreeNetwork):
         # Get the late exit posteriors
         late_posteriors_dict = {}
         for route_vec in self.routingCombinations:
-            route_tpl = tuple(route_vec.as_list())
+            route_tpl = tuple(route_vec.tolist())
             late_posteriors_dict[route_tpl] = []
         curr_index = 0
         while curr_index < dataset.get_current_sample_count():
             for route_vec in self.routingCombinations:
-                route_tpl = tuple(route_vec.as_list())
+                route_tpl = tuple(route_vec.tolist())
                 leaf_exits = []
                 for idx, leaf_node in enumerate(self.leafNodes):
                     dense_output = routing_data.dictionaryOfRoutingData["dense_output"][leaf_node.index][
@@ -198,9 +199,31 @@ class CignSingleLateExit(FastTreeNetwork):
                 results = sess.run([self.lateExitTestPosteriors], feed_dict=feed_dict)
                 late_posteriors_dict[route_tpl].append(results[0])
             curr_index += GlobalConstants.EVAL_BATCH_SIZE
-        routing_data.dictionaryOfRoutingData["posteriors_late_exit"] = late_posteriors_dict
+        for k in late_posteriors_dict.keys():
+            late_posteriors_dict[k] = np.concatenate(late_posteriors_dict[k], axis=0)
+        data_type = "test" if dataset_type == DatasetTypes.test else "training"
+        directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
+                                                               run_id=run_id, iteration=iteration,
+                                                               data_type=data_type)
+        routing_data.dictionaryOfRoutingData["lateExitTestPosteriors"] = late_posteriors_dict
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
+        string_arr_dict = {",".join((str(i) for i in k)): v for k, v in late_posteriors_dict.items()}
+        UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=string_arr_dict)
         routing_data = RoutingDataset(label_list=routing_data.labelList,
                                       dict_of_data_dicts=routing_data.dictionaryOfRoutingData)
+        return routing_data
+
+    @staticmethod
+    def load_routing_info(network, run_id, iteration, data_type):
+        routing_data = super().load_routing_info(network=network, run_id=run_id,
+                                                 iteration=iteration, data_type=data_type)
+        directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
+                                                               network_name=network.networkName,
+                                                               data_type=data_type)
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
+        dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)
+        data_dict = {tuple([int(l) for l in k.split(",")]): v for k, v in dict_read.items()}
+        routing_data["lateExitTestPosteriors"] = data_dict
         return routing_data
 
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
@@ -240,35 +263,6 @@ class CignSingleLateExit(FastTreeNetwork):
                 rows=[(run_id, iteration, epoch_id, training_accuracy,
                        validation_accuracy, validation_accuracy_late,
                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
-
-    def get_late_exit_results(self, sess, dataset, data_type):
-        dataset.set_current_data_set_type(dataset_type=DatasetTypes.test, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
-        late_posteriors_dict = {}
-        late_labels_dict = {}
-        for route_vec in self.routingCombinations:
-            route_tpl = tuple(route_vec.as_list())
-            late_posteriors_dict[route_tpl] = []
-        while True:
-            results, minibatch = self.eval_network(sess=sess, dataset=dataset, use_masking=False)
-            for route_vec in self.routingCombinations:
-                route_tpl = tuple(route_vec.as_list())
-                leaf_exits = []
-                for idx, leaf_node in enumerate(self.leafNodes):
-                    sparse_exit = results[UtilityFuncs.get_variable_name(name="sparse_output", node=leaf_node)]
-                    dense_exit = results[UtilityFuncs.get_variable_name(name="dense_output", node=leaf_node)]
-                    assert np.array_equal(sparse_exit, dense_exit)
-                    leaf_exits.append(route_tpl[idx] * dense_exit)
-                leaf_exit_input = np.concatenate(leaf_exits, axis=-1)
-
-
-
-
-
-
-            if dataset.isNewEpoch:
-                break
-
-
 
     # Unit Tests
     def test_scatter_nd_behavior(self, sess, dataset):

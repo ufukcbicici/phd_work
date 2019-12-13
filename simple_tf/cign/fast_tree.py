@@ -557,7 +557,7 @@ class FastTreeNetwork(TreeNetwork):
                 continue
             key_name = self.get_variable_name(name=output_name, node=node)
             if key_name not in results:
-                return
+                continue
             output_arr = results[self.get_variable_name(name=output_name, node=node)]
             UtilityFuncs.concat_to_np_array_dict_v2(dct=collection[output_name], key=node.index, array=output_arr)
 
@@ -786,8 +786,7 @@ class FastTreeNetwork(TreeNetwork):
         label_data = dict_of_data_dicts["label_tensor"]
         label_list = list(label_data.values())[0]
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
-        network.nodeCosts = pickle.load(open(os.path.abspath(os.path.join(directory_path,
-                                                                                        "nodeCosts.sav")), 'rb'))
+        network.nodeCosts = pickle.load(open(os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")), 'rb'))
         dict_of_data_dicts["nodeCosts"] = network.nodeCosts
         for node in network.topologicalSortedNodes:
             node.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
