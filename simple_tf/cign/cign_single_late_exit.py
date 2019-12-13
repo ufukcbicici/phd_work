@@ -200,7 +200,7 @@ class CignSingleLateExit(FastTreeNetwork):
                 late_posteriors_dict[route_tpl].append(results[0])
             curr_index += GlobalConstants.EVAL_BATCH_SIZE
         for k in late_posteriors_dict.keys():
-            late_posteriors_dict[k] = np.concatenate(late_posteriors_dict[k], axis=-1)
+            late_posteriors_dict[k] = np.concatenate(late_posteriors_dict[k], axis=0)
         data_type = "test" if dataset_type == DatasetTypes.test else "training"
         directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
                                                                run_id=run_id, iteration=iteration,
