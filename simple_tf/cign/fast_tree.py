@@ -557,7 +557,7 @@ class FastTreeNetwork(TreeNetwork):
                 continue
             key_name = self.get_variable_name(name=output_name, node=node)
             if key_name not in results:
-                return
+                continue
             output_arr = results[self.get_variable_name(name=output_name, node=node)]
             UtilityFuncs.concat_to_np_array_dict_v2(dct=collection[output_name], key=node.index, array=output_arr)
 

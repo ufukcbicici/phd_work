@@ -180,12 +180,12 @@ class CignSingleLateExit(FastTreeNetwork):
         # Get the late exit posteriors
         late_posteriors_dict = {}
         for route_vec in self.routingCombinations:
-            route_tpl = tuple(route_vec.as_list())
+            route_tpl = tuple(route_vec.tolist())
             late_posteriors_dict[route_tpl] = []
         curr_index = 0
         while curr_index < dataset.get_current_sample_count():
             for route_vec in self.routingCombinations:
-                route_tpl = tuple(route_vec.as_list())
+                route_tpl = tuple(route_vec.tolist())
                 leaf_exits = []
                 for idx, leaf_node in enumerate(self.leafNodes):
                     dense_output = routing_data.dictionaryOfRoutingData["dense_output"][leaf_node.index][
