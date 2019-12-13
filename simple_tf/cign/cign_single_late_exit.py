@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import time
+import os
 
 from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers import RoutingDataset
 from auxillary.constants import DatasetTypes
@@ -200,9 +201,29 @@ class CignSingleLateExit(FastTreeNetwork):
             curr_index += GlobalConstants.EVAL_BATCH_SIZE
         for k in late_posteriors_dict.keys():
             late_posteriors_dict[k] = np.concatenate(late_posteriors_dict[k], axis=-1)
+        data_type = "test" if dataset_type == DatasetTypes.test else "training"
+        directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
+                                                               run_id=run_id, iteration=iteration,
+                                                               data_type=data_type)
         routing_data.dictionaryOfRoutingData["lateExitTestPosteriors"] = late_posteriors_dict
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
+        string_arr_dict = {",".join((str(i) for i in k)): v for k, v in late_posteriors_dict.items()}
+        UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=string_arr_dict)
         routing_data = RoutingDataset(label_list=routing_data.labelList,
                                       dict_of_data_dicts=routing_data.dictionaryOfRoutingData)
+        return routing_data
+
+    @staticmethod
+    def load_routing_info(network, run_id, iteration, data_type):
+        routing_data = super().load_routing_info(network=network, run_id=run_id,
+                                                 iteration=iteration, data_type=data_type)
+        directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
+                                                               network_name=network.networkName,
+                                                               data_type=data_type)
+        npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
+        dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)
+        data_dict = {tuple([int(l) for l in k.split(",")]): v for k, v in dict_read.items()}
+        routing_data["lateExitTestPosteriors"] = data_dict
         return routing_data
 
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
