@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import os
+import pickle
 
 from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers import RoutingDataset
 from auxillary.constants import DatasetTypes
@@ -121,6 +122,8 @@ class CignSingleLateExit(FastTreeNetwork):
         self.dbName = DbLogger.log_db_path[DbLogger.log_db_path.rindex("/") + 1:]
         print(self.dbName)
         self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
+        # Divided by two since there are two duplicate applications; one for the training and one for the test.
+        self.nodeCosts[self.lateExitNode.index] = self.lateExitNode.macCost / 2.0
         # Build main classification loss
         self.build_main_loss()
         # Build information gain loss
@@ -209,21 +212,32 @@ class CignSingleLateExit(FastTreeNetwork):
         npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
         string_arr_dict = {",".join((str(i) for i in k)): v for k, v in late_posteriors_dict.items()}
         UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=string_arr_dict)
+        pickle.dump(self.lateExitNode.opMacCostsDict,
+                    open(
+                        os.path.abspath(
+                            os.path.join(directory_path, "node_{0}_opMacCosts.sav".format(self.lateExitNode.index))),
+                        "wb"))
+        routing_data.dictionaryOfRoutingData["node_{0}_opMacCosts".format(self.lateExitNode.index)] = \
+            self.lateExitNode.opMacCostsDict
         routing_data = RoutingDataset(label_list=routing_data.labelList,
                                       dict_of_data_dicts=routing_data.dictionaryOfRoutingData)
         return routing_data
 
-    @staticmethod
-    def load_routing_info(network, run_id, iteration, data_type):
-        routing_data = super().load_routing_info(network=network, run_id=run_id,
+    def load_routing_info(self, run_id, iteration, data_type):
+        routing_data = super().load_routing_info(run_id=run_id,
                                                  iteration=iteration, data_type=data_type)
         directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
-                                                               network_name=network.networkName,
+                                                               network_name=self.networkName,
                                                                data_type=data_type)
         npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
         dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)
         data_dict = {tuple([int(l) for l in k.split(",")]): v for k, v in dict_read.items()}
-        routing_data["lateExitTestPosteriors"] = data_dict
+        routing_data.dictionaryOfRoutingData["lateExitTestPosteriors"] = data_dict
+        self.lateExitNode.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
+                                                                            "node_{0}_opMacCosts.sav"
+                                                                            .format(self.lateExitNode.index))), 'rb'))
+        routing_data.dictionaryOfRoutingData["node_{0}_opMacCosts".format(self.lateExitNode.index)] = \
+            self.lateExitNode.opMacCostsDict
         return routing_data
 
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):

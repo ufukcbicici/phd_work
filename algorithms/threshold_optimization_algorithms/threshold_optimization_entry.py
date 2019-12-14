@@ -56,8 +56,7 @@ def bayesian_process_runner(param_tpl):
     use_weighted = param_tpl[3]
     accuracy_computation_balance = param_tpl[4]
     network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-    routing_data = FastTreeNetwork.load_routing_info(network=network, run_id=run_id, iteration=iteration,
-                                                     data_type="test")
+    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test")
     multipath_calculator = MultipathCalculatorEarlyExit(network=network)
     bayesian_optimizer = BayesianThresholdOptimizer(
         run_id=run_id, network=network, iteration=iteration, routing_data=routing_data,

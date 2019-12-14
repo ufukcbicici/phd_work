@@ -766,15 +766,14 @@ class FastTreeNetwork(TreeNetwork):
         routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
         return routing_data
 
-    @staticmethod
-    def load_routing_info(network, run_id, iteration, data_type):
+    def load_routing_info(self, run_id, iteration, data_type):
         directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
-                                                               network_name=network.networkName,
+                                                               network_name=self.networkName,
                                                                data_type=data_type)
         # Assert that the tree architecture is compatible with the loaded info
         npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
         degree_list = UtilityFuncs.load_npz(file_name=npz_file_name)
-        assert np.array_equal(np.array(network.degreeList), degree_list["tree_type"])
+        assert np.array_equal(np.array(self.degreeList), degree_list["tree_type"])
         all_output_names = list(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
         all_output_names.extend(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
         dict_of_data_dicts = {}
@@ -786,9 +785,9 @@ class FastTreeNetwork(TreeNetwork):
         label_data = dict_of_data_dicts["label_tensor"]
         label_list = list(label_data.values())[0]
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
-        network.nodeCosts = pickle.load(open(os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")), 'rb'))
-        dict_of_data_dicts["nodeCosts"] = network.nodeCosts
-        for node in network.topologicalSortedNodes:
+        self.nodeCosts = pickle.load(open(os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")), 'rb'))
+        dict_of_data_dicts["nodeCosts"] = self.nodeCosts
+        for node in self.topologicalSortedNodes:
             node.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
                                                                                 "node_{0}_opMacCosts.sav"
                                                                                 .format(node.index))), 'rb'))
@@ -801,8 +800,7 @@ class FastTreeNetwork(TreeNetwork):
         data_type = "test" if dataset_type == DatasetTypes.test else "training"
         routing_data_save = self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                                    dataset=dataset, dataset_type=dataset_type)
-        routing_data_load = FastTreeNetwork.load_routing_info(network=self, run_id=run_id, iteration=iteration,
-                                                              data_type=data_type)
+        routing_data_load = self.load_routing_info(run_id=run_id, iteration=iteration, data_type=data_type)
         assert routing_data_save == routing_data_load
 
     @staticmethod
