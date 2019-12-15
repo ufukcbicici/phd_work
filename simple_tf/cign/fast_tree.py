@@ -774,8 +774,8 @@ class FastTreeNetwork(TreeNetwork):
         npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
         degree_list = UtilityFuncs.load_npz(file_name=npz_file_name)
         assert np.array_equal(np.array(self.degreeList), degree_list["tree_type"])
-        all_output_names = list(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
-        all_output_names.extend(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
+        all_output_names = set(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
+        all_output_names = all_output_names.union(set(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT))
         dict_of_data_dicts = {}
         for output_name in all_output_names:
             npz_file_name = os.path.abspath(os.path.join(directory_path, output_name))

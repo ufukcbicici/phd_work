@@ -224,8 +224,11 @@ class CignSingleLateExit(FastTreeNetwork):
         return routing_data
 
     def load_routing_info(self, run_id, iteration, data_type):
+        prev_leaf_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
+        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(["dense_output", "sparse_output"])
         routing_data = super().load_routing_info(run_id=run_id,
                                                  iteration=iteration, data_type=data_type)
+        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = prev_leaf_outputs
         directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
                                                                network_name=self.networkName,
                                                                data_type=data_type)
@@ -271,8 +274,12 @@ class CignSingleLateExit(FastTreeNetwork):
                     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                            dataset=dataset, dataset_type=DatasetTypes.test)
                     t2 = time.time()
-                    print("t1-t0={0}".format(t1 - t0))
-                    print("t2-t1={0}".format(t2 - t1))
+                    # self.test_save_load(sess=sess, run_id=run_id, iteration=iteration, dataset=dataset,
+                    #                     dataset_type=DatasetTypes.training)
+                    # self.test_save_load(sess=sess, run_id=run_id, iteration=iteration, dataset=dataset,
+                    #                     dataset_type=DatasetTypes.test)
+                    # print("t1-t0={0}".format(t1 - t0))
+                    # print("t2-t1={0}".format(t2 - t1))
             DbLogger.write_into_table(
                 rows=[(run_id, iteration, epoch_id, training_accuracy,
                        validation_accuracy, validation_accuracy_late,
