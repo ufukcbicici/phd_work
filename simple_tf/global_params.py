@@ -77,7 +77,7 @@ class GlobalConstants:
     # Fashion Net Setting
     TOTAL_EPOCH_COUNT = 100
     EPOCH_COUNT = 100
-    EPOCH_REPORT_PERIOD = 1
+    EPOCH_REPORT_PERIOD = 1000
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 250
     USE_MULTI_GPU = False
@@ -311,6 +311,7 @@ class GlobalConstants:
     # MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05]
     # MULTIPATH_SCHEDULES.extend([i*0.001 for i in range(50)])
     SAVE_PATH_INFO_TO_HD = True
+    EVALUATION_PERIODS = 1000
     EVALUATION_EPOCHS_BEFORE_ENDING = 10
     MULTIPATH_SCHEDULES = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15,
                            0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.025, 0.02, 0.01,

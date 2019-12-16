@@ -15,7 +15,7 @@ class FashionCignLiteEarlyExit(CignEarlyExitTree):
     EARLY_EXIT_CONV_FILTER_SIZES = [1]
     EARLY_EXIT_FC_LAYERS = [128, 64]
     # Late Exit
-    LATE_EXIT_CONV_LAYERS = [128, 64, 32]
+    LATE_EXIT_CONV_LAYERS = [96, 64, 32]
     LATE_EXIT_CONV_FILTER_SIZES = [1, 1, 1]
     LATE_EXIT_FC_LAYERS = [256, 128]
     LATE_EXIT_USE_GAP = True
@@ -61,7 +61,7 @@ class FashionCignLiteEarlyExit(CignEarlyExitTree):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "Fashion Net - Early Exit v3.0\n"
+        explanation = "Fashion Net - Early Exit v2.0\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -196,7 +196,7 @@ class FashionCignLiteEarlyExit(CignEarlyExitTree):
         # Training Parameters
         GlobalConstants.TOTAL_EPOCH_COUNT = 100
         GlobalConstants.EPOCH_COUNT = 100
-        GlobalConstants.EPOCH_REPORT_PERIOD = 1
+        GlobalConstants.EPOCH_REPORT_PERIOD = 1000
         GlobalConstants.BATCH_SIZE = 125
         GlobalConstants.EVAL_BATCH_SIZE = 125
         GlobalConstants.USE_MULTI_GPU = False

@@ -194,7 +194,7 @@ class FashionCignLite(FastTreeNetwork):
 
     @staticmethod
     def build_lenet_structure(network, node, parent_F, conv_layers, conv_filters, fc_layers,
-                              conv_name, fc_name):
+                              conv_name, fc_name, use_max_pool=True):
         # Convolution Layers
         is_early_exit = "early_exit" in conv_name and "early_exit" in fc_name
         is_late_exit = "late_exit" in conv_name and "late_exit" in fc_name
@@ -222,7 +222,7 @@ class FashionCignLite(FastTreeNetwork):
             net = FastTreeNetwork.conv_layer(x=net, kernel=conv_W, strides=[1, 1, 1, 1], padding='SAME', bias=conv_b,
                                              node=node, name=conv_name)
             net = tf.nn.relu(net)
-            if is_last_layer:
+            if is_last_layer and use_max_pool:
                 net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
             node.fOpsList.extend([net])
         # FC Layers
