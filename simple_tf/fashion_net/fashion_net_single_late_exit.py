@@ -37,11 +37,11 @@ class FashionNetSingleLateExit(CignSingleLateExit):
         # ***************** F: Convolution Layer *****************
         # Conv Layer
         parent_F, parent_H = network.mask_input_nodes(node=node)
+        network.leafNodeOutputsToLateExit[node.index] = parent_F
         net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv3_weights, strides=[1, 1, 1, 1],
                                          padding='SAME', bias=conv3_biases, node=node)
         net = tf.nn.relu(net)
         net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-        network.leafNodeOutputsToLateExit[node.index] = net
         # FC Layers
         net = tf.contrib.layers.flatten(net)
         flattened_F_feature_size = net.get_shape().as_list()[-1]
@@ -232,7 +232,7 @@ class FashionNetSingleLateExit(CignSingleLateExit):
         # Training Parameters
         GlobalConstants.TOTAL_EPOCH_COUNT = 100
         GlobalConstants.EPOCH_COUNT = 100
-        GlobalConstants.EPOCH_REPORT_PERIOD = 1000
+        GlobalConstants.EPOCH_REPORT_PERIOD = 1
         GlobalConstants.BATCH_SIZE = 125
         GlobalConstants.EVAL_BATCH_SIZE = 125
         GlobalConstants.USE_MULTI_GPU = False

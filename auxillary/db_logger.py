@@ -22,7 +22,7 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger.db"
 
     # DGX DB 2
-    log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger2.db"
+    # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger2.db"
 
     # DGX DB 3
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
@@ -37,7 +37,7 @@ class DbLogger:
     # log_db_path = "C://Users//pc//Desktop//phd_work//simple_tf//dblogger.db"
 
     # Idea GPU
-    # log_db_path = "C://Users//ufuk.bicici.IDEATEKNOLOJI//Desktop//phd_work//simple_tf//dblogger.db"
+    log_db_path = "C://Users//ufuk.bicici.IDEATEKNOLOJI//Desktop//phd_work//simple_tf//dblogger.db"
 
     # Idea
     # log_db_path = "C://Users//ufuk.bicici//Desktop//PHD//phd_work//simple_tf//bnnlogger.db"
