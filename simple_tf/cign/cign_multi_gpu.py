@@ -51,6 +51,18 @@ class CignMultiGpu(FastTreeNetwork):
         #     self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
         #                                                                                  global_step=self.globalCounter)
 
+    def get_tower_network(self):
+        tower_cign = FastTreeNetwork(
+            node_build_funcs=self.nodeBuildFuncs,
+            grad_func=None,
+            hyperparameter_func=None,
+            residue_func=None,
+            summary_func=None,
+            degree_list=self.degreeList,
+            dataset=self.dataset,
+            network_name=self.networkName)
+        return tower_cign
+
     def build_network(self):
         devices = UtilityFuncs.get_available_devices(only_gpu=(not GlobalConstants.USE_CPU_AS_DEVICE))
         print(devices)
@@ -64,15 +76,7 @@ class CignMultiGpu(FastTreeNetwork):
                         with tf.name_scope("tower_{0}".format(tower_id)):
                             print(device_str)
                             # Build a Multi GPU supporting CIGN
-                            tower_cign = FastTreeNetwork(
-                                node_build_funcs=self.nodeBuildFuncs,
-                                grad_func=None,
-                                hyperparameter_func=None,
-                                residue_func=None,
-                                summary_func=None,
-                                degree_list=self.degreeList,
-                                dataset=self.dataset,
-                                network_name=self.networkName)
+                            tower_cign = self.get_tower_network()
                             tower_cign.build_network()
                             print("Built network for tower {0}".format(tower_id))
                             self.towerNetworks.append((device_str, tower_cign))

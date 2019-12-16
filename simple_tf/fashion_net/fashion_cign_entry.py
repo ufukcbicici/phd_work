@@ -17,8 +17,8 @@ use_moe = False
 use_sampling = False
 use_random_sampling = False
 use_baseline = False
-use_early_exit = False
-use_late_exit = True
+use_early_exit = True
+use_late_exit = False
 
 
 def get_network(dataset, network_name):
@@ -35,8 +35,6 @@ def get_network(dataset, network_name):
     elif use_late_exit:
         network = FashionNetSingleLateExit(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                            network_name=network_name)
-        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(
-            ["final_feature_late_exit", "logits_late_exit", "posterior_probs_late"])
     else:
         raise NotImplementedError()
     return network
