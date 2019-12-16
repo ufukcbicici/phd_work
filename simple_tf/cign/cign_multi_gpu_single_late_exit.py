@@ -30,3 +30,13 @@ class CignMultiGpuSingleLateExit(CignMultiGpu):
             network_name=self.networkName,
             late_exit_func=self.lateExitFunc)
         return tower_cign
+
+    def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
+        feed_dict = super().prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
+                                              is_train=is_train, use_masking=use_masking)
+        for tower_id, tpl in enumerate(self.towerNetworks):
+            device_str = tpl[0]
+            network = tpl[1]
+            feed_dict[network.earlyExitWeight] = GlobalConstants.EARLY_EXIT_WEIGHT
+            feed_dict[network.lateExitWeight] = GlobalConstants.LATE_EXIT_WEIGHT
+        return feed_dict
