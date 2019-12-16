@@ -268,7 +268,7 @@ class GlobalConstants:
     FASHION_F_RESIDUE_USE_DROPOUT = False
 
     TREE_DEGREE_LIST = [2, 2]
-    USE_SCALED_GRADIENTS = False
+    USE_SCALED_GRADIENTS = True
 
     # Resnet Params
     # RESNET_HYPERPARAMS = ResnetHParams(num_residual_units=[16, 16, 16, 0], use_bottleneck=True,

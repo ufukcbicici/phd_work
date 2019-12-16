@@ -16,9 +16,9 @@ class FashionNetSingleLateExit(CignSingleLateExit):
     EARLY_EXIT_CONV_FILTER_SIZES = [1]
     EARLY_EXIT_FC_LAYERS = [128, 64]
     # Late Exit
-    LATE_EXIT_CONV_LAYERS = [256, 128, 64]
+    LATE_EXIT_CONV_LAYERS = [128, 128, 64]
     LATE_EXIT_CONV_FILTER_SIZES = [1, 1, 1]
-    LATE_EXIT_FC_LAYERS = [512, 128]
+    LATE_EXIT_FC_LAYERS = [256, 128]
 
     def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func, FashionNetSingleLateExit.leaf_func]
@@ -90,7 +90,7 @@ class FashionNetSingleLateExit(CignSingleLateExit):
                 conv_filters=FashionNetSingleLateExit.LATE_EXIT_CONV_FILTER_SIZES,
                 fc_layers=FashionNetSingleLateExit.LATE_EXIT_FC_LAYERS,
                 conv_name="late_exit_conv_op",
-                fc_name="late_exit_fc_op", use_max_pool=False)
+                fc_name="late_exit_fc_op", use_max_pool=True)
         return late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases
 
     def get_explanation_string(self):

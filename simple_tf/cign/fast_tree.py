@@ -452,9 +452,11 @@ class FastTreeNetwork(TreeNetwork):
                 node.oneHotLabelTensor = tf.boolean_mask(parent_node.oneHotLabelTensor, mask_tensor)
                 if GlobalConstants.USE_UNIFIED_BATCH_NORM:
                     node.filteredMask = tf.boolean_mask(mask_without_threshold, mask_tensor)
-            # if GlobalConstants.USE_SCALED_GRADIENTS:
-            #     parent_child_count = len(self.dagObject.children(node=parent_node))
-            #     scale = 1.0 / parent_child_count
+            if GlobalConstants.USE_SCALED_GRADIENTS:
+                parent_child_count = len(self.dagObject.children(node=parent_node))
+                scale = 1.0 / parent_child_count
+                parent_F = scale * parent_F + (1 - scale) * tf.stop_gradient(parent_F)
+                parent_H = scale * parent_H + (1 - scale) * tf.stop_gradient(parent_H)
             return parent_F, parent_H
 
     def make_loss(self, node, logits):
@@ -653,6 +655,7 @@ class FastTreeNetwork(TreeNetwork):
         explanation += "USE_MULTI_GPU:{0}\n".format(GlobalConstants.USE_MULTI_GPU)
         explanation += "USE_SAMPLING_CIGN:{0}\n".format(GlobalConstants.USE_SAMPLING_CIGN)
         explanation += "USE_RANDOM_SAMPLING:{0}\n".format(GlobalConstants.USE_RANDOM_SAMPLING)
+        explanation += "USE_SCALED_GRADIENTS:{0}\n".format(GlobalConstants.USE_SCALED_GRADIENTS)
         explanation += "LR SCHEDULE:{0}\n".format(GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation())
         leaf_node = [node for node in self.topologicalSortedNodes if node.isLeaf][0]
         root_to_leaf_path = self.dagObject.ancestors(node=leaf_node)
