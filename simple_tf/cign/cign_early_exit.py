@@ -1,23 +1,11 @@
-from collections import deque
-
-import numpy as np
-import tensorflow as tf
 import time
-import os
 
-from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
-from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
-from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers import RoutingDataset
-from auxillary.db_logger import DbLogger
-from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.cign.tree import TreeNetwork
-from simple_tf.global_params import GlobalConstants, AccuracyCalcType, TrainingUpdateResult
-from algorithms.info_gain import InfoGainLoss
-from simple_tf.uncategorized.node import Node
+import tensorflow as tf
+
 from auxillary.constants import DatasetTypes
-from sklearn.metrics import confusion_matrix
-from tensorflow.contrib.framework.python.framework import checkpoint_utils
+from auxillary.db_logger import DbLogger
+from simple_tf.cign.fast_tree import FastTreeNetwork
+from simple_tf.global_params import GlobalConstants
 
 
 class CignEarlyExitTree(FastTreeNetwork):
@@ -102,17 +90,17 @@ class CignEarlyExitTree(FastTreeNetwork):
                     self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
                                             run_id=run_id,
                                             iteration=iteration, posterior_entry_name="posterior_probs_late")
-                if is_evaluation_epoch_before_ending:
-                    # self.save_model(sess=sess, run_id=run_id, iteration=iteration)
-                    t0 = time.time()
-                    self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
-                                           dataset=dataset, dataset_type=DatasetTypes.training)
-                    t1 = time.time()
-                    self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
-                                           dataset=dataset, dataset_type=DatasetTypes.test)
-                    t2 = time.time()
-                    print("t1-t0={0}".format(t1 - t0))
-                    print("t2-t1={0}".format(t2 - t1))
+                # if is_evaluation_epoch_before_ending:
+                #     # self.save_model(sess=sess, run_id=run_id, iteration=iteration)
+                #     t0 = time.time()
+                #     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                #                            dataset=dataset, dataset_type=DatasetTypes.training)
+                #     t1 = time.time()
+                #     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                #                            dataset=dataset, dataset_type=DatasetTypes.test)
+                #     t2 = time.time()
+                #     print("t1-t0={0}".format(t1 - t0))
+                #     print("t2-t1={0}".format(t2 - t1))
             DbLogger.write_into_table(
                 rows=[(run_id, iteration, epoch_id, training_accuracy,
                        validation_accuracy, validation_accuracy_late,

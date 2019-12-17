@@ -1,14 +1,6 @@
-import numpy as np
-import tensorflow as tf
-
-from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
-from auxillary.constants import DatasetTypes
-from auxillary.db_logger import DbLogger
-from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.cign_multi_gpu import CignMultiGpu
 from simple_tf.cign.cign_single_late_exit import CignSingleLateExit
-from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.global_params import GlobalConstants, AccuracyCalcType
+from simple_tf.global_params import GlobalConstants
 
 
 class CignMultiGpuSingleLateExit(CignMultiGpu):
