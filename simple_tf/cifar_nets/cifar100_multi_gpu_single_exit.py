@@ -202,37 +202,26 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
                                                         is_train=network.isTrain,
                                                         bn_momentum=GlobalConstants.BATCH_NORM_DECAY,
                                                         node=node)
-
-
-        # if num_of_units_in_this_node > 0:
-        #     # MultiGPU OK
-        #     with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_0".format(node.depth + 1), node=node)):
-        #         x = ResnetGenerator.bottleneck_residual(x=x, in_filter=in_filter, out_filter=out_filter,
-        #                                                 stride=ResnetGenerator.stride_arr(stride),
-        #                                                 activate_before_residual=_activate_before_residual,
-        #                                                 relu_leakiness=relu_leakiness, is_train=network.isTrain,
-        #                                                 bn_momentum=GlobalConstants.BATCH_NORM_DECAY, node=node)
-        #         node.fOpsList.append(x)
-        #     # MultiGPU OK
-        #     for i in range(num_of_units_in_this_node - 1):
-        #         with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(node.depth + 1, i + 1),
-        #                                                               node=node)):
-        #             x = ResnetGenerator.bottleneck_residual(x=x, in_filter=out_filter,
-        #                                                     out_filter=out_filter,
-        #                                                     stride=ResnetGenerator.stride_arr(1),
-        #                                                     activate_before_residual=False,
-        #                                                     relu_leakiness=relu_leakiness, is_train=network.isTrain,
-        #                                                     bn_momentum=GlobalConstants.BATCH_NORM_DECAY, node=node)
-
-        # late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases = \
-        #     FashionCignLite.build_lenet_structure(
-        #         network=network, node=node, parent_F=x,
-        #         conv_layers=FashionNetSingleLateExit.LATE_EXIT_CONV_LAYERS,
-        #         conv_filters=FashionNetSingleLateExit.LATE_EXIT_CONV_FILTER_SIZES,
-        #         fc_layers=FashionNetSingleLateExit.LATE_EXIT_FC_LAYERS,
-        #         conv_name="late_exit_conv_op",
-        #         fc_name="late_exit_fc_op", use_max_pool=True)
-        # return late_exit_features, late_exit_softmax_weights, late_exit_softmax_biases
+        with tf.variable_scope(UtilityFuncs.get_variable_name(name="unit_last", node=node)):
+            x = ResnetGenerator.get_output(x=x, is_train=network.isTrain, leakiness=relu_leakiness,
+                                           bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+        # assert len(net_shape) == 4
+        # x = tf.reshape(x, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
+        output = x
+        out_dim = network.labelCount
+        # MultiGPU OK
+        weight = UtilityFuncs.create_variable(
+            name=UtilityFuncs.get_variable_name(name="fc_softmax_weights", node=node),
+            shape=[output.get_shape()[1], out_dim],
+            dtype=GlobalConstants.DATA_TYPE,
+            initializer=tf.uniform_unit_scaling_initializer(factor=1.0))
+        # MultiGPU OK
+        bias = UtilityFuncs.create_variable(
+            name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node),
+            shape=[out_dim],
+            dtype=GlobalConstants.DATA_TYPE,
+            initializer=tf.constant_initializer())
+        return output, weight, bias
 
     def set_hyperparameters(self, **kwargs):
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
