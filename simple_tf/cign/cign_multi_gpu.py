@@ -367,6 +367,7 @@ class CignMultiGpu(FastTreeNetwork):
         explanation += "USE_SAMPLING_CIGN:{0}\n".format(GlobalConstants.USE_SAMPLING_CIGN)
         explanation += "USE_RANDOM_SAMPLING:{0}\n".format(GlobalConstants.USE_RANDOM_SAMPLING)
         explanation += "LR SCHEDULE:{0}\n".format(GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation())
+        explanation += "USE_SCALED_GRADIENTS:{0}\n".format(GlobalConstants.USE_SCALED_GRADIENTS)
         network = self.towerNetworks[0][1]
         leaf_node = [node for node in network.topologicalSortedNodes if node.isLeaf][0]
         root_to_leaf_path = network.dagObject.ancestors(node=leaf_node)
