@@ -16,9 +16,9 @@ class FashionNetSingleLateExit(CignSingleLateExit):
     EARLY_EXIT_CONV_FILTER_SIZES = [1]
     EARLY_EXIT_FC_LAYERS = [128, 64]
     # Late Exit
-    LATE_EXIT_CONV_LAYERS = [128, 128, 64]
+    LATE_EXIT_CONV_LAYERS = [128, 128, 128]
     LATE_EXIT_CONV_FILTER_SIZES = [1, 1, 1]
-    LATE_EXIT_FC_LAYERS = [256, 128]
+    LATE_EXIT_FC_LAYERS = [512, 256]
 
     def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = [FashionCignLite.root_func, FashionCignLite.l1_func, FashionNetSingleLateExit.leaf_func]
@@ -37,11 +37,11 @@ class FashionNetSingleLateExit(CignSingleLateExit):
         # ***************** F: Convolution Layer *****************
         # Conv Layer
         parent_F, parent_H = network.mask_input_nodes(node=node)
-        network.leafNodeOutputsToLateExit[node.index] = parent_F
         net = FastTreeNetwork.conv_layer(x=parent_F, kernel=conv3_weights, strides=[1, 1, 1, 1],
                                          padding='SAME', bias=conv3_biases, node=node)
         net = tf.nn.relu(net)
         net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        network.leafNodeOutputsToLateExit[node.index] = net
         # FC Layers
         net = tf.contrib.layers.flatten(net)
         flattened_F_feature_size = net.get_shape().as_list()[-1]
