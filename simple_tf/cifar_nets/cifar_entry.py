@@ -10,22 +10,28 @@ from simple_tf.cifar_nets.cifar100_cign import Cifar100_Cign
 from simple_tf.cifar_nets.cifar100_cign_random_sampling import Cifar100_CignRandomSampling
 from simple_tf.cifar_nets.cifar100_cign_sampling import Cifar100_CignSampling
 from simple_tf.cifar_nets.cifar100_multi_gpu_cign import Cifar100_MultiGpuCign
+from simple_tf.cifar_nets.cifar100_multi_gpu_single_exit import Cifar100_MultiGpuCignSingleLateExit
 from simple_tf.cifar_nets.cifar100_resnet_baseline import Cifar100_Baseline
 from simple_tf.global_params import GlobalConstants
 
-use_multi_gpu = True
+use_multi_gpu = False
+use_multi_gpu_single_late_exit = True
 use_sampling = False
 use_random_sampling = False
 use_baseline = False
 
 
 def get_network(dataset, network_name):
-    if not use_multi_gpu and not use_sampling and not use_random_sampling and not use_baseline:
+    if not use_multi_gpu and not use_sampling and not use_random_sampling and not use_baseline and \
+            not use_multi_gpu_single_late_exit:
         network = Cifar100_Cign(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
                                 network_name=network_name)
     elif use_multi_gpu:
         network = Cifar100_MultiGpuCign(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
                                         network_name=network_name)
+    elif use_multi_gpu_single_late_exit:
+        network = Cifar100_MultiGpuCignSingleLateExit(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
+                                                      network_name=network_name)
     elif use_sampling:
         network = Cifar100_CignSampling(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
                                         network_name=network_name)
@@ -49,18 +55,22 @@ def cifar_100_training():
     # classification_wd = [0.0002, 0.0002, 0.0025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00015, 0.0002, 0.00025] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    classification_wd = [0.00035, 0.00035, 0.00035, 0.00035, 0.00035] * 2
+    classification_wd = [0.00015, 0.00015, 0.00015, 0.00015]
     # classification_wd = [0.0001, 0.00015, 0.0002] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     classification_dropout_probs = [0.0]
     decision_dropout_probs = [0.0]
+    early_exit_weights = [1.0]
+    late_exit_weights = [1.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,
                                                                           info_gain_balance_coeffs,
                                                                           classification_dropout_probs,
-                                                                          decision_dropout_probs])
+                                                                          decision_dropout_probs,
+                                                                          early_exit_weights,
+                                                                          late_exit_weights])
     run_id = 0
     for tpl in cartesian_product:
         # try:

@@ -16,8 +16,8 @@ num_of_units_per_block = GlobalConstants.RESNET_HYPERPARAMS.num_residual_units
 relu_leakiness = GlobalConstants.RESNET_HYPERPARAMS.relu_leakiness
 first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_size
 
-class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
 
+class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
     # Late Exit
     LATE_EXIT_NUM_OF_CONV_LAYERS = 16
     LATE_EXIT_CONV_LAYER_FEATURE_COUNT = 64
@@ -147,8 +147,8 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
         GlobalConstants.TOTAL_EPOCH_COUNT = 1200
         GlobalConstants.EPOCH_COUNT = 1200
         GlobalConstants.EPOCH_REPORT_PERIOD = 10
-        GlobalConstants.BATCH_SIZE = 500
-        GlobalConstants.EVAL_BATCH_SIZE = 250
+        GlobalConstants.BATCH_SIZE = 100
+        GlobalConstants.EVAL_BATCH_SIZE = 100
         GlobalConstants.USE_MULTI_GPU = True
         GlobalConstants.USE_SAMPLING_CIGN = False
         GlobalConstants.USE_RANDOM_SAMPLING = False
