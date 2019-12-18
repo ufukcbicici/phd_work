@@ -1,3 +1,5 @@
+import tensorflow as tf
+from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
 from simple_tf.cign.cign_multi_gpu import CignMultiGpu
 from simple_tf.cign.cign_single_late_exit import CignSingleLateExit
 from simple_tf.global_params import GlobalConstants
@@ -32,3 +34,25 @@ class CignMultiGpuSingleLateExit(CignMultiGpu):
             feed_dict[network.earlyExitWeight] = GlobalConstants.EARLY_EXIT_WEIGHT
             feed_dict[network.lateExitWeight] = GlobalConstants.LATE_EXIT_WEIGHT
         return feed_dict
+
+    def prepare_batch_norm_moving_avg_ops(self):
+        batch_norm_moving_averages = tf.get_collection(CustomBatchNormAlgorithms.CUSTOM_BATCH_NORM_OPS)
+        # Assert that for every (moving_average, new_value) tuple, we have exactly #tower_count tuples with a specific
+        # moving_average entry.
+        batch_norm_ops_dict = {}
+        for moving_average, new_value in batch_norm_moving_averages:
+            if moving_average not in batch_norm_ops_dict:
+                batch_norm_ops_dict[moving_average] = []
+            expanded_new_value = tf.expand_dims(new_value, 0)
+            batch_norm_ops_dict[moving_average].append(expanded_new_value)
+        assert all([len(v) == len(self.towerNetworks) for k, v in batch_norm_ops_dict.items()])
+        # Take the mean of all values for every moving average and update the moving average value.
+        for moving_average, values_list in batch_norm_ops_dict.items():
+            values_concat = tf.concat(axis=0, values=values_list)
+            mean_new_value = tf.reduce_mean(values_concat, 0)
+            momentum = GlobalConstants.BATCH_NORM_DECAY
+            new_moving_average_value = tf.where(self.iterationHolder > 0,
+                                                (momentum * moving_average + (1.0 - momentum) * mean_new_value),
+                                                mean_new_value)
+            new_moving_average_value_assign_op = tf.assign(moving_average, new_moving_average_value)
+            self.batchNormMovingAvgAssignOps.append(new_moving_average_value_assign_op)

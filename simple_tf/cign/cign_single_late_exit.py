@@ -101,24 +101,27 @@ class CignSingleLateExit(FastTreeNetwork):
         # Build late exit for training and evaluation outputs
         with tf.variable_scope("late_exit"):
             # Training Exit: Loss and Posteriors
-            self.build_late_exit_inputs()
-            self.lateExitOutput, late_exit_sm_W, late_exit_sm_b = \
-                self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTrainingInput)
-            self.evalDict["lateExitOutput"] = self.lateExitOutput
-            self.lateExitNode.labelTensor = self.topologicalSortedNodes[0].labelTensor
-            self.lateExitNode.infoGainLoss = tf.constant(0.0)
-            self.apply_late_loss(node=self.lateExitNode, final_feature=self.lateExitOutput,
-                                 softmax_weights=late_exit_sm_W, softmax_biases=late_exit_sm_b)
+            with tf.name_scope("merge_leaf_outputs"):
+                self.build_late_exit_inputs()
+            with tf.name_scope("late_exit_training"):
+                self.lateExitOutput, late_exit_sm_W, late_exit_sm_b = \
+                    self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTrainingInput)
+                self.evalDict["lateExitOutput"] = self.lateExitOutput
+                self.lateExitNode.labelTensor = self.topologicalSortedNodes[0].labelTensor
+                self.lateExitNode.infoGainLoss = tf.constant(0.0)
+                self.apply_late_loss(node=self.lateExitNode, final_feature=self.lateExitOutput,
+                                     softmax_weights=late_exit_sm_W, softmax_biases=late_exit_sm_b)
             # Test Exit: Only Posteriors
-            var_scope = tf.get_variable_scope()
-            var_scope.reuse_variables()
-            test_output, late_exit_sm_W_test, late_exit_sm_b_test = \
-                self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTestInput)
-            assert late_exit_sm_W == late_exit_sm_W_test and late_exit_sm_b == late_exit_sm_b_test
-            self.lateExitTestLogits = FastTreeNetwork.fc_layer(x=test_output,
-                                                               W=late_exit_sm_W_test, b=late_exit_sm_b_test,
-                                                               node=self.lateExitNode, name="late_exit_fc_op")
-            self.lateExitTestPosteriors = tf.nn.softmax(self.lateExitTestLogits)
+            with tf.name_scope("late_exit_test"):
+                var_scope = tf.get_variable_scope()
+                var_scope.reuse_variables()
+                test_output, late_exit_sm_W_test, late_exit_sm_b_test = \
+                    self.lateExitFunc(network=self, node=self.lateExitNode, x=self.lateExitTestInput)
+                assert late_exit_sm_W == late_exit_sm_W_test and late_exit_sm_b == late_exit_sm_b_test
+                self.lateExitTestLogits = FastTreeNetwork.fc_layer(x=test_output,
+                                                                   W=late_exit_sm_W_test, b=late_exit_sm_b_test,
+                                                                   node=self.lateExitNode, name="late_exit_fc_op")
+                self.lateExitTestPosteriors = tf.nn.softmax(self.lateExitTestLogits)
         self.dbName = DbLogger.log_db_path[DbLogger.log_db_path.rindex("/") + 1:]
         print(self.dbName)
         self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
