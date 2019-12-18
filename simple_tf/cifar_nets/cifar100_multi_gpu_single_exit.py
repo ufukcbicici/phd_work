@@ -22,7 +22,7 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
     LATE_EXIT_NUM_OF_CONV_LAYERS = 16
     LATE_EXIT_CONV_LAYER_FEATURE_COUNT = 64
     LATE_EXIT_STRIDE = 2
-    LATE_EXIT_FIRST_KERNEL_SIZE = 3
+    LATE_EXIT_FIRST_KERNEL_SIZE = 1
 
     def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = [Cifar100_Cign.cign_block_func] * (len(degree_list))
