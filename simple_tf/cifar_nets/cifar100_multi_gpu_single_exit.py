@@ -180,7 +180,8 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
     @staticmethod
     def leaf_func(network, node):
         Cifar100_Cign.cign_block_func(network=network, node=node)
-        network.leafNodeOutputsToLateExit[node.index] = node.fOpsList[-1]
+        network.leafNodeOutputsToLateExit[node.index] = \
+            node.fOpsList[Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_NUM_OF_CONV_LAYERS]
 
     @staticmethod
     def late_exit_func(network, node, x):
