@@ -194,17 +194,19 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
         x = ResnetGenerator.get_input(input=x, out_filters=num_of_features, first_conv_filter_size=first_kernel_size,
                                       node=node)
         for layer_id in range(num_of_layers):
-            with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(node.depth + 1, layer_id + 1),
-                                                                  node=node)):
-                x = ResnetGenerator.bottleneck_residual(x=x,
-                                                        in_filter=num_of_features,
-                                                        out_filter=num_of_features,
-                                                        stride=ResnetGenerator.stride_arr(1),
-                                                        activate_before_residual=layer_id == 0,
-                                                        relu_leakiness=relu_leakiness,
-                                                        is_train=network.isTrain,
-                                                        bn_momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                                        node=node)
+            with tf.variable_scope(
+                    UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(node.depth + 1, layer_id + 1),
+                                                   node=node)):
+                x = ResnetGenerator.bottleneck_residual(
+                    x=x,
+                    in_filter=num_of_features,
+                    out_filter=num_of_features,
+                    stride=ResnetGenerator.stride_arr(2) if layer_id == 0 else ResnetGenerator.stride_arr(1),
+                    activate_before_residual=layer_id == 0,
+                    relu_leakiness=relu_leakiness,
+                    is_train=network.isTrain,
+                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY,
+                    node=node)
         with tf.variable_scope(UtilityFuncs.get_variable_name(name="unit_last", node=node)):
             x = ResnetGenerator.get_output(x=x, is_train=network.isTrain, leakiness=relu_leakiness,
                                            bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
