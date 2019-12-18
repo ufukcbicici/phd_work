@@ -48,7 +48,7 @@ def get_network(dataset, network_name):
 def cifar_100_training():
     import sys
     print(sys.version)
-    network_name = "Cifar100_MultiGpu_Cign_[2,2]_[64,64,64]_IG1.0"
+    network_name = "Cifar100_MultiGpu_CignSingleLateExit_[2,2]_[64,64,64]_IG1.0"
     # classification_wd = [0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003, 0.00035, 0.0004] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd.extend([0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)

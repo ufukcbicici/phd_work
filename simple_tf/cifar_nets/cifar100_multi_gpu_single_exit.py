@@ -25,7 +25,8 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
     LATE_EXIT_FIRST_KERNEL_SIZE = 3
 
     def __init__(self, degree_list, dataset, network_name):
-        node_build_funcs = [Cifar100_Cign.cign_block_func] * (len(degree_list) + 1)
+        node_build_funcs = [Cifar100_Cign.cign_block_func] * (len(degree_list))
+        node_build_funcs.append(Cifar100_MultiGpuCignSingleLateExit.leaf_func)
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name,
                          late_exit_func=Cifar100_MultiGpuCignSingleLateExit.late_exit_func)
 
@@ -146,7 +147,7 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
         #                                                                        (100000, 0.0001)])
         GlobalConstants.TOTAL_EPOCH_COUNT = 1200
         GlobalConstants.EPOCH_COUNT = 1200
-        GlobalConstants.EPOCH_REPORT_PERIOD = 10
+        GlobalConstants.EPOCH_REPORT_PERIOD = 1
         GlobalConstants.BATCH_SIZE = 100
         GlobalConstants.EVAL_BATCH_SIZE = 100
         GlobalConstants.USE_MULTI_GPU = True
@@ -175,10 +176,11 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
 
         GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:CPU:0"
         self.networkName = "Cifar100_CIGN_MultiGpuSingleLateExit"
-        for tower_id, tpl in enumerate(self.towerNetworks):
-            network = tpl[1]
-            for node in network.topologicalSortedNodes:
-                network.leafNodeOutputsToLateExit[node.index] = node.fOpsList[-1]
+
+    @staticmethod
+    def leaf_func(network, node):
+        Cifar100_Cign.cign_block_func(network=network, node=node)
+        network.leafNodeOutputsToLateExit[node.index] = node.fOpsList[-1]
 
     @staticmethod
     def late_exit_func(network, node, x):
