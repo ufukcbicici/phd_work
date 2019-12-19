@@ -291,6 +291,7 @@ class CignMultiGpu(FastTreeNetwork):
             feed_dict[network.informationGainBalancingCoefficient] = GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT
             feed_dict[network.iterationHolder] = iteration
             feed_dict[network.filteredMask] = np.ones((int(single_tower_batch_size),), dtype=bool)
+            feed_dict[network.batchSizeTf] = single_tower_batch_size
             if is_train:
                 feed_dict[network.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             else:
