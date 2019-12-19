@@ -41,6 +41,8 @@ class CignMultiGpuSingleLateExit(CignMultiGpu):
         # moving_average entry.
         batch_norm_ops_dict = {}
         for moving_average, new_value in batch_norm_moving_averages:
+            if "late_exit_test" in new_value.name:
+                continue
             if moving_average not in batch_norm_ops_dict:
                 batch_norm_ops_dict[moving_average] = []
             expanded_new_value = tf.expand_dims(new_value, 0)
