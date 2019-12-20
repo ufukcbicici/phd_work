@@ -152,12 +152,13 @@ class CignSingleLateExit(FastTreeNetwork):
         late_exit_collection = {"posteriors_late_exit": {}, "label_tensor": {}}
         while True:
             results, minibatch = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
-            late_posteriors_arr = results[self.get_variable_name(name="posteriors_late_exit", node=self.lateExitNode)]
-            labels_arr = results[self.get_variable_name(name="label_tensor", node=self.lateExitNode)]
-            UtilityFuncs.concat_to_np_array_dict_v2(dct=late_exit_collection["posteriors_late_exit"],
-                                                    key=self.lateExitNode.index, array=late_posteriors_arr)
-            UtilityFuncs.concat_to_np_array_dict_v2(dct=late_exit_collection["label_tensor"],
-                                                    key=self.lateExitNode.index, array=labels_arr)
+            if results is not None:
+                late_posteriors_arr = results[self.get_variable_name(name="posteriors_late_exit", node=self.lateExitNode)]
+                labels_arr = results[self.get_variable_name(name="label_tensor", node=self.lateExitNode)]
+                UtilityFuncs.concat_to_np_array_dict_v2(dct=late_exit_collection["posteriors_late_exit"],
+                                                        key=self.lateExitNode.index, array=late_posteriors_arr)
+                UtilityFuncs.concat_to_np_array_dict_v2(dct=late_exit_collection["label_tensor"],
+                                                        key=self.lateExitNode.index, array=labels_arr)
             if dataset.isNewEpoch:
                 break
         for output_name, nodes_arr_dict in late_exit_collection.items():
