@@ -205,7 +205,9 @@ class CignSingleLateExit(FastTreeNetwork):
                     assert np.array_equal(dense_output, sparse_output)
                     leaf_exits.append(route_tpl[idx] * dense_output)
                 late_exit_input = np.concatenate(leaf_exits, axis=-1)
-                feed_dict = {self.classificationDropoutKeepProb: 1.0, self.lateExitTestInput: late_exit_input}
+                feed_dict = {self.classificationDropoutKeepProb: 1.0,
+                             self.lateExitTestInput: late_exit_input,
+                             self.isTrain: False}
                 results = sess.run([self.lateExitTestPosteriors], feed_dict=feed_dict)
                 late_posteriors_dict[route_tpl].append(results[0])
             curr_index += GlobalConstants.EVAL_BATCH_SIZE
