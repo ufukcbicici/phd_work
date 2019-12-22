@@ -17,7 +17,7 @@ class FashionCignLiteEarlyExit(CignEarlyExitTree):
     # Late Exit
     LATE_EXIT_CONV_LAYERS = [96, 64, 32]
     LATE_EXIT_CONV_FILTER_SIZES = [1, 1, 1]
-    LATE_EXIT_FC_LAYERS = [128, 128, 64]
+    LATE_EXIT_FC_LAYERS = [128, 128, 128]
     LATE_EXIT_USE_GAP = True
 
     def __init__(self, degree_list, dataset, network_name):
