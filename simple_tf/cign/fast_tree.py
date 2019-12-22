@@ -738,7 +738,7 @@ class FastTreeNetwork(TreeNetwork):
             os.mkdir(directory_path)
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         inner_node_outputs = set(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
-        # inner_node_outputs.add("original_samples")
+        inner_node_outputs.add("original_samples")
         leaf_node_outputs = set(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
         leaf_node_collections, inner_node_collections = \
             self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,

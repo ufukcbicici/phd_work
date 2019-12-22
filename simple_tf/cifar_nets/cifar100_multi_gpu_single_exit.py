@@ -122,7 +122,7 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
         explanation += "\nPinning Device:{0}".format(GlobalConstants.GLOBAL_PINNING_DEVICE)
         explanation += "TRAINING PARAMETERS:\n"
         explanation += super().get_explanation_string()
-        explanation += "\nLATE_EXIT_NUM_OF_CONV_LAYERS{0}".format(
+        explanation += "\nLATE_EXIT_NUM_OF_CONV_LAYERS:{0}".format(
             Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_NUM_OF_CONV_LAYERS)
         explanation += "\nLATE_EXIT_CONV_LAYER_FEATURE_COUNT:{0}".format(
             Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_CONV_LAYER_FEATURE_COUNT)
@@ -147,12 +147,13 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
         #                                                                        (100000, 0.0001)])
         GlobalConstants.TOTAL_EPOCH_COUNT = 1200
         GlobalConstants.EPOCH_COUNT = 1200
-        GlobalConstants.EPOCH_REPORT_PERIOD = 1
-        GlobalConstants.BATCH_SIZE = 100
-        GlobalConstants.EVAL_BATCH_SIZE = 100
+        GlobalConstants.EPOCH_REPORT_PERIOD = 20
+        GlobalConstants.BATCH_SIZE = 500
+        GlobalConstants.EVAL_BATCH_SIZE = 250
         GlobalConstants.USE_MULTI_GPU = True
         GlobalConstants.USE_SAMPLING_CIGN = False
         GlobalConstants.USE_RANDOM_SAMPLING = False
+        GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING = 10
         GlobalConstants.INITIAL_LR = 0.1
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
@@ -201,7 +202,8 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
                     x=x,
                     in_filter=num_of_features,
                     out_filter=num_of_features,
-                    stride=ResnetGenerator.stride_arr(2) if layer_id == 0 else ResnetGenerator.stride_arr(1),
+                    stride=ResnetGenerator.stride_arr(first_layer_stride)
+                    if layer_id == 0 else ResnetGenerator.stride_arr(1),
                     activate_before_residual=layer_id == 0,
                     relu_leakiness=relu_leakiness,
                     is_train=network.isTrain,
