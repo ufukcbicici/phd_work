@@ -1479,3 +1479,45 @@ GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
 
+
+***************************************************************************************************************
+22.12.2019 - Lab
+-Fashion Net - Early and Late Exit
+    # Late Exit
+    # Connected after last max pool
+    LATE_EXIT_CONV_LAYERS = [96, 64, 32]
+    LATE_EXIT_CONV_FILTER_SIZES = [1, 1, 1]
+    LATE_EXIT_FC_LAYERS = [1024, 512, 256]
+-Dropout Grid Search
+-Batch Size:125
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Dropout Probability:") + LENGTH("Classification Dropout Probability:"), 4) AS ClassificationDropout,
+SUBSTR(Explanation, INSTR(Explanation,"Decision Dropout Probability:") + LENGTH("Decision Dropout Probability:"), 4) AS DecisionDropout
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 90
+	AND
+	Explanation LIKE "%Fashion Net - Early Exit v3.0%" AND
+	Explanation LIKE "%Batch Size:125%" AND
+	Explanation LIKE "%LATE_EXIT_CONV_LAYERS = [96, 64, 32]%" AND
+	Explanation LIKE "%LATE_EXIT_FC_LAYERS = [128, 128, 64]%" AND
+	Explanation LIKE "%USE_SCALED_GRADIENTS:False%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************
+
