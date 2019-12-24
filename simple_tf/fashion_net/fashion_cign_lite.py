@@ -262,7 +262,7 @@ class FashionCignLite(FastTreeNetwork):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "Fashion Net - Multipath Bayesian Optimization\n"
+        explanation = "Fashion Net - Send to Every Path\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -429,9 +429,10 @@ class FashionCignLite(FastTreeNetwork):
             node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
             initial_value = 1.0 / float(node_degree)
             threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
-            node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                                                             decay_period=12000,
-                                                             min_limit=0.4)
+            # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
+            #                                                  decay_period=12000,
+            #                                                  min_limit=0.4)
+            node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
             # Softmax Decay
             decay_name = self.get_variable_name(name="softmax_decay", node=node)
             node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
