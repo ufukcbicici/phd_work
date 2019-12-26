@@ -6,10 +6,9 @@ from simple_tf.global_params import GlobalConstants
 
 class CignMultiGpuEarlyExit(CignMultiGpu):
     def __init__(self, node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                 dataset, network_name, late_exit_func):
+                 dataset, network_name):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                          dataset, network_name)
-        self.lateExitFunc = late_exit_func
 
     def get_tower_network(self):
         tower_cign = CignEarlyExitTree(
