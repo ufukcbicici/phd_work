@@ -30,6 +30,58 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name,
                          late_exit_func=Cifar100_MultiGpuCignSingleLateExit.late_exit_func)
 
+    @staticmethod
+    def leaf_func(network, node):
+        Cifar100_Cign.cign_block_func(network=network, node=node)
+        network.leafNodeOutputsToLateExit[node.index] = \
+            node.fOpsList[Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_NUM_OF_CONV_LAYERS]
+
+    @staticmethod
+    def late_exit_func(network, node, x):
+        num_of_layers = Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_NUM_OF_CONV_LAYERS
+        num_of_features = Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_CONV_LAYER_FEATURE_COUNT
+        first_layer_stride = Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_STRIDE
+        first_kernel_size = Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_FIRST_KERNEL_SIZE
+        input_shape = x.get_shape().as_list()
+        # First: Convert the concatenated input to a ResNet block.
+        x = ResnetGenerator.get_input(input=x, out_filters=num_of_features, first_conv_filter_size=first_kernel_size,
+                                      node=node)
+        for layer_id in range(num_of_layers):
+            with tf.variable_scope(
+                    UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(node.depth + 1, layer_id + 1),
+                                                   node=node)):
+                x = ResnetGenerator.bottleneck_residual(
+                    x=x,
+                    in_filter=num_of_features,
+                    out_filter=num_of_features,
+                    stride=ResnetGenerator.stride_arr(first_layer_stride)
+                    if layer_id == 0 else ResnetGenerator.stride_arr(1),
+                    activate_before_residual=layer_id == 0,
+                    relu_leakiness=relu_leakiness,
+                    is_train=network.isTrain,
+                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY,
+                    node=node)
+        with tf.variable_scope(UtilityFuncs.get_variable_name(name="unit_last", node=node)):
+            x = ResnetGenerator.get_output(x=x, is_train=network.isTrain, leakiness=relu_leakiness,
+                                           bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
+        # assert len(net_shape) == 4
+        # x = tf.reshape(x, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
+        output = x
+        out_dim = network.labelCount
+        # MultiGPU OK
+        weight = UtilityFuncs.create_variable(
+            name=UtilityFuncs.get_variable_name(name="fc_softmax_weights", node=node),
+            shape=[output.get_shape()[1], out_dim],
+            dtype=GlobalConstants.DATA_TYPE,
+            initializer=tf.uniform_unit_scaling_initializer(factor=1.0))
+        # MultiGPU OK
+        bias = UtilityFuncs.create_variable(
+            name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node),
+            shape=[out_dim],
+            dtype=GlobalConstants.DATA_TYPE,
+            initializer=tf.constant_initializer())
+        return output, weight, bias
+
     def get_explanation_string(self):
         total_param_count = 0
         for v in tf.trainable_variables():
@@ -177,58 +229,6 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
 
         GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:CPU:0"
         self.networkName = "Cifar100_CIGN_MultiGpuSingleLateExit"
-
-    @staticmethod
-    def leaf_func(network, node):
-        Cifar100_Cign.cign_block_func(network=network, node=node)
-        network.leafNodeOutputsToLateExit[node.index] = \
-            node.fOpsList[Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_NUM_OF_CONV_LAYERS]
-
-    @staticmethod
-    def late_exit_func(network, node, x):
-        num_of_layers = Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_NUM_OF_CONV_LAYERS
-        num_of_features = Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_CONV_LAYER_FEATURE_COUNT
-        first_layer_stride = Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_STRIDE
-        first_kernel_size = Cifar100_MultiGpuCignSingleLateExit.LATE_EXIT_FIRST_KERNEL_SIZE
-        input_shape = x.get_shape().as_list()
-        # First: Convert the concatenated input to a ResNet block.
-        x = ResnetGenerator.get_input(input=x, out_filters=num_of_features, first_conv_filter_size=first_kernel_size,
-                                      node=node)
-        for layer_id in range(num_of_layers):
-            with tf.variable_scope(
-                    UtilityFuncs.get_variable_name(name="block_{0}_{1}".format(node.depth + 1, layer_id + 1),
-                                                   node=node)):
-                x = ResnetGenerator.bottleneck_residual(
-                    x=x,
-                    in_filter=num_of_features,
-                    out_filter=num_of_features,
-                    stride=ResnetGenerator.stride_arr(first_layer_stride)
-                    if layer_id == 0 else ResnetGenerator.stride_arr(1),
-                    activate_before_residual=layer_id == 0,
-                    relu_leakiness=relu_leakiness,
-                    is_train=network.isTrain,
-                    bn_momentum=GlobalConstants.BATCH_NORM_DECAY,
-                    node=node)
-        with tf.variable_scope(UtilityFuncs.get_variable_name(name="unit_last", node=node)):
-            x = ResnetGenerator.get_output(x=x, is_train=network.isTrain, leakiness=relu_leakiness,
-                                           bn_momentum=GlobalConstants.BATCH_NORM_DECAY)
-        # assert len(net_shape) == 4
-        # x = tf.reshape(x, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
-        output = x
-        out_dim = network.labelCount
-        # MultiGPU OK
-        weight = UtilityFuncs.create_variable(
-            name=UtilityFuncs.get_variable_name(name="fc_softmax_weights", node=node),
-            shape=[output.get_shape()[1], out_dim],
-            dtype=GlobalConstants.DATA_TYPE,
-            initializer=tf.uniform_unit_scaling_initializer(factor=1.0))
-        # MultiGPU OK
-        bias = UtilityFuncs.create_variable(
-            name=UtilityFuncs.get_variable_name(name="fc_softmax_biases", node=node),
-            shape=[out_dim],
-            dtype=GlobalConstants.DATA_TYPE,
-            initializer=tf.constant_initializer())
-        return output, weight, bias
 
     def set_hyperparameters(self, **kwargs):
         GlobalConstants.WEIGHT_DECAY_COEFFICIENT = kwargs["weight_decay_coefficient"]
