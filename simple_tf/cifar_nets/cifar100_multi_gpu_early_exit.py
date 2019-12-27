@@ -54,7 +54,6 @@ class Cifar100_MultiGpuCignEarlyExit(CignMultiGpuEarlyExit):
 
     @staticmethod
     def leaf_func(network, node):
-        parent_F, parent_H = network.mask_input_nodes(node=node)
         # Block Parameters
         in_filter = filters[node.depth]
         out_filter = filters[node.depth + 1]
@@ -95,13 +94,14 @@ class Cifar100_MultiGpuCignEarlyExit(CignMultiGpuEarlyExit):
         with tf.variable_scope("early_exit"):
             early_exit_features, early_exit_softmax_weights, early_exit_softmax_biases = \
                 Cifar100_MultiGpuCignEarlyExit.apply_resnet_multi_exit_losses(x=x, network=network, node=node)
+            # node.fOpsList.append(early_exit_features)
             final_feature_early, logits_early = \
                 network.apply_loss(node=node, final_feature=early_exit_features,
                                    softmax_weights=early_exit_softmax_weights,
                                    softmax_biases=early_exit_softmax_biases)
             node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits_early)
         # Late Exit
-        assert node.fOpsList[-1] == x
+        # assert node.fOpsList[-1] == x
         with tf.variable_scope("late_exit"):
             late_exit_num_of_layers = Cifar100_MultiGpuCignEarlyExit.LATE_EXIT_NUM_OF_CONV_LAYERS
             # MultiGPU OK

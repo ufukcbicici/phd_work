@@ -1,7 +1,7 @@
 import os
 
 import tensorflow as tf
-
+import numpy as np
 from auxillary.constants import DatasetTypes
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -10,12 +10,15 @@ from simple_tf.cifar_nets.cifar100_cign import Cifar100_Cign
 from simple_tf.cifar_nets.cifar100_cign_random_sampling import Cifar100_CignRandomSampling
 from simple_tf.cifar_nets.cifar100_cign_sampling import Cifar100_CignSampling
 from simple_tf.cifar_nets.cifar100_multi_gpu_cign import Cifar100_MultiGpuCign
+from simple_tf.cifar_nets.cifar100_multi_gpu_early_exit import Cifar100_MultiGpuCignEarlyExit
 from simple_tf.cifar_nets.cifar100_multi_gpu_single_exit import Cifar100_MultiGpuCignSingleLateExit
 from simple_tf.cifar_nets.cifar100_resnet_baseline import Cifar100_Baseline
+from simple_tf.cign.cign_multi_gpu_early_exit import CignMultiGpuEarlyExit
 from simple_tf.global_params import GlobalConstants
 
 use_multi_gpu = False
-use_multi_gpu_single_late_exit = True
+use_multi_gpu_single_late_exit = False
+use_multi_gpu_early_exit = True
 use_sampling = False
 use_random_sampling = False
 use_baseline = False
@@ -23,9 +26,12 @@ use_baseline = False
 
 def get_network(dataset, network_name):
     if not use_multi_gpu and not use_sampling and not use_random_sampling and not use_baseline and \
-            not use_multi_gpu_single_late_exit:
+            not use_multi_gpu_single_late_exit and not use_multi_gpu_early_exit:
         network = Cifar100_Cign(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
                                 network_name=network_name)
+    elif use_multi_gpu_early_exit:
+        network = Cifar100_MultiGpuCignEarlyExit(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
+                                                 network_name=network_name)
     elif use_multi_gpu:
         network = Cifar100_MultiGpuCign(degree_list=GlobalConstants.TREE_DEGREE_LIST, dataset=dataset,
                                         network_name=network_name)
@@ -48,16 +54,16 @@ def get_network(dataset, network_name):
 def cifar_100_training():
     import sys
     print(sys.version)
-    network_name = "Cifar100_MultiGpu_CignSingleLateExit_[2,2]_[64,64,64]_IG1.0"
+    network_name = "Cifar100_MultiGpu_CignEarlyExit_[2,2]_[64,64,64]_IG1.0"
     # classification_wd = [0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003, 0.00035, 0.0004] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd.extend([0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
     # classification_wd = [0.0002, 0.0002, 0.0025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00015, 0.0002, 0.00025] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    classification_wd = [0.0002, 0.0002, 0.0002, 0.0002]
+    classification_wd = np.random.uniform(low=0.0002, high=0.0005, size=(10, )).tolist()
     # classification_wd = [0.0001, 0.00015, 0.0002] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
-    classification_wd = sorted(classification_wd)
+    # classification_wd = sorted(classification_wd)
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0]
     classification_dropout_probs = [0.0]
@@ -97,7 +103,7 @@ def cifar_100_training():
                                     late_exit_weight=tpl[6])
         experiment_id = DbLogger.get_run_id()
         explanation = network.get_explanation_string()
-        series_id = 0 # int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
+        series_id = 0  # int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
         sess.run(init)
