@@ -7,22 +7,22 @@ from data_handling.fashion_mnist import FashionMnistDataSet
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from simple_tf.fashion_net.fashion_cign_lite_early_exit import FashionCignLiteEarlyExit
 from simple_tf.fashion_net.fashion_cign_moe_logits import FashionCignMoeLogits
+from simple_tf.fashion_net.fashion_cign_random_sample import FashionCignRandomSample
 from simple_tf.fashion_net.fashion_net_baseline import FashionNetBaseline
 from simple_tf.fashion_net.fashion_net_single_late_exit import FashionNetSingleLateExit
 from simple_tf.global_params import GlobalConstants
 from auxillary.constants import DatasetTypes
 
-
 use_moe = False
 use_sampling = False
-use_random_sampling = False
+use_random_sampling = True
 use_baseline = False
 use_early_exit = False
 use_late_exit = False
 
 
 def get_network(dataset, network_name):
-    if not (use_baseline or use_early_exit or use_late_exit):
+    if not (use_baseline or use_early_exit or use_late_exit or use_random_sampling):
         network = FashionCignLite(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                   network_name=network_name)
     elif use_baseline:
@@ -35,20 +35,23 @@ def get_network(dataset, network_name):
     elif use_late_exit:
         network = FashionNetSingleLateExit(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                            network_name=network_name)
+    elif use_random_sampling:
+        network = FashionCignRandomSample(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
+                                          network_name=network_name)
     else:
         raise NotImplementedError()
     return network
 
 
 def fashion_net_training():
-    network_name = "FashionNetLite_EarlyExitCIGN"
+    network_name = "FashionNet_Lite_RandomSampling"
     dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
     dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     # classification_dropout_probs = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] * 10
-    classification_dropout_probs = [0.0] * 4
+    classification_dropout_probs = [0.0] * 5
     classification_dropout_probs.extend([0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] * 5)
     # classification_dropout_probs = [0.3] * 8
     classification_dropout_probs = sorted(classification_dropout_probs)
