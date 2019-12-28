@@ -46,6 +46,23 @@ class CignRandomSample(CignWithSampling):
         # During testing, pick F = argmax_F p(F|x)
         arg_max_indices = tf.argmax(p_n_given_x, axis=1, output_type=tf.int32)
         chosen_indices = tf.where(self.isTrain > 0, sampled_indices, arg_max_indices)
+        # Step 4: Apply partitioning for corresponding F nodes in the same layer.
+        child_nodes = self.dagObject.children(node=node)
+        child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+        # Prevent empty branches
+        selections_arr = []
+        for index in range(len(child_nodes)):
+            equality_arr = tf.equal(x=chosen_indices, y=tf.constant(index, tf.int32))
+            are_there_any_occurences = tf.reduce_any(equality_arr)
+            selections_arr.append(are_there_any_occurences)
+        selections_tensor = tf.stack(selections_arr, axis=0)
+        all_paths_used = tf.reduce_all(selections_tensor)
+        modified_indices = tf.identity(chosen_indices)
+        for index in range(len(child_nodes)):
+            index_arr = index * tf.ones_like(modified_indices)
+            mask_arr = tf.scatter_nd([index], [1], modified_indices.shape)
+            modified_indices = tf.where(mask_arr, index_arr, chosen_indices)
+        chosen_indices = tf.where(all_paths_used, chosen_indices, modified_indices)
         node.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
         node.evalDict[self.get_variable_name(name="activations", node=node)] = activations
         node.evalDict[self.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
@@ -54,9 +71,7 @@ class CignRandomSample(CignWithSampling):
         node.evalDict[self.get_variable_name(name="branch_probs", node=node)] = p_n_given_x
         node.evalDict[self.get_variable_name(name="uniform_probs", node=node)] = uniform_probs
         node.evalDict[self.get_variable_name(name="chosen_indices", node=node)] = chosen_indices
-        # Step 4: Apply partitioning for corresponding F nodes in the same layer.
-        child_nodes = self.dagObject.children(node=node)
-        child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+        node.evalDict[self.get_variable_name(name="modified_indices", node=node)] = chosen_indices
         for index in range(len(child_nodes)):
             child_node = child_nodes[index]
             child_index = child_node.index
