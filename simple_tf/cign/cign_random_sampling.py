@@ -60,8 +60,8 @@ class CignRandomSample(CignWithSampling):
         modified_indices = tf.identity(chosen_indices)
         for index in range(len(child_nodes)):
             index_arr = index * tf.ones_like(modified_indices)
-            mask_arr = tf.scatter_nd([index], [1], modified_indices.shape)
-            modified_indices = tf.where(mask_arr, index_arr, chosen_indices)
+            mask_arr = tf.scatter_nd([index], [1], tf.shape(modified_indices))
+            modified_indices = tf.where(tf.cast(mask_arr, tf.bool), index_arr, chosen_indices)
         chosen_indices = tf.where(all_paths_used, chosen_indices, modified_indices)
         node.evalDict[self.get_variable_name(name="branching_feature", node=node)] = branching_feature
         node.evalDict[self.get_variable_name(name="activations", node=node)] = activations
@@ -71,6 +71,8 @@ class CignRandomSample(CignWithSampling):
         node.evalDict[self.get_variable_name(name="branch_probs", node=node)] = p_n_given_x
         node.evalDict[self.get_variable_name(name="uniform_probs", node=node)] = uniform_probs
         node.evalDict[self.get_variable_name(name="chosen_indices", node=node)] = chosen_indices
+        node.evalDict[self.get_variable_name(name="selections_tensor", node=node)] = selections_tensor
+        node.evalDict[self.get_variable_name(name="all_paths_used", node=node)] = all_paths_used
         node.evalDict[self.get_variable_name(name="modified_indices", node=node)] = chosen_indices
         for index in range(len(child_nodes)):
             child_node = child_nodes[index]
