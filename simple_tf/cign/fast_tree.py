@@ -538,6 +538,9 @@ class FastTreeNetwork(TreeNetwork):
                                            is_train=False, use_masking=use_masking)
         eval_filtered = {k: v for k, v in self.evalDict.items() if v is not None}
         results = sess.run(eval_filtered, feed_dict)
+        # path_dict = {k: v for k, v in results.items() if "all_paths_used" in k}
+        # if not all(list(path_dict.values())):
+        #     print("X")
         # for k, v in results.items():
         #     if "final_feature_mag" in k:
         #         print("{0}={1}".format(k, v))
