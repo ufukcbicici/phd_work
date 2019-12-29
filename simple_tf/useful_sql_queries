@@ -1,0 +1,4 @@
+--Query average total training or test information gain after a certain iteration
+SELECT RunID, AVG(Value) AS AvgIg, COUNT(1) AS CNT
+FROM run_kv_store WHERE Key = "Dataset:DatasetTypes.test Total IG" AND Iteration > 43200
+GROUP BY RunID
