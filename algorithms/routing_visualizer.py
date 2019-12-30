@@ -1,6 +1,8 @@
+import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 
+from data_handling.cifar_dataset import CifarDataSet
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
@@ -9,12 +11,14 @@ class RoutingVisualizer:
         pass
 
     @staticmethod
-    def visualize_routing(network_name, run_id, iteration, degree_list):
+    def visualize_routing(network_name, run_id, iteration, degree_list, output_names):
         network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
         routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test",
-                                                 include_original_samples=True)
+                                                 output_names=output_names)
         branch_probs = routing_data.dictionaryOfRoutingData["branch_probs"]
         sample_images = routing_data.dictionaryOfRoutingData["original_samples"]
+        plt.imshow(sample_images[0][0, :])
+        plt.show()
 
         # Calculate the total routing entropies for each sample
         total_entropies = []
@@ -25,13 +29,36 @@ class RoutingVisualizer:
             entropies = np.sum(p_log_p, axis=1)
             total_entropies[node_id] = entropies
 
+    @staticmethod
+    def whiten_dataset(dataset):
+        data_tensor = tf.placeholder(tf.float32,
+                                     shape=(dataset.get_image_size(),
+                                            dataset.get_image_size(),
+                                            dataset.get_num_of_channels()),
+                                     name="dataTensor")
+        image = tf.image.per_image_standardization(data_tensor)
+        sess = tf.Session()
+        whitened_images = []
+        for i in range(dataset.testSamples.shape[0]):
+            whitened_image = sess.run([image], feed_dict={data_tensor: dataset.testSamples[i]})[0]
+            whitened_images.append(whitened_image)
+        whitened_images = tf.stack(whitened_images, axis=0)
+        return whitened_images
 
 
-
-
-
-
-
+def main():
+    run_id = 715
+    # network_name = "Cifar100_CIGN_Sampling"
+    network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
+    iteration = 119100
+    # node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
+    # pickle.dump(node_costs, open("nodeCosts.sav", "wb"))
+    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "original_samples"]
+    dataset = CifarDataSet(session=None, validation_sample_count=0, load_validation_from=None)
+    whitened_images = RoutingVisualizer.whiten_dataset(dataset=dataset)
+    RoutingVisualizer.visualize_routing(network_name=network_name, run_id=run_id,
+                                        iteration=iteration, output_names=output_names, degree_list=[2, 2])
+    print("X")
 
 # distributions = np.random.uniform(size=(3, 2))
 # distributions = distributions / np.sum(distributions, axis=1, keepdims=True)

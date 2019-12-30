@@ -13,7 +13,7 @@ import simple_tf.cifar_nets.cifar_entry as cifar_entry
 
 import tensorflow as tf
 
-from algorithms import mode_class_visualization
+from algorithms import mode_class_visualization, routing_visualizer
 from algorithms.threshold_optimization_algorithms import threshold_optimization_entry
 from simple_tf.cigj import cigj_full_training_entry, cigj_approx_training_entry
 from simple_tf.fashion_net import fashion_cign_entry
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     # cifar_entry.cifar_100_training()
     # fashion_cign_entry.fashion_net_training()
     # threshold_optimization_entry.main()
-    mode_class_visualization.main()
-
+    # mode_class_visualization.main()
+    routing_visualizer.main()
 
 
