@@ -130,7 +130,7 @@ class FastTreeNetwork(TreeNetwork):
                     d.append(child_node)
 
     @staticmethod
-    def get_mock_tree(degree_list, network_name, node_costs):
+    def get_mock_tree(degree_list, network_name):
         tree = FastTreeNetwork(node_build_funcs=None, grad_func=None, hyperparameter_func=None,
                                residue_func=None, summary_func=None, degree_list=degree_list, dataset=None,
                                network_name=network_name)
@@ -139,7 +139,6 @@ class FastTreeNetwork(TreeNetwork):
         # Build symbolic networks
         tree.topologicalSortedNodes = tree.dagObject.get_topological_sort()
         tree.networkName = network_name
-        tree.nodeCosts = node_costs
         return tree
 
     def prepare_evaluation_dictionary(self):
@@ -218,7 +217,8 @@ class FastTreeNetwork(TreeNetwork):
         # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
         with tf.control_dependencies(self.extra_update_ops):
-            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss, global_step=self.globalCounter)
+            self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(self.finalLoss,
+                                                                                         global_step=self.globalCounter)
             # self.optimizer = tf.train.AdamOptimizer().minimize(self.finalLoss, global_step=self.globalCounter)
 
     def build_network(self):
@@ -709,10 +709,18 @@ class FastTreeNetwork(TreeNetwork):
     @staticmethod
     def get_routing_info_path(network_name, run_id, iteration, data_type):
         curr_path = os.path.dirname(os.path.abspath(__file__))
-        directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
-                                                                   "saved_training_data"),
-                                                      "{0}_run_{1}_iteration_{2}_{3}".format(network_name, run_id,
-                                                                                             iteration, data_type)))
+        if data_type != "":
+            directory_path = os.path.abspath(
+                os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
+                                          "saved_training_data"),
+                             "{0}_run_{1}_iteration_{2}_{3}".format(network_name, run_id,
+                                                                    iteration, data_type)))
+        else:
+            directory_path = os.path.abspath(
+                os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
+                                          "saved_training_data"),
+                             "{0}_run_{1}_iteration_{2}".format(network_name,
+                                                                run_id, iteration)))
         return directory_path
 
     def save_model(self, sess, run_id, iteration):
@@ -772,7 +780,11 @@ class FastTreeNetwork(TreeNetwork):
         routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
         return routing_data
 
-    def load_routing_info(self, run_id, iteration, data_type):
+    def load_routing_info(self,
+                          run_id,
+                          iteration,
+                          data_type,
+                          output_names=None):
         directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
                                                                network_name=self.networkName,
                                                                data_type=data_type)
@@ -780,9 +792,14 @@ class FastTreeNetwork(TreeNetwork):
         npz_file_name = os.path.abspath(os.path.join(directory_path, "tree_type"))
         degree_list = UtilityFuncs.load_npz(file_name=npz_file_name)
         assert np.array_equal(np.array(self.degreeList), degree_list["tree_type"])
-        all_output_names = set(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
-        all_output_names = all_output_names.union(set(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT))
         dict_of_data_dicts = {}
+        if output_names is None:
+            all_output_names = set(GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT)
+            all_output_names = all_output_names.union(set(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT))
+            all_output_names.add("original_samples")
+        else:
+            all_output_names = set(output_names)
+            all_output_names.add("label_tensor")
         for output_name in all_output_names:
             npz_file_name = os.path.abspath(os.path.join(directory_path, output_name))
             dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)

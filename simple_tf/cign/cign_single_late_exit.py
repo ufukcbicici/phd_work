@@ -232,11 +232,12 @@ class CignSingleLateExit(FastTreeNetwork):
                                       dict_of_data_dicts=routing_data.dictionaryOfRoutingData)
         return routing_data
 
-    def load_routing_info(self, run_id, iteration, data_type):
+    def load_routing_info(self, run_id, iteration, data_type, output_names=None):
         prev_leaf_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
         GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(["dense_output", "sparse_output"])
         routing_data = super().load_routing_info(run_id=run_id,
-                                                 iteration=iteration, data_type=data_type)
+                                                 iteration=iteration, data_type=data_type,
+                                                 output_names=output_names)
         GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = prev_leaf_outputs
         directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
                                                                network_name=self.networkName,
