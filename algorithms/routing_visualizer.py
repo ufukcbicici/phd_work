@@ -25,6 +25,7 @@ class RoutingVisualizer:
         self.augmentedImages = augmented_images
         self.totalPathEntropies = None
         self.entropySortingIndices = None
+        self.routesPerSample = None
 
     @staticmethod
     def get_original_image(routed_image, original_images, augmented_images):
@@ -41,12 +42,16 @@ class RoutingVisualizer:
 
     def prepare_routing_information(self):
         self.totalPathEntropies = []
+        self.routesPerSample = []
         for idx in range(self.routedSamples.shape[0]):
             curr_node = self.network.topologicalSortedNodes[0]
             total_path_entropy = 0
+            route = []
             while True:
+                route.append(curr_node.index)
                 if curr_node.isLeaf:
                     self.totalPathEntropies.append(total_path_entropy)
+                    self.routesPerSample.append(route)
                     break
                 routing_distribution = self.branchProbs[curr_node.index][idx]
                 entropy = UtilityFuncs.calculate_distribution_entropy(distribution=routing_distribution)
@@ -83,11 +88,31 @@ class RoutingVisualizer:
     def draw_routing_probabilities(self, entropy_order):
         sample_idx = self.entropySortingIndices[entropy_order]
         routed_image = self.routedSamples[sample_idx]
+        route = self.routesPerSample[sample_idx]
         original_image = RoutingVisualizer.get_original_image(routed_image=routed_image,
                                                               original_images=self.originalImages,
                                                               augmented_images=self.augmentedImages)
-        fig, axes = plt.subplots(1, len(self.innerNodes) + 1)
+        fig, axes = plt.subplots(len(route) + 1, figsize=(3, 6))
         axes[0].imshow(original_image)
+        axes[0].axis("off")
+        ax_idx = 1
+        for node_idx in route:
+            curr_node = self.network.nodes[node_idx]
+            if curr_node.isLeaf:
+                break
+            child_nodes = self.network.dagObject.children(node=curr_node)
+            child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+            route_distribution = self.branchProbs[curr_node.index][sample_idx]
+            node_labels = ["Node{0}".format(c_node.index) for c_node in child_nodes]
+            x = np.arange(len(child_nodes))  # the label locations
+            width = 0.35  # the width of the bars
+            axes[ax_idx].set_title("Node {0} Routing Probabilities".format(node_idx))
+            rects1 = axes[ax_idx].bar(x - width / 2, route_distribution, width, label='Routing Probabilities')
+            axes[ax_idx].set_ylabel('Scores')
+            axes[ax_idx].set_xticks(x - width/2)
+            axes[ax_idx].set_xticklabels(node_labels)
+            axes[ax_idx].set_ylim([0.0, 1.0])
+            ax_idx += 1
         plt.show()
 
     @staticmethod
