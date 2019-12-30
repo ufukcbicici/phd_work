@@ -11,14 +11,26 @@ class RoutingVisualizer:
         pass
 
     @staticmethod
-    def visualize_routing(network_name, run_id, iteration, degree_list, output_names):
+    def visualize_routing(network_name, run_id, iteration, degree_list, original_images, augmented_images,
+                          output_names):
         network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
         routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test",
                                                  output_names=output_names)
         branch_probs = routing_data.dictionaryOfRoutingData["branch_probs"]
-        sample_images = routing_data.dictionaryOfRoutingData["original_samples"]
-        plt.imshow(sample_images[0][0, :])
-        plt.show()
+        routed_samples = routing_data.dictionaryOfRoutingData["original_samples"][0]
+        for i in range(routed_samples.shape[0]):
+            routed_sample = routed_samples[i, :]
+            reshaped_routed_sample = np.expand_dims(
+                np.reshape(routed_sample, newshape=(np.prod(routed_sample.shape),)), axis=0)
+            reshaped_augmented_images = np.reshape(augmented_images,
+                                                   newshape=(
+                                                       augmented_images.shape[0], np.prod(augmented_images.shape[1:])))
+            difs_with_augmented_images = reshaped_routed_sample - reshaped_augmented_images
+            print("X")
+
+        # sample_images = routing_data.dictionaryOfRoutingData["original_samples"]
+        # plt.imshow(sample_images[0][0, :])
+        # plt.show()
 
         # Calculate the total routing entropies for each sample
         total_entropies = []
@@ -42,7 +54,7 @@ class RoutingVisualizer:
         for i in range(dataset.testSamples.shape[0]):
             whitened_image = sess.run([image], feed_dict={data_tensor: dataset.testSamples[i]})[0]
             whitened_images.append(whitened_image)
-        whitened_images = tf.stack(whitened_images, axis=0)
+        whitened_images = np.stack(whitened_images, axis=0)
         return whitened_images
 
 
@@ -57,6 +69,8 @@ def main():
     dataset = CifarDataSet(session=None, validation_sample_count=0, load_validation_from=None)
     whitened_images = RoutingVisualizer.whiten_dataset(dataset=dataset)
     RoutingVisualizer.visualize_routing(network_name=network_name, run_id=run_id,
+                                        original_images=dataset.testSamples,
+                                        augmented_images=whitened_images,
                                         iteration=iteration, output_names=output_names, degree_list=[2, 2])
     print("X")
 
