@@ -5,7 +5,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class MultipathCalculatorV2:
-    def __init__(self, network):
+    def __init__(self, network, routing_data):
         # self.thresholdsDict structure: (node_index, thresholds[] -> len(child_nodes) sized array.
         # Thresholds are sorted according to the child node indices:
         # i.th child's threshold is at: thresholds[sorted(child_nodes).index_of(child_node[i])]
@@ -22,9 +22,9 @@ class MultipathCalculatorV2:
         self.networkActivationCosts = {}
         self.kvRows = []
         self.baseEvaluationCost = None
-        self.branchProbs = None
-        self.posteriors = None
-        self.labelList = None
+        self.branchProbs = routing_data.get_dict("branch_probs")
+        self.posteriors = routing_data.get_dict("posterior_probs")
+        self.labelList = routing_data.labelList
         self.get_evaluation_costs()
 
     def get_evaluation_costs(self):

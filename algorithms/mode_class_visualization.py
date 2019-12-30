@@ -1,10 +1,12 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import cv2
 from algorithms.multipath_calculator_v2 import MultipathCalculatorV2
 from data_handling.cifar_dataset import CifarDataSet
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from collections import Counter
+import pickle
 from mpl_toolkits.axes_grid1 import ImageGrid
 
 
@@ -14,15 +16,9 @@ class ModeVisualizer:
         routing_data = network.load_routing_info(run_id=run_id, iteration=iteration,
                                                  data_type=data_type, output_names=output_names)
         print("X")
-        # labels_list = list(leaf_true_labels_dict.values())
-        # assert all([np.array_equal(labels_list[idx], labels_list[idx + 1]) for idx in range(len(labels_list) - 1)])
-        # label_list = labels_list[0]
-        # sample_count = label_list.shape[0]
-        # self.multipathCalculator = MultipathCalculatorV2(
-        #     thresholds_list=None, network=network,
-        #     sample_count=sample_count,
-        #     label_list=label_list, branch_probs=branch_probs_dict,
-        #     activations=activations_dict, posterior_probs=posterior_probs_dict)
+        labels_list = routing_data.labelList
+        sample_count = labels_list.shape[0]
+        self.multipathCalculator = MultipathCalculatorV2(network=network, routing_data=routing_data)
 
     def get_sample_distribution_visual(self, network, dataset, mode_threshold=0.8, sample_count_per_class=5):
         threshold_state = {}
@@ -79,7 +75,7 @@ class ModeVisualizer:
             indices = np.random.choice(sample_indices_with_correct_label, sample_count_per_class, replace=False)
             cv2.putText(canvas, "Label:{0} Probability Mass:{1:.6f} Cummulative Probability:{2:.6f}"
                         .format(label, probability_mass, cummulative_probability),
-                        (img_width // 4, top - _h // 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                        (img_width // 25, top - _h // 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
                         color=(0, 0, 0), thickness=0, lineType=cv2.LINE_AA)
             for col in range(sample_count_per_class):
                 img = dataset.testSamples[indices[col]]
@@ -90,7 +86,7 @@ class ModeVisualizer:
                 img[:, :, 2] = r
                 left = (col + 1) * extent_size + col * _w
                 canvas[top: top + _h, left: left + _w, :] = img
-        cv2.imwrite("Leaf_{0}_principal_labels.bmp".format(node.index), canvas)
+        cv2.imwrite("Leaf_{0}_principal_labels.png".format(node.index), canvas)
         # for ax, im in zip(grid, img_list):
         #     # Iterating over the grid returns the Axes.
         #     ax.imshow(im)
@@ -153,12 +149,13 @@ def main():
     # network_name = "Cifar100_CIGN_Sampling"
     network_name = "None"
     iterations = [119100]
-    node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
+    # node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
+    # pickle.dump(node_costs, open("nodeCosts.sav", "wb"))
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs"]
     tree = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
     dataset = CifarDataSet(session=None, validation_sample_count=0, load_validation_from=None)
     mode_visualizer = ModeVisualizer(network=tree, dataset=dataset, run_id=67, iteration=119100, data_type="",
                                      output_names=output_names)
-    mode_visualizer.get_sample_distribution_visual(network=tree, dataset=dataset, sample_count_per_class=15,
+    mode_visualizer.get_sample_distribution_visual(network=tree, dataset=dataset, sample_count_per_class=7,
                                                    mode_threshold=0.85)
     print("X")
