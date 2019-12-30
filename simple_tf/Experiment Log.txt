@@ -1785,3 +1785,33 @@ FROM
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
+
+
+***************************************************************************************************************
+20.06.2019 - Lab dblogger2.db
+-Resnet-50 CIGN - Thin Baseline
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.Epoch >= 290
+	AND
+	Explanation LIKE "%Resnet-50 Thin Baseline Tests%"
+)
+GROUP BY RunID
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************

@@ -18,10 +18,10 @@ from simple_tf.global_params import GlobalConstants
 
 use_multi_gpu = False
 use_multi_gpu_single_late_exit = False
-use_multi_gpu_early_exit = True
+use_multi_gpu_early_exit = False
 use_sampling = False
 use_random_sampling = False
-use_baseline = False
+use_baseline = True
 
 
 def get_network(dataset, network_name):
