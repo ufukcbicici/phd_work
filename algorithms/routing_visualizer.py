@@ -11,6 +11,20 @@ class RoutingVisualizer:
         pass
 
     @staticmethod
+    def get_original_image(routed_image, original_images, augmented_images):
+        routed_sample = routed_image
+        reshaped_routed_sample = np.expand_dims(
+            np.reshape(routed_sample, newshape=(np.prod(routed_sample.shape),)), axis=0)
+        reshaped_augmented_images = np.reshape(augmented_images,
+                                               newshape=(
+                                                   augmented_images.shape[0], np.prod(augmented_images.shape[1:])))
+        difs_with_augmented_images = reshaped_routed_sample - reshaped_augmented_images
+        difs_with_augmented_images = np.sum(np.square(difs_with_augmented_images), axis=1)
+        min_index = np.argmin(difs_with_augmented_images)
+        return original_images[min_index]
+
+
+    @staticmethod
     def visualize_routing(network_name, run_id, iteration, degree_list, original_images, augmented_images,
                           output_names):
         network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
@@ -20,17 +34,9 @@ class RoutingVisualizer:
         routed_samples = routing_data.dictionaryOfRoutingData["original_samples"][0]
         for i in range(routed_samples.shape[0]):
             routed_sample = routed_samples[i, :]
-            reshaped_routed_sample = np.expand_dims(
-                np.reshape(routed_sample, newshape=(np.prod(routed_sample.shape),)), axis=0)
-            reshaped_augmented_images = np.reshape(augmented_images,
-                                                   newshape=(
-                                                       augmented_images.shape[0], np.prod(augmented_images.shape[1:])))
-            difs_with_augmented_images = reshaped_routed_sample - reshaped_augmented_images
-            print("X")
-
-        # sample_images = routing_data.dictionaryOfRoutingData["original_samples"]
-        # plt.imshow(sample_images[0][0, :])
-        # plt.show()
+            original_image = RoutingVisualizer.get_original_image(routed_image=routed_sample,
+                                                                  original_images=original_images,
+                                                                  augmented_images=augmented_images)
 
         # Calculate the total routing entropies for each sample
         total_entropies = []
