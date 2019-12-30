@@ -23,6 +23,8 @@ class RoutingVisualizer:
         self.routedSamples = self.routingData.dictionaryOfRoutingData["original_samples"][0]
         self.originalImages = original_images
         self.augmentedImages = augmented_images
+        self.totalPathEntropies = None
+        self.entropySortingIndices = None
 
     @staticmethod
     def get_original_image(routed_image, original_images, augmented_images):
@@ -38,13 +40,13 @@ class RoutingVisualizer:
         return original_images[min_index]
 
     def prepare_routing_information(self):
-        total_path_entropies = []
+        self.totalPathEntropies = []
         for idx in range(self.routedSamples.shape[0]):
             curr_node = self.network.topologicalSortedNodes[0]
             total_path_entropy = 0
             while True:
                 if curr_node.isLeaf:
-                    total_path_entropies.append(total_path_entropy)
+                    self.totalPathEntropies.append(total_path_entropy)
                     break
                 routing_distribution = self.branchProbs[curr_node.index][idx]
                 entropy = UtilityFuncs.calculate_distribution_entropy(distribution=routing_distribution)
@@ -53,8 +55,8 @@ class RoutingVisualizer:
                 child_nodes = self.network.dagObject.children(node=curr_node)
                 child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
                 curr_node = child_nodes[arg_max_child_index]
-        total_path_entropies = np.array(total_path_entropies)
-        print("X")
+        self.totalPathEntropies = np.array(self.totalPathEntropies)
+        self.entropySortingIndices = np.argsort(self.totalPathEntropies)
         # for i in range(routed_samples.shape[0]):
         #     routed_sample = routed_samples[i, :]
         #     original_image = RoutingVisualizer.get_original_image(routed_image=routed_sample,
@@ -78,16 +80,13 @@ class RoutingVisualizer:
         #     routed_samples=routed_samples, original_images=original_images, augmented_images=augmented_images)
         # print("X")
 
-    @staticmethod
-    def draw_routing_probabilities(network, sample_idx, branch_probs,
-                                   routed_samples, original_images, augmented_images):
-        routed_image = routed_samples[sample_idx]
+    def draw_routing_probabilities(self, entropy_order):
+        sample_idx = self.entropySortingIndices[entropy_order]
+        routed_image = self.routedSamples[sample_idx]
         original_image = RoutingVisualizer.get_original_image(routed_image=routed_image,
-                                                              original_images=original_images,
-                                                              augmented_images=augmented_images)
-        inner_nodes = [node for node in network.topologicalSortedNodes if not node.isLeaf]
-        inner_nodes = sorted(inner_nodes, key=lambda node: node.index)
-        fig, axes = plt.subplots(1, len(inner_nodes) + 1)
+                                                              original_images=self.originalImages,
+                                                              augmented_images=self.augmentedImages)
+        fig, axes = plt.subplots(1, len(self.innerNodes) + 1)
         axes[0].imshow(original_image)
         plt.show()
 
@@ -122,6 +121,8 @@ def main():
                                            original_images=dataset.testSamples, augmented_images=whitened_images,
                                            iteration=iteration, output_names=output_names, degree_list=[2, 2])
     routing_visualizer.prepare_routing_information()
+    routing_visualizer.draw_routing_probabilities(entropy_order=0)
+    routing_visualizer.draw_routing_probabilities(entropy_order=-1)
     # RoutingVisualizer.visualize_routing(network_name=network_name, run_id=run_id,
     #                                     original_images=dataset.testSamples,
     #                                     augmented_images=whitened_images,
