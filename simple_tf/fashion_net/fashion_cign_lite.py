@@ -420,7 +420,7 @@ class FashionCignLite(FastTreeNetwork):
         #                                                               value=0.0,
         #                                                               schedule=[(12000, 1.0)])
         self.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
-                                                                value=0.0)
+                                                                value=1.0)
         # Thresholding and Softmax Decay
         for node in self.topologicalSortedNodes:
             if node.isLeaf:

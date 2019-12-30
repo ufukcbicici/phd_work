@@ -791,13 +791,16 @@ class FastTreeNetwork(TreeNetwork):
         label_data = dict_of_data_dicts["label_tensor"]
         label_list = list(label_data.values())[0]
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
-        self.nodeCosts = pickle.load(open(os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")), 'rb'))
-        dict_of_data_dicts["nodeCosts"] = self.nodeCosts
-        for node in self.topologicalSortedNodes:
-            node.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
-                                                                                "node_{0}_opMacCosts.sav"
-                                                                                .format(node.index))), 'rb'))
-            dict_of_data_dicts["node_{0}_opMacCosts".format(node.index)] = node.opMacCostsDict
+        try:
+            self.nodeCosts = pickle.load(open(os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")), 'rb'))
+            dict_of_data_dicts["nodeCosts"] = self.nodeCosts
+            for node in self.topologicalSortedNodes:
+                node.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
+                                                                                    "node_{0}_opMacCosts.sav"
+                                                                                    .format(node.index))), 'rb'))
+                dict_of_data_dicts["node_{0}_opMacCosts".format(node.index)] = node.opMacCostsDict
+        except:
+            print("Node Cost data does not exist.")
         routing_data = RoutingDataset(label_list=label_list, dict_of_data_dicts=dict_of_data_dicts)
         return routing_data
 

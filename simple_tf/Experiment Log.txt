@@ -1754,7 +1754,7 @@ ORDER BY AvgValidationAccuracy DESC
 
 
 ***************************************************************************************************************
-29.12.2019 - IDEA GPU
+29.12.2019 - Lab
 -Fashion Net - Random Sampling
 -Dropout Grid Search
 -Batch Size:125

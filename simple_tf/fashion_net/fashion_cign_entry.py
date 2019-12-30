@@ -44,15 +44,15 @@ def get_network(dataset, network_name):
 
 
 def fashion_net_training():
-    network_name = "FashionNet_Lite_RandomSampling"
+    network_name = "FashionNetLite_EarlyExitCIGN"
     dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
     dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
     classification_wd = [0.0]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [5.0]
     # classification_dropout_probs = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] * 10
-    classification_dropout_probs = [0.0] * 5
-    classification_dropout_probs.extend([0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] * 5)
+    classification_dropout_probs = [0.15] * 8
+    classification_dropout_probs.extend([0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] * 5)
     # classification_dropout_probs = [0.3] * 8
     classification_dropout_probs = sorted(classification_dropout_probs)
     decision_dropout_probs = \
