@@ -128,7 +128,6 @@ class RoutingVisualizer:
                 width = 0.35  # the width of the bars
                 axes[ax_idx].set_title("Node {0} Routing Probabilities".format(node_idx))
                 rects1 = axes[ax_idx].bar(x - width / 2, route_distribution, width, label='Routing Probabilities')
-                axes[ax_idx].set_ylabel('Scores')
                 axes[ax_idx].set_xticks(x - width / 2)
                 axes[ax_idx].set_xticklabels(node_labels)
                 axes[ax_idx].set_ylim([0.0, 1.0])
