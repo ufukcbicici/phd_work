@@ -9,7 +9,7 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 
 class RoutingVisualizer:
     def __init__(self, network_name, run_id, iteration, degree_list, original_images, augmented_images,
-                          output_names):
+                 output_names):
         self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
@@ -85,6 +85,25 @@ class RoutingVisualizer:
         #     routed_samples=routed_samples, original_images=original_images, augmented_images=augmented_images)
         # print("X")
 
+    def draw_routing_bar_chart(self, curr_node, sample_idx, ax):
+        child_nodes = self.network.dagObject.children(node=curr_node)
+        child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+        route_distribution = self.branchProbs[curr_node.index][sample_idx]
+        node_labels = ["N{0}".format(c_node.index) for c_node in child_nodes]
+        x = np.arange(len(child_nodes))  # the label locations
+        width = 0.35  # the width of the bars
+        ax.set_title("Node{0}".format(curr_node.index))
+        rects1 = ax.bar(x - width / 2, route_distribution, width, label='Routing Probabilities')
+        ax.set_xticks(x - width / 2)
+        ax.set_xticklabels(node_labels)
+        ax.set_ylim([0.0, 1.0])
+
+    def draw_posterior_bar_chart(self, curr_node, sample_idx, ax):
+        posterior_distribution = self.posteriors[curr_node.index][sample_idx]
+        x = np.arange(len(posterior_distribution))  # the label locations
+        ax.set_title("Node{0} Pred:{1}".format(curr_node.index, np.argmax(posterior_distribution)))
+        ax.bar(x, posterior_distribution, label='Posterior Probabilities')
+
     def draw_routing_probabilities(self, entropy_order):
         sample_idx = self.entropySortingIndices[entropy_order]
         routed_image = self.routedSamples[sample_idx]
@@ -94,26 +113,80 @@ class RoutingVisualizer:
                                                               augmented_images=self.augmentedImages)
         fig, axes = plt.subplots(len(route) + 1, figsize=(3, 6))
         axes[0].imshow(original_image)
+        axes[0].set_title("Label:{0}".format(self.labelList[sample_idx]))
         axes[0].axis("off")
         ax_idx = 1
         for node_idx in route:
             curr_node = self.network.nodes[node_idx]
-            if curr_node.isLeaf:
-                break
-            child_nodes = self.network.dagObject.children(node=curr_node)
-            child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
-            route_distribution = self.branchProbs[curr_node.index][sample_idx]
-            node_labels = ["Node{0}".format(c_node.index) for c_node in child_nodes]
-            x = np.arange(len(child_nodes))  # the label locations
-            width = 0.35  # the width of the bars
-            axes[ax_idx].set_title("Node {0} Routing Probabilities".format(node_idx))
-            rects1 = axes[ax_idx].bar(x - width / 2, route_distribution, width, label='Routing Probabilities')
-            axes[ax_idx].set_ylabel('Scores')
-            axes[ax_idx].set_xticks(x - width/2)
-            axes[ax_idx].set_xticklabels(node_labels)
-            axes[ax_idx].set_ylim([0.0, 1.0])
-            ax_idx += 1
+            if not curr_node.isLeaf:
+                # self.draw_routing_bar_chart(curr_node=curr_node, sample_idx=sample_idx, ax=axes[ax_idx])
+                child_nodes = self.network.dagObject.children(node=curr_node)
+                child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+                route_distribution = self.branchProbs[curr_node.index][sample_idx]
+                node_labels = ["Node{0}".format(c_node.index) for c_node in child_nodes]
+                x = np.arange(len(child_nodes))  # the label locations
+                width = 0.35  # the width of the bars
+                axes[ax_idx].set_title("Node {0} Routing Probabilities".format(node_idx))
+                rects1 = axes[ax_idx].bar(x - width / 2, route_distribution, width, label='Routing Probabilities')
+                axes[ax_idx].set_ylabel('Scores')
+                axes[ax_idx].set_xticks(x - width / 2)
+                axes[ax_idx].set_xticklabels(node_labels)
+                axes[ax_idx].set_ylim([0.0, 1.0])
+                ax_idx += 1
+            else:
+                # self.draw_posterior_bar_chart(curr_node=curr_node, sample_idx=sample_idx, ax=axes[ax_idx])
+                posterior_distribution = self.posteriors[curr_node.index][sample_idx]
+                x = np.arange(len(posterior_distribution))  # the label locations
+                axes[ax_idx].set_title("Node{0} Predicted Label:{1}".format(curr_node.index,
+                                                                            np.argmax(posterior_distribution)))
+                axes[ax_idx].bar(x, posterior_distribution, label='Posterior Probabilities')
         plt.show()
+        fig.savefig('sample_{0}_routing_info.png'.format(sample_idx))
+
+    def draw_routing_probabilities_in_hierarchy(self, entropy_indices):
+        sample_indices = [self.entropySortingIndices[entropy_idx] for entropy_idx in entropy_indices]
+        routes_dict = {idx: self.routesPerSample[idx] for idx in sample_indices}
+        imgs_dict = {idx: RoutingVisualizer.get_original_image(routed_image=self.routedSamples[idx],
+                                                               original_images=self.originalImages,
+                                                               augmented_images=self.augmentedImages)
+                     for idx in sample_indices}
+        unit_size = 1.0
+
+        for curr_node in self.network.topologicalSortedNodes:
+            relevant_sample_indices = [idx for idx in sample_indices if curr_node.index in set(routes_dict[idx])]
+            if len(relevant_sample_indices) == 0:
+                continue
+            fig, axes = plt.subplots(nrows=2, ncols=len(relevant_sample_indices),
+                                     figsize=(len(relevant_sample_indices) * unit_size, 2 * unit_size))
+            plt.tight_layout()
+            for idx, sample_idx in enumerate(relevant_sample_indices):
+                axes[0, idx].imshow(imgs_dict[sample_idx])
+                axes[0, idx].set_title("Label:{0}".format(self.labelList[sample_idx]))
+                axes[0, idx].axis("off")
+                if not curr_node.isLeaf:
+                    self.draw_routing_bar_chart(curr_node=curr_node, sample_idx=sample_idx, ax=axes[1, idx])
+                else:
+                    self.draw_posterior_bar_chart(curr_node=curr_node, sample_idx=sample_idx, ax=axes[1, idx])
+            plt.show()
+
+    def analyze_low_and_high_entropy_accuracies(self, sample_size):
+        low_entropy_correct_count = 0
+        for i in range(sample_size):
+            sample_idx = self.entropySortingIndices[i]
+            route = self.routesPerSample[sample_idx]
+            posterior = self.posteriors[route[-1]][sample_idx]
+            low_entropy_correct_count += self.labelList[sample_idx] == np.argmax(posterior)
+
+        high_entropy_correct_count = 0
+        for i in range(sample_size):
+            sample_idx = self.entropySortingIndices[-(i + 1)]
+            route = self.routesPerSample[sample_idx]
+            posterior = self.posteriors[route[-1]][sample_idx]
+            high_entropy_correct_count += self.labelList[sample_idx] == np.argmax(posterior)
+
+        low_entropy_accuracy = low_entropy_correct_count / sample_size
+        high_entropy_accuracy = high_entropy_correct_count / sample_size
+        return low_entropy_accuracy, high_entropy_accuracy
 
     @staticmethod
     def whiten_dataset(dataset):
@@ -146,8 +219,26 @@ def main():
                                            original_images=dataset.testSamples, augmented_images=whitened_images,
                                            iteration=iteration, output_names=output_names, degree_list=[2, 2])
     routing_visualizer.prepare_routing_information()
-    routing_visualizer.draw_routing_probabilities(entropy_order=0)
-    routing_visualizer.draw_routing_probabilities(entropy_order=-1)
+    low_entropy_accuracy, high_entropy_accuracy = \
+        routing_visualizer.analyze_low_and_high_entropy_accuracies(sample_size=250)
+    # routing_visualizer.draw_routing_probabilities_in_hierarchy(entropy_indices=[0, 1, 2, 4, -1, -2, -3, -4])
+    entropy_indices = [0, 1, 2, 4, 7, -1, -2, -3, -4, -7]
+    for entropy_idx in entropy_indices:
+        routing_visualizer.draw_routing_probabilities(entropy_order=entropy_idx)
+
+
+
+    # routing_visualizer.draw_routing_probabilities(entropy_order=0)
+    # routing_visualizer.draw_routing_probabilities(entropy_order=1)
+    # routing_visualizer.draw_routing_probabilities(entropy_order=2)
+    # routing_visualizer.draw_routing_probabilities(entropy_order=3)
+    # routing_visualizer.draw_routing_probabilities(entropy_order=4)
+    #
+    # routing_visualizer.draw_routing_probabilities(entropy_order=-1)
+    # routing_visualizer.draw_routing_probabilities(entropy_order=-2)
+    # routing_visualizer.draw_routing_probabilities(entropy_order=-3)
+    # routing_visualizer.draw_routing_probabilities(entropy_order=-4)
+    # routing_visualizer.draw_routing_probabilities(entropy_order=-5)
     # RoutingVisualizer.visualize_routing(network_name=network_name, run_id=run_id,
     #                                     original_images=dataset.testSamples,
     #                                     augmented_images=whitened_images,
