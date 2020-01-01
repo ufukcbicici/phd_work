@@ -19,9 +19,35 @@ class CombinatorialRoutingOptimizer:
         self.labelsVector = self.routingData.labelList
         self.routingCombinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(self.leafNodes))
         self.routingCombinations = [np.array(route_vec) for route_vec in self.routingCombinations]
+        self.baseEvaluationCost = None
+        self.networkActivationCosts = {}
+        self.get_evaluation_costs()
+
+    def get_evaluation_costs(self):
+        list_of_lists = []
+        path_costs = []
+        for node in self.leafNodes:
+            list_of_lists.append([0, 1])
+            leaf_ancestors = self.network.dagObject.ancestors(node=node)
+            leaf_ancestors.append(node)
+            path_costs.append(sum([self.network.nodeCosts[ancestor.index] for ancestor in leaf_ancestors]))
+        self.baseEvaluationCost = np.mean(np.array(path_costs))
+        all_result_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=list_of_lists)
+        for result_tuple in all_result_tuples:
+            processed_nodes_set = set()
+            for node_idx, curr_node in enumerate(self.leafNodes):
+                if result_tuple[node_idx] == 0:
+                    continue
+                leaf_ancestors = self.network.dagObject.ancestors(node=curr_node)
+                leaf_ancestors.append(curr_node)
+                for ancestor in leaf_ancestors:
+                    processed_nodes_set.add(ancestor.index)
+            total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
+            self.networkActivationCosts[result_tuple] = total_cost
 
     def calculate_best_routes(self):
         total_correct_count = 0
+        total_eval_cost = 0.0
         single_path_correct_count = 0
         posteriors_tensor = np.stack([self.posteriors[node.index] for node in self.leafNodes], axis=2)
         for idx in range(self.labelsVector.shape[0]):
@@ -47,13 +73,22 @@ class CombinatorialRoutingOptimizer:
                 new_route[self.leafIndices[max_likelihood_leaf.index]] = 1
                 valid_routes.add(tuple(new_route.tolist()))
             is_correct = False
+            min_eval_cost = np.infty
             for valid_route in valid_routes:
                 uniform_weight = 1.0 / sum(valid_route)
                 posteriors_sparse = posteriors_matrix * (uniform_weight * np.expand_dims(np.array(valid_route), axis=0))
                 posteriors_weighted = np.sum(posteriors_sparse, axis=1)
                 if np.argmax(posteriors_weighted) == self.labelsVector[idx]:
                     is_correct = True
-            total_correct_count += float(is_correct)
+                    eval_cost = self.networkActivationCosts[valid_route]
+                    if min_eval_cost > eval_cost:
+                        min_eval_cost = eval_cost
+            if is_correct:
+                total_correct_count += float(is_correct)
+                total_eval_cost += min_eval_cost
+            else:
+                total_eval_cost += self.baseEvaluationCost
+        mean_eval_cost = total_eval_cost / self.labelsVector.shape[0]
         print("X")
 
 
