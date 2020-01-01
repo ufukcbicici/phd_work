@@ -14,3 +14,22 @@ class CombinatorialRoutingOptimizer:
         self.branchProbs = self.routingData.get_dict("branch_probs")
         self.posteriors = self.routingData.get_dict("posterior_probs")
         self.labelsVector = self.routingData.labelList
+
+    def calculate_best_routes(self):
+        # for idx in range(self.posteriors.shape[0]):
+        #     curr_node = self.network.topologicalSortedNodes[0]
+        #     total_path_entropy = 0
+        #     route = []
+        #     while True:
+        #         route.append(curr_node.index)
+        #         if curr_node.isLeaf:
+        #             self.totalPathEntropies.append(total_path_entropy)
+        #             self.routesPerSample.append(route)
+        #             break
+        #         routing_distribution = self.branchProbs[curr_node.index][idx]
+        #         entropy = UtilityFuncs.calculate_distribution_entropy(distribution=routing_distribution)
+        #         total_path_entropy += entropy
+        #         arg_max_child_index = np.argmax(routing_distribution)
+        #         child_nodes = self.network.dagObject.children(node=curr_node)
+        #         child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+        #         curr_node = child_nodes[arg_max_child_index]
