@@ -6,15 +6,14 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
 class TreeLevelRoutingOptimizer:
-    def __init__(self, branching_state_vectors, hidden_layers, routing_combinations):
+    def __init__(self, branching_state_vectors, hidden_layers, action_space_size):
         self.branchingStateVectors = branching_state_vectors
         # self.hiddenLayers = [self.branchingStateVectors.shape[-1]]
         # self.hiddenLayers.extend(hidden_layers)
         self.hiddenLayers = hidden_layers
         self.inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.branchingStateVectors.shape[-1]],
                                      name="inputs")
-        self.routingCombinations = routing_combinations
-        self.actionCount = len(self.routingCombinations) / 2
+        self.actionCount = action_space_size
         self.hiddenLayers.append(self.actionCount)
         # Policy MLP
         self.net = self.inputs
@@ -24,16 +23,22 @@ class TreeLevelRoutingOptimizer:
 
 
 class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
-    def __init__(self, network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio, features_used):
+    def __init__(self, network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio, features_used,
+                 hidden_layers):
         super().__init__(network_name, run_id, iteration, degree_list, data_type, output_names)
         self.testRatio = test_ratio
         self.featuresUsed = features_used
+        self.hiddenLayers = hidden_layers
         # Apply Validation - Test split to the routing data
         self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=self.testRatio)
         self.validationStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.validationData)
         self.testStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.testData)
         self.policyGradientOptimizers = []
+        action_space_size = len(self.routingCombinations) / 2
         for tree_level in range(self.network.depth - 1, 0, -1):
+            policy_gradient_optimizer = TreeLevelRoutingOptimizer(
+                branching_state_vectors=self.validationStateFeatures[tree_level],
+                hidden_layers=hidden_layers[tree_level], action_space_size=action_space_size)
             print(tree_level)
 
     def prepare_features_for_dataset(self, routing_dataset):
@@ -74,11 +79,6 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         return state_vectors_for_each_tree_level
 
 
-        # for tree_level in range(self.network.depth):
-        #
-        # print("X")
-
-
 def main():
     run_id = 715
     network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
@@ -89,8 +89,8 @@ def main():
                                                                          degree_list=[2, 2], data_type="test",
                                                                          output_names=output_names,
                                                                          test_ratio=0.2,
-                                                                         features_used=["branching_feature"])
-
+                                                                         features_used=["branching_feature"],
+                                                                         hidden_layers=[[128], [256]])
 
 
 main()
