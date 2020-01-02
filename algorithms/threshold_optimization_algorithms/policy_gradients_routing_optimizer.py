@@ -38,6 +38,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         assert len(root_node) == 1
         curr_level_nodes = root_node
         curr_level = 0
+        state_vectors_for_each_tree_level = []
         while True:
             if any([node.isLeaf for node in curr_level_nodes]):
                 break
@@ -57,6 +58,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 level_features = np.concatenate(level_features_list, axis=-1)
                 sample_features_tensor.append(level_features)
             sample_features_tensor = np.stack(sample_features_tensor, axis=-1)
+            state_vectors_for_each_tree_level.append(sample_features_tensor)
             # Forward to the next level.
             curr_level += 1
             next_level_node_ids = set()
@@ -65,7 +67,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 for child_node in child_nodes:
                     next_level_node_ids.add(child_node.index)
             curr_level_nodes = [self.network.nodes[node_id] for node_id in sorted(list(next_level_node_ids))]
-        print("X")
+        return state_vectors_for_each_tree_level
 
 
         # for tree_level in range(self.network.depth):
