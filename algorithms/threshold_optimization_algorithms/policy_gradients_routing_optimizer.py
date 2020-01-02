@@ -30,7 +30,8 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.featuresUsed = features_used
         # Apply Validation - Test split to the routing data
         self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=self.testRatio)
-        self.prepare_features_for_dataset(routing_dataset=self.validationData)
+        self.validationStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.validationData)
+        self.testStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.testData)
 
     def prepare_features_for_dataset(self, routing_dataset):
         # Prepare Policy Gradients State Data
