@@ -13,7 +13,7 @@ class TreeLevelRoutingOptimizer:
         self.hiddenLayers = hidden_layers
         self.inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.branchingStateVectors.shape[-1]],
                                      name="inputs")
-        self.actionCount = action_space_size
+        self.actionCount = int(action_space_size)
         self.hiddenLayers.append(self.actionCount)
         # Policy MLP
         self.net = self.inputs
