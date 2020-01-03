@@ -34,8 +34,10 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.validationStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.validationData)
         self.testStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.testData)
         self.policyGradientOptimizers = []
-        action_space_size = len(self.routingCombinations) / 2
-        for tree_level in range(self.network.depth - 2, 0, -1):
+        # action_space_size = len(self.routingCombinations) / 2
+        for tree_level in range(self.network.depth, 1, -1):
+            level_node_count = 2 ** (tree_level - 1)
+            action_space_size = 2 ** (level_node_count - 1)
             policy_gradient_optimizer = TreeLevelRoutingOptimizer(
                 branching_state_vectors=self.validationStateFeatures[tree_level],
                 hidden_layers=hidden_layers[tree_level], action_space_size=action_space_size)
