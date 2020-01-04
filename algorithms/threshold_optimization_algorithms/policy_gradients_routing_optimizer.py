@@ -44,6 +44,12 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             self.policyGradientOptimizers.append(policy_gradient_optimizer)
             print(tree_level)
 
+    def reward_function(self, states, labels, level):
+        if level != len(self.network.depth) - 1:
+            raise NotImplementedError()
+
+
+
     def prepare_features_for_dataset(self, routing_dataset):
         # Prepare Policy Gradients State Data
         root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]

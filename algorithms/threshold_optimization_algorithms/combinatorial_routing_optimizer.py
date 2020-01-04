@@ -45,6 +45,9 @@ class CombinatorialRoutingOptimizer:
             total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
             self.networkActivationCosts[result_tuple] = total_cost
 
+    def get_max_likelihood_path(self, branch_probs, posteriors):
+
+
     def calculate_best_routes(self):
         total_correct_count = 0
         total_eval_cost = 0.0
@@ -93,18 +96,23 @@ class CombinatorialRoutingOptimizer:
 
 
 def main():
-    run_id = 67
-    # network_name = "Cifar100_CIGN_Sampling"
-    network_name = "None"
+    # run_id = 67
+    # # network_name = "Cifar100_CIGN_Sampling"
+    # network_name = "None"
+    # iteration = 119100
+    # # node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
+    # # pickle.dump(node_costs, open("nodeCosts.sav", "wb"))
+    # output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs"]
+    # # dataset = CifarDataSet(session=None, validation_sample_count=0, load_validation_from=None)
+    # # whitened_images = RoutingVisualizer.whiten_dataset(dataset=dataset)
+
+    run_id = 715
+    network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
     iteration = 119100
-    # node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
-    # pickle.dump(node_costs, open("nodeCosts.sav", "wb"))
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs"]
-    # dataset = CifarDataSet(session=None, validation_sample_count=0, load_validation_from=None)
-    # whitened_images = RoutingVisualizer.whiten_dataset(dataset=dataset)
     routing_optimizer = CombinatorialRoutingOptimizer(network_name=network_name, run_id=run_id, iteration=iteration,
-                                                      degree_list=[2, 2], data_type="", output_names=output_names)
+                                                      degree_list=[2, 2], data_type="test", output_names=output_names)
     routing_optimizer.calculate_best_routes()
 
 
-main()
+# main()
