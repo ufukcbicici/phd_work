@@ -45,8 +45,23 @@ class CombinatorialRoutingOptimizer:
             total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
             self.networkActivationCosts[result_tuple] = total_cost
 
-    def get_max_likelihood_path(self, branch_probs, posteriors):
-
+    def get_max_likelihood_paths(self, branch_probs):
+        max_likelihood_paths = []
+        for idx in range(branch_probs.shape[0]):
+            curr_node = self.network.topologicalSortedNodes[0]
+            route = []
+            while True:
+                route.append(curr_node.index)
+                if curr_node.isLeaf:
+                    break
+                routing_distribution = branch_probs[curr_node.index][idx]
+                arg_max_child_index = np.argmax(routing_distribution)
+                child_nodes = self.network.dagObject.children(node=curr_node)
+                child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+                curr_node = child_nodes[arg_max_child_index]
+            max_likelihood_paths.append(np.expand_dims(np.array(route), axis=0))
+        max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
+        return max_likelihood_paths
 
     def calculate_best_routes(self):
         total_correct_count = 0

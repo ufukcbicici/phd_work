@@ -33,6 +33,9 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=self.testRatio)
         self.validationStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.validationData)
         self.testStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.testData)
+        self.validationDataPaths = self.get_max_likelihood_paths(
+            branch_probs=self.validationData.get_dict("branch_probs"))
+        self.testDataPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
         self.policyGradientOptimizers = []
         # action_space_size = len(self.routingCombinations) / 2
         for tree_level in range(self.network.depth, 1, -1):
