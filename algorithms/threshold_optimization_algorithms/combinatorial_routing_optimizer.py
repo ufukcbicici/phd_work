@@ -46,8 +46,11 @@ class CombinatorialRoutingOptimizer:
             self.networkActivationCosts[result_tuple] = total_cost
 
     def get_max_likelihood_paths(self, branch_probs):
+        sample_sizes = list(set([arr.shape[0] for arr in branch_probs.values()]))
+        assert len(sample_sizes) == 1
+        sample_size = sample_sizes[0]
         max_likelihood_paths = []
-        for idx in range(branch_probs.shape[0]):
+        for idx in range(sample_size):
             curr_node = self.network.topologicalSortedNodes[0]
             route = []
             while True:
