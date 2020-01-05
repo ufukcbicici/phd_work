@@ -74,9 +74,9 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         # Prepare Policy Gradients State Data
         root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
         assert len(root_node) == 1
-        curr_level_nodes = root_node
-        curr_level = 0
         state_vectors_for_each_tree_level = []
+        for tree_level in range(self.network.depth - 1):
+            state_vectors_for_each_tree_level.append([])
         for idx in range(routing_dataset.labelList.shape[0]):
             route_arr = greedy_routes[idx]
             for tree_level in range(self.network.depth - 1):
@@ -92,12 +92,19 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                     r = np.array(route)
                     r[selected_node_id - min_level_id] = 1
                     valid_node_selections.add(tuple(r))
+                for route_combination in valid_node_selections:
+                    level_features_list = []
+                    for feature_name in self.featuresUsed:
+                        feature_vectors_per_node = [routing_dataset.get_dict(feature_name)[node.index][idx]
+                                                    for node in level_nodes]
+                        weighted_vectors = [route_weight * f_vec for route_weight, f_vec in
+                                            zip(route_combination, feature_vectors_per_node)]
+                        feature_vector = np.concatenate(weighted_vectors, axis=-1)
+                        level_features_list.append(feature_vector)
+                    state_vector_for_curr_level = np.concatenate(level_features_list, axis=-1)
+                    state_vectors_for_each_tree_level[tree_level].append(state_vector_for_curr_level)
                 print("X")
         return None
-
-
-
-
 
         # while True:
         #     if any([node.isLeaf for node in curr_level_nodes]):
