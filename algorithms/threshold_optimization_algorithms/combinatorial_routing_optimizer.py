@@ -75,7 +75,6 @@ class CombinatorialRoutingOptimizer:
             posteriors_matrix = posteriors_tensor[idx]
             curr_node = self.network.topologicalSortedNodes[0]
             route = []
-            max_likelihood_leaf = None
             while True:
                 route.append(curr_node.index)
                 if curr_node.isLeaf:

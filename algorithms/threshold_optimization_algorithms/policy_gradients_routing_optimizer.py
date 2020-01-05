@@ -31,18 +31,22 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.hiddenLayers = hidden_layers
         # Apply Validation - Test split to the routing data
         self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=self.testRatio)
-        self.validationStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.validationData)
-        self.testStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.testData)
+        # Greedy Information Gain Paths
         self.validationDataPaths = self.get_max_likelihood_paths(
             branch_probs=self.validationData.get_dict("branch_probs"))
         self.testDataPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
+        self.validationStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.validationData,
+                                                                         greedy_routes=self.validationDataPaths)
+        self.testStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.testData,
+                                                                   greedy_routes=self.testDataPaths)
+
         for level in range(self.network.depth - 1):
             if level != self.network.depth - 2:
                 continue
-            self.reward_function(states=self.validationStateFeatures[level], labels=self.validationData.labelList,
-                                 routes=self.validationDataPaths, level=level)
-            self.reward_function(states=self.testStateFeatures[level], labels=self.testData.labelList,
-                                 routes=self.testDataPaths, level=level)
+            # self.reward_function(states=self.validationStateFeatures[level], labels=self.validationData.labelList,
+            #                      routes=self.validationDataPaths, level=level)
+            # self.reward_function(states=self.testStateFeatures[level], labels=self.testData.labelList,
+            #                      routes=self.testDataPaths, level=level)
 
         self.policyGradientOptimizers = []
         for tree_level in range(self.network.depth, 1, -1):
@@ -58,53 +62,109 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         action_space_size = 2 ** (level_node_count - 1)
         return action_space_size
 
-    def reward_function(self, states, labels, routes, level):
-        if level != self.network.depth - 2:
-            raise NotImplementedError()
-        assert states.shape[0] == labels.shape[0] == routes.shape[0]
-        rewards = []
-        for idx in range(states.shape[0]):
-            route
+    # def reward_function(self, states, labels, routes, level):
+    #     if level != self.network.depth - 2:
+    #         raise NotImplementedError()
+    #     assert states.shape[0] == labels.shape[0] == routes.shape[0]
+    #     rewards = []
+    #     for idx in range(states.shape[0]):
+    #         route
 
-
-
-
-    def prepare_features_for_dataset(self, routing_dataset):
+    def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
         # Prepare Policy Gradients State Data
         root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
         assert len(root_node) == 1
         curr_level_nodes = root_node
         curr_level = 0
         state_vectors_for_each_tree_level = []
-        while True:
-            if any([node.isLeaf for node in curr_level_nodes]):
-                break
-            # Gather all feature dicts
-            route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(curr_level_nodes))
-            route_combinations = [route for route in route_combinations if sum(route) > 0]
-            sample_features_tensor = []
-            for route_combination in route_combinations:
-                level_features_list = []
-                for feature_name in self.featuresUsed:
-                    feature_matrices_per_node = [routing_dataset.get_dict(feature_name)[node.index]
-                                                 for node in curr_level_nodes]
-                    weighted_matrices = [route_weight * f_matrix for route_weight, f_matrix in
-                                         zip(route_combination, feature_matrices_per_node)]
-                    feature_matrix = np.concatenate(weighted_matrices, axis=-1)
-                    level_features_list.append(feature_matrix)
-                level_features = np.concatenate(level_features_list, axis=-1)
-                sample_features_tensor.append(level_features)
-            sample_features_tensor = np.stack(sample_features_tensor, axis=-1)
-            state_vectors_for_each_tree_level.append(sample_features_tensor)
-            # Forward to the next level.
-            curr_level += 1
-            next_level_node_ids = set()
-            for curr_level_node in curr_level_nodes:
-                child_nodes = self.network.dagObject.children(node=curr_level_node)
-                for child_node in child_nodes:
-                    next_level_node_ids.add(child_node.index)
-            curr_level_nodes = [self.network.nodes[node_id] for node_id in sorted(list(next_level_node_ids))]
-        return state_vectors_for_each_tree_level
+        for idx in range(routing_dataset.labelList.shape[0]):
+            route_arr = greedy_routes[idx]
+            for tree_level in range(self.network.depth - 1):
+                # Gather all feature dicts
+                level_nodes = [node for node in self.network.topologicalSortedNodes if node.depth == tree_level]
+                level_nodes = sorted(level_nodes, key=lambda node: node.index)
+                route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(level_nodes))
+                route_combinations = [route for route in route_combinations if sum(route) > 0]
+                min_level_id = min([node.index for node in level_nodes])
+                selected_node_id = route_arr[tree_level]
+                valid_node_selections = set()
+                for route in route_combinations:
+                    r = np.array(route)
+                    r[selected_node_id - min_level_id] = 1
+                    valid_node_selections.add(tuple(r))
+                print("X")
+        return None
+
+
+
+
+
+        # while True:
+        #     if any([node.isLeaf for node in curr_level_nodes]):
+        #         break
+        #     # Gather all feature dicts
+        #     route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(curr_level_nodes))
+        #     route_combinations = [route for route in route_combinations if sum(route) > 0]
+        #     sample_features_tensor = []
+        #     for route_combination in route_combinations:
+        #         level_features_list = []
+        #         for feature_name in self.featuresUsed:
+        #             feature_matrices_per_node = [routing_dataset.get_dict(feature_name)[node.index]
+        #                                          for node in curr_level_nodes]
+        #             weighted_matrices = [route_weight * f_matrix for route_weight, f_matrix in
+        #                                  zip(route_combination, feature_matrices_per_node)]
+        #             feature_matrix = np.concatenate(weighted_matrices, axis=-1)
+        #             level_features_list.append(feature_matrix)
+        #         level_features = np.concatenate(level_features_list, axis=-1)
+        #         sample_features_tensor.append(level_features)
+        #     sample_features_tensor = np.stack(sample_features_tensor, axis=-1)
+        #     state_vectors_for_each_tree_level.append(sample_features_tensor)
+        #     # Forward to the next level.
+        #     curr_level += 1
+        #     next_level_node_ids = set()
+        #     for curr_level_node in curr_level_nodes:
+        #         child_nodes = self.network.dagObject.children(node=curr_level_node)
+        #         for child_node in child_nodes:
+        #             next_level_node_ids.add(child_node.index)
+        #     curr_level_nodes = [self.network.nodes[node_id] for node_id in sorted(list(next_level_node_ids))]
+        # return state_vectors_for_each_tree_level
+
+    # def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
+    #     # Prepare Policy Gradients State Data
+    #     root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
+    #     assert len(root_node) == 1
+    #     curr_level_nodes = root_node
+    #     curr_level = 0
+    #     state_vectors_for_each_tree_level = []
+    #     while True:
+    #         if any([node.isLeaf for node in curr_level_nodes]):
+    #             break
+    #         # Gather all feature dicts
+    #         route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(curr_level_nodes))
+    #         route_combinations = [route for route in route_combinations if sum(route) > 0]
+    #         sample_features_tensor = []
+    #         for route_combination in route_combinations:
+    #             level_features_list = []
+    #             for feature_name in self.featuresUsed:
+    #                 feature_matrices_per_node = [routing_dataset.get_dict(feature_name)[node.index]
+    #                                              for node in curr_level_nodes]
+    #                 weighted_matrices = [route_weight * f_matrix for route_weight, f_matrix in
+    #                                      zip(route_combination, feature_matrices_per_node)]
+    #                 feature_matrix = np.concatenate(weighted_matrices, axis=-1)
+    #                 level_features_list.append(feature_matrix)
+    #             level_features = np.concatenate(level_features_list, axis=-1)
+    #             sample_features_tensor.append(level_features)
+    #         sample_features_tensor = np.stack(sample_features_tensor, axis=-1)
+    #         state_vectors_for_each_tree_level.append(sample_features_tensor)
+    #         # Forward to the next level.
+    #         curr_level += 1
+    #         next_level_node_ids = set()
+    #         for curr_level_node in curr_level_nodes:
+    #             child_nodes = self.network.dagObject.children(node=curr_level_node)
+    #             for child_node in child_nodes:
+    #                 next_level_node_ids.add(child_node.index)
+    #         curr_level_nodes = [self.network.nodes[node_id] for node_id in sorted(list(next_level_node_ids))]
+    #     return state_vectors_for_each_tree_level
 
 
 def main():
