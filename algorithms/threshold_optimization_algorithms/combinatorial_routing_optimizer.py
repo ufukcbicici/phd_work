@@ -62,7 +62,7 @@ class CombinatorialRoutingOptimizer:
                 child_nodes = self.network.dagObject.children(node=curr_node)
                 child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
                 curr_node = child_nodes[arg_max_child_index]
-            max_likelihood_paths.append(np.expand_dims(np.array(route), axis=0))
+            max_likelihood_paths.append(np.array(route))
         max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
         return max_likelihood_paths
 

@@ -36,20 +36,36 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.validationDataPaths = self.get_max_likelihood_paths(
             branch_probs=self.validationData.get_dict("branch_probs"))
         self.testDataPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
+        for level in range(self.network.depth - 1):
+            if level != self.network.depth - 2:
+                continue
+            self.reward_function(states=self.validationStateFeatures[level], labels=self.validationData.labelList,
+                                 routes=self.validationDataPaths, level=level)
+            self.reward_function(states=self.testStateFeatures[level], labels=self.testData.labelList,
+                                 routes=self.testDataPaths, level=level)
+
         self.policyGradientOptimizers = []
-        # action_space_size = len(self.routingCombinations) / 2
         for tree_level in range(self.network.depth, 1, -1):
-            level_node_count = 2 ** (tree_level - 1)
-            action_space_size = 2 ** (level_node_count - 1)
+            action_space_size = self.get_action_space_size(tree_level=tree_level)
             policy_gradient_optimizer = TreeLevelRoutingOptimizer(
                 branching_state_vectors=self.validationStateFeatures[tree_level],
                 hidden_layers=hidden_layers[tree_level], action_space_size=action_space_size)
             self.policyGradientOptimizers.append(policy_gradient_optimizer)
             print(tree_level)
 
-    def reward_function(self, states, labels, level):
-        if level != len(self.network.depth) - 1:
+    def get_action_space_size(self, tree_level):
+        level_node_count = 2 ** (tree_level - 1)
+        action_space_size = 2 ** (level_node_count - 1)
+        return action_space_size
+
+    def reward_function(self, states, labels, routes, level):
+        if level != self.network.depth - 2:
             raise NotImplementedError()
+        assert states.shape[0] == labels.shape[0] == routes.shape[0]
+        rewards = []
+        for idx in range(states.shape[0]):
+            route
+
 
 
 
