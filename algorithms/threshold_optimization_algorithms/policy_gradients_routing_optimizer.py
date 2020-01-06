@@ -108,8 +108,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                         level_features_list.append(feature_vector)
                     state_vector_for_curr_level = np.concatenate(level_features_list, axis=-1)
                     state_vectors_for_each_tree_level[tree_level].append(state_vector_for_curr_level)
-                print("X")
-        return None
+        return state_vectors_for_each_tree_level
 
         # while True:
         #     if any([node.isLeaf for node in curr_level_nodes]):
