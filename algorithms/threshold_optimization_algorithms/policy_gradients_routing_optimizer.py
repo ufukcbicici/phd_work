@@ -35,6 +35,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.validationDataPaths = self.get_max_likelihood_paths(
             branch_probs=self.validationData.get_dict("branch_probs"))
         self.testDataPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
+        # Enumerate possible validation and test states
         self.validationStateFeatures, self.validationSampleRoutes = self.prepare_features_for_dataset(
             routing_dataset=self.validationData,
             greedy_routes=self.validationDataPaths)
@@ -43,16 +44,12 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             greedy_routes=self.testDataPaths)
         self.test_route_size_compatibility(sample_routes=self.validationSampleRoutes)
         self.test_route_size_compatibility(sample_routes=self.testSampleRoutes)
-
-
-        for level in range(self.network.depth - 1):
-            if level != self.network.depth - 2:
-                continue
-            # self.reward_function(states=self.validationStateFeatures[level], labels=self.validationData.labelList,
-            #                      routes=self.validationDataPaths, level=level)
-            # self.reward_function(states=self.testStateFeatures[level], labels=self.testData.labelList,
-            #                      routes=self.testDataPaths, level=level)
-
+        # Enumerate rewards
+        self.reward_function(states=self.validationStateFeatures, labels=self.validationData.labelList,
+                             routes=self.validationSampleRoutes)
+        self.reward_function(states=self.testStateFeatures, labels=self.testData.labelList,
+                             routes=self.testSampleRoutes)
+        # Build Policy Gradient Networks
         self.policyGradientOptimizers = []
         for tree_level in range(self.network.depth, 1, -1):
             action_space_size = self.get_action_space_size(tree_level=tree_level)
@@ -68,18 +65,31 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 np.array_equal(sample_routes[0][int(i / (sample_routes[idx].shape[0] / sample_routes[0].shape[0]))],
                                sample_routes[idx][i]) for i in range(sample_routes[idx].shape[0])])
 
-    def get_action_space_size(self, tree_level):
-        level_node_count = 2 ** (tree_level - 1)
-        action_space_size = 2 ** (level_node_count - 1)
-        return action_space_size
+    def get_action_space(self, tree_level):
+        next_level_node_count = len([node for node in
+                                     self.network.topologicalSortedNodes if node.depth == tree_level + 1])
+        action_space_size = 2 ** next_level_node_count
+        action_space = {}
+        for action_id in range(action_space_size):
+            l = [int(x) for x in list('{0:0b}'.format(action_id))]
+            k = [0] * (next_level_node_count - len(l))
+            k.extend(l)
+            binary_node_selection = tuple(k)
+            action_space[action_id] = binary_node_selection
+        return action_space
 
-    # def reward_function(self, states, labels, routes, level):
-    #     if level != self.network.depth - 2:
-    #         raise NotImplementedError()
-    #     assert states.shape[0] == labels.shape[0] == routes.shape[0]
-    #     rewards = []
-    #     for idx in range(states.shape[0]):
-    #         route
+    def reward_function(self, states, labels, routes):
+        for tree_level in range(self.network.depth - 1):
+            if tree_level != self.network.depth - 2:
+                continue
+            level_multiplicity = routes[tree_level].shape[0] / routes[0].shape[0]
+            rewards = []
+            action_space = self.get_action_space(tree_level=tree_level)
+            for idx in range(states[tree_level].shape[0]):
+                label = labels[int(idx / level_multiplicity)]
+                route = routes[tree_level][idx]
+                state = states[tree_level][idx]
+                # Corresponds to binary mapping of each integer.
 
     def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
         # Prepare Policy Gradients State Data
