@@ -90,6 +90,8 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 route = routes[tree_level][idx]
                 state = states[tree_level][idx]
                 # Corresponds to binary mapping of each integer.
+                for action_id, node_selection in action_space.items():
+
 
     def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
         # Prepare Policy Gradients State Data
