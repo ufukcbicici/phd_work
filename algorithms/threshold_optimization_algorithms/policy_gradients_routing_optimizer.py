@@ -35,10 +35,15 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.validationDataPaths = self.get_max_likelihood_paths(
             branch_probs=self.validationData.get_dict("branch_probs"))
         self.testDataPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
-        self.validationStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.validationData,
-                                                                         greedy_routes=self.validationDataPaths)
-        self.testStateFeatures = self.prepare_features_for_dataset(routing_dataset=self.testData,
-                                                                   greedy_routes=self.testDataPaths)
+        self.validationStateFeatures, self.validationSampleRoutes = self.prepare_features_for_dataset(
+            routing_dataset=self.validationData,
+            greedy_routes=self.validationDataPaths)
+        self.testStateFeatures, self.testSampleRoutes = self.prepare_features_for_dataset(
+            routing_dataset=self.testData,
+            greedy_routes=self.testDataPaths)
+        self.test_route_size_compatibility(sample_routes=self.validationSampleRoutes)
+        self.test_route_size_compatibility(sample_routes=self.testSampleRoutes)
+
 
         for level in range(self.network.depth - 1):
             if level != self.network.depth - 2:
@@ -56,6 +61,12 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 hidden_layers=hidden_layers[tree_level], action_space_size=action_space_size)
             self.policyGradientOptimizers.append(policy_gradient_optimizer)
             print(tree_level)
+
+    def test_route_size_compatibility(self, sample_routes):
+        for idx in range(len(sample_routes)):
+            assert all([
+                np.array_equal(sample_routes[0][int(i / (sample_routes[idx].shape[0] / sample_routes[0].shape[0]))],
+                               sample_routes[idx][i]) for i in range(sample_routes[idx].shape[0])])
 
     def get_action_space_size(self, tree_level):
         level_node_count = 2 ** (tree_level - 1)
@@ -75,9 +86,12 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
         assert len(root_node) == 1
         state_vectors_for_each_tree_level = []
-        route_combination_count = None
+        routes_per_sample = []
+        route_combination_count = []
         for tree_level in range(self.network.depth - 1):
             state_vectors_for_each_tree_level.append([])
+            routes_per_sample.append([])
+            route_combination_count.append([])
         for idx in range(routing_dataset.labelList.shape[0]):
             route_arr = greedy_routes[idx]
             for tree_level in range(self.network.depth - 1):
@@ -93,10 +107,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                     r = np.array(route)
                     r[selected_node_id - min_level_id] = 1
                     valid_node_selections.add(tuple(r))
-                if route_combination_count is None:
-                    route_combination_count = len(valid_node_selections)
-                else:
-                    assert route_combination_count == len(valid_node_selections)
+                route_combination_count[tree_level].append(len(valid_node_selections))
                 for route_combination in valid_node_selections:
                     level_features_list = []
                     for feature_name in self.featuresUsed:
@@ -108,7 +119,14 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                         level_features_list.append(feature_vector)
                     state_vector_for_curr_level = np.concatenate(level_features_list, axis=-1)
                     state_vectors_for_each_tree_level[tree_level].append(state_vector_for_curr_level)
-        return state_vectors_for_each_tree_level
+                    routes_per_sample[tree_level].append(route_arr)
+        for arr in route_combination_count:
+            assert len(set(arr)) == 1
+        for tree_level in range(len(state_vectors_for_each_tree_level)):
+            state_vectors_for_each_tree_level[tree_level] = np.stack(state_vectors_for_each_tree_level[tree_level],
+                                                                     axis=0)
+            routes_per_sample[tree_level] = np.stack(routes_per_sample[tree_level], axis=0)
+        return state_vectors_for_each_tree_level, routes_per_sample
 
         # while True:
         #     if any([node.isLeaf for node in curr_level_nodes]):

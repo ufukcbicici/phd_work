@@ -56,8 +56,8 @@ def bayesian_process_runner(param_tpl):
     use_weighted = param_tpl[3]
     accuracy_computation_balance = param_tpl[4]
     network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test")
-    multipath_calculator = MultipathCalculatorEarlyExit(network=network)
+    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="")
+    multipath_calculator = MultipathCalculatorV2(network=network, routing_data=routing_data)
     bayesian_optimizer = BayesianThresholdOptimizer(
         run_id=run_id, network=network, iteration=iteration, routing_data=routing_data,
         multipath_score_calculator=multipath_calculator,
@@ -97,9 +97,9 @@ def main():
     # weighted_score_list = [False]
     # balance_list = [1.0]
 
-    run_ids = [1630]
-    iterations = [48000]
-    xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 5
+    run_ids = [67]
+    iterations = [119100, 119200, 119300, 119400, 119500, 119600, 119700, 119800, 119900, 120000]
+    xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 10
     weighted_score_list = [False]
     balance_list = [1.0, 0.99, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[run_ids, iterations,
