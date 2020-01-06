@@ -75,6 +75,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
         assert len(root_node) == 1
         state_vectors_for_each_tree_level = []
+        route_combination_count = None
         for tree_level in range(self.network.depth - 1):
             state_vectors_for_each_tree_level.append([])
         for idx in range(routing_dataset.labelList.shape[0]):
@@ -92,6 +93,10 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                     r = np.array(route)
                     r[selected_node_id - min_level_id] = 1
                     valid_node_selections.add(tuple(r))
+                if route_combination_count is None:
+                    route_combination_count = len(valid_node_selections)
+                else:
+                    assert route_combination_count == len(valid_node_selections)
                 for route_combination in valid_node_selections:
                     level_features_list = []
                     for feature_name in self.featuresUsed:
