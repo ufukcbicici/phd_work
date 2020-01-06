@@ -23,6 +23,12 @@ class TreeLevelRoutingOptimizer:
 
 
 class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
+
+    IMPOSSIBLE_ACTION_PENALTY = -1e3
+    CORRECT_PREDICTION_REWARD = 1.0
+    INCORRECT_PREDICTION_REWARD = 0.0
+
+
     def __init__(self, network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio, features_used,
                  hidden_layers):
         super().__init__(network_name, run_id, iteration, degree_list, data_type, output_names)
@@ -42,8 +48,8 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.testStateFeatures, self.testSampleRoutes = self.prepare_features_for_dataset(
             routing_dataset=self.testData,
             greedy_routes=self.testDataPaths)
-        self.test_route_size_compatibility(sample_routes=self.validationSampleRoutes)
-        self.test_route_size_compatibility(sample_routes=self.testSampleRoutes)
+        # self.test_route_size_compatibility(sample_routes=self.validationSampleRoutes)
+        # self.test_route_size_compatibility(sample_routes=self.testSampleRoutes)
         # Enumerate rewards
         self.reward_function(states=self.validationStateFeatures, labels=self.validationData.labelList,
                              routes=self.validationSampleRoutes)
@@ -87,10 +93,13 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             action_space = self.get_action_space(tree_level=tree_level)
             for idx in range(states[tree_level].shape[0]):
                 label = labels[int(idx / level_multiplicity)]
-                route = routes[tree_level][idx]
+                curr_level_selected_nodes = routes[tree_level][idx]
                 state = states[tree_level][idx]
                 # Corresponds to binary mapping of each integer.
-                for action_id, node_selection in action_space.items():
+                # for action_id, node_selection in action_space.items():
+
+
+
 
 
     def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
@@ -131,7 +140,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                         level_features_list.append(feature_vector)
                     state_vector_for_curr_level = np.concatenate(level_features_list, axis=-1)
                     state_vectors_for_each_tree_level[tree_level].append(state_vector_for_curr_level)
-                    routes_per_sample[tree_level].append(route_arr)
+                    routes_per_sample[tree_level].append(route_combination)
         for arr in route_combination_count:
             assert len(set(arr)) == 1
         for tree_level in range(len(state_vectors_for_each_tree_level)):
