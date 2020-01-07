@@ -19,7 +19,7 @@ from simple_tf.global_params import GlobalConstants
 
 # run_id = 1613
 # # network_name = "Cifar100_CIGN_Sampling"
-network_name = "FashionNet_Lite"
+network_name = "None"
 # iteration = 48000
 # routing_data_dict = {}
 # max_num_of_iterations = 10000
