@@ -23,11 +23,9 @@ class TreeLevelRoutingOptimizer:
 
 
 class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
-
     IMPOSSIBLE_ACTION_PENALTY = -1e3
     CORRECT_PREDICTION_REWARD = 1.0
     INCORRECT_PREDICTION_REWARD = 0.0
-
 
     def __init__(self, network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio, features_used,
                  hidden_layers):
@@ -97,10 +95,6 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 state = states[tree_level][idx]
                 # Corresponds to binary mapping of each integer.
                 # for action_id, node_selection in action_space.items():
-
-
-
-
 
     def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
         # Prepare Policy Gradients State Data

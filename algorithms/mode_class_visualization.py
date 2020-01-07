@@ -27,7 +27,7 @@ class ModeVisualizer:
                 continue
             child_count = len(network.dagObject.children(node=node))
             max_threshold = 1.0 / float(child_count)
-            threshold_state[node.index] = max_threshold * np.ones(shape=(child_count, ))
+            threshold_state[node.index] = max_threshold * np.ones(shape=(child_count,))
         leaf_reachability_dict = \
             self.multipathCalculator.get_sample_distributions_on_leaf_nodes(thresholds_dict=threshold_state)
         label_list = self.multipathCalculator.labelList
@@ -50,9 +50,61 @@ class ModeVisualizer:
                 cut_off_idx += 1
                 cumulative_probability = new_cumul_prob
             mode_labels = label_freq_pairs[0: cut_off_idx]
-            self.plot_mode_images(dataset=dataset, node=node, mode_labels=mode_labels,
-                                  sample_count_per_class=sample_count_per_class)
+            self.plot_mode_images_v2(dataset=dataset, node=node, mode_labels=mode_labels,
+                                     sample_count_per_class=sample_count_per_class)
             print("X")
+
+    def plot_mode_images_v2(self, dataset, node, mode_labels, sample_count_per_class, column_count=2):
+        extent_size = 4
+        column_margin = 32
+        _w = dataset.testSamples.shape[2]
+        _h = dataset.testSamples.shape[1]
+        class_nums_per_column = [int(len(mode_labels) / column_count)] * column_count
+        left_over = len(mode_labels) % column_count
+        for i in range(left_over):
+            class_nums_per_column[i] += 1
+        assert sum(class_nums_per_column) == len(mode_labels)
+        column_width = (sample_count_per_class + 3) * extent_size + (sample_count_per_class + 2) * _w
+        column_height = (max(class_nums_per_column) + 1) * extent_size + max(class_nums_per_column) * _h
+        img_width = column_count * column_width + column_count * column_margin
+        img_height = column_height
+        canvas = np.ones(shape=(img_height, img_width, 3), dtype=np.uint8)
+        canvas[:] = 255
+        cummulative_probability = 0.0
+        curr_class_idx = 0
+        for col_idx, col_class_count in enumerate(class_nums_per_column):
+            for idx in range(col_class_count):
+                label = mode_labels[curr_class_idx][0]
+                probability_mass = mode_labels[curr_class_idx][1]
+                cummulative_probability += probability_mass
+                top = (idx + 1) * extent_size + idx * _h
+                col_left = col_idx * (column_width + column_margin) + extent_size
+                curr_class_idx += 1
+                cv2.putText(canvas, "#{0}".format(label), (col_left, top + _h // 2), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.4, color=(0, 0, 0), thickness=0, lineType=cv2.LINE_AA)
+                sample_indices_with_correct_label = np.nonzero(dataset.testLabels == label)[0]
+                indices = np.random.choice(sample_indices_with_correct_label, sample_count_per_class, replace=False)
+                for img_col in range(1, sample_count_per_class + 2, 1):
+                    left = col_left + (img_col + 1) * extent_size + img_col * _w
+                    # Draw sample images
+                    if img_col < sample_count_per_class + 1:
+                        img = dataset.testSamples[indices[img_col - 1]]
+                        # Convert to BGR
+                        b = np.copy(img[:, :, 2])
+                        r = np.copy(img[:, :, 0])
+                        img[:, :, 0] = b
+                        img[:, :, 2] = r
+                        canvas[top: top + _h, left: left + _w, :] = img
+                    # Draw distribution info
+                    else:
+                        cv2.putText(canvas, "+%{0:.3f}".format(probability_mass), (left, int(top + _h * 0.35)),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.3, color=(0, 0, 0), thickness=0, lineType=cv2.LINE_AA)
+                        cv2.putText(canvas, "%{0:.3f}".format(cummulative_probability), (left, int(top + _h * 0.7)),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.3, color=(0, 0, 0), thickness=0, lineType=cv2.LINE_AA)
+                        top_left = (left, int(top + _h * 0.75))
+                        bottom_right = (left + int(cummulative_probability*_w + 0.5), int(top + _h * 0.95))
+                        cv2.rectangle(canvas, top_left, bottom_right, (255, 0, 0), -1)
+        cv2.imwrite("Leaf_{0}_principal_labels.png".format(node.index), canvas)
 
     def plot_mode_images(self, dataset, node, mode_labels, sample_count_per_class):
         extent_size = 32
@@ -99,7 +151,6 @@ class ModeVisualizer:
         #     # Iterating over the grid returns the Axes.
         #     ax.imshow(im)
         #     ax.set_title("XXX")
-
 
         # im1 = np.arange(100).reshape((10, 10))
         # im2 = 200 * np.ones_like(im1)
@@ -159,3 +210,6 @@ def main():
     mode_visualizer.get_sample_distribution_visual(network=tree, dataset=dataset, sample_count_per_class=7,
                                                    mode_threshold=0.85)
     print("X")
+
+
+main()
