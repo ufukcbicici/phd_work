@@ -84,15 +84,27 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
 
     def reward_function(self, states, labels, routes):
         for tree_level in range(self.network.depth - 1):
+            level_nodes = [node for node in self.network.topologicalSortedNodes if node.depth == tree_level]
+            level_nodes = sorted(level_nodes, key=lambda node: node.index)
             if tree_level != self.network.depth - 2:
                 continue
             level_multiplicity = routes[tree_level].shape[0] / routes[0].shape[0]
+            next_level_reachability_dict = {}
+            route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(level_nodes))
+            route_combinations = [route for route in route_combinations if sum(route) > 0]
+            for route in route_combinations:
+                reachable_next_level_node_ids = set()
+                parent_nodes = [node for i, node in enumerate(level_nodes) if route[i] != 0]
+                for parent_node in parent_nodes:
+                    child_nodes = {c_node.index for c_node in self.network.dagObject.children(node=parent_node)}
+                    reachable_next_level_node_ids = reachable_next_level_node_ids.union(child_nodes)
             rewards = []
             action_space = self.get_action_space(tree_level=tree_level)
             for idx in range(states[tree_level].shape[0]):
                 label = labels[int(idx / level_multiplicity)]
                 curr_level_selected_nodes = routes[tree_level][idx]
                 state = states[tree_level][idx]
+
                 # Corresponds to binary mapping of each integer.
                 # for action_id, node_selection in action_space.items():
 
