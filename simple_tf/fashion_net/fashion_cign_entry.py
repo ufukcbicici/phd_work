@@ -15,10 +15,10 @@ from auxillary.constants import DatasetTypes
 
 use_moe = False
 use_sampling = False
-use_random_sampling = True
+use_random_sampling = False
 use_baseline = False
 use_early_exit = False
-use_late_exit = False
+use_late_exit = True
 
 
 def get_network(dataset, network_name):
@@ -44,7 +44,7 @@ def get_network(dataset, network_name):
 
 
 def fashion_net_training():
-    network_name = "FashionNetLite_EarlyExitCIGN"
+    network_name = "FashionNetLite_SingleLateExitCIGN"
     dataset = FashionMnistDataSet(validation_sample_count=0, load_validation_from=None)
     dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
     classification_wd = [0.0]
