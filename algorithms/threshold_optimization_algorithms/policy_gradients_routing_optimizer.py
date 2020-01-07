@@ -225,4 +225,5 @@ def main():
                                                                          hidden_layers=[[128], [256]])
 
 
-main()
+if __name__ == "__main__":
+    main()

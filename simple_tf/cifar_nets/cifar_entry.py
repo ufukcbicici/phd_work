@@ -106,6 +106,7 @@ def cifar_100_training():
         series_id = 0  # int(run_id / GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
         explanation += "\n Series:{0}".format(series_id)
         DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
+        print("RunID:{0}\n".format(experiment_id))
         sess.run(init)
         dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
         network.train(sess=sess, dataset=dataset, run_id=experiment_id)
