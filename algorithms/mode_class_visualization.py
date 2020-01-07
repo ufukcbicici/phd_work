@@ -207,7 +207,7 @@ def main():
     dataset = CifarDataSet(session=None, validation_sample_count=0, load_validation_from=None)
     mode_visualizer = ModeVisualizer(network=tree, dataset=dataset, run_id=67, iteration=119100, data_type="",
                                      output_names=output_names)
-    mode_visualizer.get_sample_distribution_visual(network=tree, dataset=dataset, sample_count_per_class=7,
+    mode_visualizer.get_sample_distribution_visual(network=tree, dataset=dataset, sample_count_per_class=5,
                                                    mode_threshold=0.85)
     print("X")
 
