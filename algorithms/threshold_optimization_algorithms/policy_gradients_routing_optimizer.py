@@ -26,6 +26,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
     IMPOSSIBLE_ACTION_PENALTY = -1e3
     CORRECT_PREDICTION_REWARD = 1.0
     INCORRECT_PREDICTION_REWARD = 0.0
+    MAC_PENALTY_COEFFICIENT = 0.0
 
     def __init__(self, network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio, features_used,
                  hidden_layers):
@@ -128,11 +129,11 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 # Corresponds to binary mapping of each integer.
                 for action_id, node_selection in action_space.items():
                     # Punish impossible actions
+                    reward = 0.0
                     if node_selection not in valid_actions:
-                        sample_rewards[action_id] = PolicyGradientsRoutingOptimizer.IMPOSSIBLE_ACTION_PENALTY
+                        reward = PolicyGradientsRoutingOptimizer.IMPOSSIBLE_ACTION_PENALTY
                     # For a possible action: Correct,Incorrect Prediction Reward - MAC Cost
                     else:
-                        reward = 0.0
                         # Check if class is correctly predicted
                         uniform_weight = 1.0 / sum(node_selection)
                         posteriors_sparse = posteriors_matrix * (uniform_weight *
@@ -143,11 +144,10 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                             if predicted_label == true_label else \
                             PolicyGradientsRoutingOptimizer.INCORRECT_PREDICTION_REWARD
                         reward += prediction_reward
-
-
-
-
-
+                        # Get the calculation cost
+                        mac_cost = self.networkActivationCosts[node_selection]
+                        reward -= PolicyGradientsRoutingOptimizer.MAC_PENALTY_COEFFICIENT * mac_cost
+                    sample_rewards[action_id] = reward
 
     def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
         # Prepare Policy Gradients State Data
