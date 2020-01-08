@@ -41,10 +41,10 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             branch_probs=self.validationData.get_dict("branch_probs"))
         self.testDataPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
         # Enumerate possible validation and test states
-        self.validationStateFeatures, self.validationSampleRoutes = self.prepare_features_for_dataset(
+        self.validationStateFeatures, self.validationNodeSelections = self.prepare_features_for_dataset(
             routing_dataset=self.validationData,
             greedy_routes=self.validationDataPaths)
-        self.testStateFeatures, self.testSampleRoutes = self.prepare_features_for_dataset(
+        self.testStateFeatures, self.testNodeSelections = self.prepare_features_for_dataset(
             routing_dataset=self.testData,
             greedy_routes=self.testDataPaths)
         # self.test_route_size_compatibility(sample_routes=self.validationSampleRoutes)
@@ -52,11 +52,13 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         # Enumerate rewards
         self.validationRewards = self.reward_function(states=self.validationStateFeatures,
                                                       labels=self.validationData.labelList,
-                                                      routes=self.validationSampleRoutes,
+                                                      node_selections_per_level=self.validationNodeSelections,
+                                                      max_likelihood_routes=self.validationDataPaths,
                                                       posteriors=self.validationData.get_dict("posterior_probs"))
         self.testRewards = self.reward_function(states=self.testStateFeatures,
                                                 labels=self.testData.labelList,
-                                                routes=self.testSampleRoutes,
+                                                node_selections_per_level=self.testNodeSelections,
+                                                max_likelihood_routes=self.testDataPaths,
                                                 posteriors=self.testData.get_dict("posterior_probs"))
         # Build Policy Gradient Networks
         self.policyGradientOptimizers = []
@@ -96,7 +98,6 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         curr_level_route_combinations = [route for route in curr_level_route_combinations if sum(route) > 0]
         next_level_route_combinations = UtilityFuncs.get_cartesian_product(
             list_of_lists=[[0, 1]] * len(next_level_nodes))
-        next_level_route_combinations = [route for route in next_level_route_combinations if sum(route) > 0]
         for route in curr_level_route_combinations:
             reachable_next_level_node_ids = set()
             parent_nodes = [node for i, node in enumerate(curr_level_nodes) if route[i] != 0]
@@ -111,13 +112,13 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                     next_level_valid_actions_dict[route].add(next_level_route)
         return next_level_valid_actions_dict
 
-    def reward_function(self, states, labels, routes, posteriors):
+    def reward_function(self, states, labels, node_selections_per_level, max_likelihood_routes, posteriors):
         rewards_dict = {}
         posteriors_tensor = np.stack([posteriors[node.index] for node in self.leafNodes], axis=2)
         for tree_level in range(self.network.depth - 1):
             if tree_level != self.network.depth - 2:
                 continue
-            level_multiplicity = routes[tree_level].shape[0] / routes[0].shape[0]
+            level_multiplicity = node_selections_per_level[tree_level].shape[0] / node_selections_per_level[0].shape[0]
             rewards = []
             next_level_valid_actions_dict = self.get_reachability_dict(tree_level=tree_level)
             action_space = self.get_action_space(tree_level=tree_level)
@@ -125,7 +126,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 sample_rewards = {}
                 true_label = labels[int(idx / level_multiplicity)]
                 posteriors_matrix = posteriors_tensor[int(idx / level_multiplicity)]
-                curr_level_selected_nodes = routes[tree_level][idx]
+                curr_level_selected_nodes = node_selections_per_level[tree_level][idx]
                 state = states[tree_level][idx]
                 valid_actions = next_level_valid_actions_dict[tuple(curr_level_selected_nodes.tolist())]
                 # Corresponds to binary mapping of each integer.
