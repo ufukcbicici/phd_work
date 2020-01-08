@@ -126,6 +126,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 sample_rewards = {}
                 true_label = labels[int(idx / level_multiplicity)]
                 posteriors_matrix = posteriors_tensor[int(idx / level_multiplicity)]
+                max_likelihood_route = max_likelihood_routes[int(idx / level_multiplicity)]
                 curr_level_selected_nodes = node_selections_per_level[tree_level][idx]
                 state = states[tree_level][idx]
                 valid_actions = next_level_valid_actions_dict[tuple(curr_level_selected_nodes.tolist())]
@@ -138,9 +139,13 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                     # For a possible action: Correct,Incorrect Prediction Reward - MAC Cost
                     else:
                         # Check if class is correctly predicted
-                        uniform_weight = 1.0 / sum(node_selection)
-                        posteriors_sparse = posteriors_matrix * (uniform_weight *
-                                                                 np.expand_dims(np.array(node_selection), axis=0))
+                        node_selection_with_max_likelihood = list(node_selection)
+                        node_selection_with_max_likelihood[max_likelihood_route[tree_level + 1]] = 1
+                        node_selection_with_max_likelihood = tuple(node_selection_with_max_likelihood)
+                        uniform_weight = 1.0 / sum(node_selection_with_max_likelihood)
+                        posteriors_sparse = posteriors_matrix * \
+                                            (uniform_weight * np.expand_dims(
+                                                np.array(node_selection_with_max_likelihood), axis=0))
                         posteriors_weighted = np.sum(posteriors_sparse, axis=1)
                         predicted_label = np.argmax(posteriors_weighted)
                         prediction_reward = PolicyGradientsRoutingOptimizer.CORRECT_PREDICTION_REWARD \
@@ -148,7 +153,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                             PolicyGradientsRoutingOptimizer.INCORRECT_PREDICTION_REWARD
                         reward += prediction_reward
                         # Get the calculation cost
-                        mac_cost = self.networkActivationCosts[node_selection]
+                        mac_cost = self.networkActivationCosts[node_selection_with_max_likelihood]
                         reward -= PolicyGradientsRoutingOptimizer.MAC_PENALTY_COEFFICIENT * mac_cost
                     sample_rewards[action_id] = reward
                 rewards.append(sample_rewards)
