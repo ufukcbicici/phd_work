@@ -29,6 +29,7 @@ class FastTreeNetwork(TreeNetwork):
         self.optimizer = None
         self.infoGainDicts = None
         self.extra_update_ops = None
+        self.orderedNodesPerLevel = {}
         self.nodeCosts = {}
         self.opCosts = {}
         self.networkName = network_name
@@ -128,6 +129,13 @@ class FastTreeNetwork(TreeNetwork):
                     self.nodes[curr_index] = child_node
                     self.dagObject.add_edge(parent=curr_node, child=child_node)
                     d.append(child_node)
+        nodes_per_level_dict = {}
+        for node in self.nodes.values():
+            if node.depth not in nodes_per_level_dict:
+                nodes_per_level_dict[node.depth] = []
+            nodes_per_level_dict[node.depth].append(node)
+        for level in nodes_per_level_dict.keys():
+            self.orderedNodesPerLevel[level] = sorted(nodes_per_level_dict[level], key=lambda n: n.index)
 
     @staticmethod
     def get_mock_tree(degree_list, network_name):

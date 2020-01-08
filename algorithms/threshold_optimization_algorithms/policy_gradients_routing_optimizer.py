@@ -82,23 +82,35 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             action_space[action_id] = binary_node_selection
         return action_space
 
+    def get_reachability_dict(self, tree_level):
+        next_level_valid_actions_dict = {}
+        curr_level_nodes = self.network.orderedNodesPerLevel[tree_level]
+        next_level_nodes = self.network.orderedNodesPerLevel[tree_level + 1]
+        curr_level_route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(curr_level_nodes))
+        curr_level_route_combinations = [route for route in curr_level_route_combinations if sum(route) > 0]
+        next_level_route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(next_level_nodes))
+        next_level_route_combinations = [route for route in next_level_route_combinations if sum(route) > 0]
+        for route in curr_level_route_combinations:
+            reachable_next_level_node_ids = set()
+            parent_nodes = [node for i, node in enumerate(curr_level_nodes) if route[i] != 0]
+            next_level_valid_actions_dict[route] = []
+            for parent_node in parent_nodes:
+                child_nodes = {c_node.index for c_node in self.network.dagObject.children(node=parent_node)}
+                reachable_next_level_node_ids = reachable_next_level_node_ids.union(child_nodes)
+            for next_level_route in next_level_route_combinations:
+                reached_nodes = {node.index for is_reached, node in zip(next_level_route, next_level_nodes)
+                                 if is_reached != 0}
+                if len(reached_nodes.difference(reachable_next_level_node_ids)) == 0:
+                    next_level_valid_actions_dict[route].append(next_level_route)
+        return next_level_valid_actions_dict
+
     def reward_function(self, states, labels, routes):
         for tree_level in range(self.network.depth - 1):
-            level_nodes = [node for node in self.network.topologicalSortedNodes if node.depth == tree_level]
-            level_nodes = sorted(level_nodes, key=lambda node: node.index)
             if tree_level != self.network.depth - 2:
                 continue
             level_multiplicity = routes[tree_level].shape[0] / routes[0].shape[0]
-            next_level_reachability_dict = {}
-            route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(level_nodes))
-            route_combinations = [route for route in route_combinations if sum(route) > 0]
-            for route in route_combinations:
-                reachable_next_level_node_ids = set()
-                parent_nodes = [node for i, node in enumerate(level_nodes) if route[i] != 0]
-                for parent_node in parent_nodes:
-                    child_nodes = {c_node.index for c_node in self.network.dagObject.children(node=parent_node)}
-                    reachable_next_level_node_ids = reachable_next_level_node_ids.union(child_nodes)
             rewards = []
+            next_level_valid_actions_dict = self.get_reachability_dict(tree_level=tree_level)
             action_space = self.get_action_space(tree_level=tree_level)
             for idx in range(states[tree_level].shape[0]):
                 label = labels[int(idx / level_multiplicity)]
@@ -123,8 +135,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             route_arr = greedy_routes[idx]
             for tree_level in range(self.network.depth - 1):
                 # Gather all feature dicts
-                level_nodes = [node for node in self.network.topologicalSortedNodes if node.depth == tree_level]
-                level_nodes = sorted(level_nodes, key=lambda node: node.index)
+                level_nodes = self.network.orderedNodesPerLevel[tree_level]
                 route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(level_nodes))
                 route_combinations = [route for route in route_combinations if sum(route) > 0]
                 min_level_id = min([node.index for node in level_nodes])
