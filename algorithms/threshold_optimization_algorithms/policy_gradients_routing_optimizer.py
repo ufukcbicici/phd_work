@@ -49,10 +49,14 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         # self.test_route_size_compatibility(sample_routes=self.validationSampleRoutes)
         # self.test_route_size_compatibility(sample_routes=self.testSampleRoutes)
         # Enumerate rewards
-        self.reward_function(states=self.validationStateFeatures, labels=self.validationData.labelList,
-                             routes=self.validationSampleRoutes)
-        self.reward_function(states=self.testStateFeatures, labels=self.testData.labelList,
-                             routes=self.testSampleRoutes)
+        self.reward_function(states=self.validationStateFeatures,
+                             labels=self.validationData.labelList,
+                             routes=self.validationSampleRoutes,
+                             posteriors=self.validationData.get_dict("posterior_probs"))
+        self.reward_function(states=self.testStateFeatures,
+                             labels=self.testData.labelList,
+                             routes=self.testSampleRoutes,
+                             posteriors=self.testData.get_dict("posterior_probs"))
         # Build Policy Gradient Networks
         self.policyGradientOptimizers = []
         for tree_level in range(self.network.depth, 1, -1):
@@ -93,7 +97,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         for route in curr_level_route_combinations:
             reachable_next_level_node_ids = set()
             parent_nodes = [node for i, node in enumerate(curr_level_nodes) if route[i] != 0]
-            next_level_valid_actions_dict[route] = []
+            next_level_valid_actions_dict[route] = set()
             for parent_node in parent_nodes:
                 child_nodes = {c_node.index for c_node in self.network.dagObject.children(node=parent_node)}
                 reachable_next_level_node_ids = reachable_next_level_node_ids.union(child_nodes)
@@ -101,10 +105,12 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 reached_nodes = {node.index for is_reached, node in zip(next_level_route, next_level_nodes)
                                  if is_reached != 0}
                 if len(reached_nodes.difference(reachable_next_level_node_ids)) == 0:
-                    next_level_valid_actions_dict[route].append(next_level_route)
+                    next_level_valid_actions_dict[route].add(next_level_route)
         return next_level_valid_actions_dict
 
-    def reward_function(self, states, labels, routes):
+    def reward_function(self, states, labels, routes, posteriors):
+        rewards_dict = {}
+        posteriors_tensor = np.stack([posteriors[node.index] for node in self.leafNodes], axis=2)
         for tree_level in range(self.network.depth - 1):
             if tree_level != self.network.depth - 2:
                 continue
@@ -113,12 +119,35 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             next_level_valid_actions_dict = self.get_reachability_dict(tree_level=tree_level)
             action_space = self.get_action_space(tree_level=tree_level)
             for idx in range(states[tree_level].shape[0]):
-                label = labels[int(idx / level_multiplicity)]
+                sample_rewards = {}
+                true_label = labels[int(idx / level_multiplicity)]
+                posteriors_matrix = posteriors_tensor[int(idx / level_multiplicity)]
                 curr_level_selected_nodes = routes[tree_level][idx]
                 state = states[tree_level][idx]
-
+                valid_actions = next_level_valid_actions_dict[tuple(curr_level_selected_nodes.tolist())]
                 # Corresponds to binary mapping of each integer.
-                # for action_id, node_selection in action_space.items():
+                for action_id, node_selection in action_space.items():
+                    # Punish impossible actions
+                    if node_selection not in valid_actions:
+                        sample_rewards[action_id] = PolicyGradientsRoutingOptimizer.IMPOSSIBLE_ACTION_PENALTY
+                    # For a possible action: Correct,Incorrect Prediction Reward - MAC Cost
+                    else:
+                        reward = 0.0
+                        # Check if class is correctly predicted
+                        uniform_weight = 1.0 / sum(node_selection)
+                        posteriors_sparse = posteriors_matrix * (uniform_weight *
+                                                                 np.expand_dims(np.array(node_selection), axis=0))
+                        posteriors_weighted = np.sum(posteriors_sparse, axis=1)
+                        predicted_label = np.argmax(posteriors_weighted)
+                        prediction_reward = PolicyGradientsRoutingOptimizer.CORRECT_PREDICTION_REWARD \
+                            if predicted_label == true_label else \
+                            PolicyGradientsRoutingOptimizer.INCORRECT_PREDICTION_REWARD
+                        reward += prediction_reward
+
+
+
+
+
 
     def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
         # Prepare Policy Gradients State Data
