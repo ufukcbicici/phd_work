@@ -148,6 +148,8 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                         mac_cost = self.networkActivationCosts[node_selection]
                         reward -= PolicyGradientsRoutingOptimizer.MAC_PENALTY_COEFFICIENT * mac_cost
                     sample_rewards[action_id] = reward
+                rewards.append(sample_rewards)
+            rewards_dict[tree_level] = rewards
 
     def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
         # Prepare Policy Gradients State Data
