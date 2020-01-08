@@ -50,14 +50,14 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         # self.test_route_size_compatibility(sample_routes=self.validationSampleRoutes)
         # self.test_route_size_compatibility(sample_routes=self.testSampleRoutes)
         # Enumerate rewards
-        self.reward_function(states=self.validationStateFeatures,
-                             labels=self.validationData.labelList,
-                             routes=self.validationSampleRoutes,
-                             posteriors=self.validationData.get_dict("posterior_probs"))
-        self.reward_function(states=self.testStateFeatures,
-                             labels=self.testData.labelList,
-                             routes=self.testSampleRoutes,
-                             posteriors=self.testData.get_dict("posterior_probs"))
+        self.validationRewards = self.reward_function(states=self.validationStateFeatures,
+                                                      labels=self.validationData.labelList,
+                                                      routes=self.validationSampleRoutes,
+                                                      posteriors=self.validationData.get_dict("posterior_probs"))
+        self.testRewards = self.reward_function(states=self.testStateFeatures,
+                                                labels=self.testData.labelList,
+                                                routes=self.testSampleRoutes,
+                                                posteriors=self.testData.get_dict("posterior_probs"))
         # Build Policy Gradient Networks
         self.policyGradientOptimizers = []
         for tree_level in range(self.network.depth, 1, -1):
@@ -91,9 +91,11 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         next_level_valid_actions_dict = {}
         curr_level_nodes = self.network.orderedNodesPerLevel[tree_level]
         next_level_nodes = self.network.orderedNodesPerLevel[tree_level + 1]
-        curr_level_route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(curr_level_nodes))
+        curr_level_route_combinations = UtilityFuncs.get_cartesian_product(
+            list_of_lists=[[0, 1]] * len(curr_level_nodes))
         curr_level_route_combinations = [route for route in curr_level_route_combinations if sum(route) > 0]
-        next_level_route_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[[0, 1]] * len(next_level_nodes))
+        next_level_route_combinations = UtilityFuncs.get_cartesian_product(
+            list_of_lists=[[0, 1]] * len(next_level_nodes))
         next_level_route_combinations = [route for route in next_level_route_combinations if sum(route) > 0]
         for route in curr_level_route_combinations:
             reachable_next_level_node_ids = set()
@@ -150,6 +152,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                     sample_rewards[action_id] = reward
                 rewards.append(sample_rewards)
             rewards_dict[tree_level] = rewards
+        return rewards_dict
 
     def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
         # Prepare Policy Gradients State Data
