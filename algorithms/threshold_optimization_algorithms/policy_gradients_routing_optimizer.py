@@ -12,7 +12,7 @@ class TreeLevelRoutingOptimizer:
         # self.hiddenLayers.extend(hidden_layers)
         self.hiddenLayers = hidden_layers
         self.inputs = tf.placeholder(dtype=tf.float32,
-                                     shape=[None, self.branchingStateVectors.shape[-1]],  name="inputs")
+                                     shape=[None, self.branchingStateVectors.shape[-1]], name="inputs")
         self.actionCount = int(action_space_size)
         self.hiddenLayers.append(self.actionCount)
         # Policy MLP
@@ -21,6 +21,10 @@ class TreeLevelRoutingOptimizer:
             self.net = tf.layers.dense(inputs=self.net, units=layer_dim, activation=tf.nn.relu)
         self.pi = tf.nn.softmax(self.net)
         # Policy Evaluation on the given data
+        self.rewards = tf.placeholder(dtype=tf.float32, shape=[None, action_space_size], name="rewards")
+        self.weightedRewardMatrix = self.pi * self.rewards
+        self.valueFunctions = tf.reduce_sum(self.weightedRewardMatrix, axis=1)
+        self.policyValue = tf.reduce_mean(self.valueFunctions)
 
 
 class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
@@ -249,6 +253,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         state_sample_size = kwargs["state_sample_size"]
         policy_sample_size = kwargs["policy_sample_size"]
         states = kwargs["states"]
+        rewards = kwargs["rewards"]
         # First, sample from states
         total_data_count = states.shape[0]
         sample_indices = np.random.choice(total_data_count, state_sample_size, replace=False)
@@ -259,10 +264,21 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
     def evaluate_policy(self, sess, policy_gradient_network, **kwargs):
         tree_level = kwargs["tree_level"]
         states = kwargs["states"]
+        rewards = kwargs["rewards"]
+        if tree_level != self.network.depth - 2:
+            raise NotImplementedError()
 
+        results = sess.run([policy_gradient_network.pi,
+                            policy_gradient_network.weightedRewardMatrix,
+                            policy_gradient_network.valueFunctions,
+                            policy_gradient_network.policyValue],
+                           feed_dict={policy_gradient_network.inputs: states,
+                                      policy_gradient_network.rewards: rewards})
+        policy_value = results[-1]
+        print("Policy Value:{0}".format(policy_value))
 
     def train(self):
-        for tree_level in range(self.network.depth-2,-1,-1):
+        for tree_level in range(self.network.depth - 2, -1, -1):
             if tree_level != self.network.depth - 2:
                 continue
             policy_gradient_network = self.policyGradientOptimizers[tree_level]
@@ -277,8 +293,6 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                                        state_sample_size=self.validationStateFeatures[tree_level].shape[0],
                                        policy_sample_size=100,
                                        states=self.validationStateFeatures[tree_level])
-
-
 
     # def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
     #     # Prepare Policy Gradients State Data
