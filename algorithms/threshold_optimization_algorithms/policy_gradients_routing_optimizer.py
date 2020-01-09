@@ -11,8 +11,8 @@ class TreeLevelRoutingOptimizer:
         # self.hiddenLayers = [self.branchingStateVectors.shape[-1]]
         # self.hiddenLayers.extend(hidden_layers)
         self.hiddenLayers = hidden_layers
-        self.inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.branchingStateVectors.shape[-1]],
-                                     name="inputs")
+        self.inputs = tf.placeholder(dtype=tf.float32,
+                                     shape=[None, self.branchingStateVectors.shape[-1]],  name="inputs")
         self.actionCount = int(action_space_size)
         self.hiddenLayers.append(self.actionCount)
         # Policy MLP
@@ -72,7 +72,6 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                 branching_state_vectors=self.validationStateFeatures[tree_level],
                 hidden_layers=hidden_layers[tree_level], action_space_size=action_space_size)
             self.policyGradientOptimizers.append(policy_gradient_optimizer)
-            print(tree_level)
 
     def test_route_size_compatibility(self, sample_routes):
         for idx in range(len(sample_routes)):
