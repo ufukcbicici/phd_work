@@ -255,6 +255,10 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         # Then sample some actions from the current policy.
         policy = sess.run([policy_gradient_network.pi], feed_dict={policy_gradient_network.inputs: sampled_states})
 
+    def evaluate_policy(self, sess, policy_gradient_network, **kwargs):
+        tree_level = kwargs["tree_level"]
+        states = kwargs["states"]
+
 
     def train(self):
         for tree_level in range(self.network.depth-2,-1,-1):
