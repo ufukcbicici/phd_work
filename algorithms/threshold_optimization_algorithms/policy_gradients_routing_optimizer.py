@@ -64,8 +64,10 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                                                 posteriors=self.testData.get_dict("posterior_probs"))
         # Build Policy Gradient Networks
         self.policyGradientOptimizers = []
-        for tree_level in range(self.network.depth, 1, -1):
-            action_space_size = self.get_action_space_size(tree_level=tree_level)
+        for tree_level in range(self.network.depth - 1):
+            if tree_level != self.network.depth - 2:
+                continue
+            action_space_size = len(self.actionSpaces[tree_level])
             policy_gradient_optimizer = TreeLevelRoutingOptimizer(
                 branching_state_vectors=self.validationStateFeatures[tree_level],
                 hidden_layers=hidden_layers[tree_level], action_space_size=action_space_size)
