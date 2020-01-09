@@ -178,80 +178,80 @@ class CignSingleLateExit(FastTreeNetwork):
         cm = confusion_matrix(y_true=labels, y_pred=predicted_labels)
         return accuracy, cm
 
-    def save_routing_info(self, sess, run_id, iteration, dataset, dataset_type):
-        prev_leaf_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
-        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(["dense_output", "sparse_output"])
-        routing_data = super().save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
-                                                 dataset=dataset, dataset_type=dataset_type)
-        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = prev_leaf_outputs
-        # Get the late exit posteriors
-        late_posteriors_dict = {}
-        for route_vec in self.routingCombinations:
-            route_tpl = tuple(route_vec.tolist())
-            late_posteriors_dict[route_tpl] = []
-        curr_index = 0
-        assert all([routing_data.dictionaryOfRoutingData["dense_output"][self.leafNodes[0].index].shape == routing_data.
-                   dictionaryOfRoutingData["dense_output"][leaf_node.index].shape for leaf_node in self.leafNodes])
-        sample_count = routing_data.dictionaryOfRoutingData["dense_output"][self.leafNodes[0].index].shape[0]
-        while curr_index < sample_count:
-            for route_vec in self.routingCombinations:
-                route_tpl = tuple(route_vec.tolist())
-                leaf_exits = []
-                for idx, leaf_node in enumerate(self.leafNodes):
-                    dense_output = routing_data.dictionaryOfRoutingData["dense_output"][leaf_node.index][
-                                   curr_index: curr_index + GlobalConstants.EVAL_BATCH_SIZE]
-                    sparse_output = routing_data.dictionaryOfRoutingData["sparse_output"][leaf_node.index][
-                                    curr_index: curr_index + GlobalConstants.EVAL_BATCH_SIZE]
-                    assert np.array_equal(dense_output, sparse_output)
-                    leaf_exits.append(route_tpl[idx] * dense_output)
-                late_exit_input = np.concatenate(leaf_exits, axis=-1)
-                feed_dict = {self.classificationDropoutKeepProb: 1.0,
-                             self.lateExitTestInput: late_exit_input,
-                             self.isTrain: False}
-                results = sess.run([self.lateExitTestPosteriors], feed_dict=feed_dict)
-                late_posteriors_dict[route_tpl].append(results[0])
-            curr_index += GlobalConstants.EVAL_BATCH_SIZE
-        for k in late_posteriors_dict.keys():
-            late_posteriors_dict[k] = np.concatenate(late_posteriors_dict[k], axis=0)
-        data_type = "test" if dataset_type == DatasetTypes.test else "training"
-        directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
-                                                               run_id=run_id, iteration=iteration,
-                                                               data_type=data_type)
-        routing_data.dictionaryOfRoutingData["lateExitTestPosteriors"] = late_posteriors_dict
-        npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
-        string_arr_dict = {",".join((str(i) for i in k)): v for k, v in late_posteriors_dict.items()}
-        UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=string_arr_dict)
-        pickle.dump(self.lateExitNode.opMacCostsDict,
-                    open(
-                        os.path.abspath(
-                            os.path.join(directory_path, "node_{0}_opMacCosts.sav".format(self.lateExitNode.index))),
-                        "wb"))
-        routing_data.dictionaryOfRoutingData["node_{0}_opMacCosts".format(self.lateExitNode.index)] = \
-            self.lateExitNode.opMacCostsDict
-        routing_data = RoutingDataset(label_list=routing_data.labelList,
-                                      dict_of_data_dicts=routing_data.dictionaryOfRoutingData)
-        return routing_data
-
-    def load_routing_info(self, run_id, iteration, data_type, output_names=None):
-        prev_leaf_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
-        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(["dense_output", "sparse_output"])
-        routing_data = super().load_routing_info(run_id=run_id,
-                                                 iteration=iteration, data_type=data_type,
-                                                 output_names=output_names)
-        GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = prev_leaf_outputs
-        directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
-                                                               network_name=self.networkName,
-                                                               data_type=data_type)
-        npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
-        dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)
-        data_dict = {tuple([int(l) for l in k.split(",")]): v for k, v in dict_read.items()}
-        routing_data.dictionaryOfRoutingData["lateExitTestPosteriors"] = data_dict
-        self.lateExitNode.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
-                                                                            "node_{0}_opMacCosts.sav"
-                                                                            .format(self.lateExitNode.index))), 'rb'))
-        routing_data.dictionaryOfRoutingData["node_{0}_opMacCosts".format(self.lateExitNode.index)] = \
-            self.lateExitNode.opMacCostsDict
-        return routing_data
+    # def save_routing_info(self, sess, run_id, iteration, dataset, dataset_type):
+    #     prev_leaf_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
+    #     GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(["dense_output", "sparse_output"])
+    #     routing_data = super().save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+    #                                              dataset=dataset, dataset_type=dataset_type)
+    #     GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = prev_leaf_outputs
+    #     # Get the late exit posteriors
+    #     late_posteriors_dict = {}
+    #     for route_vec in self.routingCombinations:
+    #         route_tpl = tuple(route_vec.tolist())
+    #         late_posteriors_dict[route_tpl] = []
+    #     curr_index = 0
+    #     assert all([routing_data.dictionaryOfRoutingData["dense_output"][self.leafNodes[0].index].shape == routing_data.
+    #                dictionaryOfRoutingData["dense_output"][leaf_node.index].shape for leaf_node in self.leafNodes])
+    #     sample_count = routing_data.dictionaryOfRoutingData["dense_output"][self.leafNodes[0].index].shape[0]
+    #     while curr_index < sample_count:
+    #         for route_vec in self.routingCombinations:
+    #             route_tpl = tuple(route_vec.tolist())
+    #             leaf_exits = []
+    #             for idx, leaf_node in enumerate(self.leafNodes):
+    #                 dense_output = routing_data.dictionaryOfRoutingData["dense_output"][leaf_node.index][
+    #                                curr_index: curr_index + GlobalConstants.EVAL_BATCH_SIZE]
+    #                 sparse_output = routing_data.dictionaryOfRoutingData["sparse_output"][leaf_node.index][
+    #                                 curr_index: curr_index + GlobalConstants.EVAL_BATCH_SIZE]
+    #                 assert np.array_equal(dense_output, sparse_output)
+    #                 leaf_exits.append(route_tpl[idx] * dense_output)
+    #             late_exit_input = np.concatenate(leaf_exits, axis=-1)
+    #             feed_dict = {self.classificationDropoutKeepProb: 1.0,
+    #                          self.lateExitTestInput: late_exit_input,
+    #                          self.isTrain: False}
+    #             results = sess.run([self.lateExitTestPosteriors], feed_dict=feed_dict)
+    #             late_posteriors_dict[route_tpl].append(results[0])
+    #         curr_index += GlobalConstants.EVAL_BATCH_SIZE
+    #     for k in late_posteriors_dict.keys():
+    #         late_posteriors_dict[k] = np.concatenate(late_posteriors_dict[k], axis=0)
+    #     data_type = "test" if dataset_type == DatasetTypes.test else "training"
+    #     directory_path = FastTreeNetwork.get_routing_info_path(network_name=self.networkName,
+    #                                                            run_id=run_id, iteration=iteration,
+    #                                                            data_type=data_type)
+    #     routing_data.dictionaryOfRoutingData["lateExitTestPosteriors"] = late_posteriors_dict
+    #     npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
+    #     string_arr_dict = {",".join((str(i) for i in k)): v for k, v in late_posteriors_dict.items()}
+    #     UtilityFuncs.save_npz(file_name=npz_file_name, arr_dict=string_arr_dict)
+    #     pickle.dump(self.lateExitNode.opMacCostsDict,
+    #                 open(
+    #                     os.path.abspath(
+    #                         os.path.join(directory_path, "node_{0}_opMacCosts.sav".format(self.lateExitNode.index))),
+    #                     "wb"))
+    #     routing_data.dictionaryOfRoutingData["node_{0}_opMacCosts".format(self.lateExitNode.index)] = \
+    #         self.lateExitNode.opMacCostsDict
+    #     routing_data = RoutingDataset(label_list=routing_data.labelList,
+    #                                   dict_of_data_dicts=routing_data.dictionaryOfRoutingData)
+    #     return routing_data
+    #
+    # def load_routing_info(self, run_id, iteration, data_type, output_names=None):
+    #     prev_leaf_outputs = list(GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT)
+    #     GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT.extend(["dense_output", "sparse_output"])
+    #     routing_data = super().load_routing_info(run_id=run_id,
+    #                                              iteration=iteration, data_type=data_type,
+    #                                              output_names=output_names)
+    #     GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = prev_leaf_outputs
+    #     directory_path = FastTreeNetwork.get_routing_info_path(run_id=run_id, iteration=iteration,
+    #                                                            network_name=self.networkName,
+    #                                                            data_type=data_type)
+    #     npz_file_name = os.path.abspath(os.path.join(directory_path, "lateExitTestPosteriors"))
+    #     dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)
+    #     data_dict = {tuple([int(l) for l in k.split(",")]): v for k, v in dict_read.items()}
+    #     routing_data.dictionaryOfRoutingData["lateExitTestPosteriors"] = data_dict
+    #     self.lateExitNode.opMacCostsDict = pickle.load(open(os.path.abspath(os.path.join(directory_path,
+    #                                                                         "node_{0}_opMacCosts.sav"
+    #                                                                         .format(self.lateExitNode.index))), 'rb'))
+    #     routing_data.dictionaryOfRoutingData["node_{0}_opMacCosts".format(self.lateExitNode.index)] = \
+    #         self.lateExitNode.opMacCostsDict
+    #     return routing_data
 
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
         # moving_results_1 = sess.run(moving_stat_vars)
