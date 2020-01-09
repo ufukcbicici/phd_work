@@ -27,6 +27,8 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
     CORRECT_PREDICTION_REWARD = 1.0
     INCORRECT_PREDICTION_REWARD = 0.0
     MAC_PENALTY_COEFFICIENT = 0.0
+    BATCH_SIZE = 10000
+    TOTAL_ITERATIONS = 100000
 
     def __init__(self, network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio, features_used,
                  hidden_layers):
@@ -240,6 +242,38 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         #             next_level_node_ids.add(child_node.index)
         #     curr_level_nodes = [self.network.nodes[node_id] for node_id in sorted(list(next_level_node_ids))]
         # return state_vectors_for_each_tree_level
+
+    def sample_trajectory(self, sess, policy_gradient_network, **kwargs):
+        tree_level = kwargs["tree_level"]
+        state_sample_size = kwargs["state_sample_size"]
+        policy_sample_size = kwargs["policy_sample_size"]
+        states = kwargs["states"]
+        # First, sample from states
+        total_data_count = states.shape[0]
+        sample_indices = np.random.choice(total_data_count, state_sample_size, replace=False)
+        sampled_states = states[sample_indices]
+        # Then sample some actions from the current policy.
+        policy = sess.run([policy_gradient_network.pi], feed_dict={policy_gradient_network.inputs: sampled_states})
+
+
+    def train(self):
+        for tree_level in range(self.network.depth-2,-1,-1):
+            if tree_level != self.network.depth - 2:
+                continue
+            policy_gradient_network = self.policyGradientOptimizers[tree_level]
+            sess = tf.Session()
+            init = tf.global_variables_initializer()
+            sess.run(init)
+
+            for iteration_id in range(PolicyGradientsRoutingOptimizer.TOTAL_ITERATIONS):
+                self.sample_trajectory(sess=sess,
+                                       policy_gradient_network=policy_gradient_network,
+                                       tree_level=tree_level,
+                                       state_sample_size=self.validationStateFeatures[tree_level].shape[0],
+                                       policy_sample_size=100,
+                                       states=self.validationStateFeatures[tree_level])
+
+
 
     # def prepare_features_for_dataset(self, routing_dataset, greedy_routes):
     #     # Prepare Policy Gradients State Data
