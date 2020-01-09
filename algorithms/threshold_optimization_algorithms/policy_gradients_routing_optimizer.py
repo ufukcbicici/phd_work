@@ -20,6 +20,7 @@ class TreeLevelRoutingOptimizer:
         for layer_dim in self.hiddenLayers:
             self.net = tf.layers.dense(inputs=self.net, units=layer_dim, activation=tf.nn.relu)
         self.pi = tf.nn.softmax(self.net)
+        # Policy Evaluation on the given data
 
 
 class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
