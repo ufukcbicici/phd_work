@@ -155,7 +155,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                         reward += prediction_reward
                         # Get the calculation cost
                         mac_cost = self.networkActivationCosts[node_selection_with_max_likelihood]
-                        mac_cost /= self.baseEvaluationCost
+                        mac_cost = (mac_cost / self.baseEvaluationCost) - 1.0
                         reward -= PolicyGradientsRoutingOptimizer.MAC_PENALTY_COEFFICIENT * mac_cost
                     sample_rewards[action_id] = reward
                 rewards.append(sample_rewards)
