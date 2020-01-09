@@ -34,6 +34,8 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.testRatio = test_ratio
         self.featuresUsed = features_used
         self.hiddenLayers = hidden_layers
+        self.actionSpaces = [self.get_action_space(tree_level=tree_level)
+                             for tree_level in range(self.network.depth - 1)]
         # Apply Validation - Test split to the routing data
         self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=self.testRatio)
         # Greedy Information Gain Paths
@@ -122,7 +124,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             rewards = []
             next_level_valid_actions_dict = self.get_reachability_dict(tree_level=tree_level)
             next_level_min_id = min([n.index for n in self.network.orderedNodesPerLevel[tree_level + 1]])
-            action_space = self.get_action_space(tree_level=tree_level)
+            action_space = self.actionSpaces[tree_level]
             for idx in range(states[tree_level].shape[0]):
                 sample_rewards = {}
                 true_label = labels[int(idx / level_multiplicity)]
