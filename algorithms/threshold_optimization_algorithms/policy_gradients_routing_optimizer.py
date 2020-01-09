@@ -121,6 +121,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
             level_multiplicity = node_selections_per_level[tree_level].shape[0] / node_selections_per_level[0].shape[0]
             rewards = []
             next_level_valid_actions_dict = self.get_reachability_dict(tree_level=tree_level)
+            next_level_min_id = min([n.index for n in self.network.orderedNodesPerLevel[tree_level + 1]])
             action_space = self.get_action_space(tree_level=tree_level)
             for idx in range(states[tree_level].shape[0]):
                 sample_rewards = {}
@@ -140,7 +141,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                     else:
                         # Check if class is correctly predicted
                         node_selection_with_max_likelihood = list(node_selection)
-                        node_selection_with_max_likelihood[max_likelihood_route[tree_level + 1]] = 1
+                        node_selection_with_max_likelihood[max_likelihood_route[tree_level + 1] - next_level_min_id] = 1
                         node_selection_with_max_likelihood = tuple(node_selection_with_max_likelihood)
                         uniform_weight = 1.0 / sum(node_selection_with_max_likelihood)
                         posteriors_sparse = posteriors_matrix * \
@@ -154,6 +155,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                         reward += prediction_reward
                         # Get the calculation cost
                         mac_cost = self.networkActivationCosts[node_selection_with_max_likelihood]
+                        mac_cost /= self.baseEvaluationCost
                         reward -= PolicyGradientsRoutingOptimizer.MAC_PENALTY_COEFFICIENT * mac_cost
                     sample_rewards[action_id] = reward
                 rewards.append(sample_rewards)
