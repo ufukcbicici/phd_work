@@ -18,6 +18,7 @@ class TreeLevelRoutingOptimizer:
         self.logits = None
         self.pi = None
         self.repeatedPolicy = None
+        self.logRepeatedPolicy = None
         # Policy Evaluation on the given data
         self.rewards = None
         self.weightedRewardMatrix = None
@@ -25,6 +26,7 @@ class TreeLevelRoutingOptimizer:
         self.policyValue = None
         self.policySampleCount = None
         self.policySamples = None
+        self.logSampledPolicies = None
         self.l2Loss = None
         self.l2Lambda = PolicyGradientsRoutingOptimizer.L2_LAMBDA
         self.paramL2Norms = {}
@@ -53,7 +55,9 @@ class TreeLevelRoutingOptimizer:
         self.policyValue = tf.reduce_mean(self.valueFunctions)
         # Sampling the policy
         self.repeatedPolicy = tf.tile(self.pi, [self.policySampleCount, 1])
+        self.logRepeatedPolicy = tf.log(self.repeatedPolicy)
         self.policySamples = FastTreeNetwork.sample_from_categorical_v2(probs=self.repeatedPolicy)
+        self.logSampledPolicies = tf.gather_nd(self.logRepeatedPolicy, tf.expand_dims(self.policySamples, axis=1))
 
     def get_l2_loss(self):
         # L2 Loss
@@ -271,11 +275,11 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         total_data_count = states.shape[0]
         sample_indices = np.random.choice(total_data_count, state_sample_size, replace=False)
         sampled_states = states[sample_indices]
-        # Then sample some actions from the current policy.
         results = sess.run([policy_gradient_network.pi,
                             policy_gradient_network.logits,
                             policy_gradient_network.repeatedPolicy,
-                            policy_gradient_network.policySamples],
+                            policy_gradient_network.policySamples,
+                            policy_gradient_network.logRepeatedPolicy],
                            feed_dict={policy_gradient_network.inputs: sampled_states,
                                       policy_gradient_network.policySampleCount: policy_sample_size})
         print("X")
