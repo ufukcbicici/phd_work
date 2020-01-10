@@ -705,6 +705,20 @@ class FastTreeNetwork(TreeNetwork):
         selected_indices = tf.cast(tf.argmax(gumbel_max, axis=1), tf.int32)
         return selected_indices
 
+    @staticmethod
+    def sample_from_categorical_v2(probs):
+        uniform = tf.distributions.Uniform(low=0.0, high=1.0)
+        prob_shape = tf.shape(probs)
+        batch_size = tf.gather_nd(prob_shape, [0])
+        category_count = tf.gather_nd(prob_shape, [1])
+        uniform_sample = uniform.sample(sample_shape=(tf.cast(batch_size, tf.int32),
+                                                      tf.cast(category_count, tf.int32)))
+        gumbel_sample = -1.0 * tf.log(-1.0 * tf.log(uniform_sample))
+        log_probs = tf.log(probs)
+        gumbel_max = gumbel_sample + log_probs
+        selected_indices = tf.cast(tf.argmax(gumbel_max, axis=1), tf.int32)
+        return selected_indices
+
     def get_checkpoint_path(self, run_id, iteration):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
