@@ -11,9 +11,26 @@ class TreeLevelRoutingOptimizer:
         # self.hiddenLayers = [self.branchingStateVectors.shape[-1]]
         # self.hiddenLayers.extend(hidden_layers)
         self.hiddenLayers = hidden_layers
+        self.actionCount = int(action_space_size)
+        self.inputs = None
+        # Policy MLP
+        self.net = None
+        self.pi = None
+        # Policy Evaluation on the given data
+        self.rewards = None
+        self.weightedRewardMatrix = None
+        self.valueFunctions = None
+        self.policyValue = None
+        self.l2Loss = None
+        self.l2Lambda = PolicyGradientsRoutingOptimizer.L2_LAMBDA
+        self.paramL2Norms = {}
+        # Build network
+        self.build_network()
+        self.get_l2_loss()
+
+    def build_network(self):
         self.inputs = tf.placeholder(dtype=tf.float32,
                                      shape=[None, self.branchingStateVectors.shape[-1]], name="inputs")
-        self.actionCount = int(action_space_size)
         self.hiddenLayers.append(self.actionCount)
         # Policy MLP
         self.net = self.inputs
@@ -21,10 +38,19 @@ class TreeLevelRoutingOptimizer:
             self.net = tf.layers.dense(inputs=self.net, units=layer_dim, activation=tf.nn.relu)
         self.pi = tf.nn.softmax(self.net)
         # Policy Evaluation on the given data
-        self.rewards = tf.placeholder(dtype=tf.float32, shape=[None, action_space_size], name="rewards")
+        self.rewards = tf.placeholder(dtype=tf.float32, shape=[None, self.actionCount], name="rewards")
         self.weightedRewardMatrix = self.pi * self.rewards
         self.valueFunctions = tf.reduce_sum(self.weightedRewardMatrix, axis=1)
         self.policyValue = tf.reduce_mean(self.valueFunctions)
+
+    def get_l2_loss(self):
+        # L2 Loss
+        tvars = tf.trainable_variables()
+        self.l2Loss = tf.constant(0.0)
+        for tv in tvars:
+            if 'kernel' in tv.name:
+                self.l2Loss += self.l2Lambda * tf.nn.l2_loss(tv)
+            self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
 
 
 class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
@@ -34,6 +60,7 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
     MAC_PENALTY_COEFFICIENT = 0.0
     BATCH_SIZE = 10000
     TOTAL_ITERATIONS = 100000
+    L2_LAMBDA = 0.0
 
     def __init__(self, network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio, features_used,
                  hidden_layers):
@@ -354,7 +381,7 @@ def main():
                                                                          output_names=output_names,
                                                                          test_ratio=0.2,
                                                                          features_used=["branching_feature"],
-                                                                         hidden_layers=[[128], [256]])
+                                                                         hidden_layers=[[256], [512]])
     policy_gradients_routing_optimizer.train()
 
 
