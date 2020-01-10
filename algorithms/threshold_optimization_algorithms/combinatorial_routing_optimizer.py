@@ -66,6 +66,20 @@ class CombinatorialRoutingOptimizer:
         max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
         return max_likelihood_paths
 
+    def get_max_likelihood_accuracy(self, max_likelihood_paths, posteriors, labels):
+        sample_counts_set = set([arr.shape[0] for arr in posteriors.values()])
+        sample_counts_set.add(max_likelihood_paths.shape[0])
+        sample_counts_set.add(labels.shape[0])
+        assert len(sample_counts_set) == 1
+        correct_count = 0
+        for idx in range(labels.shape[0]):
+            leaf_id = max_likelihood_paths[idx, -1]
+            posterior = posteriors[leaf_id][idx]
+            predicted_label = np.argmax(posterior)
+            correct_count += float(predicted_label == labels[idx])
+        accuracy = correct_count / labels.shape[0]
+        return accuracy
+
     def calculate_best_routes(self):
         total_correct_count = 0
         total_eval_cost = 0.0

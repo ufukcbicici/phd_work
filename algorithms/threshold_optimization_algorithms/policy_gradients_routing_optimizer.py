@@ -96,6 +96,12 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                                                 node_selections_per_level=self.testNodeSelections,
                                                 max_likelihood_routes=self.testDataPaths,
                                                 posteriors=self.testData.get_dict("posterior_probs"))
+        self.validationMaxLikelihoodAccuracy = self.get_max_likelihood_accuracy(
+            max_likelihood_paths=self.validationDataPaths,
+            posteriors=self.validationData.get_dict("posterior_probs"), labels=self.validationData.labelList)
+        self.testMaxLikelihoodAccuracy = self.get_max_likelihood_accuracy(
+            max_likelihood_paths=self.testDataPaths,
+            posteriors=self.testData.get_dict("posterior_probs"), labels=self.testData.labelList)
         # Build Policy Gradient Networks
         self.policyGradientOptimizers = []
         for tree_level in range(self.network.depth - 1):
