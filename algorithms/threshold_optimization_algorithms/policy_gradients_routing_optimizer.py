@@ -279,7 +279,8 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                             policy_gradient_network.logits,
                             policy_gradient_network.repeatedPolicy,
                             policy_gradient_network.policySamples,
-                            policy_gradient_network.logRepeatedPolicy],
+                            policy_gradient_network.logRepeatedPolicy,
+                            policy_gradient_network.logSampledPolicies],
                            feed_dict={policy_gradient_network.inputs: sampled_states,
                                       policy_gradient_network.policySampleCount: policy_sample_size})
         print("X")
