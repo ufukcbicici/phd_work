@@ -75,9 +75,9 @@ class TreeLevelRoutingOptimizer:
         self.proxyPolicyValue = tf.reduce_mean(self.proxyValueVector)
         self.get_l2_loss()
         self.totalLoss = (-1.0 * self.proxyPolicyValue) + self.l2Loss
-        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
-        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate). \
-        #     minimize(self.totalLoss, global_step=self.globalStep)
+        # self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate). \
+            minimize(self.totalLoss, global_step=self.globalStep)
 
     def get_l2_loss(self):
         # L2 Loss
@@ -138,6 +138,8 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         self.testMaxLikelihoodAccuracy = self.get_max_likelihood_accuracy(
             max_likelihood_paths=self.testDataPaths,
             posteriors=self.testData.get_dict("posterior_probs"), labels=self.testData.labelList)
+        print("validationMaxLikelihoodAccuracy={0}".format(self.validationMaxLikelihoodAccuracy))
+        print("testMaxLikelihoodAccuracy={0}".format(self.testMaxLikelihoodAccuracy))
         # Build Policy Gradient Networks
         self.policyGradientOptimizers = []
         for tree_level in range(self.network.depth - 1):
@@ -412,29 +414,31 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                                        policy_sample_size=100,
                                        states=self.validationStateFeatures[tree_level],
                                        rewards=self.validationRewards[tree_level])
-                print("Iteration {0} validation policy Value:".format(iteration_id))
-                self.evaluate_policy(sess=sess,
-                                     policy_gradient_network=policy_gradient_network,
-                                     tree_level=tree_level,
-                                     states=self.validationStateFeatures[tree_level],
-                                     rewards=self.validationRewards[tree_level],
-                                     labels=self.validationData.labelList,
-                                     node_selections_per_level=self.validationNodeSelections,
-                                     max_likelihood_routes=self.validationDataPaths,
-                                     posteriors=self.validationData.get_dict("posterior_probs")
-                                     )
-                print("Iteration {0} test policy Value:".format(iteration_id))
-                self.evaluate_policy(sess=sess,
-                                     policy_gradient_network=policy_gradient_network,
-                                     tree_level=tree_level,
-                                     states=self.testStateFeatures[tree_level],
-                                     rewards=self.testRewards[tree_level],
-                                     labels=self.testData.labelList,
-                                     node_selections_per_level=self.testNodeSelections,
-                                     max_likelihood_routes=self.testDataPaths,
-                                     posteriors=self.testData.get_dict("posterior_probs")
-                                     )
-
+                if iteration_id % 10 == 0:
+                    print("**********************************")
+                    print("Iteration {0} validation policy Value:".format(iteration_id))
+                    self.evaluate_policy(sess=sess,
+                                         policy_gradient_network=policy_gradient_network,
+                                         tree_level=tree_level,
+                                         states=self.validationStateFeatures[tree_level],
+                                         rewards=self.validationRewards[tree_level],
+                                         labels=self.validationData.labelList,
+                                         node_selections_per_level=self.validationNodeSelections,
+                                         max_likelihood_routes=self.validationDataPaths,
+                                         posteriors=self.validationData.get_dict("posterior_probs")
+                                         )
+                    print("Iteration {0} test policy Value:".format(iteration_id))
+                    self.evaluate_policy(sess=sess,
+                                         policy_gradient_network=policy_gradient_network,
+                                         tree_level=tree_level,
+                                         states=self.testStateFeatures[tree_level],
+                                         rewards=self.testRewards[tree_level],
+                                         labels=self.testData.labelList,
+                                         node_selections_per_level=self.testNodeSelections,
+                                         max_likelihood_routes=self.testDataPaths,
+                                         posteriors=self.testData.get_dict("posterior_probs")
+                                         )
+                    print("**********************************")
 
 def main():
     # run_id = 715
