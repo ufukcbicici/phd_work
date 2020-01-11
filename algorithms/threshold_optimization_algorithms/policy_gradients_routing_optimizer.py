@@ -30,14 +30,17 @@ class TreeLevelRoutingOptimizer:
         self.policySamples = None
         self.logSampledPolicies = None
         self.rewardSamples = None
-        self.proxyLossVector = None
-        self.proxyLoss = None
+        self.proxyValueVector = None
+        self.proxyPolicyValue = None
+        self.globalStep = tf.Variable(0, name='global_step', trainable=False)
+        self.learningRate = tf.constant(0.00001)
+        self.optimizer = None
         self.l2Loss = None
+        self.totalLoss = None
         self.l2Lambda = PolicyGradientsRoutingOptimizer.L2_LAMBDA
         self.paramL2Norms = {}
         # Build network
         self.build_network()
-        self.get_l2_loss()
 
     def build_network(self):
         self.inputs = tf.placeholder(dtype=tf.float32,
@@ -58,7 +61,7 @@ class TreeLevelRoutingOptimizer:
         self.weightedRewardMatrix = self.pi * self.rewards
         self.valueFunctions = tf.reduce_sum(self.weightedRewardMatrix, axis=1)
         self.policyValue = tf.reduce_mean(self.valueFunctions)
-        # Sampling the policy
+        # Proxy Objective Function and maximizing it
         self.repeatedPolicy = tf.tile(self.pi, [self.policySampleCount, 1])
         self.logRepeatedPolicy = tf.log(self.repeatedPolicy)
         self.policySamples = FastTreeNetwork.sample_from_categorical_v2(probs=self.repeatedPolicy)
@@ -68,8 +71,13 @@ class TreeLevelRoutingOptimizer:
         self.policySamples = tf.stack([tf.range(0, self.stateCount, 1), self.policySamples], axis=1)
         self.logSampledPolicies = tf.gather_nd(self.logRepeatedPolicy, self.policySamples)
         self.rewardSamples = tf.gather_nd(self.rewards, self.policySamples)
-        self.proxyLossVector = self.logSampledPolicies * self.rewardSamples
-        self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
+        self.proxyValueVector = self.logSampledPolicies * self.rewardSamples
+        self.proxyPolicyValue = tf.reduce_mean(self.proxyValueVector)
+        self.get_l2_loss()
+        self.totalLoss = (-1.0 * self.proxyPolicyValue) + self.l2Loss
+        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate). \
+        #     minimize(self.totalLoss, global_step=self.globalStep)
 
     def get_l2_loss(self):
         # L2 Loss
@@ -82,12 +90,12 @@ class TreeLevelRoutingOptimizer:
 
 
 class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
-    IMPOSSIBLE_ACTION_PENALTY = -1e3
+    IMPOSSIBLE_ACTION_PENALTY = -1000.0
     CORRECT_PREDICTION_REWARD = 1.0
-    INCORRECT_PREDICTION_REWARD = 0.0
+    INCORRECT_PREDICTION_REWARD = -1000.0
     MAC_PENALTY_COEFFICIENT = 0.0
     BATCH_SIZE = 10000
-    TOTAL_ITERATIONS = 100000
+    TOTAL_ITERATIONS = 1000000
     L2_LAMBDA = 0.0
 
     def __init__(self, network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio, features_used,
@@ -287,26 +295,40 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         total_data_count = states.shape[0]
         sample_indices = np.random.choice(total_data_count, state_sample_size, replace=False)
         sampled_states = states[sample_indices]
-        results = sess.run([policy_gradient_network.pi,
-                            policy_gradient_network.logits,
-                            policy_gradient_network.repeatedPolicy,
-                            policy_gradient_network.policySamples,
-                            policy_gradient_network.logRepeatedPolicy,
-                            policy_gradient_network.stateCount,
-                            policy_gradient_network.categoryCount,
-                            policy_gradient_network.logSampledPolicies,
-                            policy_gradient_network.rewardSamples,
-                            policy_gradient_network.proxyLossVector,
-                            policy_gradient_network.proxyLoss],
-                           feed_dict={policy_gradient_network.inputs: sampled_states,
-                                      policy_gradient_network.rewards: rewards,
-                                      policy_gradient_network.policySampleCount: policy_sample_size})
-        print("X")
+        feed_dict = {policy_gradient_network.inputs: sampled_states,
+                     policy_gradient_network.rewards: rewards,
+                     policy_gradient_network.policySampleCount: policy_sample_size}
+        # results = sess.run([policy_gradient_network.pi,
+        #                     policy_gradient_network.logits,
+        #                     policy_gradient_network.repeatedPolicy,
+        #                     policy_gradient_network.policySamples,
+        #                     policy_gradient_network.logRepeatedPolicy,
+        #                     policy_gradient_network.stateCount,
+        #                     policy_gradient_network.categoryCount,
+        #                     policy_gradient_network.logSampledPolicies,
+        #                     policy_gradient_network.rewardSamples,
+        #                     policy_gradient_network.proxyValueVector,
+        #                     policy_gradient_network.proxyPolicyValue],
+        #                    feed_dict={policy_gradient_network.inputs: sampled_states,
+        #                               policy_gradient_network.rewards: rewards,
+        #                               policy_gradient_network.policySampleCount: policy_sample_size})
+        results = sess.run([policy_gradient_network.optimizer,
+                            policy_gradient_network.pi,
+                            policy_gradient_network.proxyPolicyValue],
+                           feed_dict=feed_dict)
+        print("Proxy value:{0}".format(results[-1]))
 
     def evaluate_policy(self, sess, policy_gradient_network, **kwargs):
         tree_level = kwargs["tree_level"]
         states = kwargs["states"]
         rewards = kwargs["rewards"]
+        node_selections_per_level = kwargs["node_selections_per_level"]
+        max_likelihood_routes = kwargs["max_likelihood_routes"]
+        posteriors = kwargs["posteriors"]
+        labels = kwargs["labels"]
+        level_multiplicity = int(node_selections_per_level[tree_level].shape[0] / node_selections_per_level[0].shape[0])
+        next_level_min_id = min([n.index for n in self.network.orderedNodesPerLevel[tree_level + 1]])
+        posteriors_tensor = np.stack([posteriors[node.index] for node in self.leafNodes], axis=2)
         if tree_level != self.network.depth - 2:
             raise NotImplementedError()
 
@@ -316,8 +338,37 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                             policy_gradient_network.policyValue],
                            feed_dict={policy_gradient_network.inputs: states,
                                       policy_gradient_network.rewards: rewards})
+        policy = results[0]
         policy_value = results[-1]
         print("Policy Value:{0}".format(policy_value))
+        all_cases_correct_count = 0
+        best_case_correct_count = 0
+        for idx in range(policy.shape[0]):
+            max_likelihood_route = max_likelihood_routes[int(idx / level_multiplicity)]
+            posteriors_matrix = posteriors_tensor[int(idx / level_multiplicity)]
+            true_label = labels[int(idx / level_multiplicity)]
+            best_case_correct = False
+            for jdx in range(level_multiplicity):
+                state_policy = policy[idx + jdx]
+                selected_action = int(np.argmax(state_policy))
+                node_selection = self.actionSpaces[tree_level][selected_action]
+                node_selection_with_max_likelihood = list(node_selection)
+                node_selection_with_max_likelihood[max_likelihood_route[tree_level + 1] - next_level_min_id] = 1
+                node_selection_with_max_likelihood = tuple(node_selection_with_max_likelihood)
+                uniform_weight = 1.0 / sum(node_selection_with_max_likelihood)
+                posteriors_sparse = posteriors_matrix * \
+                                    (uniform_weight * np.expand_dims(
+                                        np.array(node_selection_with_max_likelihood), axis=0))
+                posteriors_weighted = np.sum(posteriors_sparse, axis=1)
+                predicted_label = np.argmax(posteriors_weighted)
+                if predicted_label == true_label:
+                    best_case_correct = True
+                    all_cases_correct_count += 1.0
+            best_case_correct_count += float(best_case_correct)
+        all_cases_accuracy = all_cases_correct_count / policy.shape[0]
+        best_cases_accuracy = best_case_correct_count / (policy.shape[0] / level_multiplicity)
+        print("all_cases_accuracy={0}".format(all_cases_accuracy))
+        print("best_cases_accuracy={0}".format(best_cases_accuracy))
 
     def train(self):
         for tree_level in range(self.network.depth - 2, -1, -1):
@@ -349,6 +400,18 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                                        policy_sample_size=100,
                                        states=self.validationStateFeatures[tree_level],
                                        rewards=self.validationRewards[tree_level])
+                print("Iteration {0} validation policy Value:".format(iteration_id))
+                self.evaluate_policy(sess=sess,
+                                     policy_gradient_network=policy_gradient_network,
+                                     tree_level=tree_level,
+                                     states=self.validationStateFeatures[tree_level],
+                                     rewards=self.validationRewards[tree_level])
+                print("Iteration {0} test policy Value:".format(iteration_id))
+                self.evaluate_policy(sess=sess,
+                                     policy_gradient_network=policy_gradient_network,
+                                     tree_level=tree_level,
+                                     states=self.testStateFeatures[tree_level],
+                                     rewards=self.testRewards[tree_level])
 
 
 def main():
