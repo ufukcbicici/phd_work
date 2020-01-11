@@ -19,6 +19,8 @@ class TreeLevelRoutingOptimizer:
         self.pi = None
         self.repeatedPolicy = None
         self.logRepeatedPolicy = None
+        self.stateCount = None
+        self.categoryCount = None
         # Policy Evaluation on the given data
         self.rewards = None
         self.weightedRewardMatrix = None
@@ -27,6 +29,9 @@ class TreeLevelRoutingOptimizer:
         self.policySampleCount = None
         self.policySamples = None
         self.logSampledPolicies = None
+        self.rewardSamples = None
+        self.proxyLossVector = None
+        self.proxyLoss = None
         self.l2Loss = None
         self.l2Lambda = PolicyGradientsRoutingOptimizer.L2_LAMBDA
         self.paramL2Norms = {}
@@ -57,7 +62,14 @@ class TreeLevelRoutingOptimizer:
         self.repeatedPolicy = tf.tile(self.pi, [self.policySampleCount, 1])
         self.logRepeatedPolicy = tf.log(self.repeatedPolicy)
         self.policySamples = FastTreeNetwork.sample_from_categorical_v2(probs=self.repeatedPolicy)
-        self.logSampledPolicies = tf.gather_nd(self.logRepeatedPolicy, tf.expand_dims(self.policySamples, axis=1))
+        prob_shape = tf.shape(self.logRepeatedPolicy)
+        self.stateCount = tf.gather_nd(prob_shape, [0])
+        self.categoryCount = tf.gather_nd(prob_shape, [1])
+        self.policySamples = tf.stack([tf.range(0, self.stateCount, 1), self.policySamples], axis=1)
+        self.logSampledPolicies = tf.gather_nd(self.logRepeatedPolicy, self.policySamples)
+        self.rewardSamples = tf.gather_nd(self.rewards, self.policySamples)
+        self.proxyLossVector = self.logSampledPolicies * self.rewardSamples
+        self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
 
     def get_l2_loss(self):
         # L2 Loss
@@ -280,8 +292,14 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                             policy_gradient_network.repeatedPolicy,
                             policy_gradient_network.policySamples,
                             policy_gradient_network.logRepeatedPolicy,
-                            policy_gradient_network.logSampledPolicies],
+                            policy_gradient_network.stateCount,
+                            policy_gradient_network.categoryCount,
+                            policy_gradient_network.logSampledPolicies,
+                            policy_gradient_network.rewardSamples,
+                            policy_gradient_network.proxyLossVector,
+                            policy_gradient_network.proxyLoss],
                            feed_dict={policy_gradient_network.inputs: sampled_states,
+                                      policy_gradient_network.rewards: rewards,
                                       policy_gradient_network.policySampleCount: policy_sample_size})
         print("X")
 
@@ -334,10 +352,16 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
 
 
 def main():
-    run_id = 715
-    network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
-    iteration = 119100
-    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature"]
+    # run_id = 715
+    # network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
+    # iteration = 119100
+
+    run_id = 453
+    network_name = "FashionNet_Lite"
+    iteration = 43680
+
+    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
+                    "pre_branch_feature"]
     policy_gradients_routing_optimizer = PolicyGradientsRoutingOptimizer(network_name=network_name, run_id=run_id,
                                                                          iteration=iteration,
                                                                          degree_list=[2, 2], data_type="test",

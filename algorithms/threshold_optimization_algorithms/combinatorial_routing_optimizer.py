@@ -123,6 +123,9 @@ class CombinatorialRoutingOptimizer:
             else:
                 total_eval_cost += self.baseEvaluationCost
         mean_eval_cost = total_eval_cost / self.labelsVector.shape[0]
+        print("single_path_correct_count={0}".format(single_path_correct_count))
+        print("total_correct_count={0}".format(total_correct_count))
+        print("mean_eval_cost={0}".format(mean_eval_cost))
         print("X")
 
 
@@ -137,13 +140,17 @@ def main():
     # # dataset = CifarDataSet(session=None, validation_sample_count=0, load_validation_from=None)
     # # whitened_images = RoutingVisualizer.whiten_dataset(dataset=dataset)
 
-    run_id = 715
-    network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
-    iteration = 119100
+    # run_id = 715
+    # network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
+    # iteration = 119100
+    run_id = 453
+    network_name = "FashionNet_Lite"
+    iteration = 43680
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs"]
     routing_optimizer = CombinatorialRoutingOptimizer(network_name=network_name, run_id=run_id, iteration=iteration,
                                                       degree_list=[2, 2], data_type="test", output_names=output_names)
     routing_optimizer.calculate_best_routes()
 
 
-# main()
+if __name__ == "__main__":
+    main()
