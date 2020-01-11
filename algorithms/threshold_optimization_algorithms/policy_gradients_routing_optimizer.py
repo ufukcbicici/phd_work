@@ -342,31 +342,33 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         policy_value = results[-1]
         print("Policy Value:{0}".format(policy_value))
         all_cases_correct_count = 0
-        best_case_correct_count = 0
+        sample_wise_predictions_dict = {}
         for idx in range(policy.shape[0]):
-            max_likelihood_route = max_likelihood_routes[int(idx / level_multiplicity)]
-            posteriors_matrix = posteriors_tensor[int(idx / level_multiplicity)]
-            true_label = labels[int(idx / level_multiplicity)]
+            sample_id = int(idx / level_multiplicity)
+            max_likelihood_route = max_likelihood_routes[sample_id]
+            posteriors_matrix = posteriors_tensor[sample_id]
+            true_label = labels[sample_id]
             best_case_correct = False
-            for jdx in range(level_multiplicity):
-                state_policy = policy[idx + jdx]
-                selected_action = int(np.argmax(state_policy))
-                node_selection = self.actionSpaces[tree_level][selected_action]
-                node_selection_with_max_likelihood = list(node_selection)
-                node_selection_with_max_likelihood[max_likelihood_route[tree_level + 1] - next_level_min_id] = 1
-                node_selection_with_max_likelihood = tuple(node_selection_with_max_likelihood)
-                uniform_weight = 1.0 / sum(node_selection_with_max_likelihood)
-                posteriors_sparse = posteriors_matrix * \
-                                    (uniform_weight * np.expand_dims(
-                                        np.array(node_selection_with_max_likelihood), axis=0))
-                posteriors_weighted = np.sum(posteriors_sparse, axis=1)
-                predicted_label = np.argmax(posteriors_weighted)
-                if predicted_label == true_label:
-                    best_case_correct = True
-                    all_cases_correct_count += 1.0
-            best_case_correct_count += float(best_case_correct)
+            if sample_id not in sample_wise_predictions_dict:
+                sample_wise_predictions_dict[sample_id] = []
+            state_policy = policy[idx]
+            selected_action = int(np.argmax(state_policy))
+            node_selection = self.actionSpaces[tree_level][selected_action]
+            node_selection_with_max_likelihood = list(node_selection)
+            node_selection_with_max_likelihood[max_likelihood_route[tree_level + 1] - next_level_min_id] = 1
+            node_selection_with_max_likelihood = tuple(node_selection_with_max_likelihood)
+            uniform_weight = 1.0 / sum(node_selection_with_max_likelihood)
+            posteriors_sparse = posteriors_matrix * \
+                                (uniform_weight * np.expand_dims(
+                                    np.array(node_selection_with_max_likelihood), axis=0))
+            posteriors_weighted = np.sum(posteriors_sparse, axis=1)
+            predicted_label = np.argmax(posteriors_weighted)
+            is_correct = predicted_label == true_label
+            sample_wise_predictions_dict[sample_id].append(is_correct)
+            all_cases_correct_count += float(is_correct)
         all_cases_accuracy = all_cases_correct_count / policy.shape[0]
-        best_cases_accuracy = best_case_correct_count / (policy.shape[0] / level_multiplicity)
+        sample_wise_predictions = [any(pred_list) for pred_list in sample_wise_predictions_dict.values()]
+        best_cases_accuracy = sum(sample_wise_predictions) / float(len(sample_wise_predictions))
         print("all_cases_accuracy={0}".format(all_cases_accuracy))
         print("best_cases_accuracy={0}".format(best_cases_accuracy))
 
@@ -384,13 +386,23 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                                  policy_gradient_network=policy_gradient_network,
                                  tree_level=tree_level,
                                  states=self.validationStateFeatures[tree_level],
-                                 rewards=self.validationRewards[tree_level])
+                                 rewards=self.validationRewards[tree_level],
+                                 labels=self.validationData.labelList,
+                                 node_selections_per_level=self.validationNodeSelections,
+                                 max_likelihood_routes=self.validationDataPaths,
+                                 posteriors=self.validationData.get_dict("posterior_probs")
+                                 )
             print("Before Start Test Value")
             self.evaluate_policy(sess=sess,
                                  policy_gradient_network=policy_gradient_network,
                                  tree_level=tree_level,
                                  states=self.testStateFeatures[tree_level],
-                                 rewards=self.testRewards[tree_level])
+                                 rewards=self.testRewards[tree_level],
+                                 labels=self.testData.labelList,
+                                 node_selections_per_level=self.testNodeSelections,
+                                 max_likelihood_routes=self.testDataPaths,
+                                 posteriors=self.testData.get_dict("posterior_probs")
+                                 )
             # Train with Policy Gradients
             for iteration_id in range(PolicyGradientsRoutingOptimizer.TOTAL_ITERATIONS):
                 self.sample_trajectory(sess=sess,
@@ -405,13 +417,23 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
                                      policy_gradient_network=policy_gradient_network,
                                      tree_level=tree_level,
                                      states=self.validationStateFeatures[tree_level],
-                                     rewards=self.validationRewards[tree_level])
+                                     rewards=self.validationRewards[tree_level],
+                                     labels=self.validationData.labelList,
+                                     node_selections_per_level=self.validationNodeSelections,
+                                     max_likelihood_routes=self.validationDataPaths,
+                                     posteriors=self.validationData.get_dict("posterior_probs")
+                                     )
                 print("Iteration {0} test policy Value:".format(iteration_id))
                 self.evaluate_policy(sess=sess,
                                      policy_gradient_network=policy_gradient_network,
                                      tree_level=tree_level,
                                      states=self.testStateFeatures[tree_level],
-                                     rewards=self.testRewards[tree_level])
+                                     rewards=self.testRewards[tree_level],
+                                     labels=self.testData.labelList,
+                                     node_selections_per_level=self.testNodeSelections,
+                                     max_likelihood_routes=self.testDataPaths,
+                                     posteriors=self.testData.get_dict("posterior_probs")
+                                     )
 
 
 def main():
