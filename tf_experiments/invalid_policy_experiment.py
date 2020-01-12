@@ -142,6 +142,19 @@ def main():
     # dy/d(policies_tiled) -> Correct. Only selected actions are nonzero.
     assert np.array_equal(selection_arr, (grads_arr[1] != 0.0).astype(np.int32))
     # dy/d(policy_selected) -> Correct. Only selected actions are nonzero.
+    tiled_grads = [grads_arr[1][_i*sample_count:(_i+1)*sample_count] for _i in range(sample_repeat_count)]
+    sum_tiled_grads = np.sum(np.stack(tiled_grads, axis=len(tiled_grads[0].shape)), axis=-1)
+    assert np.allclose(grads_arr[2], sum_tiled_grads)
+    print("X")
+
+
+# grads = tf.gradients(proxy_policy_value, [log_policies_tiled,
+#                                           policies_tiled,
+#                                           policy_selected,
+#                                           policies,
+#                                           policies_non_modified,
+#                                           sparse_logits,
+#                                           logits])
 
 
 if __name__ == "__main__":
