@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from collections import Counter
+
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 sample_count = 1000
@@ -14,6 +15,7 @@ state_input = tf.placeholder(dtype=tf.float32, shape=[None, state_dim], name="in
 routes_input = tf.placeholder(dtype=tf.int32, shape=[None, action_space_size], name="routes")
 policy_selector = tf.placeholder(dtype=tf.int32, shape=[None], name="policy_selector")
 rewards_input = tf.placeholder(dtype=tf.float32, shape=[None, action_space_size], name="rewards")
+sampled_actions_input = tf.placeholder(dtype=tf.int32, shape=[None], name="sampled_actions_input")
 
 net = state_input
 for layer_id, layer_dim in enumerate(hiddenLayers):
@@ -29,7 +31,15 @@ uniform_distribution = tf.ones_like(logits) * tf.constant(1.0 / action_space_siz
 policy_selected = tf.where(tf.cast(policy_selector, tf.bool), policies, uniform_distribution)
 # Sample from the policies
 policies_tiled = tf.tile(policy_selected, [sample_repeat_count, 1])
+log_policies_tiled = tf.log(policies_tiled)
 sampled_actions = FastTreeNetwork.sample_from_categorical_v2(probs=policies_tiled)
+# Build Proxy Loss
+prob_shape = tf.shape(policies_tiled)
+num_states = tf.gather_nd(prob_shape, [0])
+num_categories = tf.gather_nd(prob_shape, [1])
+sampled_actions_2d = tf.stack([tf.range(0, num_states, 1), sampled_actions], axis=1)
+log_sampled_policies = tf.gather_nd(log_policies_tiled, sampled_actions_2d)
+
 
 # uniform_distribution = tf.ones_like(logits) * tf.constant(1.0 / action_space_size)
 # policy = tf.nn.softmax(logits)
@@ -49,7 +59,7 @@ def main():
     states = np.random.uniform(size=(sample_count, state_dim))
     routes = np.random.choice([0, 1], size=(sample_count, action_space_size), p=[0.1, 0.9])
     rewards = np.random.uniform(low=-5.0, high=5.0, size=(sample_count, action_space_size))
-    distribution_selector = np.random.choice([0, 1], size=(sample_count, ), p=[0.2, 0.8])
+    distribution_selector = np.random.choice([0, 1], size=(sample_count,), p=[0.2, 0.8])
 
     sess = tf.Session()
     init = tf.global_variables_initializer()
@@ -68,22 +78,39 @@ def main():
                                   policy_selector: distribution_selector})
     final_policy = results[-3]
     final_actions = results[-1]
-    sampled_action_distributions = []
-    for idx in range(sample_count):
-        actions_for_state_idx = [final_actions[idx + j*sample_count] for j in range(sample_repeat_count)]
-        counter = Counter(actions_for_state_idx)
-        freq_arr = [0] * action_space_size
-        for k, v in counter.items():
-            freq_arr[k] = v
-        freq_arr = np.array(freq_arr)
-        freq_arr = freq_arr * (1.0/np.sum(freq_arr))
-        print("Route:{0}".format(routes[idx]))
-        print("Policy Selection:{0}".format(distribution_selector[idx]))
-        print("Policy:{0}".format(final_policy[idx]))
-        print("Sampled Policy:{0}".format(freq_arr))
-        print("X")
-    # Sample actions
 
+    # sampled_action_distributions = []
+    # for idx in range(sample_count):
+    #     actions_for_state_idx = [final_actions[idx + j*sample_count] for j in range(sample_repeat_count)]
+    #     counter = Counter(actions_for_state_idx)
+    #     freq_arr = [0] * action_space_size
+    #     for k, v in counter.items():
+    #         freq_arr[k] = v
+    #     freq_arr = np.array(freq_arr)
+    #     freq_arr = freq_arr * (1.0/np.sum(freq_arr))
+    #     print("Route:{0}".format(routes[idx]))
+    #     print("Policy Selection:{0}".format(distribution_selector[idx]))
+    #     print("Policy:{0}".format(final_policy[idx]))
+    #     print("Sampled Policy:{0}".format(freq_arr))
+    #     print("X")
+
+    # Simulate Proxy Loss
+    results = sess.run([logits,
+                        sparse_logits,
+                        policies,
+                        policy_selected,
+                        policies_tiled,
+                        sampled_actions_2d,
+                        log_policies_tiled,
+                        log_sampled_policies],
+                       feed_dict={state_input: states,
+                                  routes_input: routes,
+                                  rewards_input: rewards,
+                                  policy_selector: distribution_selector})
+    log_policy = results[-2]
+    log_sampled_policy = results[-1]
+    is_inf_array = np.isinf(log_sampled_policy)
+    assert not np.any(is_inf_array)
     print("X")
 
 
