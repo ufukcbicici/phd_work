@@ -4,7 +4,7 @@ from collections import Counter
 
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
-sample_count = 3
+sample_count = 25
 sample_repeat_count = 100
 state_dim = 10
 action_space_size = 4
@@ -135,16 +135,20 @@ def main():
     grads_arr = results[-1]
     is_inf_array = np.isinf(log_sampled_policy)
     assert not np.any(is_inf_array)
-    # dy/d(log_policies_tiled) -> Correct. Only selected actions are nonzero.
+    # dy/d(log_policies_tiled) -> Only selected actions are nonzero.
     selection_arr = np.zeros(shape=(_sampled_actions.shape[0], action_space_size))
     selection_arr[_sampled_actions[:, 0], _sampled_actions[:, 1]] = 1
     assert np.array_equal(selection_arr, (grads_arr[0] != 0.0).astype(np.int32))
-    # dy/d(policies_tiled) -> Correct. Only selected actions are nonzero.
+    # dy/d(policies_tiled) -> Only selected actions are nonzero.
     assert np.array_equal(selection_arr, (grads_arr[1] != 0.0).astype(np.int32))
-    # dy/d(policy_selected) -> Correct. Only selected actions are nonzero.
+    # dy/d(policy_selected) -> Sum of all tiled policies_tiled elements.
     tiled_grads = [grads_arr[1][_i*sample_count:(_i+1)*sample_count] for _i in range(sample_repeat_count)]
     sum_tiled_grads = np.sum(np.stack(tiled_grads, axis=len(tiled_grads[0].shape)), axis=-1)
     assert np.allclose(grads_arr[2], sum_tiled_grads)
+    # dy/d(policies) -> Whenever distribution_selector[row]=1 then dy/d(policies)[row] = dy/d(policy_selected)[row]
+    # Else: distribution_selector[row]=0
+    dy_d_policies_selected = np.copy(grads_arr[2])
+    assert np.array_equal(grads_arr[3], dy_d_policies_selected * np.expand_dims(distribution_selector, 1))
     print("X")
 
 
