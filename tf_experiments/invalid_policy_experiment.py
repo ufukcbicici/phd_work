@@ -4,8 +4,8 @@ from collections import Counter
 
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
-sample_count = 25
-sample_repeat_count = 100
+sample_count = 100
+sample_repeat_count = 10000
 state_dim = 10
 action_space_size = 4
 passive_weight = tf.constant(-1e+10)
@@ -163,6 +163,10 @@ def main():
     # else, both must be zero.
     dy_d_policies_non_modified = np.copy(grads_arr[4])
     assert np.array_equal(grads_arr[5] == 0.0, dy_d_policies_non_modified == 0.0)
+    # dy/d(logits) -> dy/d(sparse_logits) * routes = dy/d(logits)
+    dy_d_sparse_logits = np.copy(grads_arr[5])
+    dy_logits_calculated = dy_d_sparse_logits * routes
+    assert np.array_equal(grads_arr[6], dy_logits_calculated)
     print("X")
 
 
