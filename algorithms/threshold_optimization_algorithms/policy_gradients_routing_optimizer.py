@@ -316,7 +316,9 @@ class PolicyGradientsRoutingOptimizer(CombinatorialRoutingOptimizer):
         #                               policy_gradient_network.policySampleCount: policy_sample_size})
         results = sess.run([policy_gradient_network.optimizer,
                             policy_gradient_network.pi,
-                            policy_gradient_network.proxyPolicyValue],
+                            policy_gradient_network.proxyPolicyValue,
+                            policy_gradient_network.rewards,
+                            policy_gradient_network.rewardSamples],
                            feed_dict=feed_dict)
         print("Proxy value:{0}".format(results[-1]))
 
