@@ -78,7 +78,7 @@ def main():
         freq_arr = np.array(freq_arr)
         freq_arr = freq_arr * (1.0/np.sum(freq_arr))
         print("Route:{0}".format(routes[idx]))
-        print("Policy Selection{0}".format(distribution_selector[idx]))
+        print("Policy Selection:{0}".format(distribution_selector[idx]))
         print("Policy:{0}".format(final_policy[idx]))
         print("Sampled Policy:{0}".format(freq_arr))
         print("X")
