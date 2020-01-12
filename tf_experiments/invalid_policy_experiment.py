@@ -39,6 +39,11 @@ num_states = tf.gather_nd(prob_shape, [0])
 num_categories = tf.gather_nd(prob_shape, [1])
 sampled_actions_2d = tf.stack([tf.range(0, num_states, 1), sampled_actions], axis=1)
 log_sampled_policies = tf.gather_nd(log_policies_tiled, sampled_actions_2d)
+sampled_rewards = tf.gather_nd(rewards_input, sampled_actions_2d)
+trajectories = log_sampled_policies * sampled_rewards
+proxy_policy_value = tf.reduce_mean(trajectories)
+grads = tf.gradients(proxy_policy_value, [log_policies_tiled, policies_tiled, policy_selected,
+                                          policies, sparse_logits, logits])
 
 
 # uniform_distribution = tf.ones_like(logits) * tf.constant(1.0 / action_space_size)
@@ -102,7 +107,9 @@ def main():
                         policies_tiled,
                         sampled_actions_2d,
                         log_policies_tiled,
-                        log_sampled_policies],
+                        log_sampled_policies,
+                        proxy_policy_value,
+                        grads],
                        feed_dict={state_input: states,
                                   routes_input: routes,
                                   rewards_input: rewards,
