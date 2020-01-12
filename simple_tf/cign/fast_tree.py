@@ -823,10 +823,14 @@ class FastTreeNetwork(TreeNetwork):
             all_output_names = set(output_names)
             all_output_names.add("label_tensor")
         for output_name in all_output_names:
-            npz_file_name = os.path.abspath(os.path.join(directory_path, output_name))
-            dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)
-            data_dict = {int(k): v for k, v in dict_read.items()}
-            dict_of_data_dicts[output_name] = data_dict
+            try:
+                npz_file_name = os.path.abspath(os.path.join(directory_path, output_name))
+                dict_read = UtilityFuncs.load_npz(file_name=npz_file_name)
+                data_dict = {int(k): v for k, v in dict_read.items()}
+                dict_of_data_dicts[output_name] = data_dict
+            except:
+                print("Data for {0} does not exist.".format(output_name))
+        assert "label_tensor" in dict_of_data_dicts
         label_data = dict_of_data_dicts["label_tensor"]
         label_list = list(label_data.values())[0]
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
