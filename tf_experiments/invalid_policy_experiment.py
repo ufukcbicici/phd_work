@@ -9,6 +9,7 @@ sample_repeat_count = 10000
 state_dim = 64
 action_space_size = 4
 passive_weight = tf.constant(-1e+10)
+epsilon_prob = tf.constant(1e+3)
 hiddenLayers = [128, action_space_size]
 
 state_input = tf.placeholder(dtype=tf.float32, shape=[None, state_dim], name="inputs")
@@ -27,6 +28,7 @@ logits = net
 passive_weights_matrix = tf.ones_like(routes_input, dtype=tf.float32) * passive_weight
 sparse_logits = tf.where(tf.cast(routes_input, tf.bool), logits, passive_weights_matrix)
 policies = tf.nn.softmax(sparse_logits)
+policies = policies + tf.where(tf.cast(routes_input, tf.bool), 0.0, epsilon_prob)
 uniform_distribution = tf.ones_like(logits) * tf.constant(1.0 / action_space_size)
 policy_selected = tf.where(tf.cast(policy_selector, tf.bool), policies, uniform_distribution)
 # Sample from the policies
@@ -42,8 +44,12 @@ log_sampled_policies = tf.gather_nd(log_policies_tiled, sampled_actions_2d)
 sampled_rewards = tf.gather_nd(rewards_input, sampled_actions_2d)
 trajectories = log_sampled_policies * sampled_rewards
 proxy_policy_value = tf.reduce_mean(trajectories)
-grads = tf.gradients(proxy_policy_value, [log_policies_tiled, policies_tiled, policy_selected,
-                                          policies, sparse_logits, logits])
+grads = tf.gradients(proxy_policy_value, [log_policies_tiled,
+                                          policies_tiled,
+                                          policy_selected,
+                                          policies,
+                                          sparse_logits,
+                                          logits])
 
 
 # uniform_distribution = tf.ones_like(logits) * tf.constant(1.0 / action_space_size)
@@ -115,9 +121,20 @@ def main():
                                   rewards_input: rewards,
                                   policy_selector: distribution_selector})
     log_policy = results[-2]
-    log_sampled_policy = results[-1]
+    log_sampled_policy = results[-3]
+    _sampled_actions = results[5]
     is_inf_array = np.isinf(log_sampled_policy)
     assert not np.any(is_inf_array)
+
+    # grads = tf.gradients(proxy_policy_value, [log_policies_tiled,
+    #                                           policies_tiled,
+    #                                           policy_selected,
+    #                                           policies,
+    #                                           sparse_logits,
+    #                                           logits])
+
+    # dy/d(log_policies_tiled) -> Correct. Only selected actions are nonzero.
+    # dy/d(policies_tiled) -> Correct. Only selected actions are nonzero.
     print("X")
 
 
