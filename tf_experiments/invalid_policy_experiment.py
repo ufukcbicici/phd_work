@@ -34,12 +34,17 @@ policies = policies_non_modified + tf.where(tf.cast(routes_input, tf.bool),
                                             tf.ones_like(policies_non_modified, dtype=tf.float32) * epsilon_prob)
 uniform_distribution = tf.ones_like(logits) * tf.constant(1.0 / action_space_size)
 policy_selected = tf.where(tf.cast(policy_selector, tf.bool), policies, uniform_distribution)
+policies_selected_for_sampling = tf.where(tf.cast(policy_selector, tf.bool), policies_non_modified,
+                                          uniform_distribution)
+
 # Sample from the policies
+policies_tiled_for_sampling = tf.tile(policies_selected_for_sampling, [sample_repeat_count_input, 1])
+sampled_actions = FastTreeNetwork.sample_from_categorical_v2(probs=policies_tiled_for_sampling)
+
+# Build Proxy Loss
 policies_tiled = tf.tile(policy_selected, [sample_repeat_count_input, 1])
 rewards_tiled = tf.tile(rewards_input, [sample_repeat_count_input, 1])
 log_policies_tiled = tf.log(policies_tiled)
-sampled_actions = FastTreeNetwork.sample_from_categorical_v2(probs=policies_tiled)
-# Build Proxy Loss
 prob_shape = tf.shape(policies_tiled)
 num_states = tf.gather_nd(prob_shape, [0])
 num_categories = tf.gather_nd(prob_shape, [1])
@@ -149,6 +154,15 @@ def main():
     # Else: distribution_selector[row]=0
     dy_d_policies_selected = np.copy(grads_arr[2])
     assert np.array_equal(grads_arr[3], dy_d_policies_selected * np.expand_dims(distribution_selector, 1))
+    # dy/d(policies_non_modified) -> Must be equal to dy/d(policies)
+    # Else: distribution_selector[row]=0
+    dy_d_policies = np.copy(grads_arr[3])
+    assert np.array_equal(grads_arr[4], dy_d_policies)
+    # dy/d(sparse_logits) -> Whenever distribution_selector[row]=1 then
+    # both dy/d(policies_non_modified)[row] and dy/d(sparse_logits)[row] must be non-zero.
+    # else, both must be zero.
+    dy_d_policies_non_modified = np.copy(grads_arr[4])
+    assert np.array_equal(grads_arr[5] == 0.0, dy_d_policies_non_modified == 0.0)
     print("X")
 
 
