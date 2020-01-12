@@ -4,7 +4,7 @@ from collections import Counter
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 sample_count = 1000
-sample_repeat_count = 1000
+sample_repeat_count = 10000
 state_dim = 64
 action_space_size = 4
 passive_weight = tf.constant(-1e+10)
@@ -76,9 +76,11 @@ def main():
         for k, v in counter.items():
             freq_arr[k] = v
         freq_arr = np.array(freq_arr)
-        freq_arr /= np.sum(freq_arr)
+        freq_arr = freq_arr * (1.0/np.sum(freq_arr))
+        print("Route:{0}".format(routes[idx]))
+        print("Policy Selection{0}".format(distribution_selector[idx]))
         print("Policy:{0}".format(final_policy[idx]))
-        print(("Sampled Policy:{0}".format(freq_arr)))
+        print("Sampled Policy:{0}".format(freq_arr))
         print("X")
     # Sample actions
 
