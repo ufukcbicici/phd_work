@@ -688,6 +688,7 @@ ORDER BY AvgValidationAccuracy DESC
 
 ***************************************************************************************************************
 02.09.2019 - TRUBA dblogger2_cign.db
+-Run67 is here!!!
 -[2, 2] Resnet-50 CIGN
 -Resnet-50 CIFAR-100 CIGN, Info Gain Balance Coefficient: [1.0]
 -Wd: classification_wd = [0.00035, 0.0004, 0.00045, 0.0005] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR

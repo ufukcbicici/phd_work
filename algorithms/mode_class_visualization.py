@@ -11,6 +11,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 
 
 class ModeVisualizer:
+    MAX_CLASS_COUNT_IN_LEAF_DISTRIBUTION = 25
     def __init__(self, network, dataset, run_id, iteration, data_type, output_names):
         self.network = network
         self.dataset = dataset
@@ -61,6 +62,35 @@ class ModeVisualizer:
             mode_labels = label_freq_pairs[0: cut_off_idx]
             self.plot_mode_images_v3(dataset=dataset, node=node, mode_labels=mode_labels,
                                      sample_count_per_class=sample_count_per_class)
+        self.plot_leaf_distribution(leaf_distribution_matrix=leaf_distribution_matrix)
+        print("X")
+
+    def plot_leaf_distribution(self, leaf_distribution_matrix):
+        max_class_count = ModeVisualizer.MAX_CLASS_COUNT_IN_LEAF_DISTRIBUTION
+        for idx in range(0, len(leaf_distribution_matrix), max_class_count):
+            mat = leaf_distribution_matrix[idx:idx + max_class_count, :]
+            label_ids = ["Class #{0}".format(idx + jdx) for jdx in range(mat.shape[0])]
+            node_ids = ["Node #{0}".format(l_n.index) for l_n in self.leafNodes]
+
+            fig, ax = plt.subplots(figsize=(7.5, 7.5))
+            im = ax.imshow(mat)
+            ax.set_xticks(np.arange(len(node_ids)))
+            ax.set_yticks(np.arange(len(label_ids)))
+            ax.set_xticklabels(node_ids)
+            ax.set_yticklabels(label_ids)
+            ax.tick_params(labelsize=7)
+            plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+            for i in range(len(label_ids)):
+                for j in range(len(node_ids)):
+                    text = ax.text(j, i, int(mat[i, j]),
+                                   ha="center", va="center", color="w", fontsize=10)
+
+            ax.set_title("Class distribution on leaf nodes")
+            fig.tight_layout()
+            plt.show()
+            fig.savefig("Leaf_distribution_Ids_({0}-{1}).png".format(idx, idx + max_class_count))
+            # plt.savefig("Leaf_distribution_Ids_({0}-{1}).png".format(idx, idx + max_class_count))
             print("X")
 
     def plot_mode_images_v3(self, dataset, node, mode_labels, sample_count_per_class, column_count=2):
