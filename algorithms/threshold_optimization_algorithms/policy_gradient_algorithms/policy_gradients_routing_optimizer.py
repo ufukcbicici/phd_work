@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from algorithms.threshold_optimization_algorithms.combinatorial_routing_optimizer import CombinatorialRoutingOptimizer
+from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.combinatorial_routing_optimizer import CombinatorialRoutingOptimizer
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 

@@ -1,8 +1,4 @@
-import numpy as np
 import tensorflow as tf
-from algorithms.threshold_optimization_algorithms.combinatorial_routing_optimizer import CombinatorialRoutingOptimizer
-from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
 class PolicyGradientsNetwork:
@@ -19,6 +15,9 @@ class PolicyGradientsNetwork:
         self.rewards = []
 
     def build_policy_networks(self):
+        pass
+
+    def state_transition(self, history):
         pass
 
     def build_policy_gradient_loss(self):
