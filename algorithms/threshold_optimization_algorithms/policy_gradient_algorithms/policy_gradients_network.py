@@ -56,6 +56,9 @@ class PolicyGradientsNetwork:
     def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         pass
 
+    def get_max_trajectory_length(self):
+        pass
+
     def state_transition(self, history):
         pass
 
@@ -69,19 +72,20 @@ class PolicyGradientsNetwork:
         pass
 
     def build_network(self):
-        # State inputs and reward inputs
-        for t in range(self.trajectoryMaxLength):
-            # States
-            input_shape = [None]
-            input_shape.extend(self.stateShapes[t])
-            state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
-            self.inputs.append(state_input)
-            # Rewards
-            reward_shape = [None, len(self.actionSpaces[t])]
-            reward_input = tf.placeholder(dtype=tf.float32, shape=reward_shape, name="rewards_{0}".format(t))
-            self.rewards.append(reward_input)
-        # Build policy generating networks; self.policies are filled.
-        self.build_policy_networks()
+        pass
+        # # State inputs and reward inputs
+        # for t in range(self.trajectoryMaxLength):
+        #     # States
+        #     input_shape = [None]
+        #     input_shape.extend(self.stateShapes[t])
+        #     state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
+        #     self.inputs.append(state_input)
+        #     # Rewards
+        #     reward_shape = [None, len(self.actionSpaces[t])]
+        #     reward_input = tf.placeholder(dtype=tf.float32, shape=reward_shape, name="rewards_{0}".format(t))
+        #     self.rewards.append(reward_input)
+        # # Build policy generating networks; self.policies are filled.
+        # self.build_policy_networks()
 
     def get_l2_loss(self):
         # L2 Loss
@@ -120,4 +124,7 @@ class PolicyGradientsNetwork:
                                              ml_selections_arr=self.validationMLPaths,
                                              state_sample_count=state_sample_count,
                                              samples_per_state=samples_per_state)
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            print("X")
 

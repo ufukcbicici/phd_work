@@ -49,6 +49,9 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         history.states.append(initial_state_vectors)
         return history
 
+    def get_max_trajectory_length(self):
+        return self.network.depth - 1
+
     def state_transition(self, history):
         pass
 
