@@ -24,6 +24,8 @@ class PolicyGradientsNetwork:
         self.inputs = []
         self.policies = []
         self.rewards = []
+        self.validationFeaturesDict = {}
+        self.testFeaturesDict = {}
         # Prepare CIGN topology data.
         self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
@@ -37,14 +39,19 @@ class PolicyGradientsNetwork:
         self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=test_ratio)
         self.validationMLPaths = self.get_max_likelihood_paths( branch_probs=self.validationData.get_dict("branch_probs"))
         self.testMLPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
+        self.validationFeaturesDict = self.prepare_state_features(data=self.validationData)
+        self.testFeaturesDict = self.prepare_state_features(data=self.testData)
 
-    def build_policy_networks(self):
+    def prepare_state_features(self, data):
         pass
 
-    def sample_initial_states(self, data, state_sample_count, samples_per_state):
+    def sample_initial_states(self, data, features_dict, state_sample_count, samples_per_state):
         pass
 
     def state_transition(self, history):
+        pass
+
+    def build_policy_networks(self):
         pass
 
     def prepare_sampling_feed_dict(self, curr_time_step):

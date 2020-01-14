@@ -16,25 +16,29 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     def __init__(self, l2_lambda,
                  network_name, run_id, iteration, degree_list, data_type, output_names,
                  test_ratio=0.2):
-        super().__init__(l2_lambda,
-                 network_name, run_id, iteration, degree_list, data_type, output_names, test_ratio=test_ratio)
-
-    def sample_initial_states(self, data, state_sample_count, samples_per_state):
-        total_sample_count = data.labelList.shape[0]
-        sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
-        sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
-
-    def state_transition(self, history):
-        pass
+        super().__init__(l2_lambda, network_name, run_id, iteration, degree_list, data_type, output_names,
+                         test_ratio=test_ratio)
 
     def prepare_state_features(self, data):
         # Prepare Policy Gradients State Data
         root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
         assert len(root_node) == 1
+        features_dict = {}
         for node in self.innerNodes:
-            array_list = []
+            array_list = [data.get_dict(feature_name)[node.index] for feature_name in self.networkFeatureNames]
+            feature_vectors = np.concatenate(array_list, axis=-1)
+            features_dict[node.index] = feature_vectors
+        return features_dict
 
+    def sample_initial_states(self, data, features_dict, state_sample_count, samples_per_state):
+        total_sample_count = data.labelList.shape[0]
+        sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
+        sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
+        feature_arr = features_dict[self.network.topologicalSortedNodes[0].index]
+        initial_states = features_dict[sample_indices, :]
 
+    def state_transition(self, history):
+        pass
 
 
     # def prepare_sampling_feed_dict(self, curr_time_step):
