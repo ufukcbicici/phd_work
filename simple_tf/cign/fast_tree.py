@@ -833,7 +833,12 @@ class FastTreeNetwork(TreeNetwork):
         assert "label_tensor" in dict_of_data_dicts
         label_data = dict_of_data_dicts["label_tensor"]
         label_list = list(label_data.values())[0]
+        # Check the integrity of all the loaded data.
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
+        for k, data_dict in dict_of_data_dicts.values():
+            for arr in data_dict.values():
+                assert arr.shape[0] == label_list.shape[0]
+        # Load node cost information.
         try:
             self.nodeCosts = pickle.load(open(os.path.abspath(os.path.join(directory_path, "nodeCosts.sav")), 'rb'))
             dict_of_data_dicts["nodeCosts"] = self.nodeCosts
