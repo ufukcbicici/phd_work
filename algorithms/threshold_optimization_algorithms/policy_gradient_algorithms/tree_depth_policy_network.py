@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.policy_gradients_network import \
-    PolicyGradientsNetwork
+    PolicyGradientsNetwork, TrajectoryHistory
 
 
 class TreeDepthState:
@@ -25,7 +25,15 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         assert len(root_node) == 1
         features_dict = {}
         for node in self.innerNodes:
-            array_list = [data.get_dict(feature_name)[node.index] for feature_name in self.networkFeatureNames]
+            # array_list = [data.get_dict(feature_name)[node.index] for feature_name in self.networkFeatureNames]
+            array_list = []
+            for feature_name in self.networkFeatureNames:
+                feature_arr = data.get_dict(feature_name)[node.index]
+                if len(feature_arr.shape) > 2:
+                    shape_as_list = list(feature_arr.shape)
+                    mean_axes = tuple(shape_as_list[1:-1])
+                    feature_arr = np.mean(feature_arr, axis=mean_axes)
+                array_list.append(feature_arr)
             feature_vectors = np.concatenate(array_list, axis=-1)
             features_dict[node.index] = feature_vectors
         return features_dict
@@ -36,9 +44,10 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
         feature_arr = features_dict[self.network.topologicalSortedNodes[0].index]
         initial_state_vectors = feature_arr[sample_indices, :]
-        tree_depth_states = TreeDepthState(state_ids=sample_indices, state_vecs=initial_state_vectors,
-                                           max_likelihood_selections=ml_selections_arr)
-        return tree_depth_states
+        state_ml_selections = ml_selections_arr[sample_indices, :]
+        history = TrajectoryHistory(state_ids=sample_indices, max_likelihood_routes=state_ml_selections)
+        history.states.append(initial_state_vectors)
+        return history
 
     def state_transition(self, history):
         pass

@@ -5,11 +5,19 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
-class MarkovDecisionProcessTimeStep:
-    def __init__(self, s, a=None, r=None):
-        self.state = s
-        self.action = a
-        self.reward = r
+# class MarkovDecisionProcessTimeStep:
+#     def __init__(self, s, a=None, r=None):
+#         self.state = s
+#         self.action = a
+#         self.reward = r
+
+class TrajectoryHistory:
+    def __init__(self, state_ids, max_likelihood_routes):
+        self.stateIds = state_ids
+        self.maxLikelihoodRoutes = max_likelihood_routes
+        self.states = []
+        self.actions = []
+        self.rewards = []
 
 
 class PolicyGradientsNetwork:
