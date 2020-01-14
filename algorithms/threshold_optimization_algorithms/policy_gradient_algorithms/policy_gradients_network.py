@@ -114,32 +114,10 @@ class PolicyGradientsNetwork:
         return max_likelihood_paths
 
     def sample_trajectories(self, sess, data, state_sample_count, samples_per_state):
-        pass
-        # history = []
-        # total_sample_count = data.labelList.shape[0]
-        # # Sample from s1 ~ p(s1)
-        # sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
-        # sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
-        # for t in range(self.trajectoryMaxLength):
-
-
-
-
-            # # Sample actions from the policy pi_{t}(a_t|history(t))
-            # feed_dict = self.prepare_sampling_feed_dict(curr_time_step=t)
-
-
-
-
-        # for t in range(self.trajectoryMaxLength):
-        #     # Sample actions from the policy pi_{t}(a_t|history(t))
-        #     feed_dict = self.prepare_sampling_feed_dict(curr_time_step=t)
-        #
-
-
-
-
-            # sess.run(self.policies[t], feed_dict)
-
-
+        # Sample from s1 ~ p(s1)
+        history = self.sample_initial_states(data=data,
+                                             features_dict=self.validationFeaturesDict,
+                                             ml_selections_arr=self.validationMLPaths,
+                                             state_sample_count=state_sample_count,
+                                             samples_per_state=samples_per_state)
 
