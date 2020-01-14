@@ -6,10 +6,10 @@ from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.pol
 
 
 class TreeDepthState:
-    def __init__(self, state_id, state_vec, max_likelihood_selection):
-        self.id = state_id
-        self.stateVector = state_vec
-        self.maxLikelihoodSelection = max_likelihood_selection
+    def __init__(self, state_ids, state_vecs, max_likelihood_selections):
+        self.stateIds = state_ids
+        self.stateVectors = state_vecs
+        self.maxLikelihoodSelections = max_likelihood_selections
 
 
 class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
@@ -30,13 +30,15 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             features_dict[node.index] = feature_vectors
         return features_dict
 
-    def sample_initial_states(self, data, features_dict, state_sample_count, samples_per_state):
+    def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         total_sample_count = data.labelList.shape[0]
         sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
         sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
         feature_arr = features_dict[self.network.topologicalSortedNodes[0].index]
-        initial_state_vectors = features_dict[sample_indices, :]
-        states = [for idx in sample_indices]
+        initial_state_vectors = feature_arr[sample_indices, :]
+        tree_depth_states = TreeDepthState(state_ids=sample_indices, state_vecs=initial_state_vectors,
+                                           max_likelihood_selections=ml_selections_arr)
+        return tree_depth_states
 
     def state_transition(self, history):
         pass

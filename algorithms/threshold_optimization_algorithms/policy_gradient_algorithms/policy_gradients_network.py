@@ -45,7 +45,7 @@ class PolicyGradientsNetwork:
     def prepare_state_features(self, data):
         pass
 
-    def sample_initial_states(self, data, features_dict, state_sample_count, samples_per_state):
+    def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         pass
 
     def state_transition(self, history):
