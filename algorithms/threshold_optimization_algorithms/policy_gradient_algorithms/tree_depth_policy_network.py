@@ -35,7 +35,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
         sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
         feature_arr = features_dict[self.network.topologicalSortedNodes[0].index]
-        initial_states = features_dict[sample_indices, :]
+        initial_state_vectors = features_dict[sample_indices, :]
+        states = [for idx in sample_indices]
 
     def state_transition(self, history):
         pass
