@@ -14,10 +14,10 @@ class TreeDepthState:
 
 class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     def __init__(self, l2_lambda,
-                 network_name, run_id, iteration, degree_list, data_type, output_names,
+                 network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
                  test_ratio=0.2):
         super().__init__(l2_lambda, network_name, run_id, iteration, degree_list, data_type, output_names,
-                         test_ratio=test_ratio)
+                         used_feature_names, test_ratio=test_ratio)
 
     def prepare_state_features(self, data):
         # Prepare Policy Gradients State Data
@@ -73,6 +73,7 @@ def main():
 
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
+    used_output_names = ["pre_branch_feature"]
     policy_gradients_routing_optimizer = TreeDepthPolicyNetwork(l2_lambda=0.0,
                                                                 network_name=network_name,
                                                                 run_id=run_id,
@@ -80,6 +81,7 @@ def main():
                                                                 degree_list=[2, 2],
                                                                 data_type="test",
                                                                 output_names=output_names,
+                                                                used_feature_names=used_output_names,
                                                                 test_ratio=0.2)
     state_sample_count = policy_gradients_routing_optimizer.validationData.labelList.shape[0]
     samples_per_state = 100

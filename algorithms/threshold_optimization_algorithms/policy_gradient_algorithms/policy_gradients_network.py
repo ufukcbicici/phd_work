@@ -22,10 +22,11 @@ class TrajectoryHistory:
 
 class PolicyGradientsNetwork:
     def __init__(self, l2_lambda,
-                 network_name, run_id, iteration, degree_list, data_type, output_names,
+                 network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
                  test_ratio=0.2):
         self.actionSpaces = None
         self.networkFeatureNames = output_names
+        self.usedFeatureNames = used_feature_names
         self.l2Lambda = l2_lambda
         self.paramL2Norms = {}
         self.l2Loss = None

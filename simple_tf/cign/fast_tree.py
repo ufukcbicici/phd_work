@@ -835,7 +835,7 @@ class FastTreeNetwork(TreeNetwork):
         label_list = list(label_data.values())[0]
         # Check the integrity of all the loaded data.
         assert all([np.array_equal(label_list, arr) for idx, arr in label_data.items()])
-        for k, data_dict in dict_of_data_dicts.values():
+        for k, data_dict in dict_of_data_dicts.items():
             for arr in data_dict.values():
                 assert arr.shape[0] == label_list.shape[0]
         # Load node cost information.
