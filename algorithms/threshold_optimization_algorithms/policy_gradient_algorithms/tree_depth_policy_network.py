@@ -55,7 +55,39 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     def state_transition(self, history):
         pass
 
+    def train(self, state_sample_count, samples_per_state):
+        self.sample_initial_states(data=self.validationData,
+                                   features_dict=self.validationFeaturesDict,
+                                   ml_selections_arr=self.validationMLPaths,
+                                   state_sample_count=state_sample_count,
+                                   samples_per_state=samples_per_state)
 
+def main():
+    # run_id = 715
+    # network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
+    # iteration = 119100
+
+    run_id = 453
+    network_name = "FashionNet_Lite"
+    iteration = 43680
+
+    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
+                    "pre_branch_feature"]
+    policy_gradients_routing_optimizer = TreeDepthPolicyNetwork(l2_lambda=0.0,
+                                                                network_name=network_name,
+                                                                run_id=run_id,
+                                                                iteration=iteration,
+                                                                degree_list=[2, 2],
+                                                                data_type="test",
+                                                                output_names=output_names,
+                                                                test_ratio=0.2)
+    state_sample_count = policy_gradients_routing_optimizer.validationData.labelList.shape[0]
+    samples_per_state = 100
+    policy_gradients_routing_optimizer.train(state_sample_count=state_sample_count, samples_per_state=samples_per_state)
+
+
+if __name__ == "__main__":
+    main()
     # def prepare_sampling_feed_dict(self, curr_time_step):
     #     feed_dict = {}
     #     for tau in range(curr_time_step):

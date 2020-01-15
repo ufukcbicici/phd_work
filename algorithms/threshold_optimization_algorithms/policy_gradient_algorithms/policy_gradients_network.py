@@ -73,6 +73,9 @@ class PolicyGradientsNetwork:
 
     def build_network(self):
         pass
+
+    def train(self, state_sample_count, samples_per_state):
+        pass
         # # State inputs and reward inputs
         # for t in range(self.trajectoryMaxLength):
         #     # States
