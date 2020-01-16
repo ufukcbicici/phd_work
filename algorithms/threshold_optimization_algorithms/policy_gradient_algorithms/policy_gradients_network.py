@@ -50,13 +50,17 @@ class PolicyGradientsNetwork:
         self.testMLPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
         self.validationFeaturesDict = self.prepare_state_features(data=self.validationData)
         self.testFeaturesDict = self.prepare_state_features(data=self.testData)
+        self.build_action_spaces()
 
+    # OK
     def prepare_state_features(self, data):
         pass
 
+    # OK
     def build_action_spaces(self):
         pass
 
+    # OK
     def build_policy_networks(self):
         pass
 

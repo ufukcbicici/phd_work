@@ -15,7 +15,9 @@ class TreeDepthState:
 class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     def __init__(self, l2_lambda,
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
-                 test_ratio=0.2):
+                 hidden_layers, test_ratio=0.2):
+        self.hiddenLayers = hidden_layers
+        assert len(self.hiddenLayers) == self.get_max_trajectory_length()
         super().__init__(l2_lambda, network_name, run_id, iteration, degree_list, data_type, output_names,
                          used_feature_names, test_ratio=test_ratio)
 
@@ -40,7 +42,19 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
 
     def build_action_spaces(self):
         max_trajectory_length = self.get_max_trajectory_length()
-
+        self.actionSpaces = []
+        for t in range(max_trajectory_length):
+            next_level_node_count = len(self.network.orderedNodesPerLevel[t+1])
+            action_count = (2 ** next_level_node_count) - 1
+            action_space = {}
+            for action_id in range(action_count):
+                action_code = action_id + 1
+                l = [int(x) for x in list('{0:0b}'.format(action_code))]
+                k = [0] * (next_level_node_count - len(l))
+                k.extend(l)
+                binary_node_selection = tuple(k)
+                action_space[action_id] = binary_node_selection
+            self.actionSpaces.append(action_space)
 
     def build_policy_networks(self):
         max_trajectory_length = self.get_max_trajectory_length()
@@ -57,6 +71,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
             self.inputs.append(state_input)
             # Create the policy network
+
 
     # # State inputs and reward inputs
     # for t in range(self.trajectoryMaxLength):
@@ -120,7 +135,8 @@ def main():
                                                                 data_type="test",
                                                                 output_names=output_names,
                                                                 used_feature_names=used_output_names,
-                                                                test_ratio=0.2)
+                                                                test_ratio=0.2,
+                                                                hidden_layers=[[128], [256]])
     state_sample_count = policy_gradients_routing_optimizer.validationData.labelList.shape[0]
     samples_per_state = 100
     policy_gradients_routing_optimizer.train(state_sample_count=state_sample_count, samples_per_state=samples_per_state)
