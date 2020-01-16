@@ -56,11 +56,12 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         pass
 
     def train(self, state_sample_count, samples_per_state):
-        self.sample_initial_states(data=self.validationData,
-                                   features_dict=self.validationFeaturesDict,
-                                   ml_selections_arr=self.validationMLPaths,
-                                   state_sample_count=state_sample_count,
-                                   samples_per_state=samples_per_state)
+        sess = tf.Session()
+        self.sample_trajectories(sess=sess, data=self.validationData, features_dict=self.validationFeaturesDict,
+                                 ml_selections_arr=self.validationMLPaths, state_sample_count=state_sample_count,
+                                 samples_per_state=samples_per_state)
+        print("X")
+
 
 def main():
     # run_id = 715
