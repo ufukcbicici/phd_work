@@ -17,6 +17,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
                  hidden_layers, test_ratio=0.2):
         self.hiddenLayers = hidden_layers
+        self.logits = []
         assert len(self.hiddenLayers) == self.get_max_trajectory_length()
         super().__init__(l2_lambda, network_name, run_id, iteration, degree_list, data_type, output_names,
                          used_feature_names, test_ratio=test_ratio)
@@ -71,21 +72,16 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
             self.inputs.append(state_input)
             # Create the policy network
-
-
-    # # State inputs and reward inputs
-    # for t in range(self.trajectoryMaxLength):
-    #     # States
-    #     input_shape = [None]
-    #     input_shape.extend(self.stateShapes[t])
-    #     state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
-    #     self.inputs.append(state_input)
-    #     # Rewards
-    #     reward_shape = [None, len(self.actionSpaces[t])]
-    #     reward_input = tf.placeholder(dtype=tf.float32, shape=reward_shape, name="rewards_{0}".format(t))
-    #     self.rewards.append(reward_input)
-    # # Build policy generating networks; self.policies are filled.
-    # self.build_policy_networks()
+            hidden_layers = list(self.hiddenLayers[t])
+            hidden_layers.append(len(self.actionSpaces[t]))
+            net = self.inputs[t]
+            for layer_id, layer_dim in enumerate(hidden_layers):
+                if layer_id < len(hidden_layers) - 1:
+                    net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+                else:
+                    net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
+            self.logits.append(net)
+            self.policies.append(tf.nn.softmax(self.logits))
 
     def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         total_sample_count = data.labelList.shape[0]
