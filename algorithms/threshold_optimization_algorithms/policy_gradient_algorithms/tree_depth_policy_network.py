@@ -27,11 +27,11 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         for node in self.innerNodes:
             # array_list = [data.get_dict(feature_name)[node.index] for feature_name in self.networkFeatureNames]
             array_list = []
-            for feature_name in self.networkFeatureNames:
+            for feature_name in self.usedFeatureNames:
                 feature_arr = data.get_dict(feature_name)[node.index]
                 if len(feature_arr.shape) > 2:
                     shape_as_list = list(feature_arr.shape)
-                    mean_axes = tuple(shape_as_list[1:-1])
+                    mean_axes = tuple([i for i in range(1, len(shape_as_list) - 1, 1)])
                     feature_arr = np.mean(feature_arr, axis=mean_axes)
                 array_list.append(feature_arr)
             feature_vectors = np.concatenate(array_list, axis=-1)
