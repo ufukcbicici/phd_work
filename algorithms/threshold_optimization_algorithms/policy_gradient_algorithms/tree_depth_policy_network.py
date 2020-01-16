@@ -17,7 +17,6 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
                  hidden_layers, test_ratio=0.2):
         self.hiddenLayers = hidden_layers
-        self.logits = []
         assert len(self.hiddenLayers) == self.get_max_trajectory_length()
         super().__init__(l2_lambda, network_name, run_id, iteration, degree_list, data_type, output_names,
                          used_feature_names, test_ratio=test_ratio)
@@ -57,31 +56,18 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                 action_space[action_id] = binary_node_selection
             self.actionSpaces.append(action_space)
 
-    def build_policy_networks(self):
-        max_trajectory_length = self.get_max_trajectory_length()
-        for t in range(max_trajectory_length):
-            # Create state input for the time step t
-            input_shape = [None]
-            ordered_nodes_at_level = self.network.orderedNodesPerLevel[t]
-            inputs_list = [self.validationFeaturesDict[node.index] for node in ordered_nodes_at_level]
-            shape_set = {input_arr.shape for input_arr in inputs_list}
-            assert len(shape_set) == 1
-            concated_feat = np.concatenate(inputs_list, axis=-1)
-            input_shape.extend(concated_feat.shape[1:])
-            input_shape = tuple(input_shape)
-            state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
-            self.inputs.append(state_input)
-            # Create the policy network
-            hidden_layers = list(self.hiddenLayers[t])
-            hidden_layers.append(len(self.actionSpaces[t]))
-            net = self.inputs[t]
-            for layer_id, layer_dim in enumerate(hidden_layers):
-                if layer_id < len(hidden_layers) - 1:
-                    net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
-                else:
-                    net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
-            self.logits.append(net)
-            self.policies.append(tf.nn.softmax(self.logits))
+    def build_policy_networks(self, time_step):
+        # Create the policy network
+        hidden_layers = list(self.hiddenLayers[time_step])
+        hidden_layers.append(len(self.actionSpaces[time_step]))
+        net = self.inputs[time_step]
+        for layer_id, layer_dim in enumerate(hidden_layers):
+            if layer_id < len(hidden_layers) - 1:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+            else:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
+        self.logits.append(net)
+        self.policies.append(tf.nn.softmax(self.logits))
 
     def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         total_sample_count = data.labelList.shape[0]

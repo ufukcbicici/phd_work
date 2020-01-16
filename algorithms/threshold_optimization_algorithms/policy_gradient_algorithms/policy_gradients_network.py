@@ -31,6 +31,7 @@ class PolicyGradientsNetwork:
         self.paramL2Norms = {}
         self.l2Loss = None
         self.inputs = []
+        self.logits = []
         self.policies = []
         self.rewards = []
         self.validationFeaturesDict = {}
@@ -61,8 +62,35 @@ class PolicyGradientsNetwork:
         pass
 
     # OK
-    def build_policy_networks(self):
+    def build_networks(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            self.build_state_inputs(time_step=t)
+            self.build_policy_networks(time_step=t)
+
+    # OK
+    def build_state_inputs(self, time_step):
+        ordered_nodes_at_level = self.network.orderedNodesPerLevel[time_step]
+        inputs_list = [self.validationFeaturesDict[node.index] for node in ordered_nodes_at_level]
+        shape_set = {input_arr.shape for input_arr in inputs_list}
+        assert len(shape_set) == 1
+        concated_feat = np.concatenate(inputs_list, axis=-1)
+        input_shape = [None]
+        input_shape.extend(concated_feat.shape[1:])
+        input_shape = tuple(input_shape)
+        state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(time_step))
+        self.inputs.append(state_input)
+
+    # OK
+    def build_policy_networks(self, time_step):
         pass
+
+    # OK
+    def build_rewards(self, time_step):
+        action_count = self.actionSpaces[time_step]
+        reward_input = tf.placeholder(dtype=tf.float32, shape=[None, action_count],
+                                      name="rewards_{0}".format(time_step))
+        self.rewards.append(reward_input)
 
     def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         pass
