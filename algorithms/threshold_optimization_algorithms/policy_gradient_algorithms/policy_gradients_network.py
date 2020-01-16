@@ -34,6 +34,9 @@ class PolicyGradientsNetwork:
         self.logits = []
         self.policies = []
         self.rewards = []
+        self.weightedRewardMatrices = []
+        self.valueFunctions = None
+        self.policyValue = None
         self.validationFeaturesDict = {}
         self.testFeaturesDict = {}
         # Prepare CIGN topology data.
@@ -67,6 +70,7 @@ class PolicyGradientsNetwork:
         for t in range(max_trajectory_length):
             self.build_state_inputs(time_step=t)
             self.build_policy_networks(time_step=t)
+            self.build_rewards(time_step=t)
 
     # OK
     def build_state_inputs(self, time_step):
