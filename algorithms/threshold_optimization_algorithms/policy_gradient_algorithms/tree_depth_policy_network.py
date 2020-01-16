@@ -66,8 +66,9 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
             else:
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
-        self.logits.append(net)
-        self.policies.append(tf.nn.softmax(self.logits))
+        _logits = net
+        self.logits.append(_logits)
+        self.policies.append(tf.nn.softmax(_logits))
 
     def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         total_sample_count = data.labelList.shape[0]

@@ -55,6 +55,7 @@ class PolicyGradientsNetwork:
         self.validationFeaturesDict = self.prepare_state_features(data=self.validationData)
         self.testFeaturesDict = self.prepare_state_features(data=self.testData)
         self.build_action_spaces()
+        self.build_networks()
 
     # OK
     def prepare_state_features(self, data):
