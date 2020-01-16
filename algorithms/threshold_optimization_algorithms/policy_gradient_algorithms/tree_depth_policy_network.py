@@ -38,6 +38,40 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             features_dict[node.index] = feature_vectors
         return features_dict
 
+    def build_action_spaces(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+
+
+    def build_policy_networks(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            # Create state input for the time step t
+            input_shape = [None]
+            ordered_nodes_at_level = self.network.orderedNodesPerLevel[t]
+            inputs_list = [self.validationFeaturesDict[node.index] for node in ordered_nodes_at_level]
+            shape_set = {input_arr.shape for input_arr in inputs_list}
+            assert len(shape_set) == 1
+            concated_feat = np.concatenate(inputs_list, axis=-1)
+            input_shape.extend(concated_feat.shape[1:])
+            input_shape = tuple(input_shape)
+            state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
+            self.inputs.append(state_input)
+            # Create the policy network
+
+    # # State inputs and reward inputs
+    # for t in range(self.trajectoryMaxLength):
+    #     # States
+    #     input_shape = [None]
+    #     input_shape.extend(self.stateShapes[t])
+    #     state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
+    #     self.inputs.append(state_input)
+    #     # Rewards
+    #     reward_shape = [None, len(self.actionSpaces[t])]
+    #     reward_input = tf.placeholder(dtype=tf.float32, shape=reward_shape, name="rewards_{0}".format(t))
+    #     self.rewards.append(reward_input)
+    # # Build policy generating networks; self.policies are filled.
+    # self.build_policy_networks()
+
     def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         total_sample_count = data.labelList.shape[0]
         sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
@@ -51,6 +85,9 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
 
     def get_max_trajectory_length(self):
         return self.network.depth - 1
+
+    def sample_from_policy(self, history, time_step):
+        assert len(history.states) == time_step + 1
 
     def state_transition(self, history):
         pass

@@ -54,16 +54,22 @@ class PolicyGradientsNetwork:
     def prepare_state_features(self, data):
         pass
 
+    def build_action_spaces(self):
+        pass
+
+    def build_policy_networks(self):
+        pass
+
     def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         pass
 
     def get_max_trajectory_length(self):
         pass
 
-    def state_transition(self, history):
+    def sample_from_policy(self, history, time_step):
         pass
 
-    def build_policy_networks(self):
+    def state_transition(self, history):
         pass
 
     def prepare_sampling_feed_dict(self, curr_time_step):
