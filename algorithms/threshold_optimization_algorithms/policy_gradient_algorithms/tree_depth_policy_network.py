@@ -17,9 +17,9 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
                  hidden_layers, test_ratio=0.2):
         self.hiddenLayers = hidden_layers
-        assert len(self.hiddenLayers) == self.get_max_trajectory_length()
         super().__init__(l2_lambda, network_name, run_id, iteration, degree_list, data_type, output_names,
                          used_feature_names, test_ratio=test_ratio)
+        assert len(self.hiddenLayers) == self.get_max_trajectory_length()
 
     def prepare_state_features(self, data):
         # Prepare Policy Gradients State Data
@@ -86,13 +86,19 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
 
     def sample_from_policy(self, history, time_step):
         assert len(history.states) == time_step + 1
+        feed_dict = {self.inputs[t]: history.states[t] for t in range(time_step + 1)}
+        results = self.tfSession.run([self.policies[time_step], self.policySamples[time_step]], feed_dict=feed_dict)
+        policy_samples = results[-1]
+        return policy_samples
 
-    def state_transition(self, history):
+    def state_transition(self, history, time_step):
         pass
 
     def train(self, state_sample_count, samples_per_state):
-        sess = tf.Session()
-        self.sample_trajectories(sess=sess, data=self.validationData, features_dict=self.validationFeaturesDict,
+        self.tfSession = tf.Session()
+        init = tf.global_variables_initializer()
+        self.tfSession.run(init)
+        self.sample_trajectories(data=self.validationData, features_dict=self.validationFeaturesDict,
                                  ml_selections_arr=self.validationMLPaths, state_sample_count=state_sample_count,
                                  samples_per_state=samples_per_state)
         print("X")

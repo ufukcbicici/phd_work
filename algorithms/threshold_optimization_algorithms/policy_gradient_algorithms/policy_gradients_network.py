@@ -33,12 +33,14 @@ class PolicyGradientsNetwork:
         self.inputs = []
         self.logits = []
         self.policies = []
+        self.policySamples = []
         self.rewards = []
         self.weightedRewardMatrices = []
         self.valueFunctions = None
         self.policyValue = None
         self.validationFeaturesDict = {}
         self.testFeaturesDict = {}
+        self.tfSession = None
         # Prepare CIGN topology data.
         self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
@@ -72,6 +74,9 @@ class PolicyGradientsNetwork:
             self.build_state_inputs(time_step=t)
             self.build_policy_networks(time_step=t)
             self.build_rewards(time_step=t)
+            # Policy sampling
+            sampler = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[t])
+            self.policySamples.append(sampler)
 
     # OK
     def build_state_inputs(self, time_step):
@@ -90,9 +95,13 @@ class PolicyGradientsNetwork:
     def build_policy_networks(self, time_step):
         pass
 
+    def build_policy_sampling_networks(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+
+
     # OK
     def build_rewards(self, time_step):
-        action_count = self.actionSpaces[time_step]
+        action_count = len(self.actionSpaces[time_step])
         reward_input = tf.placeholder(dtype=tf.float32, shape=[None, action_count],
                                       name="rewards_{0}".format(time_step))
         self.rewards.append(reward_input)
@@ -106,7 +115,7 @@ class PolicyGradientsNetwork:
     def sample_from_policy(self, history, time_step):
         pass
 
-    def state_transition(self, history):
+    def state_transition(self, history, time_step):
         pass
 
     def prepare_sampling_feed_dict(self, curr_time_step):
@@ -164,7 +173,7 @@ class PolicyGradientsNetwork:
         max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
         return max_likelihood_paths
 
-    def sample_trajectories(self, sess, data, features_dict, ml_selections_arr,
+    def sample_trajectories(self, data, features_dict, ml_selections_arr,
                             state_sample_count, samples_per_state):
         # Sample from s1 ~ p(s1)
         history = self.sample_initial_states(data=data,
@@ -174,5 +183,10 @@ class PolicyGradientsNetwork:
                                              samples_per_state=samples_per_state)
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
-            print("X")
+            # Sample from a_t ~ p(a_t|history(t))
+            policy_samples = self.sample_from_policy(history=history, time_step=t)
+            history.actions.append(policy_samples)
+            # State transition s_{t+1} ~ p(s_{t+1}|history(t))
+            new_states = self.state_transition(history=history, time_step=t)
+
 
