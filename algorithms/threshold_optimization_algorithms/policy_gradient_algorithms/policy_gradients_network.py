@@ -96,9 +96,6 @@ class PolicyGradientsNetwork:
     def build_policy_networks(self, time_step):
         pass
 
-    def build_policy_sampling_networks(self):
-        max_trajectory_length = self.get_max_trajectory_length()
-
     # OK
     def build_rewards(self, time_step):
         action_count = self.actionSpaces[time_step].shape[0]
@@ -106,16 +103,23 @@ class PolicyGradientsNetwork:
                                       name="rewards_{0}".format(time_step))
         self.rewards.append(reward_input)
 
+    # OK
     def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
         pass
 
+    # OK
     def get_max_trajectory_length(self):
         pass
 
+    # OK
     def sample_from_policy(self, history, time_step):
         pass
 
+    # OK
     def state_transition(self, history, features_dict, time_step):
+        pass
+
+    def reward_calculation(self, history, time_step):
         pass
 
     def prepare_sampling_feed_dict(self, curr_time_step):
