@@ -94,13 +94,21 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
 
     def state_transition(self, history, features_dict, time_step):
         nodes_in_level = self.network.orderedNodesPerLevel[time_step + 1]
-        feature_arrays = [features_dict[node.index] for node in nodes_in_level]
+        feature_arrays = [features_dict[node.index][history.stateIds] for node in nodes_in_level]
         routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
-        routing_decisions_t_v2 = \
-            np.apply_along_axis(lambda a: self.actionSpaces[time_step][np.asscalar(a), :], axis=1,
-                                arr=np.expand_dims(history.actions[time_step], axis=1))
-        assert np.array_equal(routing_decisions_t, routing_decisions_t_v2)
-        print("X")
+        weighted_feature_arrays = [np.expand_dims(routing_decisions_t[:, idx], axis=1) * feature_arrays[idx]
+                                   for idx in range(len(nodes_in_level))]
+
+        # indicator_arr = np.stack([np.any(arr, axis=1) for arr in weighted_feature_arrays], axis=1).astype(np.int32)
+        # assert np.array_equal(indicator_arr, routing_decisions_t)
+
+        # routing_decisions_t_v2 = \
+        #     np.apply_along_axis(lambda a: self.actionSpaces[time_step][np.asscalar(a), :], axis=1,
+        #                         arr=np.expand_dims(history.actions[time_step], axis=1))
+        # assert np.array_equal(routing_decisions_t, routing_decisions_t_v2)
+
+        states_t_plus_1 = np.concatenate(weighted_feature_arrays, axis=1)
+        return states_t_plus_1
 
     def train(self, state_sample_count, samples_per_state):
         self.tfSession = tf.Session()
