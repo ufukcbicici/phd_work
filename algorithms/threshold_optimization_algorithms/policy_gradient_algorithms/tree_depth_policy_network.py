@@ -99,7 +99,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         routing_decisions_t_v2 = \
             np.apply_along_axis(lambda a: self.actionSpaces[time_step][np.asscalar(a), :], axis=1,
                                 arr=np.expand_dims(history.actions[time_step], axis=1))
-
+        assert np.array_equal(routing_decisions_t, routing_decisions_t_v2)
         print("X")
 
     def train(self, state_sample_count, samples_per_state):
