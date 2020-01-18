@@ -52,7 +52,8 @@ class PolicyGradientsNetwork:
         self.routingData = self.network.load_routing_info(run_id=run_id, iteration=iteration, data_type=data_type,
                                                           output_names=self.networkFeatureNames)
         self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=test_ratio)
-        self.validationMLPaths = self.get_max_likelihood_paths( branch_probs=self.validationData.get_dict("branch_probs"))
+        self.validationMLPaths = self.get_max_likelihood_paths(
+            branch_probs=self.validationData.get_dict("branch_probs"))
         self.testMLPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
         self.validationFeaturesDict = self.prepare_state_features(data=self.validationData)
         self.testFeaturesDict = self.prepare_state_features(data=self.testData)
@@ -98,10 +99,9 @@ class PolicyGradientsNetwork:
     def build_policy_sampling_networks(self):
         max_trajectory_length = self.get_max_trajectory_length()
 
-
     # OK
     def build_rewards(self, time_step):
-        action_count = len(self.actionSpaces[time_step])
+        action_count = self.actionSpaces[time_step].shape[0]
         reward_input = tf.placeholder(dtype=tf.float32, shape=[None, action_count],
                                       name="rewards_{0}".format(time_step))
         self.rewards.append(reward_input)
@@ -115,7 +115,7 @@ class PolicyGradientsNetwork:
     def sample_from_policy(self, history, time_step):
         pass
 
-    def state_transition(self, history, time_step):
+    def state_transition(self, history, features_dict, time_step):
         pass
 
     def prepare_sampling_feed_dict(self, curr_time_step):
@@ -187,6 +187,4 @@ class PolicyGradientsNetwork:
             policy_samples = self.sample_from_policy(history=history, time_step=t)
             history.actions.append(policy_samples)
             # State transition s_{t+1} ~ p(s_{t+1}|history(t))
-            new_states = self.state_transition(history=history, time_step=t)
-
-
+            new_states = self.state_transition(history=history, features_dict=self.validationFeaturesDict, time_step=t)

@@ -44,22 +44,23 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         max_trajectory_length = self.get_max_trajectory_length()
         self.actionSpaces = []
         for t in range(max_trajectory_length):
-            next_level_node_count = len(self.network.orderedNodesPerLevel[t+1])
+            next_level_node_count = len(self.network.orderedNodesPerLevel[t + 1])
             action_count = (2 ** next_level_node_count) - 1
-            action_space = {}
+            action_space = []
             for action_id in range(action_count):
                 action_code = action_id + 1
                 l = [int(x) for x in list('{0:0b}'.format(action_code))]
                 k = [0] * (next_level_node_count - len(l))
                 k.extend(l)
-                binary_node_selection = tuple(k)
-                action_space[action_id] = binary_node_selection
+                binary_node_selection = np.array(k)
+                action_space.append(binary_node_selection)
+            action_space = np.stack(action_space, axis=0)
             self.actionSpaces.append(action_space)
 
     def build_policy_networks(self, time_step):
         # Create the policy network
         hidden_layers = list(self.hiddenLayers[time_step])
-        hidden_layers.append(len(self.actionSpaces[time_step]))
+        hidden_layers.append(self.actionSpaces[time_step].shape[0])
         net = self.inputs[time_step]
         for layer_id, layer_dim in enumerate(hidden_layers):
             if layer_id < len(hidden_layers) - 1:
@@ -91,8 +92,15 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         policy_samples = results[-1]
         return policy_samples
 
-    def state_transition(self, history, time_step):
-        pass
+    def state_transition(self, history, features_dict, time_step):
+        nodes_in_level = self.network.orderedNodesPerLevel[time_step + 1]
+        feature_arrays = [features_dict[node.index] for node in nodes_in_level]
+        routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
+        routing_decisions_t_v2 = \
+            np.apply_along_axis(lambda a: self.actionSpaces[time_step][np.asscalar(a), :], axis=1,
+                                arr=np.expand_dims(history.actions[time_step], axis=1))
+
+        print("X")
 
     def train(self, state_sample_count, samples_per_state):
         self.tfSession = tf.Session()
