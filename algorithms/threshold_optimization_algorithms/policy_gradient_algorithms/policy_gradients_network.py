@@ -186,6 +186,9 @@ class PolicyGradientsNetwork:
             # Sample from a_t ~ p(a_t|history(t))
             policy_samples = self.sample_from_policy(history=history, time_step=t)
             history.actions.append(policy_samples)
+            # Get the reward: r_t ~ p(r_t|history(t))
+
             # State transition s_{t+1} ~ p(s_{t+1}|history(t))
-            new_states = self.state_transition(history=history, features_dict=self.validationFeaturesDict, time_step=t)
-            history.states.append(new_states)
+            if t < max_trajectory_length - 1:
+                new_states = self.state_transition(history=history, features_dict=self.validationFeaturesDict, time_step=t)
+                history.states.append(new_states)
