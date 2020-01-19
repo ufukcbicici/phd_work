@@ -17,6 +17,7 @@ class TrajectoryHistory:
         self.maxLikelihoodRoutes = max_likelihood_routes
         self.states = []
         self.actions = []
+        self.routingDecisions = []
         self.rewards = []
 
 
@@ -40,6 +41,9 @@ class PolicyGradientsNetwork:
         self.policyValue = None
         self.validationFeaturesDict = {}
         self.testFeaturesDict = {}
+        self.networkActivationCosts = None
+        self.baseEvaluationCost = None
+        self.reachabilityMatrices = []
         self.tfSession = None
         # Prepare CIGN topology data.
         self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
@@ -57,7 +61,13 @@ class PolicyGradientsNetwork:
         self.testMLPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
         self.validationFeaturesDict = self.prepare_state_features(data=self.validationData)
         self.testFeaturesDict = self.prepare_state_features(data=self.testData)
+        self.validationPosteriorsTensor = \
+            np.stack([self.validationData.get_dict("posterior_probs")[node.index] for node in self.leafNodes], axis=2)
+        self.testPosteriorsTensor = \
+            np.stack([self.testData.get_dict("posterior_probs")[node.index] for node in self.leafNodes], axis=2)
         self.build_action_spaces()
+        self.get_evaluation_costs()
+        self.get_reachability_matrices()
         self.build_networks()
 
     # OK
@@ -98,9 +108,7 @@ class PolicyGradientsNetwork:
 
     # OK
     def build_rewards(self, time_step):
-        action_count = self.actionSpaces[time_step].shape[0]
-        reward_input = tf.placeholder(dtype=tf.float32, shape=[None, action_count],
-                                      name="rewards_{0}".format(time_step))
+        reward_input = tf.placeholder(dtype=tf.float32, shape=[None], name="rewards_{0}".format(time_step))
         self.rewards.append(reward_input)
 
     # OK
@@ -119,7 +127,7 @@ class PolicyGradientsNetwork:
     def state_transition(self, history, features_dict, time_step):
         pass
 
-    def reward_calculation(self, history, time_step):
+    def reward_calculation(self, data, history, posteriors_tensor, time_step):
         pass
 
     def prepare_sampling_feed_dict(self, curr_time_step):
@@ -146,6 +154,33 @@ class PolicyGradientsNetwork:
         #     self.rewards.append(reward_input)
         # # Build policy generating networks; self.policies are filled.
         # self.build_policy_networks()
+
+    def get_evaluation_costs(self):
+        list_of_lists = []
+        path_costs = []
+        for node in self.leafNodes:
+            list_of_lists.append([0, 1])
+            leaf_ancestors = self.network.dagObject.ancestors(node=node)
+            leaf_ancestors.append(node)
+            path_costs.append(sum([self.network.nodeCosts[ancestor.index] for ancestor in leaf_ancestors]))
+        self.baseEvaluationCost = np.mean(np.array(path_costs))
+        self.networkActivationCosts = []
+        for action_id in range(self.actionSpaces[-1].shape[0]):
+            node_selection = self.actionSpaces[-1][action_id]
+            processed_nodes_set = set()
+            for node_idx, curr_node in enumerate(self.leafNodes):
+                if node_selection[node_idx] == 0:
+                    continue
+                leaf_ancestors = self.network.dagObject.ancestors(node=curr_node)
+                leaf_ancestors.append(curr_node)
+                for ancestor in leaf_ancestors:
+                    processed_nodes_set.add(ancestor.index)
+            total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
+            self.networkActivationCosts.append(total_cost)
+        self.networkActivationCosts = np.array(self.networkActivationCosts)
+
+    def get_reachability_matrices(self):
+        pass
 
     def get_l2_loss(self):
         # L2 Loss
@@ -188,11 +223,9 @@ class PolicyGradientsNetwork:
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
             # Sample from a_t ~ p(a_t|history(t))
-            policy_samples = self.sample_from_policy(history=history, time_step=t)
-            history.actions.append(policy_samples)
+            self.sample_from_policy(history=history, time_step=t)
             # Get the reward: r_t ~ p(r_t|history(t))
 
             # State transition s_{t+1} ~ p(s_{t+1}|history(t))
             if t < max_trajectory_length - 1:
-                new_states = self.state_transition(history=history, features_dict=self.validationFeaturesDict, time_step=t)
-                history.states.append(new_states)
+                self.state_transition(history=history, features_dict=self.validationFeaturesDict, time_step=t)

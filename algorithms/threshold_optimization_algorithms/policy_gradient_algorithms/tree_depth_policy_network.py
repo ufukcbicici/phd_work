@@ -83,24 +83,42 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         return history
 
     def get_max_trajectory_length(self):
-        return self.network.depth - 1
+        return int(self.network.depth - 1)
+
+    def get_reachability_matrices(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            actions_t = self.actionSpaces[t]
+            if t == 0:
+                reachability_matrix_t = np.ones(shape=(1, actions_t.shape[0]))
+            else:
+                reachability_matrix_t = np.zeros(shape=(self.actionSpaces[t - 1].shape[0], actions_t.shape[0]))
+                for action_t_id in range(self.actionSpaces[t - 1].shape[0]):
+                    node_selection_vec_t = self.actionSpaces[t - 1][action_t_id]
+                    selected_nodes_t = [node for i, node in enumerate(self.network.orderedNodesPerLevel[t])
+                                        if node_selection_vec_t[i] != 0]
+
+
 
     def sample_from_policy(self, history, time_step):
         assert len(history.states) == time_step + 1
+        assert len(history.actions) == time_step
         feed_dict = {self.inputs[t]: history.states[t] for t in range(time_step + 1)}
         results = self.tfSession.run([self.policies[time_step], self.policySamples[time_step]], feed_dict=feed_dict)
         policy_samples = results[-1]
-        return policy_samples
+        history.actions.append(policy_samples)
+        routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
+        history.routingDecisions.append(routing_decisions_t)
 
     def state_transition(self, history, features_dict, time_step):
         nodes_in_level = self.network.orderedNodesPerLevel[time_step + 1]
         feature_arrays = [features_dict[node.index][history.stateIds] for node in nodes_in_level]
-        routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
+        # routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
+        routing_decisions_t = history.routingDecisions[time_step]
         weighted_feature_arrays = [np.expand_dims(routing_decisions_t[:, idx], axis=1) * feature_arrays[idx]
                                    for idx in range(len(nodes_in_level))]
-
-        # indicator_arr = np.stack([np.any(arr, axis=1) for arr in weighted_feature_arrays], axis=1).astype(np.int32)
-        # assert np.array_equal(indicator_arr, routing_decisions_t)
+        indicator_arr = np.stack([np.any(arr, axis=1) for arr in weighted_feature_arrays], axis=1).astype(np.int32)
+        assert np.array_equal(indicator_arr, routing_decisions_t)
 
         # routing_decisions_t_v2 = \
         #     np.apply_along_axis(lambda a: self.actionSpaces[time_step][np.asscalar(a), :], axis=1,
@@ -108,7 +126,18 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         # assert np.array_equal(routing_decisions_t, routing_decisions_t_v2)
 
         states_t_plus_1 = np.concatenate(weighted_feature_arrays, axis=1)
-        return states_t_plus_1
+        history.states.append(states_t_plus_1)
+
+    def reward_calculation(self, data, history, posteriors_tensor, time_step):
+        if time_step < self.get_max_trajectory_length() - 1:
+            rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
+        else:
+            # Get the true labels for all samples
+            true_labels = data.labelList[history.stateIds]
+            routing_costs = self.networkActivationCosts[history.actions[self.get_max_trajectory_length() - 1]]
+
+
+
 
     def train(self, state_sample_count, samples_per_state):
         self.tfSession = tf.Session()
