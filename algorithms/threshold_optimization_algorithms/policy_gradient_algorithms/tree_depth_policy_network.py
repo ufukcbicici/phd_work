@@ -140,12 +140,22 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         history.states.append(states_t_plus_1)
 
     def reward_calculation(self, data, history, posteriors_tensor, time_step):
-        if time_step < self.get_max_trajectory_length() - 1:
-            rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
+        rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
+        if time_step - 1 < 0:
+            actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
         else:
-            # Get the true labels for all samples
-            true_labels = data.labelList[history.stateIds]
-            routing_costs = self.networkActivationCosts[history.actions[self.get_max_trajectory_length() - 1]]
+            actions_t_minus_one = history.actions[time_step - 1]
+        # Asses availability of the decisions
+        action_t = history.actions[time_step]
+        validity_of_actions_arr = self.reachabilityMatrices[time_step][actions_t_minus_one, action_t]
+
+
+        # if time_step < self.get_max_trajectory_length() - 1:
+        #     rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
+        # else:
+        #     # Get the true labels for all samples
+        #     true_labels = data.labelList[history.stateIds]
+        #     routing_costs = self.networkActivationCosts[history.actions[self.get_max_trajectory_length() - 1]]
 
 
 
