@@ -93,12 +93,23 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                 reachability_matrix_t = np.ones(shape=(1, actions_t.shape[0]))
             else:
                 reachability_matrix_t = np.zeros(shape=(self.actionSpaces[t - 1].shape[0], actions_t.shape[0]))
-                for action_t_id in range(self.actionSpaces[t - 1].shape[0]):
-                    node_selection_vec_t = self.actionSpaces[t - 1][action_t_id]
+                for action_t_minus_one_id in range(self.actionSpaces[t - 1].shape[0]):
+                    node_selection_vec_t_minus_one = self.actionSpaces[t - 1][action_t_minus_one_id]
                     selected_nodes_t = [node for i, node in enumerate(self.network.orderedNodesPerLevel[t])
-                                        if node_selection_vec_t[i] != 0]
+                                        if node_selection_vec_t_minus_one[i] != 0]
+                    next_level_nodes = self.network.orderedNodesPerLevel[t+1]
+                    reachable_next_level_node_ids = set()
+                    for parent_node in selected_nodes_t:
+                        child_nodes = {c_node.index for c_node in self.network.dagObject.children(node=parent_node)}
+                        reachable_next_level_node_ids = reachable_next_level_node_ids.union(child_nodes)
 
-
+                    for actions_t_id in range(actions_t.shape[0]):
+                        node_selection_vec_t = actions_t[actions_t_id]
+                        reached_nodes = {node.index for is_reached, node in zip(node_selection_vec_t, next_level_nodes)
+                                         if is_reached != 0}
+                        is_valid_selection = int(len(reached_nodes.difference(reachable_next_level_node_ids)) == 0)
+                        reachability_matrix_t[action_t_minus_one_id, actions_t_id] = is_valid_selection
+            self.reachabilityMatrices.append(reachability_matrix_t)
 
     def sample_from_policy(self, history, time_step):
         assert len(history.states) == time_step + 1
