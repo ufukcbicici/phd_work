@@ -13,6 +13,8 @@ class TreeDepthState:
 
 
 class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
+    INVALID_ACTION_PENALTY = -10
+
     def __init__(self, l2_lambda,
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
                  hidden_layers, test_ratio=0.2):
@@ -97,7 +99,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                     node_selection_vec_t_minus_one = self.actionSpaces[t - 1][action_t_minus_one_id]
                     selected_nodes_t = [node for i, node in enumerate(self.network.orderedNodesPerLevel[t])
                                         if node_selection_vec_t_minus_one[i] != 0]
-                    next_level_nodes = self.network.orderedNodesPerLevel[t+1]
+                    next_level_nodes = self.network.orderedNodesPerLevel[t + 1]
                     reachable_next_level_node_ids = set()
                     for parent_node in selected_nodes_t:
                         child_nodes = {c_node.index for c_node in self.network.dagObject.children(node=parent_node)}
@@ -148,7 +150,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         # Asses availability of the decisions
         action_t = history.actions[time_step]
         validity_of_actions_arr = self.reachabilityMatrices[time_step][actions_t_minus_one, action_t]
-
+        validity_rewards = np.array([TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY, 0.0])
+        rewards_arr += validity_rewards[validity_of_actions_arr]
 
         # if time_step < self.get_max_trajectory_length() - 1:
         #     rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
@@ -156,9 +159,6 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         #     # Get the true labels for all samples
         #     true_labels = data.labelList[history.stateIds]
         #     routing_costs = self.networkActivationCosts[history.actions[self.get_max_trajectory_length() - 1]]
-
-
-
 
     def train(self, state_sample_count, samples_per_state):
         self.tfSession = tf.Session()
