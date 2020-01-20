@@ -18,7 +18,9 @@ class RoIPooling:
         feature_map_height = int(feature_map.shape[1])
         split_features = tf.split(feature_map, BATCH_SIZE, axis=0)
         split_features = [f_map[0, :] for f_map in split_features]
-        return split_features
+        split_rois = tf.split(roi_list, BATCH_SIZE, axis=0)
+        split_rois = [roi_arr[0, :] for roi_arr in split_features]
+        return split_features, split_rois
 
         # roi_feature_maps = []
         # for roi_dims in roi_list:
@@ -35,7 +37,7 @@ class RoIPooling:
 def main():
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, IMG_W, IMG_H, FEATURE_COUNT])
     rois_tensor = tf.placeholder(tf.float32, shape=(None, NUM_ROIS, 4))
-    split_features = RoIPooling.roi_pool(feature_map=input_tensor, roi_list=rois_tensor)
+    split_features, split_rois = RoIPooling.roi_pool(feature_map=input_tensor, roi_list=rois_tensor)
     # RoIPooling.roi_pool(x=input_tensor, roi_list=ROI_LIST)
 
     # Prepare dummy image data
@@ -52,7 +54,8 @@ def main():
     roi_arr = np.stack([rois_top_coord, rois_left_coord, rois_bottom_coord, rois_right_coord], axis=2)
     sess = tf.Session()
 
-    results = sess.run([split_features, input_tensor], feed_dict={input_tensor: random_imgs, rois_tensor: roi_arr})
+    results = sess.run([split_features, split_rois, input_tensor],
+                       feed_dict={input_tensor: random_imgs, rois_tensor: roi_arr})
     print("X")
 
 
