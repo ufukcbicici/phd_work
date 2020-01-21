@@ -189,6 +189,14 @@ class PolicyGradientsNetwork:
         expected_policy_value = total_rewards / trajectory_count
         return expected_policy_value
 
+    def evaluate_policy_values(self):
+        validation_policy_value = self.calculate_policy_value(routing_data=self.validationDataForMDP,
+                                                              state_batch_size=100, samples_per_state=10000)
+        test_policy_value = self.calculate_policy_value(routing_data=self.testDataForMDP,
+                                                        state_batch_size=100, samples_per_state=10000)
+        print("validation_policy_value={0}".format(validation_policy_value))
+        print("test_policy_value={0}".format(test_policy_value))
+
     def build_policy_gradient_loss(self):
         pass
 
