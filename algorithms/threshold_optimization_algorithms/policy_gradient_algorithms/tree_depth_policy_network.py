@@ -143,6 +143,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
 
     def reward_calculation(self, data, history, posteriors_tensor, time_step):
         rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
+        # Check if valid actions
         if time_step - 1 < 0:
             actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
         else:
@@ -152,6 +153,19 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         validity_of_actions_arr = self.reachabilityMatrices[time_step][actions_t_minus_one, action_t]
         validity_rewards = np.array([TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY, 0.0])
         rewards_arr += validity_rewards[validity_of_actions_arr]
+        # If in the last step, calculate reward according to the accuracy + computation cost
+        if time_step == self.get_max_trajectory_length() - 1:
+            true_labels = data.labelList[history.stateIds]
+            posteriors = posteriors_tensor[history.stateIds, :]
+            routing_decisions_t = history.routingDecisions[time_step]
+            assert routing_decisions_t.shape[1] == posteriors.shape[2]
+            routing_weights = np.reciprocal(np.sum(routing_decisions_t, axis=1))
+            routing_decisions_t_weighted = routing_decisions_t * np.expand_dims(routing_weights, axis=1)
+            weighted_posteriors = posteriors * np.expand_dims(routing_decisions_t_weighted, axis=1)
+            final_posteriors = np.sum(weighted_posteriors, axis=2)
+            predicted_labels = np.argmax(final_posteriors, axis=1)
+            print("X")
+        print("X")
 
         # if time_step < self.get_max_trajectory_length() - 1:
         #     rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
@@ -164,8 +178,11 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         self.tfSession = tf.Session()
         init = tf.global_variables_initializer()
         self.tfSession.run(init)
-        self.sample_trajectories(data=self.validationData, features_dict=self.validationFeaturesDict,
-                                 ml_selections_arr=self.validationMLPaths, state_sample_count=state_sample_count,
+        self.sample_trajectories(data=self.validationData,
+                                 features_dict=self.validationFeaturesDict,
+                                 ml_selections_arr=self.validationMLPaths,
+                                 posteriors_tensor=self.validationPosteriorsTensor,
+                                 state_sample_count=state_sample_count,
                                  samples_per_state=samples_per_state)
         print("X")
 

@@ -212,7 +212,7 @@ class PolicyGradientsNetwork:
         max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
         return max_likelihood_paths
 
-    def sample_trajectories(self, data, features_dict, ml_selections_arr,
+    def sample_trajectories(self, data, features_dict, ml_selections_arr, posteriors_tensor,
                             state_sample_count, samples_per_state):
         # Sample from s1 ~ p(s1)
         history = self.sample_initial_states(data=data,
@@ -225,7 +225,7 @@ class PolicyGradientsNetwork:
             # Sample from a_t ~ p(a_t|history(t))
             self.sample_from_policy(history=history, time_step=t)
             # Get the reward: r_t ~ p(r_t|history(t))
-
+            self.reward_calculation(data=data, history=history, posteriors_tensor=posteriors_tensor, time_step=t)
             # State transition s_{t+1} ~ p(s_{t+1}|history(t))
             if t < max_trajectory_length - 1:
                 self.state_transition(history=history, features_dict=self.validationFeaturesDict, time_step=t)
