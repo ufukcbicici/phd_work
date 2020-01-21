@@ -95,9 +95,10 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         for t in range(max_trajectory_length):
             actions_t = self.actionSpaces[t]
             if t == 0:
-                reachability_matrix_t = np.ones(shape=(1, actions_t.shape[0]))
+                reachability_matrix_t = np.ones(shape=(1, actions_t.shape[0]), dtype=np.int32)
             else:
-                reachability_matrix_t = np.zeros(shape=(self.actionSpaces[t - 1].shape[0], actions_t.shape[0]))
+                reachability_matrix_t = np.zeros(shape=(self.actionSpaces[t - 1].shape[0], actions_t.shape[0]),
+                                                 dtype=np.int32)
                 for action_t_minus_one_id in range(self.actionSpaces[t - 1].shape[0]):
                     node_selection_vec_t_minus_one = self.actionSpaces[t - 1][action_t_minus_one_id]
                     selected_nodes_t = [node for i, node in enumerate(self.network.orderedNodesPerLevel[t])
@@ -163,7 +164,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             posteriors = posteriors_tensor[history.stateIds, :]
             routing_decisions_t = history.routingDecisions[time_step]
             assert routing_decisions_t.shape[1] == posteriors.shape[2]
-            routing_weights = np.reciprocal(np.sum(routing_decisions_t, axis=1))
+            routing_weights = np.reciprocal(np.sum(routing_decisions_t.astype(np.float32), axis=1))
             routing_decisions_t_weighted = routing_decisions_t * np.expand_dims(routing_weights, axis=1)
             weighted_posteriors = posteriors * np.expand_dims(routing_decisions_t_weighted, axis=1)
             final_posteriors = np.sum(weighted_posteriors, axis=2)
