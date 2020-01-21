@@ -177,7 +177,7 @@ class PolicyGradientsNetwork:
                     processed_nodes_set.add(ancestor.index)
             total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
             self.networkActivationCosts.append(total_cost)
-        self.networkActivationCosts = np.array(self.networkActivationCosts)
+        self.networkActivationCosts = np.array(self.networkActivationCosts) * (1.0 / self.baseEvaluationCost)
 
     def get_reachability_matrices(self):
         pass

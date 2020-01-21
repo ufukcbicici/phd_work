@@ -13,7 +13,10 @@ class TreeDepthState:
 
 
 class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
-    INVALID_ACTION_PENALTY = -10
+    INVALID_ACTION_PENALTY = -10.0
+    VALID_PREDICTION_REWARD = 1.0
+    INVALID_PREDICTION_PENALTY = 0.0
+    LAMBDA_MAC_COST = 0.0
 
     def __init__(self, l2_lambda,
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
@@ -150,11 +153,12 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             actions_t_minus_one = history.actions[time_step - 1]
         # Asses availability of the decisions
         action_t = history.actions[time_step]
-        validity_of_actions_arr = self.reachabilityMatrices[time_step][actions_t_minus_one, action_t]
+        validity_of_actions_vec = self.reachabilityMatrices[time_step][actions_t_minus_one, action_t]
         validity_rewards = np.array([TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY, 0.0])
-        rewards_arr += validity_rewards[validity_of_actions_arr]
+        rewards_arr += validity_rewards[validity_of_actions_vec]
         # If in the last step, calculate reward according to the accuracy + computation cost
         if time_step == self.get_max_trajectory_length() - 1:
+            # Prediction Rewards
             true_labels = data.labelList[history.stateIds]
             posteriors = posteriors_tensor[history.stateIds, :]
             routing_decisions_t = history.routingDecisions[time_step]
@@ -164,15 +168,17 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             weighted_posteriors = posteriors * np.expand_dims(routing_decisions_t_weighted, axis=1)
             final_posteriors = np.sum(weighted_posteriors, axis=2)
             predicted_labels = np.argmax(final_posteriors, axis=1)
+            validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+            validity_of_prediction_rewards = np.array([TreeDepthPolicyNetwork.INVALID_PREDICTION_PENALTY,
+                                                       TreeDepthPolicyNetwork.VALID_PREDICTION_REWARD])
+            prediction_rewards = validity_of_prediction_rewards[validity_of_predictions_vec]
+            rewards_arr += prediction_rewards
+            # Computation Cost Penalties
+            activation_cost_arr = self.networkActivationCosts[history.actions[time_step]]
+            activation_cost_arr = -TreeDepthPolicyNetwork.LAMBDA_MAC_COST * activation_cost_arr
+            rewards_arr += activation_cost_arr
             print("X")
-        print("X")
-
-        # if time_step < self.get_max_trajectory_length() - 1:
-        #     rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
-        # else:
-        #     # Get the true labels for all samples
-        #     true_labels = data.labelList[history.stateIds]
-        #     routing_costs = self.networkActivationCosts[history.actions[self.get_max_trajectory_length() - 1]]
+        history.rewards.append(rewards_arr)
 
     def train(self, state_sample_count, samples_per_state):
         self.tfSession = tf.Session()
