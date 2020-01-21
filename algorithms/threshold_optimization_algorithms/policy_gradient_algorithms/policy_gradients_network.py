@@ -21,6 +21,14 @@ class TrajectoryHistory:
         self.rewards = []
 
 
+class RoutingDataForMDP:
+    def __init__(self, routing_dataset, features_dict, ml_paths, posteriors_tensor):
+        self.routingDataset = routing_dataset
+        self.featuresDict = features_dict
+        self.mlPaths = ml_paths
+        self.posteriorsTensor = posteriors_tensor
+
+
 class PolicyGradientsNetwork:
     def __init__(self, l2_lambda,
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
@@ -65,6 +73,16 @@ class PolicyGradientsNetwork:
             np.stack([self.validationData.get_dict("posterior_probs")[node.index] for node in self.leafNodes], axis=2)
         self.testPosteriorsTensor = \
             np.stack([self.testData.get_dict("posterior_probs")[node.index] for node in self.leafNodes], axis=2)
+        self.validationDataForMDP = RoutingDataForMDP(
+            routing_dataset=self.validationData,
+            features_dict=self.validationFeaturesDict,
+            ml_paths=self.validationMLPaths,
+            posteriors_tensor=self.validationPosteriorsTensor)
+        self.testDataForMDP = RoutingDataForMDP(
+            routing_dataset=self.testData,
+            features_dict=self.testFeaturesDict,
+            ml_paths=self.testMLPaths,
+            posteriors_tensor=self.testPosteriorsTensor)
         self.build_action_spaces()
         self.get_evaluation_costs()
         self.get_reachability_matrices()
@@ -112,29 +130,64 @@ class PolicyGradientsNetwork:
         self.rewards.append(reward_input)
 
     # OK
-    def sample_initial_states(self, data, features_dict, ml_selections_arr,
-                              state_sample_count, samples_per_state, state_ids=None):
+    def sample_initial_states(self, routing_data, state_sample_count, samples_per_state,
+                              state_ids=None) -> TrajectoryHistory:
         pass
 
     # OK
-    def get_max_trajectory_length(self):
+    def get_max_trajectory_length(self) -> int:
         pass
 
     # OK
-    def sample_from_policy(self, history, time_step):
+    def sample_from_policy(self, routing_data, history, time_step):
         pass
 
     # OK
-    def state_transition(self, history, features_dict, time_step):
+    def state_transition(self, routing_data, history, time_step):
         pass
 
     # OK
-    def reward_calculation(self, data, history, posteriors_tensor, time_step):
+    def reward_calculation(self, routing_data, history, time_step):
         pass
 
-    # def calculate_policy_value(self, data, state_batch_size, samples_per_state):
-    #     curr_state_id = 0
-    #     while True:
+    def sample_trajectories(self, routing_data, state_sample_count, samples_per_state, state_ids=None) \
+            -> TrajectoryHistory:
+        # if state_ids is None, sample from state distribution
+        # Sample from s1 ~ p(s1)
+        history = self.sample_initial_states(routing_data=routing_data,
+                                             state_sample_count=state_sample_count,
+                                             samples_per_state=samples_per_state,
+                                             state_ids=state_ids)
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            # Sample from a_t ~ p(a_t|history(t))
+            self.sample_from_policy(routing_data=routing_data, history=history, time_step=t)
+            # Get the reward: r_t ~ p(r_t|history(t))
+            self.reward_calculation(routing_data=routing_data, history=history, time_step=t)
+            # State transition s_{t+1} ~ p(s_{t+1}|history(t))
+            if t < max_trajectory_length - 1:
+                self.state_transition(routing_data=routing_data, history=history, time_step=t)
+        return history
+
+    def calculate_policy_value(self, routing_data, state_batch_size, samples_per_state):
+        # self, data, features_dict, ml_selections_arr, posteriors_tensor,
+        # state_sample_count, samples_per_state, state_ids = None
+        # curr_state_id = 0
+        total_rewards = 0.0
+        trajectory_count = 0.0
+        data_count = routing_data.routingDataset.labelsList.shape[0]
+        id_list = list(range(data_count))
+        for idx in range(0, data_count, state_batch_size):
+            curr_sample_ids = id_list[idx:idx + state_batch_size]
+            history = self.sample_trajectories(routing_data=routing_data,
+                                               state_sample_count=None,
+                                               samples_per_state=samples_per_state,
+                                               state_ids=curr_sample_ids)
+            rewards_matrix = np.stack([history.rewards[t] for t in range(self.get_max_trajectory_length())], axis=1)
+            total_rewards += np.sum(rewards_matrix)
+            trajectory_count += rewards_matrix.shape[0]
+        expected_policy_value = total_rewards / trajectory_count
+        return expected_policy_value
 
     def build_policy_gradient_loss(self):
         pass
@@ -211,22 +264,3 @@ class PolicyGradientsNetwork:
             max_likelihood_paths.append(np.array(route))
         max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
         return max_likelihood_paths
-
-    def sample_trajectories(self, data, features_dict, ml_selections_arr, posteriors_tensor,
-                            state_sample_count, samples_per_state, state_ids=None):
-        # if state_ids is None, sample from state distribution
-        # Sample from s1 ~ p(s1)
-        history = self.sample_initial_states(data=data,
-                                             features_dict=features_dict, ml_selections_arr=ml_selections_arr,
-                                             state_sample_count=state_sample_count,
-                                             samples_per_state=samples_per_state,
-                                             state_ids=state_ids)
-        max_trajectory_length = self.get_max_trajectory_length()
-        for t in range(max_trajectory_length):
-            # Sample from a_t ~ p(a_t|history(t))
-            self.sample_from_policy(history=history, time_step=t)
-            # Get the reward: r_t ~ p(r_t|history(t))
-            self.reward_calculation(data=data, history=history, posteriors_tensor=posteriors_tensor, time_step=t)
-            # State transition s_{t+1} ~ p(s_{t+1}|history(t))
-            if t < max_trajectory_length - 1:
-                self.state_transition(history=history, features_dict=self.validationFeaturesDict, time_step=t)

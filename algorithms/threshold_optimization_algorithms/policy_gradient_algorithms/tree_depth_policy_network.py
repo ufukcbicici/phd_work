@@ -76,22 +76,22 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         self.logits.append(_logits)
         self.policies.append(tf.nn.softmax(_logits))
 
-    def sample_initial_states(self, data, features_dict, ml_selections_arr,
-                              state_sample_count, samples_per_state, state_ids=None):
+    def sample_initial_states(self, routing_data, state_sample_count, samples_per_state, state_ids=None) \
+            -> TrajectoryHistory:
         if state_ids is None:
-            total_sample_count = data.labelList.shape[0]
+            total_sample_count = routing_data.routingDataset.labelList.shape[0]
             sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
-            sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
         else:
             sample_indices = state_ids
-        feature_arr = features_dict[self.network.topologicalSortedNodes[0].index]
+        sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
+        feature_arr = routing_data.featuresDict[self.network.topologicalSortedNodes[0].index]
         initial_state_vectors = feature_arr[sample_indices, :]
-        state_ml_selections = ml_selections_arr[sample_indices, :]
+        state_ml_selections = routing_data.mlPaths[sample_indices, :]
         history = TrajectoryHistory(state_ids=sample_indices, max_likelihood_routes=state_ml_selections)
         history.states.append(initial_state_vectors)
         return history
 
-    def get_max_trajectory_length(self):
+    def get_max_trajectory_length(self) -> int:
         return int(self.network.depth - 1)
 
     def get_reachability_matrices(self):
@@ -121,7 +121,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                         reachability_matrix_t[action_t_minus_one_id, actions_t_id] = is_valid_selection
             self.reachabilityMatrices.append(reachability_matrix_t)
 
-    def sample_from_policy(self, history, time_step):
+    def sample_from_policy(self, routing_data, history, time_step):
         assert len(history.states) == time_step + 1
         assert len(history.actions) == time_step
         feed_dict = {self.inputs[t]: history.states[t] for t in range(time_step + 1)}
@@ -131,9 +131,9 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
         history.routingDecisions.append(routing_decisions_t)
 
-    def state_transition(self, history, features_dict, time_step):
+    def state_transition(self, history, routing_data, time_step):
         nodes_in_level = self.network.orderedNodesPerLevel[time_step + 1]
-        feature_arrays = [features_dict[node.index][history.stateIds] for node in nodes_in_level]
+        feature_arrays = [routing_data.featuresDict[node.index][history.stateIds] for node in nodes_in_level]
         # routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
         routing_decisions_t = history.routingDecisions[time_step]
         weighted_feature_arrays = [np.expand_dims(routing_decisions_t[:, idx], axis=1) * feature_arrays[idx]
@@ -149,7 +149,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         states_t_plus_1 = np.concatenate(weighted_feature_arrays, axis=1)
         history.states.append(states_t_plus_1)
 
-    def reward_calculation(self, data, history, posteriors_tensor, time_step):
+    def reward_calculation(self, routing_data, history, time_step):
         rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
         # Check if valid actions
         if time_step - 1 < 0:
@@ -164,8 +164,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         # If in the last step, calculate reward according to the accuracy + computation cost
         if time_step == self.get_max_trajectory_length() - 1:
             # Prediction Rewards
-            true_labels = data.labelList[history.stateIds]
-            posteriors = posteriors_tensor[history.stateIds, :]
+            true_labels = routing_data.routingDataset.labelList[history.stateIds]
+            posteriors = routing_data.posteriorsTensor[history.stateIds, :]
             routing_decisions_t = history.routingDecisions[time_step]
             assert routing_decisions_t.shape[1] == posteriors.shape[2]
             routing_weights = np.reciprocal(np.sum(routing_decisions_t.astype(np.float32), axis=1))
@@ -189,10 +189,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         self.tfSession = tf.Session()
         init = tf.global_variables_initializer()
         self.tfSession.run(init)
-        self.sample_trajectories(data=self.validationData,
-                                 features_dict=self.validationFeaturesDict,
-                                 ml_selections_arr=self.validationMLPaths,
-                                 posteriors_tensor=self.validationPosteriorsTensor,
+        self.sample_trajectories(routing_data=self.validationDataForMDP,
                                  state_sample_count=state_sample_count,
                                  samples_per_state=samples_per_state)
         print("X")
