@@ -76,10 +76,14 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         self.logits.append(_logits)
         self.policies.append(tf.nn.softmax(_logits))
 
-    def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
-        total_sample_count = data.labelList.shape[0]
-        sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
-        sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
+    def sample_initial_states(self, data, features_dict, ml_selections_arr,
+                              state_sample_count, samples_per_state, state_ids=None):
+        if state_ids is None:
+            total_sample_count = data.labelList.shape[0]
+            sample_indices = np.random.choice(total_sample_count, state_sample_count, replace=False)
+            sample_indices = np.repeat(sample_indices, repeats=samples_per_state)
+        else:
+            sample_indices = state_ids
         feature_arr = features_dict[self.network.topologicalSortedNodes[0].index]
         initial_state_vectors = feature_arr[sample_indices, :]
         state_ml_selections = ml_selections_arr[sample_indices, :]

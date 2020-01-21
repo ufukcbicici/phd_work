@@ -112,7 +112,8 @@ class PolicyGradientsNetwork:
         self.rewards.append(reward_input)
 
     # OK
-    def sample_initial_states(self, data, features_dict, ml_selections_arr, state_sample_count, samples_per_state):
+    def sample_initial_states(self, data, features_dict, ml_selections_arr,
+                              state_sample_count, samples_per_state, state_ids=None):
         pass
 
     # OK
@@ -127,16 +128,15 @@ class PolicyGradientsNetwork:
     def state_transition(self, history, features_dict, time_step):
         pass
 
+    # OK
     def reward_calculation(self, data, history, posteriors_tensor, time_step):
         pass
 
-    def prepare_sampling_feed_dict(self, curr_time_step):
-        pass
+    # def calculate_policy_value(self, data, state_batch_size, samples_per_state):
+    #     curr_state_id = 0
+    #     while True:
 
     def build_policy_gradient_loss(self):
-        pass
-
-    def build_network(self):
         pass
 
     def train(self, state_sample_count, samples_per_state):
@@ -213,13 +213,14 @@ class PolicyGradientsNetwork:
         return max_likelihood_paths
 
     def sample_trajectories(self, data, features_dict, ml_selections_arr, posteriors_tensor,
-                            state_sample_count, samples_per_state):
+                            state_sample_count, samples_per_state, state_ids=None):
+        # if state_ids is None, sample from state distribution
         # Sample from s1 ~ p(s1)
         history = self.sample_initial_states(data=data,
-                                             features_dict=features_dict,
-                                             ml_selections_arr=ml_selections_arr,
+                                             features_dict=features_dict, ml_selections_arr=ml_selections_arr,
                                              state_sample_count=state_sample_count,
-                                             samples_per_state=samples_per_state)
+                                             samples_per_state=samples_per_state,
+                                             state_ids=state_ids)
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
             # Sample from a_t ~ p(a_t|history(t))
