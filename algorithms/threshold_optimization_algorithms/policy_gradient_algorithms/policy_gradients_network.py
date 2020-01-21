@@ -52,7 +52,7 @@ class PolicyGradientsNetwork:
         self.networkActivationCosts = None
         self.baseEvaluationCost = None
         self.reachabilityMatrices = []
-        self.tfSession = None
+        self.tfSession = tf.Session()
         # Prepare CIGN topology data.
         self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
@@ -87,6 +87,8 @@ class PolicyGradientsNetwork:
         self.get_evaluation_costs()
         self.get_reachability_matrices()
         self.build_networks()
+        init = tf.global_variables_initializer()
+        self.tfSession.run(init)
 
     # OK
     def prepare_state_features(self, data):
@@ -175,7 +177,7 @@ class PolicyGradientsNetwork:
         # curr_state_id = 0
         total_rewards = 0.0
         trajectory_count = 0.0
-        data_count = routing_data.routingDataset.labelsList.shape[0]
+        data_count = routing_data.routingDataset.labelList.shape[0]
         id_list = list(range(data_count))
         for idx in range(0, data_count, state_batch_size):
             curr_sample_ids = id_list[idx:idx + state_batch_size]
@@ -191,9 +193,9 @@ class PolicyGradientsNetwork:
 
     def evaluate_policy_values(self):
         validation_policy_value = self.calculate_policy_value(routing_data=self.validationDataForMDP,
-                                                              state_batch_size=100, samples_per_state=10000)
+                                                              state_batch_size=1000, samples_per_state=100)
         test_policy_value = self.calculate_policy_value(routing_data=self.testDataForMDP,
-                                                        state_batch_size=100, samples_per_state=10000)
+                                                        state_batch_size=1000, samples_per_state=100)
         print("validation_policy_value={0}".format(validation_policy_value))
         print("test_policy_value={0}".format(test_policy_value))
 

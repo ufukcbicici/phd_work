@@ -182,13 +182,9 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             activation_cost_arr = self.networkActivationCosts[history.actions[time_step]]
             activation_cost_arr = -TreeDepthPolicyNetwork.LAMBDA_MAC_COST * activation_cost_arr
             rewards_arr += activation_cost_arr
-            print("X")
         history.rewards.append(rewards_arr)
 
     def train(self, state_sample_count, samples_per_state):
-        self.tfSession = tf.Session()
-        init = tf.global_variables_initializer()
-        self.tfSession.run(init)
         self.sample_trajectories(routing_data=self.validationDataForMDP,
                                  state_sample_count=state_sample_count,
                                  samples_per_state=samples_per_state)
