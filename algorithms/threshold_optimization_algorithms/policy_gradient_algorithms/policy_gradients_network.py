@@ -44,6 +44,7 @@ class PolicyGradientsNetwork:
         self.policies = []
         self.logPolicies = []
         self.policySamples = []
+        self.policyArgMaxSamples = []
         self.selectedPolicyInputs = []
         self.selectedLogPolicySamples = []
         self.proxyLossTrajectories = []
@@ -128,6 +129,9 @@ class PolicyGradientsNetwork:
             selected_policy_input = tf.placeholder(dtype=tf.int32, shape=[None],
                                                    name="selected_policy_input_{0}".format(t))
             self.selectedPolicyInputs.append(selected_policy_input)
+            # Argmax actions
+            argmax_actions = tf.argmax(self.policies[t], axis=1)
+            self.policyArgMaxSamples.append(argmax_actions)
         # Get the total number of trajectories
         state_input_shape = tf.shape(self.stateInputs[0])
         self.trajectoryCount = tf.gather_nd(state_input_shape, [0])
@@ -178,7 +182,7 @@ class PolicyGradientsNetwork:
         pass
 
     # OK
-    def sample_from_policy(self, routing_data, history, time_step):
+    def sample_from_policy(self, routing_data, history, time_step, select_argmax=False):
         pass
 
     # OK
@@ -190,7 +194,8 @@ class PolicyGradientsNetwork:
         pass
 
     # OK
-    def sample_trajectories(self, routing_data, state_sample_count, samples_per_state, state_ids=None) \
+    def sample_trajectories(self, routing_data, state_sample_count, samples_per_state,
+                            state_ids=None, select_argmax=False) \
             -> TrajectoryHistory:
         # if state_ids is None, sample from state distribution
         # Sample from s1 ~ p(s1)
@@ -201,7 +206,8 @@ class PolicyGradientsNetwork:
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
             # Sample from a_t ~ p(a_t|history(t))
-            self.sample_from_policy(routing_data=routing_data, history=history, time_step=t)
+            self.sample_from_policy(routing_data=routing_data, history=history, time_step=t,
+                                    select_argmax=select_argmax)
             # Get the reward: r_t ~ p(r_t|history(t))
             self.reward_calculation(routing_data=routing_data, history=history, time_step=t)
             # State transition s_{t+1} ~ p(s_{t+1}|history(t))
@@ -229,6 +235,12 @@ class PolicyGradientsNetwork:
             trajectory_count += rewards_matrix.shape[0]
         expected_policy_value = total_rewards / trajectory_count
         return expected_policy_value
+
+    def calculate_routing_accuracy(self, routing_data, state_batch_size):
+        data_count = routing_data.routingDataset.labelList.shape[0]
+        id_list = list(range(data_count))
+        for idx in range(0, data_count, state_batch_size):
+
 
     # OK
     def evaluate_policy_values(self):

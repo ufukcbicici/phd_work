@@ -135,11 +135,12 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                         reachability_matrix_t[action_t_minus_one_id, actions_t_id] = is_valid_selection
             self.reachabilityMatrices.append(reachability_matrix_t)
 
-    def sample_from_policy(self, routing_data, history, time_step):
+    def sample_from_policy(self, routing_data, history, time_step, select_argmax=False):
         assert len(history.states) == time_step + 1
         assert len(history.actions) == time_step
         feed_dict = {self.stateInputs[t]: history.states[t] for t in range(time_step + 1)}
-        results = self.tfSession.run([self.policies[time_step], self.policySamples[time_step]], feed_dict=feed_dict)
+        sampling_op = self.policyArgMaxSamples[time_step] if select_argmax else self.policySamples[time_step]
+        results = self.tfSession.run([self.policies[time_step], sampling_op], feed_dict=feed_dict)
         policy_samples = results[-1]
         history.actions.append(policy_samples)
         routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
