@@ -133,7 +133,8 @@ class PolicyGradientsNetwork:
         self.trajectoryCount = tf.gather_nd(state_input_shape, [0])
         # Cumulative Rewards
         for t1 in range(max_trajectory_length):
-            cum_sum = tf.add_n([self.rewards[t2] for t2 in range(t1, max_trajectory_length, 1)])
+            rew_list = [self.rewards[t2] for t2 in range(t1, max_trajectory_length, 1)]
+            cum_sum = tf.add_n(rew_list)
             self.cumulativeRewards.append(cum_sum)
         # Building the proxy loss and the policy gradient
         self.build_policy_gradient_loss()
