@@ -66,7 +66,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         # Create the policy network
         hidden_layers = list(self.hiddenLayers[time_step])
         hidden_layers.append(self.actionSpaces[time_step].shape[0])
-        net = self.inputs[time_step]
+        net = self.stateInputs[time_step]
         for layer_id, layer_dim in enumerate(hidden_layers):
             if layer_id < len(hidden_layers) - 1:
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
@@ -75,6 +75,20 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         _logits = net
         self.logits.append(_logits)
         self.policies.append(tf.nn.softmax(_logits))
+        self.logPolicies.append(tf.log(self.policies[-1]))
+
+    def build_policy_gradient_loss(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            selected_policy_indices = tf.stack([tf.range(0, self.trajectoryCount, 1), self.selectedPolicyInputs[t]],
+                                               axis=1)
+            log_selected_policies = tf.gather_nd(self.logPolicies[t], selected_policy_indices)
+            self.selectedLogPolicySamples.append(log_selected_policies)
+            # TODO: ADD BASELINE HERE WHEN THE TIME COMES
+            proxy_loss_step_t = self.selectedLogPolicySamples[t] * self.cumulativeRewards[t]
+            self.proxyLossTrajectories.append(proxy_loss_step_t)
+        self.proxyLossVector = tf.add_n(self.proxyLossTrajectories)
+        self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
 
     def sample_initial_states(self, routing_data, state_sample_count, samples_per_state, state_ids=None) \
             -> TrajectoryHistory:
@@ -124,7 +138,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     def sample_from_policy(self, routing_data, history, time_step):
         assert len(history.states) == time_step + 1
         assert len(history.actions) == time_step
-        feed_dict = {self.inputs[t]: history.states[t] for t in range(time_step + 1)}
+        feed_dict = {self.stateInputs[t]: history.states[t] for t in range(time_step + 1)}
         results = self.tfSession.run([self.policies[time_step], self.policySamples[time_step]], feed_dict=feed_dict)
         policy_samples = results[-1]
         history.actions.append(policy_samples)

@@ -39,11 +39,22 @@ class PolicyGradientsNetwork:
         self.l2Lambda = l2_lambda
         self.paramL2Norms = {}
         self.l2Loss = None
-        self.inputs = []
+        self.stateInputs = []
         self.logits = []
         self.policies = []
+        self.logPolicies = []
         self.policySamples = []
+        self.selectedPolicyInputs = []
+        self.selectedLogPolicySamples = []
+        self.proxyLossTrajectories = []
+        self.proxyLossVector = None
+        self.proxyLoss = None
+        self.totalLoss = None
+        self.globalStep = tf.Variable(0, name='global_step', trainable=False)
+        self.learningRate = None
+        self.trajectoryCount = None
         self.rewards = []
+        self.cumulativeRewards = []
         self.weightedRewardMatrices = []
         self.valueFunctions = None
         self.policyValue = None
@@ -52,6 +63,7 @@ class PolicyGradientsNetwork:
         self.networkActivationCosts = None
         self.baseEvaluationCost = None
         self.reachabilityMatrices = []
+        self.optimizer = None
         self.tfSession = tf.Session()
         # Prepare CIGN topology data.
         self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
@@ -99,15 +111,34 @@ class PolicyGradientsNetwork:
         pass
 
     # OK
+    def get_reachability_matrices(self):
+        pass
+
+    # OK
     def build_networks(self):
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
             self.build_state_inputs(time_step=t)
             self.build_policy_networks(time_step=t)
-            self.build_rewards(time_step=t)
+            reward_input = tf.placeholder(dtype=tf.float32, shape=[None], name="rewards_{0}".format(t))
+            self.rewards.append(reward_input)
             # Policy sampling
             sampler = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[t])
             self.policySamples.append(sampler)
+            selected_policy_input = tf.placeholder(dtype=tf.int32, shape=[None],
+                                                   name="selected_policy_input_{0}".format(t))
+            self.selectedPolicyInputs.append(selected_policy_input)
+        # Get the total number of trajectories
+        state_input_shape = tf.shape(self.stateInputs[0])
+        self.trajectoryCount = tf.gather_nd(state_input_shape, [0])
+        # Cumulative Rewards
+        for t1 in range(max_trajectory_length):
+            cum_sum = tf.add_n([self.rewards[t2] for t2 in range(t1, max_trajectory_length, 1)])
+            self.cumulativeRewards.append(cum_sum)
+        # Building the proxy loss and the policy gradient
+        self.build_policy_gradient_loss()
+        self.get_l2_loss()
+        self.build_optimizer()
 
     # OK
     def build_state_inputs(self, time_step):
@@ -120,16 +151,21 @@ class PolicyGradientsNetwork:
         input_shape.extend(concated_feat.shape[1:])
         input_shape = tuple(input_shape)
         state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(time_step))
-        self.inputs.append(state_input)
+        self.stateInputs.append(state_input)
 
     # OK
     def build_policy_networks(self, time_step):
         pass
 
-    # OK
-    def build_rewards(self, time_step):
-        reward_input = tf.placeholder(dtype=tf.float32, shape=[None], name="rewards_{0}".format(time_step))
-        self.rewards.append(reward_input)
+    def build_policy_gradient_loss(self):
+        pass
+
+    def build_optimizer(self):
+        self.learningRate = tf.constant(0.00001)
+        self.totalLoss = (-1.0 * self.proxyLoss) + self.l2Loss
+        # self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate). \
+            minimize(self.totalLoss, global_step=self.globalStep)
 
     # OK
     def sample_initial_states(self, routing_data, state_sample_count, samples_per_state,
@@ -152,6 +188,7 @@ class PolicyGradientsNetwork:
     def reward_calculation(self, routing_data, history, time_step):
         pass
 
+    # OK
     def sample_trajectories(self, routing_data, state_sample_count, samples_per_state, state_ids=None) \
             -> TrajectoryHistory:
         # if state_ids is None, sample from state distribution
@@ -171,6 +208,7 @@ class PolicyGradientsNetwork:
                 self.state_transition(routing_data=routing_data, history=history, time_step=t)
         return history
 
+    # OK
     def calculate_policy_value(self, routing_data, state_batch_size, samples_per_state):
         # self, data, features_dict, ml_selections_arr, posteriors_tensor,
         # state_sample_count, samples_per_state, state_ids = None
@@ -191,6 +229,7 @@ class PolicyGradientsNetwork:
         expected_policy_value = total_rewards / trajectory_count
         return expected_policy_value
 
+    # OK
     def evaluate_policy_values(self):
         validation_policy_value = self.calculate_policy_value(routing_data=self.validationDataForMDP,
                                                               state_batch_size=1000, samples_per_state=100)
@@ -199,18 +238,15 @@ class PolicyGradientsNetwork:
         print("validation_policy_value={0}".format(validation_policy_value))
         print("test_policy_value={0}".format(test_policy_value))
 
-    def build_policy_gradient_loss(self):
-        pass
-
     def train(self, state_sample_count, samples_per_state):
         pass
-        # # State inputs and reward inputs
+        # # State stateInputs and reward stateInputs
         # for t in range(self.trajectoryMaxLength):
         #     # States
         #     input_shape = [None]
         #     input_shape.extend(self.stateShapes[t])
         #     state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(t))
-        #     self.inputs.append(state_input)
+        #     self.stateInputs.append(state_input)
         #     # Rewards
         #     reward_shape = [None, len(self.actionSpaces[t])]
         #     reward_input = tf.placeholder(dtype=tf.float32, shape=reward_shape, name="rewards_{0}".format(t))
@@ -241,9 +277,6 @@ class PolicyGradientsNetwork:
             total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
             self.networkActivationCosts.append(total_cost)
         self.networkActivationCosts = np.array(self.networkActivationCosts) * (1.0 / self.baseEvaluationCost)
-
-    def get_reachability_matrices(self):
-        pass
 
     def get_l2_loss(self):
         # L2 Loss
