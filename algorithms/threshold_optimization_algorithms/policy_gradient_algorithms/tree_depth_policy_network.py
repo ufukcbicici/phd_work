@@ -144,10 +144,6 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             results = self.tfSession.run([self.policies[time_step], self.policySamples[time_step]], feed_dict=feed_dict)
             policies = results[0]
             policy_samples = results[-1]
-            history.policies.append(policies)
-            history.actions.append(policy_samples)
-            routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
-            history.routingDecisions.append(routing_decisions_t)
         else:
             results = self.tfSession.run([self.policies[time_step]], feed_dict=feed_dict)
             policies = results[0]
@@ -157,6 +153,14 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             else:
                 actions_t_minus_one = history.actions[time_step - 1]
             reachability_matrix = self.reachabilityMatrices[time_step][actions_t_minus_one, :]
+            assert policies.shape == reachability_matrix.shape
+            policies = policies * reachability_matrix if ignore_invalid_actions else policies
+            policy_samples = np.argmax(policies, axis=1)
+        history.policies.append(policies)
+        history.actions.append(policy_samples)
+        routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
+        history.routingDecisions.append(routing_decisions_t)
+        print("X")
 
     def state_transition(self, history, routing_data, time_step):
         nodes_in_level = self.network.orderedNodesPerLevel[time_step + 1]
