@@ -135,16 +135,28 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                         reachability_matrix_t[action_t_minus_one_id, actions_t_id] = is_valid_selection
             self.reachabilityMatrices.append(reachability_matrix_t)
 
-    def sample_from_policy(self, routing_data, history, time_step, select_argmax=False):
+    def sample_from_policy(self, routing_data, history, time_step, select_argmax, ignore_invalid_actions):
         assert len(history.states) == time_step + 1
         assert len(history.actions) == time_step
         feed_dict = {self.stateInputs[t]: history.states[t] for t in range(time_step + 1)}
-        sampling_op = self.policyArgMaxSamples[time_step] if select_argmax else self.policySamples[time_step]
-        results = self.tfSession.run([self.policies[time_step], sampling_op], feed_dict=feed_dict)
-        policy_samples = results[-1]
-        history.actions.append(policy_samples)
-        routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
-        history.routingDecisions.append(routing_decisions_t)
+        if not select_argmax:
+            # sampling_op = self.policyArgMaxSamples[time_step] if select_argmax else self.policySamples[time_step]
+            results = self.tfSession.run([self.policies[time_step], self.policySamples[time_step]], feed_dict=feed_dict)
+            policies = results[0]
+            policy_samples = results[-1]
+            history.policies.append(policies)
+            history.actions.append(policy_samples)
+            routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
+            history.routingDecisions.append(routing_decisions_t)
+        else:
+            results = self.tfSession.run([self.policies[time_step]], feed_dict=feed_dict)
+            policies = results[0]
+            # Determine valid actions
+            if time_step - 1 < 0:
+                actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
+            else:
+                actions_t_minus_one = history.actions[time_step - 1]
+            reachability_matrix = self.reachabilityMatrices[time_step][actions_t_minus_one, :]
 
     def state_transition(self, history, routing_data, time_step):
         nodes_in_level = self.network.orderedNodesPerLevel[time_step + 1]
@@ -179,16 +191,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         # If in the last step, calculate reward according to the accuracy + computation cost
         if time_step == self.get_max_trajectory_length() - 1:
             # Prediction Rewards
-            true_labels = routing_data.routingDataset.labelList[history.stateIds]
-            posteriors = routing_data.posteriorsTensor[history.stateIds, :]
-            routing_decisions_t = history.routingDecisions[time_step]
-            assert routing_decisions_t.shape[1] == posteriors.shape[2]
-            routing_weights = np.reciprocal(np.sum(routing_decisions_t.astype(np.float32), axis=1))
-            routing_decisions_t_weighted = routing_decisions_t * np.expand_dims(routing_weights, axis=1)
-            weighted_posteriors = posteriors * np.expand_dims(routing_decisions_t_weighted, axis=1)
-            final_posteriors = np.sum(weighted_posteriors, axis=2)
-            predicted_labels = np.argmax(final_posteriors, axis=1)
-            validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+            validity_of_predictions_vec = self.calculate_accuracy_of_trajectories(routing_data=routing_data,
+                                                                                  history=history)
             validity_of_prediction_rewards = np.array([TreeDepthPolicyNetwork.INVALID_PREDICTION_PENALTY,
                                                        TreeDepthPolicyNetwork.VALID_PREDICTION_REWARD])
             prediction_rewards = validity_of_prediction_rewards[validity_of_predictions_vec]
@@ -199,10 +203,38 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             rewards_arr += activation_cost_arr
         history.rewards.append(rewards_arr)
 
+    def calculate_routing_accuracy(self, routing_data, state_batch_size):
+        data_count = routing_data.routingDataset.labelList.shape[0]
+        id_list = list(range(data_count))
+        ignore_invalid_action_flags = [False, True]
+        accuracy_types_list = ["All Actions", "Only Valid Actions"]
+        accuracy_dict = {}
+        for ignore_invalid_actions, accuracy_type in zip(ignore_invalid_action_flags, accuracy_types_list):
+            validity_vectors = []
+            for idx in range(0, data_count, state_batch_size):
+                curr_sample_ids = id_list[idx:idx + state_batch_size]
+                history = self.sample_trajectories(routing_data=routing_data,
+                                                   state_sample_count=None,
+                                                   samples_per_state=1,
+                                                   state_ids=curr_sample_ids,
+                                                   select_argmax=True,
+                                                   ignore_invalid_actions=ignore_invalid_actions)
+                validity_of_predictions_vec = \
+                    self.calculate_accuracy_of_trajectories(routing_data=routing_data, history=history)
+                validity_vectors.append(validity_of_predictions_vec)
+            validity_vector = np.concatenate(validity_vectors)
+            total_correct_count = np.sum(validity_vector)
+            accuracy = total_correct_count / validity_vector.shape[0]
+            accuracy_dict[accuracy_type] = accuracy
+        return accuracy_dict
+
     def train(self, state_sample_count, samples_per_state):
         self.sample_trajectories(routing_data=self.validationDataForMDP,
                                  state_sample_count=state_sample_count,
-                                 samples_per_state=samples_per_state)
+                                 samples_per_state=samples_per_state,
+                                 state_ids=None,
+                                 select_argmax=False,
+                                 ignore_invalid_actions=False)
         print("X")
 
 
@@ -232,6 +264,7 @@ def main():
     samples_per_state = 100
 
     policy_gradients_routing_optimizer.evaluate_policy_values()
+    policy_gradients_routing_optimizer.evaluate_routing_accuracies()
     policy_gradients_routing_optimizer.calculate_routing_accuracy(
         routing_data=policy_gradients_routing_optimizer.validationDataForMDP, state_batch_size=1000)
     policy_gradients_routing_optimizer.train(state_sample_count=state_sample_count, samples_per_state=samples_per_state)

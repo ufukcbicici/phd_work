@@ -16,6 +16,7 @@ class TrajectoryHistory:
         self.stateIds = state_ids
         self.maxLikelihoodRoutes = max_likelihood_routes
         self.states = []
+        self.policies = []
         self.actions = []
         self.routingDecisions = []
         self.rewards = []
@@ -182,7 +183,7 @@ class PolicyGradientsNetwork:
         pass
 
     # OK
-    def sample_from_policy(self, routing_data, history, time_step, select_argmax=False):
+    def sample_from_policy(self, routing_data, history, time_step, select_argmax, ignore_invalid_actions):
         pass
 
     # OK
@@ -195,7 +196,7 @@ class PolicyGradientsNetwork:
 
     # OK
     def sample_trajectories(self, routing_data, state_sample_count, samples_per_state,
-                            state_ids=None, select_argmax=False) \
+                            select_argmax, ignore_invalid_actions,  state_ids) \
             -> TrajectoryHistory:
         # if state_ids is None, sample from state distribution
         # Sample from s1 ~ p(s1)
@@ -207,13 +208,27 @@ class PolicyGradientsNetwork:
         for t in range(max_trajectory_length):
             # Sample from a_t ~ p(a_t|history(t))
             self.sample_from_policy(routing_data=routing_data, history=history, time_step=t,
-                                    select_argmax=select_argmax)
+                                    select_argmax=select_argmax, ignore_invalid_actions=ignore_invalid_actions)
             # Get the reward: r_t ~ p(r_t|history(t))
             self.reward_calculation(routing_data=routing_data, history=history, time_step=t)
             # State transition s_{t+1} ~ p(s_{t+1}|history(t))
             if t < max_trajectory_length - 1:
                 self.state_transition(routing_data=routing_data, history=history, time_step=t)
         return history
+
+    # OK
+    def calculate_accuracy_of_trajectories(self, routing_data, history):
+        true_labels = routing_data.routingDataset.labelList[history.stateIds]
+        posteriors = routing_data.posteriorsTensor[history.stateIds, :]
+        routing_decisions_t = history.routingDecisions[-1]
+        assert routing_decisions_t.shape[1] == posteriors.shape[2]
+        routing_weights = np.reciprocal(np.sum(routing_decisions_t.astype(np.float32), axis=1))
+        routing_decisions_t_weighted = routing_decisions_t * np.expand_dims(routing_weights, axis=1)
+        weighted_posteriors = posteriors * np.expand_dims(routing_decisions_t_weighted, axis=1)
+        final_posteriors = np.sum(weighted_posteriors, axis=2)
+        predicted_labels = np.argmax(final_posteriors, axis=1)
+        validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+        return validity_of_predictions_vec
 
     # OK
     def calculate_policy_value(self, routing_data, state_batch_size, samples_per_state):
@@ -229,6 +244,8 @@ class PolicyGradientsNetwork:
             history = self.sample_trajectories(routing_data=routing_data,
                                                state_sample_count=None,
                                                samples_per_state=samples_per_state,
+                                               select_argmax=False,
+                                               ignore_invalid_actions=False,
                                                state_ids=curr_sample_ids)
             rewards_matrix = np.stack([history.rewards[t] for t in range(self.get_max_trajectory_length())], axis=1)
             total_rewards += np.sum(rewards_matrix)
@@ -236,18 +253,9 @@ class PolicyGradientsNetwork:
         expected_policy_value = total_rewards / trajectory_count
         return expected_policy_value
 
+    # OK
     def calculate_routing_accuracy(self, routing_data, state_batch_size):
-        data_count = routing_data.routingDataset.labelList.shape[0]
-        id_list = list(range(data_count))
-        for idx in range(0, data_count, state_batch_size):
-            curr_sample_ids = id_list[idx:idx + state_batch_size]
-            history = self.sample_trajectories(routing_data=routing_data,
-                                               state_sample_count=None,
-                                               samples_per_state=1,
-                                               state_ids=curr_sample_ids,
-                                               select_argmax=True)
-
-
+        pass
 
     # OK
     def evaluate_policy_values(self):
@@ -257,6 +265,13 @@ class PolicyGradientsNetwork:
                                                         state_batch_size=1000, samples_per_state=100)
         print("validation_policy_value={0}".format(validation_policy_value))
         print("test_policy_value={0}".format(test_policy_value))
+
+    def evaluate_routing_accuracies(self):
+        validation_accuracy = self.calculate_routing_accuracy(routing_data=self.validationDataForMDP,
+                                                              state_batch_size=100)
+        test_accuracy = self.calculate_routing_accuracy(routing_data=self.testDataForMDP, state_batch_size=100)
+        print("validation_accuracy={0}".format(validation_accuracy))
+        print("test_accuracy={0}".format(test_accuracy))
 
     def train(self, state_sample_count, samples_per_state):
         pass
