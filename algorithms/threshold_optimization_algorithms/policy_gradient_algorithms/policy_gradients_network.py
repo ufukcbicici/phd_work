@@ -240,6 +240,12 @@ class PolicyGradientsNetwork:
         data_count = routing_data.routingDataset.labelList.shape[0]
         id_list = list(range(data_count))
         for idx in range(0, data_count, state_batch_size):
+            curr_sample_ids = id_list[idx:idx + state_batch_size]
+            history = self.sample_trajectories(routing_data=routing_data,
+                                               state_sample_count=None,
+                                               samples_per_state=1,
+                                               state_ids=curr_sample_ids,
+                                               select_argmax=True)
 
 
     # OK
