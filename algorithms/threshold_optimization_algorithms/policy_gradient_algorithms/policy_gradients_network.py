@@ -248,6 +248,7 @@ class PolicyGradientsNetwork:
                                                select_argmax=True)
 
 
+
     # OK
     def evaluate_policy_values(self):
         validation_policy_value = self.calculate_policy_value(routing_data=self.validationDataForMDP,
