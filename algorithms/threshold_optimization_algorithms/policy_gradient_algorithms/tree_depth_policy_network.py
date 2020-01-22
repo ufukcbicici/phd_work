@@ -269,8 +269,6 @@ def main():
 
     policy_gradients_routing_optimizer.evaluate_policy_values()
     policy_gradients_routing_optimizer.evaluate_routing_accuracies()
-    policy_gradients_routing_optimizer.calculate_routing_accuracy(
-        routing_data=policy_gradients_routing_optimizer.validationDataForMDP, state_batch_size=1000)
     policy_gradients_routing_optimizer.train(state_sample_count=state_sample_count, samples_per_state=samples_per_state)
 
 

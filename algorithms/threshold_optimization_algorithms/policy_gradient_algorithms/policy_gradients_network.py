@@ -268,7 +268,7 @@ class PolicyGradientsNetwork:
 
     def evaluate_routing_accuracies(self):
         validation_accuracy = self.calculate_routing_accuracy(routing_data=self.validationDataForMDP,
-                                                              state_batch_size=100)
+                                                              state_batch_size=1000)
         test_accuracy = self.calculate_routing_accuracy(routing_data=self.testDataForMDP, state_batch_size=100)
         print("validation_accuracy={0}".format(validation_accuracy))
         print("test_accuracy={0}".format(test_accuracy))
