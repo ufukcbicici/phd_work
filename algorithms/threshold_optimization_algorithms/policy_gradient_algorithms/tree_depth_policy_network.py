@@ -160,7 +160,6 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         history.actions.append(policy_samples)
         routing_decisions_t = self.actionSpaces[time_step][history.actions[time_step], :]
         history.routingDecisions.append(routing_decisions_t)
-        print("X")
 
     def state_transition(self, history, routing_data, time_step):
         nodes_in_level = self.network.orderedNodesPerLevel[time_step + 1]
@@ -267,6 +266,7 @@ def main():
     state_sample_count = policy_gradients_routing_optimizer.validationData.labelList.shape[0]
     samples_per_state = 100
 
+    policy_gradients_routing_optimizer.evaluate_ml_routing_accuracies()
     policy_gradients_routing_optimizer.evaluate_policy_values()
     policy_gradients_routing_optimizer.evaluate_routing_accuracies()
     policy_gradients_routing_optimizer.train(state_sample_count=state_sample_count, samples_per_state=samples_per_state)

@@ -196,7 +196,7 @@ class PolicyGradientsNetwork:
 
     # OK
     def sample_trajectories(self, routing_data, state_sample_count, samples_per_state,
-                            select_argmax, ignore_invalid_actions,  state_ids) \
+                            select_argmax, ignore_invalid_actions, state_ids) \
             -> TrajectoryHistory:
         # if state_ids is None, sample from state distribution
         # Sample from s1 ~ p(s1)
@@ -257,6 +257,22 @@ class PolicyGradientsNetwork:
     def calculate_routing_accuracy(self, routing_data, state_batch_size):
         pass
 
+    def get_max_likelihood_accuracy(self, routing_data):
+        sample_counts_set = set()
+        sample_counts_set.add(routing_data.posteriorsTensor.shape[0])
+        sample_counts_set.add(routing_data.mlPaths.shape[0])
+        sample_counts_set.add(routing_data.routingDataset.labelList.shape[0])
+        assert len(sample_counts_set) == 1
+        correct_count = 0
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth-1]])
+        for idx in range(routing_data.routingDataset.labelList.shape[0]):
+            leaf_id = routing_data.mlPaths[idx, -1]
+            posterior = routing_data.posteriorsTensor[idx, :, leaf_id - min_leaf_id]
+            predicted_label = np.argmax(posterior)
+            correct_count += float(predicted_label == routing_data.routingDataset.labelList[idx])
+        accuracy = correct_count / routing_data.routingDataset.labelList.shape[0]
+        return accuracy
+
     # OK
     def evaluate_policy_values(self):
         validation_policy_value = self.calculate_policy_value(routing_data=self.validationDataForMDP,
@@ -272,6 +288,12 @@ class PolicyGradientsNetwork:
         test_accuracy = self.calculate_routing_accuracy(routing_data=self.testDataForMDP, state_batch_size=100)
         print("validation_accuracy={0}".format(validation_accuracy))
         print("test_accuracy={0}".format(test_accuracy))
+
+    def evaluate_ml_routing_accuracies(self):
+        val_ml_accuracy = self.get_max_likelihood_accuracy(routing_data=self.validationDataForMDP)
+        test_ml_accuracy = self.get_max_likelihood_accuracy(routing_data=self.testDataForMDP)
+        print("val_ml_accuracy={0}".format(val_ml_accuracy))
+        print("test_ml_accuracy={0}".format(test_ml_accuracy))
 
     def train(self, state_sample_count, samples_per_state):
         pass
