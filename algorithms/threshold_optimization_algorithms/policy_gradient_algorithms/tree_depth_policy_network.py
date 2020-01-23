@@ -238,7 +238,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         # for t in range(self.get_max_trajectory_length()):
         pass
 
-    def train(self, max_num_of_iterations=100000):
+    def train(self, max_num_of_iterations=7500):
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values()
         self.evaluate_routing_accuracies()

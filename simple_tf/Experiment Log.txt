@@ -725,6 +725,33 @@ FROM
 )
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
+
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1190
+	AND
+	Explanation LIKE "%Decay Step:35000%"
+	AND
+	Explanation LIKE "%Batch Size:500%"
+	AND
+	Explanation LIKE "%Tree Degree:[2, 2]%"
+)
+GROUP BY RunId
+ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
 
 
