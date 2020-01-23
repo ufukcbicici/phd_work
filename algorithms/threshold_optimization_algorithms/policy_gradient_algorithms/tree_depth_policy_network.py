@@ -293,6 +293,9 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         explanation += "Use Baselines:{0}\n".format(self.useBaselines)
         explanation += "stateSampleCount:{0}\n".format(self.stateSampleCount)
         explanation += "trajectoryPerStateSampleCount:{0}\n".format(self.trajectoryPerStateSampleCount)
+        val_ml_accuracy, test_ml_accuracy = self.evaluate_ml_routing_accuracies()
+        explanation += "val_ml_accuracy:{0}\n".format(val_ml_accuracy)
+        explanation += "test_ml_accuracy:{0}\n".format(test_ml_accuracy)
         return explanation
 
 

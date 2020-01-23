@@ -302,6 +302,7 @@ class PolicyGradientsNetwork:
         test_ml_accuracy = self.get_max_likelihood_accuracy(routing_data=self.testDataForMDP)
         print("val_ml_accuracy={0}".format(val_ml_accuracy))
         print("test_ml_accuracy={0}".format(test_ml_accuracy))
+        return val_ml_accuracy, test_ml_accuracy
 
     def train(self, max_num_of_iterations):
         pass
