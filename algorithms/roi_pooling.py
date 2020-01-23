@@ -58,7 +58,9 @@ class RoIPooling:
         def curried_pool_rois(_x):
             s0 = tf.reduce_sum(_x[0])
             s1 = tf.reduce_sum(_x[1])
-            tf_arr = tf.constant([s0, s1])
+            s0 = tf.expand_dims(s0, axis=0)
+            s1 = tf.expand_dims(s1, axis=0)
+            tf_arr = tf.concat([s0, s1], axis=0)
             return tf_arr
         pooled_areas = tf.map_fn(curried_pool_rois, x, dtype=tf.float32)
         return pooled_areas
