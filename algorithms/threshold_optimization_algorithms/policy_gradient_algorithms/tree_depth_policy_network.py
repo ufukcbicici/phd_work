@@ -250,20 +250,13 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                 feed_dict[self.stateInputs[t]] = history.states[t]
                 feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
                 feed_dict[self.rewards[t]] = history.rewards[t]
-
-            # max_trajectory_length = self.get_max_trajectory_length()
-            # for t in range(max_trajectory_length):
-            #     selected_policy_indices = tf.stack([tf.range(0, self.trajectoryCount, 1), self.selectedPolicyInputs[t]],
-            #                                        axis=1)
-            #     log_selected_policies = tf.gather_nd(self.logPolicies[t], selected_policy_indices)
-            #     self.selectedLogPolicySamples.append(log_selected_policies)
-            #     # TODO: ADD BASELINE HERE WHEN THE TIME COMES
-            #     proxy_loss_step_t = self.selectedLogPolicySamples[t] * self.cumulativeRewards[t]
-            #     self.proxyLossTrajectories.append(proxy_loss_step_t)
-            # self.proxyLossVector = tf.add_n(self.proxyLossTrajectories)
-            # self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
-
-
+            results = self.tfSession.run([self.logPolicies,
+                                          self.selectedLogPolicySamples,
+                                          self.cumulativeRewards,
+                                          self.proxyLossTrajectories,
+                                          self.proxyLossVector,
+                                          self.proxyLoss], feed_dict=feed_dict)
+            print("X")
         print("X")
 
 
@@ -292,9 +285,6 @@ def main():
     state_sample_count = policy_gradients_routing_optimizer.validationData.labelList.shape[0]
     samples_per_state = 100
 
-    policy_gradients_routing_optimizer.evaluate_ml_routing_accuracies()
-    policy_gradients_routing_optimizer.evaluate_policy_values()
-    policy_gradients_routing_optimizer.evaluate_routing_accuracies()
     policy_gradients_routing_optimizer.train(state_sample_count=state_sample_count, samples_per_state=samples_per_state)
 
 
