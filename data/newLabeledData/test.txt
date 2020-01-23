@@ -1,0 +1,16 @@
+/home/vision/darknet/newLabeledData/IMG_20160823_123506.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_130110.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_112354.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_090636.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_130715.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_125405.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_124910.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_103417.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_123700.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_124559.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_131925.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_141306.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_112350.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_120838.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_123638.jpg
+/home/vision/darknet/newLabeledData/IMG_20160823_124909.jpg
