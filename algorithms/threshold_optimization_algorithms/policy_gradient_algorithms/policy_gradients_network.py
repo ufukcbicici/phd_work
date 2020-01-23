@@ -39,6 +39,7 @@ class PolicyGradientsNetwork:
         self.networkFeatureNames = output_names
         self.usedFeatureNames = used_feature_names
         self.l2Lambda = l2_lambda
+        self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
         self.paramL2Norms = {}
         self.l2Loss = None
         self.stateInputs = []
@@ -363,7 +364,7 @@ class PolicyGradientsNetwork:
         self.l2Loss = tf.constant(0.0)
         for tv in tvars:
             if 'kernel' in tv.name:
-                self.l2Loss += self.l2Lambda * tf.nn.l2_loss(tv)
+                self.l2Loss += self.l2LambdaTf * tf.nn.l2_loss(tv)
             self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
 
     def get_max_likelihood_paths(self, branch_probs):

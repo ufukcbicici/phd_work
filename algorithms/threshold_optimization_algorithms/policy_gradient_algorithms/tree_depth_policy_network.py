@@ -261,6 +261,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                 feed_dict[self.stateInputs[t]] = history.states[t]
                 feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
                 feed_dict[self.rewards[t]] = history.rewards[t]
+            feed_dict[self.l2LambdaTf] = self.l2Lambda
             results = self.tfSession.run([self.logPolicies,
                                           self.selectedLogPolicySamples,
                                           self.cumulativeRewards,
@@ -286,6 +287,11 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             # print("X")
         print("X")
 
+    def grid_search(self):
+        for l2_lambda in [0.0, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]:
+            self.l2Lambda = l2_lambda
+            self.train()
+
     def get_explanation(self):
         explanation = ""
         explanation += "INVALID_ACTION_PENALTY={0}\n".format(TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY)
@@ -299,6 +305,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         explanation += "Use Baselines:{0}\n".format(self.useBaselines)
         explanation += "stateSampleCount:{0}\n".format(self.stateSampleCount)
         explanation += "trajectoryPerStateSampleCount:{0}\n".format(self.trajectoryPerStateSampleCount)
+        explanation += "l2Lambda:{0}\n".format(self.l2Lambda)
         val_ml_accuracy, test_ml_accuracy = self.evaluate_ml_routing_accuracies()
         explanation += "val_ml_accuracy:{0}\n".format(val_ml_accuracy)
         explanation += "test_ml_accuracy:{0}\n".format(test_ml_accuracy)
@@ -333,7 +340,8 @@ def main():
                                                                 state_sample_count=state_sample_count,
                                                                 trajectory_per_state_sample_count=samples_per_state,
                                                                 hidden_layers=[[128], [256]])
-    policy_gradients_routing_optimizer.train()
+    # policy_gradients_routing_optimizer.train()
+    policy_gradients_routing_optimizer.grid_search()
 
 
 if __name__ == "__main__":

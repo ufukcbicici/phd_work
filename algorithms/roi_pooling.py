@@ -54,9 +54,14 @@ class RoIPooling:
     #     self.pooledWidth = pooled_width
     #     self.pooledHeight = pooled_height
     @staticmethod
-    def roi_pool(pooled_width, pooled_height):
-        pass
-
+    def roi_pool(x, pooled_width, pooled_height):
+        def curried_pool_rois(_x):
+            s0 = tf.reduce_sum(_x[0])
+            s1 = tf.reduce_sum(_x[1])
+            tf_arr = tf.constant([s0, s1])
+            return tf_arr
+        pooled_areas = tf.map_fn(curried_pool_rois, x, dtype=tf.float32)
+        return pooled_areas
 
 
 def get_dummy_roi_tensor():
@@ -79,7 +84,7 @@ def get_dummy_roi_tensor():
 def main():
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, IMG_W, IMG_H, FEATURE_COUNT])
     rois_tensor = tf.placeholder(tf.float32, shape=(None, NUM_ROIS, 4))
-    split_features, split_rois, roi_tensors = RoIPooling.roi_pool(feature_map=input_tensor, roi_list=rois_tensor)
+    # split_features, split_rois, roi_tensors = RoIPooling.roi_pool(feature_map=input_tensor, roi_list=rois_tensor)
     # RoIPooling.roi_pool(x=input_tensor, roi_list=ROI_LIST)
 
     # Prepare dummy image data
@@ -87,9 +92,11 @@ def main():
     # Prepare dummy roi data
     roi_arr = get_dummy_roi_tensor()
 
+    # Network
+    roi_output = RoIPooling.roi_pool(x=[input_tensor, rois_tensor], pooled_height=7, pooled_width=7)
+
     sess = tf.Session()
-    results = sess.run([split_features, split_rois, roi_tensors, input_tensor],
-                       feed_dict={input_tensor: random_imgs, rois_tensor: roi_arr})
+    results = sess.run([roi_output],  feed_dict={input_tensor: random_imgs, rois_tensor: roi_arr})
     print("X")
 
 
