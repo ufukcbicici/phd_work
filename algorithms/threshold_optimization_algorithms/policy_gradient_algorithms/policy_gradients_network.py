@@ -33,6 +33,7 @@ class RoutingDataForMDP:
 class PolicyGradientsNetwork:
     def __init__(self, l2_lambda,
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
+                 use_baselines, state_sample_count, trajectory_per_state_sample_count,
                  test_ratio=0.2):
         self.actionSpaces = None
         self.networkFeatureNames = output_names
@@ -66,7 +67,12 @@ class PolicyGradientsNetwork:
         self.baseEvaluationCost = None
         self.reachabilityMatrices = []
         self.optimizer = None
+        self.stateSampleCount = state_sample_count
+        self.trajectoryPerStateSampleCount = trajectory_per_state_sample_count
+        self.useBaselines = use_baselines
         self.tfSession = tf.Session()
+        self.networkName = network_name
+        self.networkRunId = run_id
         # Prepare CIGN topology data.
         self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
@@ -169,9 +175,9 @@ class PolicyGradientsNetwork:
     def build_optimizer(self):
         self.learningRate = tf.constant(0.00001)
         self.totalLoss = (-1.0 * self.proxyLoss) + self.l2Loss
-        # self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
-        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate). \
-            minimize(self.totalLoss, global_step=self.globalStep)
+        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate). \
+        #     minimize(self.totalLoss, global_step=self.globalStep)
 
     # OK
     def sample_initial_states(self, routing_data, state_sample_count, samples_per_state,
@@ -281,6 +287,7 @@ class PolicyGradientsNetwork:
                                                         state_batch_size=1000, samples_per_state=100)
         print("validation_policy_value={0}".format(validation_policy_value))
         print("test_policy_value={0}".format(test_policy_value))
+        return validation_policy_value, test_policy_value
 
     def evaluate_routing_accuracies(self):
         validation_accuracy = self.calculate_routing_accuracy(routing_data=self.validationDataForMDP,
@@ -288,6 +295,7 @@ class PolicyGradientsNetwork:
         test_accuracy = self.calculate_routing_accuracy(routing_data=self.testDataForMDP, state_batch_size=100)
         print("validation_accuracy={0}".format(validation_accuracy))
         print("test_accuracy={0}".format(test_accuracy))
+        return validation_accuracy, test_accuracy
 
     def evaluate_ml_routing_accuracies(self):
         val_ml_accuracy = self.get_max_likelihood_accuracy(routing_data=self.validationDataForMDP)
@@ -295,7 +303,7 @@ class PolicyGradientsNetwork:
         print("val_ml_accuracy={0}".format(val_ml_accuracy))
         print("test_ml_accuracy={0}".format(test_ml_accuracy))
 
-    def train(self, state_sample_count, samples_per_state):
+    def train(self, max_num_of_iterations):
         pass
         # # State stateInputs and reward stateInputs
         # for t in range(self.trajectoryMaxLength):
@@ -364,3 +372,6 @@ class PolicyGradientsNetwork:
             max_likelihood_paths.append(np.array(route))
         max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
         return max_likelihood_paths
+
+    def get_explanation(self):
+        pass

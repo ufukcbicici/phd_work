@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
+from auxillary.db_logger import DbLogger
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.policy_gradients_network import \
     PolicyGradientsNetwork, TrajectoryHistory
 
@@ -20,10 +21,11 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
 
     def __init__(self, l2_lambda,
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
-                 hidden_layers, test_ratio=0.2):
+                 hidden_layers, use_baselines, state_sample_count, trajectory_per_state_sample_count, test_ratio=0.2):
         self.hiddenLayers = hidden_layers
         super().__init__(l2_lambda, network_name, run_id, iteration, degree_list, data_type, output_names,
-                         used_feature_names, test_ratio=test_ratio)
+                         used_feature_names, use_baselines,
+                         state_sample_count, trajectory_per_state_sample_count, test_ratio=test_ratio)
         assert len(self.hiddenLayers) == self.get_max_trajectory_length()
 
     def prepare_state_features(self, data):
@@ -231,16 +233,20 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             accuracy_dict[accuracy_type] = accuracy
         return accuracy_dict
 
-    def train(self, state_sample_count, samples_per_state, max_num_of_iterations=100000):
+    def train(self, max_num_of_iterations=100000):
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values()
         self.evaluate_routing_accuracies()
 
+        exp_str = self.get_explanation()
+        run_id = DbLogger.get_run_id()
+        DbLogger.write_into_table(rows=[(run_id, exp_str)], table=DbLogger.runMetaData, col_count=2)
+
         for iteration_id in range(max_num_of_iterations):
             # Sample a set of trajectories
             history = self.sample_trajectories(routing_data=self.validationDataForMDP,
-                                               state_sample_count=state_sample_count,
-                                               samples_per_state=samples_per_state,
+                                               state_sample_count=self.stateSampleCount,
+                                               samples_per_state=self.trajectoryPerStateSampleCount,
                                                state_ids=None,
                                                select_argmax=False,
                                                ignore_invalid_actions=False)
@@ -255,9 +261,39 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                                           self.cumulativeRewards,
                                           self.proxyLossTrajectories,
                                           self.proxyLossVector,
-                                          self.proxyLoss], feed_dict=feed_dict)
-            print("X")
+                                          self.proxyLoss,
+                                          self.optimizer], feed_dict=feed_dict)
+            # self.evaluate_ml_routing_accuracies()
+            if iteration_id % 10 == 0:
+                print("***********Iteration {0}***********".format(iteration_id))
+                validation_policy_value, test_policy_value = self.evaluate_policy_values()
+                validation_accuracy, test_accuracy = self.evaluate_routing_accuracies()
+                DbLogger.write_into_table(rows=[(run_id,
+                                                 iteration_id,
+                                                 validation_policy_value,
+                                                 test_policy_value,
+                                                 validation_accuracy["All Actions"],
+                                                 test_accuracy["All Actions"],
+                                                 validation_accuracy["Only Valid Actions"],
+                                                 test_accuracy["Only Valid Actions"])],
+                                          table="policy_gradients_results", col_count=8)
+                print("***********Iteration {0}***********".format(iteration_id))
+            # print("X")
         print("X")
+
+    def get_explanation(self):
+        explanation = ""
+        explanation += "INVALID_ACTION_PENALTY={0}\n".format(TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY)
+        explanation += "VALID_PREDICTION_REWARD={0}\n".format(TreeDepthPolicyNetwork.VALID_PREDICTION_REWARD)
+        explanation += "INVALID_PREDICTION_PENALTY={0}\n".format(TreeDepthPolicyNetwork.INVALID_PREDICTION_PENALTY)
+        explanation += "LAMBDA_MAC_COST={0}\n".format(TreeDepthPolicyNetwork.LAMBDA_MAC_COST)
+        explanation += "Hidden Layers={0}\n".format(self.hiddenLayers)
+        explanation += "Network Name:{0}\n".format(self.networkName)
+        explanation += "Network Run Id:{0}\n".format(self.networkRunId)
+        explanation += "Use Baselines:{0}\n".format(self.useBaselines)
+        explanation += "stateSampleCount:{0}\n".format(self.stateSampleCount)
+        explanation += "trajectoryPerStateSampleCount:{0}\n".format(self.trajectoryPerStateSampleCount)
+        return explanation
 
 
 def main():
@@ -272,6 +308,9 @@ def main():
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
     used_output_names = ["pre_branch_feature"]
+    state_sample_count = 8000
+    samples_per_state = 100
+
     policy_gradients_routing_optimizer = TreeDepthPolicyNetwork(l2_lambda=0.0,
                                                                 network_name=network_name,
                                                                 run_id=run_id,
@@ -281,11 +320,11 @@ def main():
                                                                 output_names=output_names,
                                                                 used_feature_names=used_output_names,
                                                                 test_ratio=0.2,
+                                                                use_baselines=False,
+                                                                state_sample_count=state_sample_count,
+                                                                trajectory_per_state_sample_count=samples_per_state,
                                                                 hidden_layers=[[128], [256]])
-    state_sample_count = policy_gradients_routing_optimizer.validationData.labelList.shape[0]
-    samples_per_state = 100
-
-    policy_gradients_routing_optimizer.train(state_sample_count=state_sample_count, samples_per_state=samples_per_state)
+    policy_gradients_routing_optimizer.train()
 
 
 if __name__ == "__main__":
