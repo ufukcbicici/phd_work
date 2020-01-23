@@ -58,6 +58,8 @@ class PolicyGradientsNetwork:
         self.trajectoryCount = None
         self.rewards = []
         self.cumulativeRewards = []
+        self.baselinesTf = []
+        self.baselinesNp = []
         self.weightedRewardMatrices = []
         self.valueFunctions = None
         self.policyValue = None
@@ -130,6 +132,14 @@ class PolicyGradientsNetwork:
             self.build_policy_networks(time_step=t)
             reward_input = tf.placeholder(dtype=tf.float32, shape=[None], name="rewards_{0}".format(t))
             self.rewards.append(reward_input)
+            baseline_input = tf.placeholder(dtype=tf.float32, shape=[None], name="baselines_{0}".format(t))
+            self.baselinesTf.append(baseline_input)
+            if t - 1 < 0:
+                baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0], 1))
+            else:
+                baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0],
+                                              self.actionSpaces[t - 1].shape[1]))
+            self.baselinesNp.append(baseline_np)
             # Policy sampling
             sampler = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[t])
             self.policySamples.append(sampler)
@@ -222,6 +232,9 @@ class PolicyGradientsNetwork:
                 self.state_transition(routing_data=routing_data, history=history, time_step=t)
         return history
 
+    def update_baselines(self, history):
+        pass
+
     # OK
     def calculate_accuracy_of_trajectories(self, routing_data, history):
         true_labels = routing_data.routingDataset.labelList[history.stateIds]
@@ -270,7 +283,7 @@ class PolicyGradientsNetwork:
         sample_counts_set.add(routing_data.routingDataset.labelList.shape[0])
         assert len(sample_counts_set) == 1
         correct_count = 0
-        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth-1]])
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
         for idx in range(routing_data.routingDataset.labelList.shape[0]):
             leaf_id = routing_data.mlPaths[idx, -1]
             posterior = routing_data.posteriorsTensor[idx, :, leaf_id - min_leaf_id]

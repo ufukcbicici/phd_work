@@ -18,6 +18,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
     LAMBDA_MAC_COST = 0.0
+    BASELINE_UPDATE_GAMMA = 0.99
 
     def __init__(self, l2_lambda,
                  network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
@@ -233,6 +234,11 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             accuracy_dict[accuracy_type] = accuracy
         return accuracy_dict
 
+    def update_baselines(self, history):
+        # for t in range(self.get_max_trajectory_length()):
+        pass
+
+
     def train(self, max_num_of_iterations=100000):
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values()
@@ -287,6 +293,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         explanation += "VALID_PREDICTION_REWARD={0}\n".format(TreeDepthPolicyNetwork.VALID_PREDICTION_REWARD)
         explanation += "INVALID_PREDICTION_PENALTY={0}\n".format(TreeDepthPolicyNetwork.INVALID_PREDICTION_PENALTY)
         explanation += "LAMBDA_MAC_COST={0}\n".format(TreeDepthPolicyNetwork.LAMBDA_MAC_COST)
+        explanation += "BASELINE_UPDATE_GAMMA={0}\n".format(TreeDepthPolicyNetwork.BASELINE_UPDATE_GAMMA)
         explanation += "Hidden Layers={0}\n".format(self.hiddenLayers)
         explanation += "Network Name:{0}\n".format(self.networkName)
         explanation += "Network Run Id:{0}\n".format(self.networkRunId)
