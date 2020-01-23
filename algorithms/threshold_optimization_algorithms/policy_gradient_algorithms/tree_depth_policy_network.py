@@ -269,6 +269,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                                           self.proxyLossVector,
                                           self.proxyLoss,
                                           self.optimizer], feed_dict=feed_dict)
+            if any([np.any(np.isinf(log_policy_arr)) for log_policy_arr in results[0]]):
+                print("Contains inf!!!")
             # self.evaluate_ml_routing_accuracies()
             if iteration_id % 10 == 0:
                 print("***********Iteration {0}***********".format(iteration_id))
@@ -288,7 +290,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         print("X")
 
     def grid_search(self):
-        for l2_lambda in [0.0, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]:
+        for l2_lambda in [0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]:
             self.l2Lambda = l2_lambda
             self.train()
 
