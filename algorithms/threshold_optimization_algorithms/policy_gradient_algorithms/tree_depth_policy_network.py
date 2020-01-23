@@ -231,13 +231,39 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             accuracy_dict[accuracy_type] = accuracy
         return accuracy_dict
 
-    def train(self, state_sample_count, samples_per_state):
-        self.sample_trajectories(routing_data=self.validationDataForMDP,
-                                 state_sample_count=state_sample_count,
-                                 samples_per_state=samples_per_state,
-                                 state_ids=None,
-                                 select_argmax=False,
-                                 ignore_invalid_actions=False)
+    def train(self, state_sample_count, samples_per_state, max_num_of_iterations=100000):
+        self.evaluate_ml_routing_accuracies()
+        self.evaluate_policy_values()
+        self.evaluate_routing_accuracies()
+
+        for iteration_id in range(max_num_of_iterations):
+            # Sample a set of trajectories
+            history = self.sample_trajectories(routing_data=self.validationDataForMDP,
+                                               state_sample_count=state_sample_count,
+                                               samples_per_state=samples_per_state,
+                                               state_ids=None,
+                                               select_argmax=False,
+                                               ignore_invalid_actions=False)
+            # Calculate the policy gradient, update the network.
+            feed_dict = {}
+            for t in range(self.get_max_trajectory_length()):
+                feed_dict[self.stateInputs[t]] = history.states[t]
+                feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
+                feed_dict[self.rewards[t]] = history.rewards[t]
+
+            # max_trajectory_length = self.get_max_trajectory_length()
+            # for t in range(max_trajectory_length):
+            #     selected_policy_indices = tf.stack([tf.range(0, self.trajectoryCount, 1), self.selectedPolicyInputs[t]],
+            #                                        axis=1)
+            #     log_selected_policies = tf.gather_nd(self.logPolicies[t], selected_policy_indices)
+            #     self.selectedLogPolicySamples.append(log_selected_policies)
+            #     # TODO: ADD BASELINE HERE WHEN THE TIME COMES
+            #     proxy_loss_step_t = self.selectedLogPolicySamples[t] * self.cumulativeRewards[t]
+            #     self.proxyLossTrajectories.append(proxy_loss_step_t)
+            # self.proxyLossVector = tf.add_n(self.proxyLossTrajectories)
+            # self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
+
+
         print("X")
 
 
