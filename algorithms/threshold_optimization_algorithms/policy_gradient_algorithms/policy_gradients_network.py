@@ -139,7 +139,7 @@ class PolicyGradientsNetwork:
                 baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0], 1))
             else:
                 baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0],
-                                              self.actionSpaces[t - 1].shape[1]))
+                                              self.actionSpaces[t - 1].shape[0]))
             self.baselinesNp.append(baseline_np)
             # Policy sampling
             sampler = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[t])
