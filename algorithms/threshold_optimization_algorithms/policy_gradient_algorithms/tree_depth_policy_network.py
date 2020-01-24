@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
+from collections import Counter
 from auxillary.db_logger import DbLogger
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.policy_gradients_network import \
     PolicyGradientsNetwork, TrajectoryHistory
@@ -244,8 +245,13 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                 actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
             else:
                 actions_t_minus_one = history.actions[t - 1]
-            self.baselinesNp[t][history.stateIds, actions_t_minus_one] += \
-                gamma * self.baselinesNp[t][history.stateIds, actions_t_minus_one] + (1.0 - gamma) * cummulative_rewards
+            delta_arr = np.zeros_like(self.baselinesNp[t])
+            count_arr = np.zeros_like(self.baselinesNp[t])
+            for state_id, action_t_minus_1, reward in zip(history.stateIds, actions_t_minus_one, cummulative_rewards):
+                delta_arr[state_id, action_t_minus_1] += reward
+                count_arr[state_id, action_t_minus_1] += 1.0
+            mean_delta_arr = delta_arr * np.reciprocal(count_arr)
+            self.baselinesNp[t] += gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
 
     def train(self, max_num_of_iterations=7500):
         self.evaluate_ml_routing_accuracies()
