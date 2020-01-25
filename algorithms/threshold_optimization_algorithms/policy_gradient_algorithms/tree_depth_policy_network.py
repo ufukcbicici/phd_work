@@ -49,6 +49,13 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             features_dict[node.index] = feature_vectors
         return features_dict
 
+    def get_previous_actions(self, history, time_step):
+        if time_step - 1 < 0:
+            actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
+        else:
+            actions_t_minus_one = history.actions[time_step - 1]
+        return actions_t_minus_one
+
     def build_action_spaces(self):
         max_trajectory_length = self.get_max_trajectory_length()
         self.actionSpaces = []
@@ -107,7 +114,6 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         state_ml_selections = routing_data.mlPaths[sample_indices, :]
         history = TrajectoryHistory(state_ids=sample_indices, max_likelihood_routes=state_ml_selections)
         history.states.append(initial_state_vectors)
-        history.stateIdsTemporal.append(np.stack([sample_indices, np.zeros_like(sample_indices)], axis=1))
         return history
 
     def get_max_trajectory_length(self) -> int:
@@ -153,10 +159,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             results = self.tfSession.run([self.policies[time_step]], feed_dict=feed_dict)
             policies = results[0]
             # Determine valid actions
-            if time_step - 1 < 0:
-                actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
-            else:
-                actions_t_minus_one = history.actions[time_step - 1]
+            actions_t_minus_one = self.get_previous_actions(history=history, time_step=time_step)
             reachability_matrix = self.reachabilityMatrices[time_step][actions_t_minus_one, :]
             assert policies.shape == reachability_matrix.shape
             policies = policies * reachability_matrix if ignore_invalid_actions else policies
@@ -187,10 +190,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     def reward_calculation(self, routing_data, history, time_step):
         rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
         # Check if valid actions
-        if time_step - 1 < 0:
-            actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
-        else:
-            actions_t_minus_one = history.actions[time_step - 1]
+        actions_t_minus_one = self.get_previous_actions(history=history, time_step=time_step)
         # Asses availability of the decisions
         action_t = history.actions[time_step]
         validity_of_actions_vec = self.reachabilityMatrices[time_step][actions_t_minus_one, action_t]
@@ -242,17 +242,18 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         for t in range(max_trajectory_length):
             forward_rewards = np.stack([history.rewards[_t] for _t in range(t, max_trajectory_length)], axis=1)
             cumulative_rewards = np.sum(forward_rewards, axis=1)
-            if t - 1 < 0:
-                actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
-            else:
-                actions_t_minus_one = history.actions[t - 1]
+            actions_t_minus_one = self.get_previous_actions(history=history, time_step=t)
             delta_arr = np.zeros_like(self.baselinesNp[t])
             count_arr = np.zeros_like(self.baselinesNp[t])
             for state_id, action_t_minus_1, reward in zip(history.stateIds, actions_t_minus_one, cumulative_rewards):
                 delta_arr[state_id, action_t_minus_1] += reward
                 count_arr[state_id, action_t_minus_1] += 1.0
+            # update_indicator = count_arr > 0.0
             mean_delta_arr = delta_arr * np.reciprocal(count_arr)
-            self.baselinesNp[t] += gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
+            new_baseline_arr = gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
+            nan_mask = np.logical_not(np.isnan(new_baseline_arr))
+            self.baselinesNp[t] = np.where(nan_mask, new_baseline_arr, self.baselinesNp[t])
+            # self.baselinesNp[t] += gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
 
     def train(self, max_num_of_iterations=7500):
         self.evaluate_ml_routing_accuracies()
@@ -272,13 +273,16 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                                                select_argmax=False,
                                                ignore_invalid_actions=False)
             # Calculate the policy gradient, update the network.
+            # Fill the feed dict
             feed_dict = {}
             for t in range(self.get_max_trajectory_length()):
                 feed_dict[self.stateInputs[t]] = history.states[t]
                 feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
                 feed_dict[self.rewards[t]] = history.rewards[t]
-                feed_dict[self.baselinesTf[t]] = self.baselinesNp[t]
+                actions_t_minus_one = self.get_previous_actions(history=history, time_step=t)
+                feed_dict[self.baselinesTf[t]] = self.baselinesNp[t][history.stateIds, actions_t_minus_one]
             feed_dict[self.l2LambdaTf] = self.l2Lambda
+
             results = self.tfSession.run([self.logPolicies,
                                           self.selectedLogPolicySamples,
                                           self.cumulativeRewards,
@@ -358,7 +362,7 @@ def main():
                                                                 output_names=output_names,
                                                                 used_feature_names=used_output_names,
                                                                 test_ratio=0.2,
-                                                                use_baselines=False,
+                                                                use_baselines=True,
                                                                 state_sample_count=state_sample_count,
                                                                 trajectory_per_state_sample_count=samples_per_state,
                                                                 hidden_layers=[[128], [256]])
