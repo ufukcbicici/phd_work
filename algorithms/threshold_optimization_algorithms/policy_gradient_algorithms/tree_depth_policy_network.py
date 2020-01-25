@@ -257,7 +257,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             self.baselinesNp[t] = np.where(nan_mask, new_baseline_arr, self.baselinesNp[t])
             # self.baselinesNp[t] += gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
 
-    def train(self, max_num_of_iterations=7500):
+    def train(self, max_num_of_iterations=15000):
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values()
         self.evaluate_routing_accuracies()
@@ -352,8 +352,8 @@ def main():
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
     used_output_names = ["pre_branch_feature"]
-    state_sample_count = 8000
-    samples_per_state = 100
+    state_sample_count = 1000
+    samples_per_state = 10
 
     policy_gradients_routing_optimizer = TreeDepthPolicyNetwork(l2_lambda=0.0,
                                                                 network_name=network_name,
