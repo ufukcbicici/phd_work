@@ -16,6 +16,7 @@ class TrajectoryHistory:
         self.stateIds = state_ids
         self.maxLikelihoodRoutes = max_likelihood_routes
         self.states = []
+        self.stateIdsTemporal = []
         self.policies = []
         self.actions = []
         self.routingDecisions = []

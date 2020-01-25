@@ -89,7 +89,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             log_selected_policies = tf.gather_nd(self.logPolicies[t], selected_policy_indices)
             self.selectedLogPolicySamples.append(log_selected_policies)
             # TODO: ADD BASELINE HERE WHEN THE TIME COMES
-            proxy_loss_step_t = self.selectedLogPolicySamples[t] * self.cumulativeRewards[t]
+            proxy_loss_step_t = self.selectedLogPolicySamples[t] * (self.cumulativeRewards[t] - self.baselinesTf[t])
             self.proxyLossTrajectories.append(proxy_loss_step_t)
         self.proxyLossVector = tf.add_n(self.proxyLossTrajectories)
         self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
@@ -107,6 +107,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         state_ml_selections = routing_data.mlPaths[sample_indices, :]
         history = TrajectoryHistory(state_ids=sample_indices, max_likelihood_routes=state_ml_selections)
         history.states.append(initial_state_vectors)
+        history.stateIdsTemporal.append(np.stack([sample_indices, np.zeros_like(sample_indices)], axis=1))
         return history
 
     def get_max_trajectory_length(self) -> int:
@@ -276,6 +277,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                 feed_dict[self.stateInputs[t]] = history.states[t]
                 feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
                 feed_dict[self.rewards[t]] = history.rewards[t]
+                feed_dict[self.baselinesTf[t]] = self.baselinesNp[t]
             feed_dict[self.l2LambdaTf] = self.l2Lambda
             results = self.tfSession.run([self.logPolicies,
                                           self.selectedLogPolicySamples,
@@ -285,7 +287,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                                           self.proxyLoss,
                                           self.optimizer], feed_dict=feed_dict)
             # Update baselines
-            self.update_baselines(history=history)
+            if self.useBaselines:
+                self.update_baselines(history=history)
             if any([np.any(np.isinf(log_policy_arr)) for log_policy_arr in results[0]]):
                 print("Contains inf!!!")
             # self.evaluate_ml_routing_accuracies()
