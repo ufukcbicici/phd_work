@@ -240,14 +240,14 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         gamma = TreeDepthPolicyNetwork.BASELINE_UPDATE_GAMMA
         for t in range(max_trajectory_length):
             forward_rewards = np.stack([history.rewards[_t] for _t in range(t, max_trajectory_length)], axis=1)
-            cummulative_rewards = np.sum(forward_rewards, axis=1)
+            cumulative_rewards = np.sum(forward_rewards, axis=1)
             if t - 1 < 0:
                 actions_t_minus_one = np.zeros(shape=history.stateIds.shape, dtype=np.int32)
             else:
                 actions_t_minus_one = history.actions[t - 1]
             delta_arr = np.zeros_like(self.baselinesNp[t])
             count_arr = np.zeros_like(self.baselinesNp[t])
-            for state_id, action_t_minus_1, reward in zip(history.stateIds, actions_t_minus_one, cummulative_rewards):
+            for state_id, action_t_minus_1, reward in zip(history.stateIds, actions_t_minus_one, cumulative_rewards):
                 delta_arr[state_id, action_t_minus_1] += reward
                 count_arr[state_id, action_t_minus_1] += 1.0
             mean_delta_arr = delta_arr * np.reciprocal(count_arr)
