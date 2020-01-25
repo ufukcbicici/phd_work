@@ -252,6 +252,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             mean_delta_arr = delta_arr * np.reciprocal(count_arr)
             new_baseline_arr = gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
             nan_mask = np.logical_not(np.isnan(new_baseline_arr))
+            if not np.all(nan_mask):
+                print("X")
             self.baselinesNp[t] = np.where(nan_mask, new_baseline_arr, self.baselinesNp[t])
             # self.baselinesNp[t] += gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
 
