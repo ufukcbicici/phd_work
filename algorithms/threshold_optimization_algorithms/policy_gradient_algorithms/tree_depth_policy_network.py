@@ -26,11 +26,12 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                  output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
                  trajectory_per_state_sample_count):
+        self.hiddenLayers = hidden_layers
+        self.network = network
+        assert len(self.hiddenLayers) == self.get_max_trajectory_length()
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, use_baselines, state_sample_count,
                          trajectory_per_state_sample_count)
-        self.hiddenLayers = hidden_layers
-        assert len(self.hiddenLayers) == self.get_max_trajectory_length()
 
     def prepare_state_features(self, data):
         # Prepare Policy Gradients State Data
@@ -332,6 +333,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         explanation += "Use Baselines:{0}\n".format(self.useBaselines)
         explanation += "stateSampleCount:{0}\n".format(self.stateSampleCount)
         explanation += "trajectoryPerStateSampleCount:{0}\n".format(self.trajectoryPerStateSampleCount)
+        explanation += "validation Data Count:{0}\n".format(self.validationData.labelList.shape[0])
+        explanation += "test Data Count:{0}\n".format(self.testData.labelList.shape[0])
         explanation += "l2Lambda:{0}\n".format(self.l2Lambda)
         val_ml_accuracy, test_ml_accuracy = self.evaluate_ml_routing_accuracies()
         explanation += "val_ml_accuracy:{0}\n".format(val_ml_accuracy)
@@ -354,10 +357,10 @@ def main():
     network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
     routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test",
                                              output_names=output_names)
-    validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.2)
+    validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
 
     wd_list = [0.0, 0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]
-    state_sample_count_list = [8000]
+    state_sample_count_list = [validation_data.labelList.shape[0]]
     samples_per_state_list = [1, 5, 10, 100]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
                                                                           state_sample_count_list,
