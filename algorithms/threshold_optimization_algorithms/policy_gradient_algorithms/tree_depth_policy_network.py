@@ -5,6 +5,8 @@ from collections import Counter
 from auxillary.db_logger import DbLogger
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.policy_gradients_network import \
     PolicyGradientsNetwork, TrajectoryHistory
+from auxillary.general_utility_funcs import UtilityFuncs
+from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
 class TreeDepthState:
@@ -21,13 +23,13 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     LAMBDA_MAC_COST = 0.0
     BASELINE_UPDATE_GAMMA = 0.99
 
-    def __init__(self, l2_lambda,
-                 network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
-                 hidden_layers, use_baselines, state_sample_count, trajectory_per_state_sample_count, test_ratio=0.2):
+    def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
+                 output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
+                 trajectory_per_state_sample_count):
+        super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
+                         output_names, used_feature_names, use_baselines, state_sample_count,
+                         trajectory_per_state_sample_count)
         self.hiddenLayers = hidden_layers
-        super().__init__(l2_lambda, network_name, run_id, iteration, degree_list, data_type, output_names,
-                         used_feature_names, use_baselines,
-                         state_sample_count, trajectory_per_state_sample_count, test_ratio=test_ratio)
         assert len(self.hiddenLayers) == self.get_max_trajectory_length()
 
     def prepare_state_features(self, data):
@@ -286,6 +288,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             feed_dict[self.l2LambdaTf] = self.l2Lambda
 
             results = self.tfSession.run([self.logPolicies,
+                                          self.policies,
                                           self.selectedLogPolicySamples,
                                           self.cumulativeRewards,
                                           self.proxyLossTrajectories,
@@ -315,11 +318,6 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             # print("X")
         print("X")
 
-    def grid_search(self):
-        for l2_lambda in [0.0, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]:
-            self.l2Lambda = l2_lambda
-            self.train()
-
     def get_explanation(self):
         explanation = ""
         explanation += "INVALID_ACTION_PENALTY={0}\n".format(TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY)
@@ -330,6 +328,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         explanation += "Hidden Layers={0}\n".format(self.hiddenLayers)
         explanation += "Network Name:{0}\n".format(self.networkName)
         explanation += "Network Run Id:{0}\n".format(self.networkRunId)
+        explanation += "Network Iteration:{0}\n".format(self.networkIteration)
         explanation += "Use Baselines:{0}\n".format(self.useBaselines)
         explanation += "stateSampleCount:{0}\n".format(self.stateSampleCount)
         explanation += "trajectoryPerStateSampleCount:{0}\n".format(self.trajectoryPerStateSampleCount)
@@ -352,24 +351,37 @@ def main():
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
     used_output_names = ["pre_branch_feature"]
-    state_sample_count = 1000
-    samples_per_state = 10
+    network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
+    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test",
+                                             output_names=output_names)
+    validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.2)
 
-    policy_gradients_routing_optimizer = TreeDepthPolicyNetwork(l2_lambda=0.0,
-                                                                network_name=network_name,
-                                                                run_id=run_id,
-                                                                iteration=iteration,
-                                                                degree_list=[2, 2],
-                                                                data_type="test",
-                                                                output_names=output_names,
-                                                                used_feature_names=used_output_names,
-                                                                test_ratio=0.2,
-                                                                use_baselines=True,
-                                                                state_sample_count=state_sample_count,
-                                                                trajectory_per_state_sample_count=samples_per_state,
-                                                                hidden_layers=[[128], [256]])
-    # policy_gradients_routing_optimizer.train()
-    policy_gradients_routing_optimizer.grid_search()
+    wd_list = [0.0, 0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]
+    state_sample_count_list = [8000]
+    samples_per_state_list = [1, 5, 10, 100]
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
+                                                                          state_sample_count_list,
+                                                                          samples_per_state_list])
+
+    for tpl in cartesian_product:
+        l2_wd = tpl[0]
+        state_sample_count = tpl[1]
+        samples_per_state = tpl[2]
+        policy_gradients_routing_optimizer = TreeDepthPolicyNetwork(l2_lambda=l2_wd,
+                                                                    network=network,
+                                                                    network_name=network_name,
+                                                                    run_id=run_id,
+                                                                    iteration=iteration,
+                                                                    degree_list=[2, 2],
+                                                                    output_names=output_names,
+                                                                    used_feature_names=used_output_names,
+                                                                    use_baselines=True,
+                                                                    state_sample_count=state_sample_count,
+                                                                    trajectory_per_state_sample_count=samples_per_state,
+                                                                    hidden_layers=[[128], [256]],
+                                                                    validation_data=validation_data,
+                                                                    test_data=test_data)
+        policy_gradients_routing_optimizer.train(max_num_of_iterations=20000)
 
 
 if __name__ == "__main__":

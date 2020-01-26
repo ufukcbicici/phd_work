@@ -32,10 +32,9 @@ class RoutingDataForMDP:
 
 
 class PolicyGradientsNetwork:
-    def __init__(self, l2_lambda,
-                 network_name, run_id, iteration, degree_list, data_type, output_names, used_feature_names,
-                 use_baselines, state_sample_count, trajectory_per_state_sample_count,
-                 test_ratio=0.2):
+    def __init__(self, validation_data, test_data, l2_lambda,
+                 network, network_name, run_id, iteration, degree_list, output_names, used_feature_names,
+                 use_baselines, state_sample_count, trajectory_per_state_sample_count):
         self.actionSpaces = None
         self.networkFeatureNames = output_names
         self.usedFeatureNames = used_feature_names
@@ -77,17 +76,21 @@ class PolicyGradientsNetwork:
         self.tfSession = tf.Session()
         self.networkName = network_name
         self.networkRunId = run_id
+        self.networkIteration = iteration
         # Prepare CIGN topology data.
-        self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
+        self.network = network
+        # self.network = FastTreeNetwork.get_mock_tree(degree_list=degree_list, network_name=network_name)
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
         self.innerNodes = sorted(self.innerNodes, key=lambda node: node.index)
         self.leafNodes = sorted(self.leafNodes, key=lambda node: node.index)
         self.leafIndices = {node.index: idx for idx, node in enumerate(self.leafNodes)}
         # Preparing training data for the policy gradients algorithm.
-        self.routingData = self.network.load_routing_info(run_id=run_id, iteration=iteration, data_type=data_type,
-                                                          output_names=self.networkFeatureNames)
-        self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=test_ratio)
+        # self.routingData = self.network.load_routing_info(run_id=run_id, iteration=iteration, data_type=data_type,
+        #                                                   output_names=self.networkFeatureNames)
+        # self.validationData, self.testData = self.routingData.apply_validation_test_split(test_ratio=test_ratio)
+        self.validationData = validation_data
+        self.testData = test_data
         self.validationMLPaths = self.get_max_likelihood_paths(
             branch_probs=self.validationData.get_dict("branch_probs"))
         self.testMLPaths = self.get_max_likelihood_paths(branch_probs=self.testData.get_dict("branch_probs"))
@@ -185,11 +188,16 @@ class PolicyGradientsNetwork:
         pass
 
     def build_optimizer(self):
-        self.learningRate = tf.constant(0.00001)
+        self.learningRate = tf.constant(0.0001)
         self.totalLoss = (-1.0 * self.proxyLoss) + self.l2Loss
         self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
-        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learningRate). \
-        #     minimize(self.totalLoss, global_step=self.globalStep)
+        # boundaries = [1000, 10000]
+        # values = [0.1, 0.01, 0.001]
+        # self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
+        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
+        #     self.totalLoss, global_step=self.globalStep)
+        # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).minimize(
+        #     self.totalLoss, global_step=self.globalStep)
 
     # OK
     def sample_initial_states(self, routing_data, state_sample_count, samples_per_state,
