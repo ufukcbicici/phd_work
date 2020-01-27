@@ -25,11 +25,13 @@ class ObjectDetectionDataManager:
         assert len(img_files) == len(txt_files)
         self.dataList = []
         data_dict = {}
-        for f in onlyfiles:
+        for f in img_files:
             filename, file_extension = os.path.splitext(f)
-            if file_extension == ".JPG":
-                file_path = os.path.join(self.dataPath, f)
-                img_arr = cv2.imread(filename=file_path)
-                assert img_arr is not None and len(img_arr.shape) == 3 and img_arr.shape[0] > 0 and img_arr.shape[1] > 0
-            print("X")
+            file_path = os.path.join(self.dataPath, f)
+            img_arr = cv2.imread(filename=file_path)
+            assert img_arr is not None and len(img_arr.shape) == 3 and img_arr.shape[0] > 0 and img_arr.shape[1] > 0
+            img_obj = DetectionImage(img_name=filename, img_arr=img_arr)
+            assert filename not in data_dict
+            data_dict[filename] = img_obj
+        print("X")
 
