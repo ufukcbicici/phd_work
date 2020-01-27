@@ -302,6 +302,22 @@ class PolicyGradientsNetwork:
         accuracy = correct_count / routing_data.routingDataset.labelList.shape[0]
         return accuracy
 
+    def get_max_likelihood_accuracy_static(self, routing_data, ml_paths, posteriors):
+        sample_counts_set = set()
+        sample_counts_set.add(routing_data.posteriorsTensor.shape[0])
+        sample_counts_set.add(routing_data.mlPaths.shape[0])
+        sample_counts_set.add(routing_data.routingDataset.labelList.shape[0])
+        assert len(sample_counts_set) == 1
+        correct_count = 0
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        for idx in range(routing_data.routingDataset.labelList.shape[0]):
+            leaf_id = routing_data.mlPaths[idx, -1]
+            posterior = routing_data.posteriorsTensor[idx, :, leaf_id - min_leaf_id]
+            predicted_label = np.argmax(posterior)
+            correct_count += float(predicted_label == routing_data.routingDataset.labelList[idx])
+        accuracy = correct_count / routing_data.routingDataset.labelList.shape[0]
+        return accuracy
+
     # OK
     def evaluate_policy_values(self):
         validation_policy_value = self.calculate_policy_value(routing_data=self.validationDataForMDP,

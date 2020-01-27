@@ -302,7 +302,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             if any([np.any(np.isinf(log_policy_arr)) for log_policy_arr in results[0]]):
                 print("Contains inf!!!")
             # self.evaluate_ml_routing_accuracies()
-            if iteration_id % 10 == 0:
+            if iteration_id % 100 == 0 or iteration_id == max_num_of_iterations - 1:
                 print("***********Iteration {0}***********".format(iteration_id))
                 validation_policy_value, test_policy_value = self.evaluate_policy_values()
                 validation_accuracy, test_accuracy = self.evaluate_routing_accuracies()
@@ -342,6 +342,11 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         return explanation
 
 
+# def get_ideal_split(routing_data, test_ratio, mean_accuracy, max_deviation):
+#     while True:
+#         validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
+#
+
 def main():
     # run_id = 715
     # network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
@@ -359,9 +364,10 @@ def main():
                                              output_names=output_names)
     validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
 
-    wd_list = [0.0, 0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]
-    state_sample_count_list = [validation_data.labelList.shape[0]]
-    samples_per_state_list = [1, 5, 10, 100]
+    wd_list = [0.0] * 10
+    # [0.0, 0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]
+    state_sample_count_list = [1000]
+    samples_per_state_list = [1]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
                                                                           state_sample_count_list,
                                                                           samples_per_state_list])
@@ -384,7 +390,7 @@ def main():
                                                                     hidden_layers=[[128], [256]],
                                                                     validation_data=validation_data,
                                                                     test_data=test_data)
-        policy_gradients_routing_optimizer.train(max_num_of_iterations=20000)
+        policy_gradients_routing_optimizer.train(max_num_of_iterations=15000)
 
 
 if __name__ == "__main__":
