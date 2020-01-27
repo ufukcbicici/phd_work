@@ -124,55 +124,55 @@ def test_roi_pooling_layer():
     pooled_width = 7
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, IMG_W, IMG_H, FEATURE_COUNT])
     rois_tensor = tf.placeholder(tf.float32, shape=(None, NUM_ROIS, 4))
-    # Prepare dummy image data
-    random_imgs = np.random.uniform(size=(BATCH_SIZE, IMG_W, IMG_H, FEATURE_COUNT))
-    # Prepare dummy roi data
-    roi_arr = get_dummy_roi_tensor()
-
-    # Network
-    roi_output = RoIPooling.roi_pool(x=[input_tensor, rois_tensor],
-                                     pooled_height=pooled_height, pooled_width=pooled_width)
-
-    # Get the Tensorflow result.
     sess = tf.Session()
-    results = sess.run([roi_output], feed_dict={input_tensor: random_imgs, rois_tensor: roi_arr})
-    tf_result = results[0]
+    for iteration_id in range(1000):
+        # Prepare dummy image data
+        random_imgs = np.random.uniform(size=(BATCH_SIZE, IMG_W, IMG_H, FEATURE_COUNT))
+        # Prepare dummy roi data
+        roi_arr = get_dummy_roi_tensor()
 
-    # Calculate a manual simulation, with very basic for loops
-    pooled_imgs = []
-    for img_idx in range(random_imgs.shape[0]):
-        feature_map = random_imgs[img_idx]
-        img_rois = roi_arr[img_idx]
-        pooled_maps = []
-        for roi_idx in range(img_rois.shape[0]):
-            roi = img_rois[roi_idx]
-            feature_map_height = int(feature_map.shape[0])
-            feature_map_width = int(feature_map.shape[1])
-            h_start = int(feature_map_height * roi[0])
-            w_start = int(feature_map_width * roi[1])
-            h_end = int(feature_map_height * roi[2])
-            w_end = int(feature_map_width * roi[3])
-            region = feature_map[h_start:h_end, w_start:w_end, :]
-            # Divide the region into non overlapping areas
-            region_height = h_end - h_start
-            region_width = w_end - w_start
-            h_step = int(region_height / pooled_height)
-            w_step = int(region_width / pooled_width)
-            pooled_map = np.zeros(shape=(pooled_height, pooled_width, region.shape[-1]))
-            for i in range(pooled_height):
-                delta_h = h_step if i != pooled_height - 1 else region_height - i * h_step
-                for j in range(pooled_width):
-                    delta_w = w_step if j != pooled_width - 1 else region_width - j * w_step
-                    sub_region = region[i*h_step:i*h_step + delta_h, j*w_step:j*w_step + delta_w, :]
-                    max_val = np.max(sub_region, axis=(0, 1))
-                    pooled_map[i, j, :] = max_val
-            pooled_maps.append(pooled_map)
-        pooled_maps = np.stack(pooled_maps, axis=0)
-        pooled_imgs.append(pooled_maps)
-    np_result = np.stack(pooled_imgs, axis=0)
+        # Network
+        roi_output = RoIPooling.roi_pool(x=[input_tensor, rois_tensor],
+                                         pooled_height=pooled_height, pooled_width=pooled_width)
 
-    assert np.allclose(tf_result, np_result)
-    print("X")
+        # Get the Tensorflow result.
+        results = sess.run([roi_output], feed_dict={input_tensor: random_imgs, rois_tensor: roi_arr})
+        tf_result = results[0]
+
+        # Calculate a manual simulation, with very basic for loops
+        pooled_imgs = []
+        for img_idx in range(random_imgs.shape[0]):
+            feature_map = random_imgs[img_idx]
+            img_rois = roi_arr[img_idx]
+            pooled_maps = []
+            for roi_idx in range(img_rois.shape[0]):
+                roi = img_rois[roi_idx]
+                feature_map_height = int(feature_map.shape[0])
+                feature_map_width = int(feature_map.shape[1])
+                h_start = int(feature_map_height * roi[0])
+                w_start = int(feature_map_width * roi[1])
+                h_end = int(feature_map_height * roi[2])
+                w_end = int(feature_map_width * roi[3])
+                region = feature_map[h_start:h_end, w_start:w_end, :]
+                # Divide the region into non overlapping areas
+                region_height = h_end - h_start
+                region_width = w_end - w_start
+                h_step = int(region_height / pooled_height)
+                w_step = int(region_width / pooled_width)
+                pooled_map = np.zeros(shape=(pooled_height, pooled_width, region.shape[-1]))
+                for i in range(pooled_height):
+                    delta_h = h_step if i != pooled_height - 1 else region_height - i * h_step
+                    for j in range(pooled_width):
+                        delta_w = w_step if j != pooled_width - 1 else region_width - j * w_step
+                        sub_region = region[i*h_step:i*h_step + delta_h, j*w_step:j*w_step + delta_w, :]
+                        max_val = np.max(sub_region, axis=(0, 1))
+                        pooled_map[i, j, :] = max_val
+                pooled_maps.append(pooled_map)
+            pooled_maps = np.stack(pooled_maps, axis=0)
+            pooled_imgs.append(pooled_maps)
+        np_result = np.stack(pooled_imgs, axis=0)
+        assert np.allclose(tf_result, np_result)
+        print("Passed iteration {0}".format(iteration_id))
 
 
 def main():
