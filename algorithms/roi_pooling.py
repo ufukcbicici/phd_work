@@ -162,9 +162,9 @@ def test_roi_pooling_layer():
             for i in range(pooled_height):
                 delta_h = h_step if i != pooled_height - 1 else region_height - i * h_step
                 for j in range(pooled_width):
-                    delta_w = w_step if j != pooled_width - 1 else pooled_width - j * w_step
-                    sub_region = region[i*delta_h:(i+1)*delta_h, j*delta_w:(j+1)*delta_w, :]
-                    max_val = np.max(sub_region, axis=[1, 2])
+                    delta_w = w_step if j != pooled_width - 1 else region_width - j * w_step
+                    sub_region = region[i*h_step:i*h_step + delta_h, j*w_step:j*w_step + delta_w, :]
+                    max_val = np.max(sub_region, axis=(0, 1))
                     pooled_map[i, j, :] = max_val
             pooled_maps.append(pooled_map)
         pooled_maps = np.stack(pooled_maps, axis=0)
