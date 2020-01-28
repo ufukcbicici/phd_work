@@ -5,6 +5,7 @@ from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.pol
     TrajectoryHistory
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.tree_depth_policy_network import \
     TreeDepthPolicyNetwork
+from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
 class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
@@ -20,6 +21,16 @@ class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
                          trajectory_per_state_sample_count)
+        self.stateInputTransformed = []
+        self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay")
+        self.actionSpacesTf = []
+        self.resultsDict = {}
+
+    def build_action_spaces(self):
+        super().build_action_spaces()
+        for t in range(self.get_max_trajectory_length()):
+            self.actionSpacesTf.append(tf.constant(self.actionSpaces[t]))
+        self.resultsDict["actionSpacesTf"] = self.actionSpacesTf
 
     def build_state_inputs(self, time_step):
         ordered_nodes_at_level = self.network.orderedNodesPerLevel[time_step]
@@ -29,13 +40,102 @@ class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
         feat_shape = list(shape_set)[0]
         input_shape = [None]
         input_shape.extend(feat_shape.shape[1:])
+        tf_list = [
+            tf.placeholder(dtype=tf.float32, shape=input_shape,
+                           name="inputs_t{0}_node{1}".format(time_step, node.index))
+            for node in ordered_nodes_at_level]
+        self.stateInputs.append([tf_list])
 
-        # concated_feat = np.concatenate(inputs_list, axis=-1)
-        # input_shape = [None]
-        # input_shape.extend(concated_feat.shape[1:])
-        # input_shape = tuple(input_shape)
-        # state_input = tf.placeholder(dtype=tf.float32, shape=input_shape, name="inputs_{0}".format(time_step))
-        # self.stateInputs.append(state_input)
+    # Override this for different type of policy network implementations
+    def build_policy_networks(self, time_step):
+        pass
+
+    def sample_from_policy_tf(self, time_step):
+        samples = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[time_step])
+        self.policySamples.append(samples)
+        self.resultsDict["policy_samples_{0}".format(time_step)] = samples
+
+    def build_state_transition(self, time_step):
+        if time_step == 0:
+            assert len(self.stateInputTransformed) == 0
+            self.stateInputTransformed.append(self.stateInputs[0])
+
+    def build_networks(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            self.build_state_inputs(time_step=t)
+            self.build_policy_networks(time_step=t)
+            self.sample_from_policy_tf(time_step=t)
+
+
+        #     reward_input = tf.placeholder(dtype=tf.float32, shape=[None], name="rewards_{0}".format(t))
+        #     self.rewards.append(reward_input)
+        #     baseline_input = tf.placeholder(dtype=tf.float32, shape=[None], name="baselines_{0}".format(t))
+        #     self.baselinesTf.append(baseline_input)
+        #     if t - 1 < 0:
+        #         baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0], 1))
+        #     else:
+        #         baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0],
+        #                                       self.actionSpaces[t - 1].shape[0]))
+        #     self.baselinesNp.append(baseline_np)
+        #     # Policy sampling
+        #     sampler = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[t])
+        #     self.policySamples.append(sampler)
+        #     selected_policy_input = tf.placeholder(dtype=tf.int32, shape=[None],
+        #                                            name="selected_policy_input_{0}".format(t))
+        #     self.selectedPolicyInputs.append(selected_policy_input)
+        #     # Argmax actions
+        #     argmax_actions = tf.argmax(self.policies[t], axis=1)
+        #     self.policyArgMaxSamples.append(argmax_actions)
+        # # Get the total number of trajectories
+        # state_input_shape = tf.shape(self.stateInputs[0])
+        # self.trajectoryCount = tf.gather_nd(state_input_shape, [0])
+        # # Cumulative Rewards
+        # for t1 in range(max_trajectory_length):
+        #     rew_list = [self.rewards[t2] for t2 in range(t1, max_trajectory_length, 1)]
+        #     cum_sum = tf.add_n(rew_list)
+        #     self.cumulativeRewards.append(cum_sum)
+        # # Building the proxy loss and the policy gradient
+        # self.build_policy_gradient_loss()
+        # self.get_l2_loss()
+        # self.build_optimizer()
+
+    # Prevent policies from reaching exactly to 1.0
+    # def clamp_policies(self, time_step):
+    #     epsilon = 1e-30
+    #     policy = self.policies[time_step]
+    #     policy_count = self.actionSpaces[time_step].shape[1]
+    #     inf_mask = tf.greater_equal(policy, 1.0 - epsilon)
+    #     inf_detection_vector = tf.reduce_any(inf_mask, axis=1)
+    #     # inf_detection_vector =
+    #
+    #
+    #
+    #     self.resultsDict["inf_mask_{0}".format(time_step)] = inf_mask
+    #     self.resultsDict["inf_detection_vector_{0}".format(time_step)] = inf_detection_vector
+
+
+
+
+
+
+
+        # state_input_t = self.stateInputTransformed[time_step]
+        # hidden_layers = list(self.hiddenLayers[time_step])
+        # hidden_layers.append(self.actionSpaces[time_step].shape[0])
+        # net = state_input_t
+        # for layer_id, layer_dim in enumerate(hidden_layers):
+        #     if layer_id < len(hidden_layers) - 1:
+        #         net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+        #     else:
+        #         net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
+        # _logits = net
+        # _logits = _logits / self.softmaxDecay
+        # self.logits.append(_logits)
+        # self.policies.append(tf.nn.softmax(_logits))
+        # self.logPolicies.append(tf.log(self.policies[-1]))
+
+
 
     # def sample_initial_states(self, routing_data, state_sample_count, samples_per_state, state_ids=None) \
     #         -> TrajectoryHistory:
