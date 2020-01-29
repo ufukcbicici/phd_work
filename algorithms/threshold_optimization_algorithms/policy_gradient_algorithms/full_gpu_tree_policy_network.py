@@ -22,6 +22,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.stateInputTransformed = []
         self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay")
         self.actionSpacesTf = []
+        self.validationRewards = []
+        self.testRewards = []
         self.resultsDict = {}
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
@@ -34,7 +36,10 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.resultsDict["actionSpacesTf"] = self.actionSpacesTf
 
     def reward_calculation_tf(self):
-        invalid_action_penalty = TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY
+        invalid_action_penalty = FullGpuTreePolicyGradientsNetwork.INVALID_ACTION_PENALTY
+        valid_prediction_reward = FullGpuTreePolicyGradientsNetwork.VALID_PREDICTION_REWARD
+        invalid_prediction_penalty = FullGpuTreePolicyGradientsNetwork.INVALID_PREDICTION_PENALTY
+
         for t in range(self.get_max_trajectory_length()):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
@@ -63,6 +68,13 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                     prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
                     prediction_correctness_tensor = np.repeat(
                         np.expand_dims(prediction_correctness_matrix, axis=1), axis=1, repeats=action_count_t_minus_one)
+                    rewards_arr += (prediction_correctness_tensor == 1).astype(np.float32) * valid_prediction_reward
+                    rewards_arr += (prediction_correctness_tensor == 0).astype(np.float32) * invalid_prediction_penalty
+                if dataset == self.validationDataForMDP:
+                    self.validationRewards.append(rewards_arr)
+                else:
+                    self.testRewards.append(rewards_arr)
+
         print("X")
 
         # def calculate_accuracy_of_trajectories(self, routing_data, history):
