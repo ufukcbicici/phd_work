@@ -9,7 +9,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
-class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
+class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_ACTION_PENALTY = -10.0
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
@@ -34,6 +34,7 @@ class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.resultsDict["actionSpacesTf"] = self.actionSpacesTf
 
     def reward_calculation_tf(self):
+        invalid_action_penalty = TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY
         for t in range(self.get_max_trajectory_length()):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
@@ -43,7 +44,43 @@ class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 validity_of_actions_tensor = np.repeat(
                     np.expand_dims(self.reachabilityMatrices[t], axis=0),
                     repeats=dataset.routingDataset.labelList.shape[0], axis=0)
+                rewards_arr += (validity_of_actions_tensor == 0.0).astype(np.float32) * invalid_action_penalty
+                if t == self.get_max_trajectory_length() - 1:
+                    true_labels = dataset.routingDataset.labelList
+                    # Prediction Rewards:
+                    # Calculate the prediction results for every state and for every routing decision
+                    prediction_correctness_vec_list = []
+                    for action_id in range(self.actionSpaces[t].shape[0]):
+                        routing_decision = self.actionSpaces[t][action_id, :]
+                        weight = 1.0 / np.sum(routing_decision)
+                        routing_decision_weighted = weight * routing_decision
+                        assert routing_decision.shape[0] == dataset.posteriorsTensor.shape[2]
+                        weighted_posteriors = dataset.posteriorsTensor * routing_decision_weighted
+                        final_posteriors = np.sum(weighted_posteriors, axis=2)
+                        predicted_labels = np.argmax(final_posteriors, axis=1)
+                        validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+                        prediction_correctness_vec_list.append(validity_of_predictions_vec)
+                    prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
+
+
+
         print("X")
+
+        # def calculate_accuracy_of_trajectories(self, routing_data, history):
+        #     true_labels = routing_data.routingDataset.labelList[history.stateIds]
+        #     posteriors = routing_data.posteriorsTensor[history.stateIds, :]
+        #     routing_decisions_t = history.routingDecisions[-1]
+        #     assert routing_decisions_t.shape[1] == posteriors.shape[2]
+        #     routing_weights = np.reciprocal(np.sum(routing_decisions_t.astype(np.float32), axis=1))
+        #     routing_decisions_t_weighted = routing_decisions_t * np.expand_dims(routing_weights, axis=1)
+        #     weighted_posteriors = posteriors * np.expand_dims(routing_decisions_t_weighted, axis=1)
+        #     final_posteriors = np.sum(weighted_posteriors, axis=2)
+        #     predicted_labels = np.argmax(final_posteriors, axis=1)
+        #     validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+        #     return validity_of_predictions_vec
+        #
+
+
 
         # rewards_arr = np.zeros(shape=history.stateIds.shape, dtype=np.float32)
         # # Check if valid actions
@@ -75,7 +112,7 @@ class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
         assert len(shape_set) == 1
         feat_shape = list(shape_set)[0]
         input_shape = [None]
-        input_shape.extend(feat_shape.shape[1:])
+        input_shape.extend(feat_shape[1:])
         tf_list = [
             tf.placeholder(dtype=tf.float32, shape=input_shape,
                            name="inputs_t{0}_node{1}".format(time_step, node.index))
@@ -95,6 +132,7 @@ class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
         if time_step == 0:
             assert len(self.stateInputTransformed) == 0
             self.stateInputTransformed.append(self.stateInputs[0])
+        self.resultsDict["stateInputTransformed_{0}".format(time_step)] = self.stateInputTransformed[time_step]
 
     def build_networks(self):
         self.reward_calculation_tf()
@@ -200,52 +238,4 @@ class FullGpuPolicyGradientsNetwork(TreeDepthPolicyNetwork):
     #     return history
 
 
-def main():
-    # run_id = 715
-    # network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
-    # iteration = 119100
 
-    run_id = 453
-    network_name = "FashionNet_Lite"
-    iteration = 43680
-
-    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
-                    "pre_branch_feature"]
-    used_output_names = ["pre_branch_feature"]
-    network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test",
-                                             output_names=output_names)
-    validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
-
-    wd_list = [0.0] * 10
-    # [0.0, 0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]
-    state_sample_count_list = [1000]
-    samples_per_state_list = [1]
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
-                                                                          state_sample_count_list,
-                                                                          samples_per_state_list])
-
-    for tpl in cartesian_product:
-        l2_wd = tpl[0]
-        state_sample_count = tpl[1]
-        samples_per_state = tpl[2]
-        policy_gradients_routing_optimizer = \
-            FullGpuPolicyGradientsNetwork(l2_lambda=l2_wd,
-                                          network=network,
-                                          network_name=network_name,
-                                          run_id=run_id,
-                                          iteration=iteration,
-                                          degree_list=[2, 2],
-                                          output_names=output_names,
-                                          used_feature_names=used_output_names,
-                                          use_baselines=True,
-                                          state_sample_count=state_sample_count,
-                                          trajectory_per_state_sample_count=samples_per_state,
-                                          hidden_layers=[[128], [256]],
-                                          validation_data=validation_data,
-                                          test_data=test_data)
-        policy_gradients_routing_optimizer.train(max_num_of_iterations=15000)
-
-
-if __name__ == "__main__":
-    main()
