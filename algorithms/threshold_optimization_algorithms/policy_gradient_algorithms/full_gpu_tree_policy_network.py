@@ -61,9 +61,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                         validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
                         prediction_correctness_vec_list.append(validity_of_predictions_vec)
                     prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
-
-
-
+                    prediction_correctness_tensor = np.repeat(
+                        np.expand_dims(prediction_correctness_matrix, axis=1), axis=1, repeats=action_count_t_minus_one)
         print("X")
 
         # def calculate_accuracy_of_trajectories(self, routing_data, history):
