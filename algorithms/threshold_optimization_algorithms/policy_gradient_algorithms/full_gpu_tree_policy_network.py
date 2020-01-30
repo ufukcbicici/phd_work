@@ -21,6 +21,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                  trajectory_per_state_sample_count):
         self.stateInputTransformed = []
         self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay")
+        self.isSamplingTrajectory = tf.placeholder(dtype=tf.bool, name="isSamplingTrajectory")
         self.actionSpacesTf = []
         self.validationRewards = []
         self.testRewards = []
@@ -28,6 +29,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.testRewardsTf = []
         self.routingDecisions = []
         self.rangeIndex = None
+        self.argMaxActions = []
         self.resultsDict = {}
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
@@ -97,63 +99,103 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             assert len(self.stateInputTransformed) == 0
             self.stateInputTransformed.append(self.stateInputs[0][0])
             state_input_shape = tf.shape(self.stateInputs[0][0])
-            self.rangeIndex = tf.range(0, self.trajectoryCount, 1)
             self.trajectoryCount = tf.gather_nd(state_input_shape, [0])
+            self.rangeIndex = tf.range(0, self.trajectoryCount, 1)
             self.resultsDict["stateInputTransformed_{0}".format(time_step)] = self.stateInputTransformed[time_step]
             self.resultsDict["trajectoryCount"] = self.trajectoryCount
             self.resultsDict["rangeIndex"] = self.rangeIndex
+        else:
+            routing_decisions = self.routingDecisions[time_step - 1]
+            list_of_indices = []
+            list_of_coefficients = []
+            weighted_state_inputs = []
+            for action_id, state_input in enumerate(self.stateInputs[time_step]):
+                routing_indices = tf.stack([self.rangeIndex, action_id * tf.ones_like(self.rangeIndex)], axis=1)
+                list_of_indices.append(routing_indices)
+                route_coefficients = tf.gather_nd(routing_decisions, routing_indices)
+                list_of_coefficients.append(route_coefficients)
+                weighted_state_inputs.append(route_coefficients * state_input)
+            assert len(self.stateInputTransformed) == time_step
+            self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=1))
+            self.resultsDict["routing_indices_{0}".format(time_step)] = list_of_indices
+            self.resultsDict["routing_weights_{0}".format(time_step)] = list_of_coefficients
+            self.resultsDict["stateInputTransformed_{0}".format(time_step)] = self.stateInputTransformed[time_step]
+
+
+    #     routing_decisions = self.routingDecisions[time_step]
+    #     list_of_indices = []
+    #     list_of_coefficients = []
+    #     weighted_state_inputs = []
+    #     for action_id, state_input in enumerate(self.stateInputs[time_step]):
+    #         routing_indices = tf.stack([self.rangeIndex, action_id * tf.ones_like(self.rangeIndex)], axis=1)
+    #         list_of_indices.append(routing_indices)
+    #         route_coefficients = tf.gather_nd(routing_decisions, routing_indices)
+    #         list_of_coefficients.append(route_coefficients)
+    #         weighted_state_inputs.append(route_coefficients * state_input)
+    #     self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=1))
+    #     assert len(self.stateInputTransformed) == time_step + 1
+    #     self.resultsDict["routing_indices_{0}".format(time_step)] = list_of_indices
+    #     self.resultsDict["routing_weights_{0}".format(time_step)] = list_of_coefficients
+    #     self.resultsDict["stateInputTransformed_{0}".format(time_step + 1)] = self.stateInputTransformed[time_step + 1]
 
     # Override this for different type of policy network implementations
     def build_policy_networks(self, time_step):
         pass
 
     def sample_from_policy_tf(self, time_step):
-        samples = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[time_step])
+        sampled_actions = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[time_step])
+        argmax_actions = tf.argmax(self.policies[time_step], axis=1)
+        samples = tf.where(self.isSamplingTrajectory, sampled_actions, argmax_actions)
         routing_decisions = tf.gather_nd(self.actionSpacesTf[time_step], tf.expand_dims(samples, axis=1))
-        self.policySamples.append(samples)
+        self.policySamples.append(sampled_actions)
+        self.argMaxActions.append(argmax_actions)
         self.routingDecisions.append(routing_decisions)
-        self.resultsDict["policy_samples_{0}".format(time_step)] = samples
-        self.resultsDict["routing_decisions_{0}".format(time_step)] = routing_decisions
-
-    def build_state_transition(self, time_step):
-        routing_decisions = self.routingDecisions[time_step]
-        list_of_indices = []
-        list_of_coefficients = []
-        weighted_state_inputs = []
-        for action_id, state_input in enumerate(self.stateInputs[time_step]):
-            routing_indices = tf.stack([self.rangeIndex, action_id * tf.ones_like(self.rangeIndex)], axis=1)
-            list_of_indices.append(routing_indices)
-            route_coefficients = tf.gather_nd(routing_decisions, routing_indices)
-            list_of_coefficients.append(route_coefficients)
-            weighted_state_inputs.append(route_coefficients * state_input)
-        self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=1))
-        assert len(self.stateInputTransformed) == time_step + 1
-        self.resultsDict["routing_indices_{0}".format(time_step)] = list_of_indices
-        self.resultsDict["routing_weights_{0}".format(time_step)] = list_of_coefficients
-        self.resultsDict["stateInputTransformed_{0}".format(time_step + 1)] = self.stateInputTransformed[time_step + 1]
+        self.resultsDict["policySamples_{0}".format(time_step)] = sampled_actions
+        self.resultsDict["argMaxActions_{0}".format(time_step)] = argmax_actions
+        self.resultsDict["routingDecisions_{0}".format(time_step)] = routing_decisions
 
     def build_networks(self):
         self.reward_calculation_tf()
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
+            # Handle the first step: s_0 and state transitions s_{t+1} = f(s_t,a_t)
             self.build_state_inputs(time_step=t)
+            # Build the network generating the policy at time step t: \pi_t(a_t|s_t)
             self.build_policy_networks(time_step=t)
+            # Sample actions from the policy network: a_t ~ \pi_t(a_t|s_t)
+            # Or select the maximum likely action: a_t = argmax_{a_t} \pi_t(a_t|s_t)
             self.sample_from_policy_tf(time_step=t)
-            self.build_state_transition(time_step=t)
-
-
+            # self.build_state_transition(time_step=t)
         # self.build_state_inputs(time_step=0)
         # self.build_policy_networks(time_step=0)
         # self.sample_from_policy_tf(time_step=0)
         # self.build_state_transition(time_step=0)
-        #
-        # init = tf.global_variables_initializer()
-        # self.tfSession.run(init)
-        # _x = self.validationFeaturesDict[0][0:1000, :]
-        # results = self.tfSession.run(self.resultsDict, feed_dict={self.stateInputs[0][0]: _x, self.softmaxDecay: 1.0})
-        # assert np.array_equal(self.actionSpaces[0][results["policy_samples_0"], :], results["routing_decisions_0"])
+        init = tf.global_variables_initializer()
+        self.tfSession.run(init)
+        _x = self.validationFeaturesDict[0][0:1000, :]
+        results = self.tfSession.run(self.resultsDict, feed_dict={self.stateInputs[0][0]: _x, self.softmaxDecay: 1.0})
+        assert np.array_equal(self.actionSpaces[0][results["policy_samples_0"], :], results["routing_decisions_0"])
 
         print("X")
+
+    # def build_state_transition(self, time_step):
+    #     routing_decisions = self.routingDecisions[time_step]
+    #     list_of_indices = []
+    #     list_of_coefficients = []
+    #     weighted_state_inputs = []
+    #     for action_id, state_input in enumerate(self.stateInputs[time_step]):
+    #         routing_indices = tf.stack([self.rangeIndex, action_id * tf.ones_like(self.rangeIndex)], axis=1)
+    #         list_of_indices.append(routing_indices)
+    #         route_coefficients = tf.gather_nd(routing_decisions, routing_indices)
+    #         list_of_coefficients.append(route_coefficients)
+    #         weighted_state_inputs.append(route_coefficients * state_input)
+    #     self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=1))
+    #     assert len(self.stateInputTransformed) == time_step + 1
+    #     self.resultsDict["routing_indices_{0}".format(time_step)] = list_of_indices
+    #     self.resultsDict["routing_weights_{0}".format(time_step)] = list_of_coefficients
+    #     self.resultsDict["stateInputTransformed_{0}".format(time_step + 1)] = self.stateInputTransformed[time_step + 1]
+
+
 
 
 
