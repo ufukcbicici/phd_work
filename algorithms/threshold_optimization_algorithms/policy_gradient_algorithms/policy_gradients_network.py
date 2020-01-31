@@ -63,7 +63,6 @@ class PolicyGradientsNetwork:
         self.baselinesNp = []
         self.weightedRewardMatrices = []
         self.valueFunctions = None
-        self.policyValue = None
         self.validationFeaturesDict = {}
         self.testFeaturesDict = {}
         self.networkActivationCosts = None

@@ -24,6 +24,10 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.isSamplingTrajectory = tf.placeholder(dtype=tf.bool, name="isSamplingTrajectory")
         self.rewardTensors = []
         self.selectedRewards = []
+        self.cumRewards = []
+        self.trajectoryValues = None
+        self.trajectoryValuesSum = None
+        self.policyValue = None
         self.actionSpacesTf = []
         self.validationRewards = []
         self.testRewards = []
@@ -177,6 +181,14 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.selectedRewards.append(selected_rewards)
         self.resultsDict["selected_rewards_{0}".format(time_step)] = selected_rewards
         self.resultsDict["reward_indices_{0}".format(time_step)] = reward_indices
+
+    def calculate_policy_value_tf(self):
+        self.trajectoryValues = tf.add_n(self.selectedRewards)
+        self.trajectoryValuesSum = tf.reduce_sum(self.trajectoryValues)
+        self.policyValue = tf.reduce_mean(self.trajectoryValues)
+        self.resultsDict["trajectoryValues"] = self.trajectoryValues
+        self.resultsDict["trajectoryValuesSum"] = self.trajectoryValuesSum
+        self.resultsDict["policyValue"] = self.policyValue
 
     def build_networks(self):
         self.calculate_reward_tensors()
