@@ -41,7 +41,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             self.actionSpacesTf.append(tf.constant(self.actionSpaces[t]))
         self.resultsDict["actionSpacesTf"] = self.actionSpacesTf
 
-    def reward_calculation_tf(self):
+    def calculate_reward_tensors(self):
         invalid_action_penalty = FullGpuTreePolicyGradientsNetwork.INVALID_ACTION_PENALTY
         valid_prediction_reward = FullGpuTreePolicyGradientsNetwork.VALID_PREDICTION_REWARD
         invalid_prediction_penalty = FullGpuTreePolicyGradientsNetwork.INVALID_PREDICTION_PENALTY
@@ -155,7 +155,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.resultsDict["routingDecisions_{0}".format(time_step)] = routing_decisions
 
     def build_networks(self):
-        self.reward_calculation_tf()
+        self.calculate_reward_tensors()
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
             # Handle the first step: s_0 and state transitions s_{t+1} = f(s_t,a_t)
