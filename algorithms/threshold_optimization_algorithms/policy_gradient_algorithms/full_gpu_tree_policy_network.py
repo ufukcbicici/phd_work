@@ -20,7 +20,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                  output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
                  trajectory_per_state_sample_count):
         self.stateInputTransformed = []
-        self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay")
+        self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay", shape=[])
         self.isSamplingTrajectory = tf.placeholder(dtype=tf.bool, name="isSamplingTrajectory")
         self.rewardTensors = []
         self.selectedRewards = []
@@ -32,7 +32,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.argMaxActions = []
         self.finalActions = []
         self.resultsDict = {}
-        self.stateIds = []
+        self.stateIds = tf.placeholder(dtype=tf.int32, name="stateIds", shape=[None])
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
                          trajectory_per_state_sample_count)
@@ -117,7 +117,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 list_of_indices.append(routing_indices)
                 route_coefficients = tf.gather_nd(routing_decisions, routing_indices)
                 list_of_coefficients.append(route_coefficients)
-                weighted_state_inputs.append(route_coefficients * state_input)
+                weighted_state_inputs.append(tf.cast(route_coefficients, dtype=tf.float32) * state_input)
             assert len(self.stateInputTransformed) == time_step
             self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=1))
             self.resultsDict["routing_indices_{0}".format(time_step)] = list_of_indices
@@ -146,7 +146,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
 
     def sample_from_policy_tf(self, time_step):
         sampled_actions = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[time_step])
-        argmax_actions = tf.argmax(self.policies[time_step], axis=1)
+        argmax_actions = tf.cast(tf.argmax(self.policies[time_step], axis=1), dtype=tf.int32)
         samples = tf.where(self.isSamplingTrajectory, sampled_actions, argmax_actions)
         routing_decisions = tf.gather_nd(self.actionSpacesTf[time_step], tf.expand_dims(samples, axis=1))
         self.policySamples.append(sampled_actions)
