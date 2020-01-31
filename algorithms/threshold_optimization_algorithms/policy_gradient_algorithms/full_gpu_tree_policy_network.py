@@ -121,7 +121,6 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             self.resultsDict["routing_weights_{0}".format(time_step)] = list_of_coefficients
             self.resultsDict["stateInputTransformed_{0}".format(time_step)] = self.stateInputTransformed[time_step]
 
-
     #     routing_decisions = self.routingDecisions[time_step]
     #     list_of_indices = []
     #     list_of_coefficients = []
@@ -195,43 +194,37 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     #     self.resultsDict["routing_weights_{0}".format(time_step)] = list_of_coefficients
     #     self.resultsDict["stateInputTransformed_{0}".format(time_step + 1)] = self.stateInputTransformed[time_step + 1]
 
-
-
-
-
-
-
-        #     reward_input = tf.placeholder(dtype=tf.float32, shape=[None], name="rewards_{0}".format(t))
-        #     self.rewards.append(reward_input)
-        #     baseline_input = tf.placeholder(dtype=tf.float32, shape=[None], name="baselines_{0}".format(t))
-        #     self.baselinesTf.append(baseline_input)
-        #     if t - 1 < 0:
-        #         baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0], 1))
-        #     else:
-        #         baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0],
-        #                                       self.actionSpaces[t - 1].shape[0]))
-        #     self.baselinesNp.append(baseline_np)
-        #     # Policy sampling
-        #     sampler = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[t])
-        #     self.policySamples.append(sampler)
-        #     selected_policy_input = tf.placeholder(dtype=tf.int32, shape=[None],
-        #                                            name="selected_policy_input_{0}".format(t))
-        #     self.selectedPolicyInputs.append(selected_policy_input)
-        #     # Argmax actions
-        #     argmax_actions = tf.argmax(self.policies[t], axis=1)
-        #     self.policyArgMaxSamples.append(argmax_actions)
-        # # Get the total number of trajectories
-        # state_input_shape = tf.shape(self.stateInputs[0])
-        # self.trajectoryCount = tf.gather_nd(state_input_shape, [0])
-        # # Cumulative Rewards
-        # for t1 in range(max_trajectory_length):
-        #     rew_list = [self.rewards[t2] for t2 in range(t1, max_trajectory_length, 1)]
-        #     cum_sum = tf.add_n(rew_list)
-        #     self.cumulativeRewards.append(cum_sum)
-        # # Building the proxy loss and the policy gradient
-        # self.build_policy_gradient_loss()
-        # self.get_l2_loss()
-        # self.build_optimizer()
+    #     reward_input = tf.placeholder(dtype=tf.float32, shape=[None], name="rewards_{0}".format(t))
+    #     self.rewards.append(reward_input)
+    #     baseline_input = tf.placeholder(dtype=tf.float32, shape=[None], name="baselines_{0}".format(t))
+    #     self.baselinesTf.append(baseline_input)
+    #     if t - 1 < 0:
+    #         baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0], 1))
+    #     else:
+    #         baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0],
+    #                                       self.actionSpaces[t - 1].shape[0]))
+    #     self.baselinesNp.append(baseline_np)
+    #     # Policy sampling
+    #     sampler = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[t])
+    #     self.policySamples.append(sampler)
+    #     selected_policy_input = tf.placeholder(dtype=tf.int32, shape=[None],
+    #                                            name="selected_policy_input_{0}".format(t))
+    #     self.selectedPolicyInputs.append(selected_policy_input)
+    #     # Argmax actions
+    #     argmax_actions = tf.argmax(self.policies[t], axis=1)
+    #     self.policyArgMaxSamples.append(argmax_actions)
+    # # Get the total number of trajectories
+    # state_input_shape = tf.shape(self.stateInputs[0])
+    # self.trajectoryCount = tf.gather_nd(state_input_shape, [0])
+    # # Cumulative Rewards
+    # for t1 in range(max_trajectory_length):
+    #     rew_list = [self.rewards[t2] for t2 in range(t1, max_trajectory_length, 1)]
+    #     cum_sum = tf.add_n(rew_list)
+    #     self.cumulativeRewards.append(cum_sum)
+    # # Building the proxy loss and the policy gradient
+    # self.build_policy_gradient_loss()
+    # self.get_l2_loss()
+    # self.build_optimizer()
 
     # Prevent policies from reaching exactly to 1.0
     # def clamp_policies(self, time_step):
@@ -295,6 +288,3 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     #         if t < max_trajectory_length - 1:
     #             self.state_transition(routing_data=routing_data, history=history, time_step=t)
     #     return history
-
-
-
