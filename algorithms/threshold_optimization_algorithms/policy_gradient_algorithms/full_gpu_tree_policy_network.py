@@ -174,7 +174,6 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         _x = self.validationFeaturesDict[0][0:1000, :]
         results = self.tfSession.run(self.resultsDict, feed_dict={self.stateInputs[0][0]: _x, self.softmaxDecay: 1.0})
         assert np.array_equal(self.actionSpaces[0][results["policy_samples_0"], :], results["routing_decisions_0"])
-
         print("X")
 
     # def build_state_transition(self, time_step):
