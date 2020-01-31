@@ -22,15 +22,17 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.stateInputTransformed = []
         self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay")
         self.isSamplingTrajectory = tf.placeholder(dtype=tf.bool, name="isSamplingTrajectory")
+        self.rewardTensors = []
+        self.selectedRewards = []
         self.actionSpacesTf = []
         self.validationRewards = []
         self.testRewards = []
-        self.validationRewardsTf = []
-        self.testRewardsTf = []
         self.routingDecisions = []
         self.rangeIndex = None
         self.argMaxActions = []
+        self.finalActions = []
         self.resultsDict = {}
+        self.stateIds = []
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
                          trajectory_per_state_sample_count)
@@ -48,6 +50,9 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         for t in range(self.get_max_trajectory_length()):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
+            self.rewardTensors.append(
+                tf.placeholder(dtype=tf.float32, name="rewardTensors_{0}".format(t),
+                               shape=(None, action_count_t_minus_one, action_count_t)))
             for dataset in [self.validationDataForMDP, self.testDataForMDP]:
                 reward_shape = (dataset.routingDataset.labelList.shape[0], action_count_t_minus_one, action_count_t)
                 rewards_arr = np.zeros(shape=reward_shape, dtype=np.float32)
@@ -77,10 +82,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                     rewards_arr += (prediction_correctness_tensor == 0).astype(np.float32) * invalid_prediction_penalty
                 if dataset == self.validationDataForMDP:
                     self.validationRewards.append(rewards_arr)
-                    self.validationRewardsTf.append(tf.constant(rewards_arr))
                 else:
                     self.testRewards.append(rewards_arr)
-                    self.testRewardsTf.append(tf.constant(rewards_arr))
 
     def build_state_inputs(self, time_step):
         ordered_nodes_at_level = self.network.orderedNodesPerLevel[time_step]
@@ -148,33 +151,50 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         routing_decisions = tf.gather_nd(self.actionSpacesTf[time_step], tf.expand_dims(samples, axis=1))
         self.policySamples.append(sampled_actions)
         self.argMaxActions.append(argmax_actions)
+        self.finalActions.append(samples)
         self.routingDecisions.append(routing_decisions)
         self.resultsDict["policySamples_{0}".format(time_step)] = sampled_actions
         self.resultsDict["argMaxActions_{0}".format(time_step)] = argmax_actions
         self.resultsDict["routingDecisions_{0}".format(time_step)] = routing_decisions
+        self.resultsDict["finalActions_{0}".format(time_step)] = samples
+
+    def calculate_reward(self, time_step):
+        # Get state indices
+        samples_t_minus_one = tf.zeros_like(self.stateIds) if time_step == 0 else self.finalActions[time_step - 1]
+        samples_t = self.finalActions[time_step]
+        reward_indices = tf.stack([self.stateIds, samples_t_minus_one, samples_t], axis=1)
+        reward_tensor = self.rewardTensors[time_step]
+        selected_rewards = tf.gather_nd(reward_tensor, reward_indices)
+        self.selectedRewards.append(selected_rewards)
+        self.resultsDict["selected_rewards_{0}".format(time_step)] = selected_rewards
+        self.resultsDict["reward_indices_{0}".format(time_step)] = reward_indices
 
     def build_networks(self):
         self.calculate_reward_tensors()
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
-            # Handle the first step: s_0 and state transitions s_{t+1} = f(s_t,a_t)
+            # Handle the first step: s_0 and state transitions s_{t} = f(s_{t-1},a_{t-1})
             self.build_state_inputs(time_step=t)
             # Build the network generating the policy at time step t: \pi_t(a_t|s_t)
             self.build_policy_networks(time_step=t)
             # Sample actions from the policy network: a_t ~ \pi_t(a_t|s_t)
             # Or select the maximum likely action: a_t = argmax_{a_t} \pi_t(a_t|s_t)
             self.sample_from_policy_tf(time_step=t)
-            # self.build_state_transition(time_step=t)
-        # self.build_state_inputs(time_step=0)
-        # self.build_policy_networks(time_step=0)
-        # self.sample_from_policy_tf(time_step=0)
-        # self.build_state_transition(time_step=0)
-        init = tf.global_variables_initializer()
-        self.tfSession.run(init)
-        _x = self.validationFeaturesDict[0][0:1000, :]
-        results = self.tfSession.run(self.resultsDict, feed_dict={self.stateInputs[0][0]: _x, self.softmaxDecay: 1.0})
-        assert np.array_equal(self.actionSpaces[0][results["policy_samples_0"], :], results["routing_decisions_0"])
-        print("X")
+            # Select a reward r_t = r(s_t, a_t)
+            self.calculate_reward(time_step=t)
+
+
+        #     # self.build_state_transition(time_step=t)
+        # # self.build_state_inputs(time_step=0)
+        # # self.build_policy_networks(time_step=0)
+        # # self.sample_from_policy_tf(time_step=0)
+        # # self.build_state_transition(time_step=0)
+        # init = tf.global_variables_initializer()
+        # self.tfSession.run(init)
+        # _x = self.validationFeaturesDict[0][0:1000, :]
+        # results = self.tfSession.run(self.resultsDict, feed_dict={self.stateInputs[0][0]: _x, self.softmaxDecay: 1.0})
+        # assert np.array_equal(self.actionSpaces[0][results["policy_samples_0"], :], results["routing_decisions_0"])
+        # print("X")
 
     # def build_state_transition(self, time_step):
     #     routing_decisions = self.routingDecisions[time_step]
