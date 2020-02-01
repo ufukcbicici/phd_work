@@ -169,9 +169,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         reachability_matrix = tf.gather_nd(self.reachabilityMatricesTf[time_step],
                                            tf.expand_dims(actions_t_minus_one, axis=1))
         argmax_actions_all = tf.cast(tf.argmax(self.policies[time_step], axis=1), dtype=tf.int32)
-        argmax_actions_only_valid = tf.cast(
-            tf.argmax(self.policies[time_step] * tf.cast(reachability_matrix, dtype=tf.float32), axis=1),
-            dtype=tf.int32)
+        valid_policies = self.policies[time_step] * tf.cast(reachability_matrix, dtype=tf.float32)
+        argmax_actions_only_valid = tf.cast(tf.argmax(valid_policies, axis=1), dtype=tf.int32)
         argmax_actions = tf.where(self.ignoreInvalidActions, argmax_actions_only_valid, argmax_actions_all)
         samples = tf.where(self.isSamplingTrajectory, sampled_actions, argmax_actions)
         routing_decisions = tf.gather_nd(self.actionSpacesTf[time_step], tf.expand_dims(samples, axis=1))
@@ -180,6 +179,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.finalActions.append(samples)
         self.routingDecisions.append(routing_decisions)
         self.resultsDict["reachability_matrix_{0}".format(time_step)] = reachability_matrix
+        self.resultsDict["valid_policies_{0}".format(time_step)] = valid_policies
         self.resultsDict["policySamples_{0}".format(time_step)] = sampled_actions
         self.resultsDict["argmax_actions_all_{0}".format(time_step)] = argmax_actions_all
         self.resultsDict["argmax_actions_only_valid_{0}".format(time_step)] = argmax_actions_only_valid
@@ -253,6 +253,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             history.actions.append(results["finalActions_{0}".format(t)])
             history.rewards.append(results["selected_rewards_{0}".format(t)])
             history.routingDecisions.append(results["routingDecisions_{0}".format(t)])
+            history.validPolicies.append(results["valid_policies_{0}".format(t)])
         return history
 
         # max_trajectory_length = self.get_max_trajectory_length()

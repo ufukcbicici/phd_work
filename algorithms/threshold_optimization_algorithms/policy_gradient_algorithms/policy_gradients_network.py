@@ -18,6 +18,7 @@ class TrajectoryHistory:
         self.states = []
         self.stateIdsTemporal = []
         self.policies = []
+        self.validPolicies = []
         self.actions = []
         self.routingDecisions = []
         self.rewards = []

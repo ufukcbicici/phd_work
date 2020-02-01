@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import time
 
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.full_gpu_tree_policy_network import \
     FullGpuTreePolicyGradientsNetwork
@@ -53,6 +54,7 @@ def test_gpu_implementation():
     # [0.0, 0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]
     state_sample_count_list = [1000]
     samples_per_state_list = [1]
+    ignore_invalid_actions = False
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
                                                                           state_sample_count_list,
                                                                           samples_per_state_list])
@@ -94,31 +96,45 @@ def test_gpu_implementation():
                                                       validation_data=validation_data,
                                                       test_data=test_data)
         sess.run(tf.initialize_all_variables())
-        random_ids = np.random.choice(
-            gpu_policy_grads.validationDataForMDP.routingDataset.labelList.shape[0],
-            250, replace=False)
-        history_gpu = gpu_policy_grads. \
-            sample_trajectories(sess=sess,
-                                routing_data=gpu_policy_grads.validationDataForMDP,
-                                state_sample_count=None,
-                                samples_per_state=1000,
-                                select_argmax=True,
-                                ignore_invalid_actions=False,
-                                state_ids=random_ids)
-        history_cpu = cpu_policy_grads.sample_trajectories(sess=sess,
-                                                           routing_data=gpu_policy_grads.validationDataForMDP,
-                                                           state_sample_count=None,
-                                                           samples_per_state=1000,
-                                                           select_argmax=True,
-                                                           ignore_invalid_actions=False,
-                                                           state_ids=random_ids)
-        assert np.array_equal(history_gpu.stateIds, history_cpu.stateIds)
-        for t in range(network.depth - 1):
-            assert np.allclose(history_gpu.states[t], history_cpu.states[t])
-            assert np.allclose(history_gpu.policies[t], history_cpu.policies[t])
-            assert np.array_equal(history_gpu.actions[t], history_cpu.actions[t])
-            assert np.array_equal(history_gpu.rewards[t], history_cpu.rewards[t])
-            assert np.array_equal(history_gpu.routingDecisions[t], history_cpu.routingDecisions[t])
+        gpu_time = 0
+        cpu_time = 0
+        for repeat_id in range(100):
+            random_ids = np.random.choice(
+                gpu_policy_grads.validationDataForMDP.routingDataset.labelList.shape[0],
+                250, replace=False)
+            t0 = time.time()
+            history_gpu = gpu_policy_grads. \
+                sample_trajectories(sess=sess,
+                                    routing_data=gpu_policy_grads.validationDataForMDP,
+                                    state_sample_count=None,
+                                    samples_per_state=1000,
+                                    select_argmax=True,
+                                    ignore_invalid_actions=ignore_invalid_actions,
+                                    state_ids=random_ids)
+            t1 = time.time()
+            history_cpu = cpu_policy_grads.sample_trajectories(sess=sess,
+                                                               routing_data=gpu_policy_grads.validationDataForMDP,
+                                                               state_sample_count=None,
+                                                               samples_per_state=1000,
+                                                               select_argmax=True,
+                                                               ignore_invalid_actions=ignore_invalid_actions,
+                                                               state_ids=random_ids)
+            t2 = time.time()
+            gpu_time += (t1 - t0)
+            cpu_time += (t2 - t1)
+            assert np.array_equal(history_gpu.stateIds, history_cpu.stateIds)
+            for t in range(network.depth - 1):
+                assert np.allclose(history_gpu.states[t], history_cpu.states[t])
+                if not ignore_invalid_actions:
+                    assert np.allclose(history_gpu.policies[t], history_cpu.policies[t])
+                else:
+                    assert np.allclose(history_gpu.validPolicies[t], history_cpu.policies[t])
+                assert np.array_equal(history_gpu.actions[t], history_cpu.actions[t])
+                assert np.array_equal(history_gpu.rewards[t], history_cpu.rewards[t])
+                assert np.array_equal(history_gpu.routingDecisions[t], history_cpu.routingDecisions[t])
+            print("iteration:{0}".format(repeat_id))
+        print("gpu_time={0}".format(gpu_time))
+        print("cpu_time={0}".format(cpu_time))
         tf.reset_default_graph()
 
 
