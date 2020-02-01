@@ -251,7 +251,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             history.states.append(results["stateInputTransformed_{0}".format(t)])
             history.policies.append(results["policies_{0}".format(t)])
             history.actions.append(results["finalActions_{0}".format(t)])
-            history.routingDecisions.append(results["selected_rewards_{0}".format(t)])
+            history.rewards.append(results["selected_rewards_{0}".format(t)])
+            history.routingDecisions.append(results["routingDecisions_{0}".format(t)])
         return history
 
         # max_trajectory_length = self.get_max_trajectory_length()

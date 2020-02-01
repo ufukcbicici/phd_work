@@ -93,6 +93,7 @@ def test_gpu_implementation():
                                                       hidden_layers=[[128], [256]],
                                                       validation_data=validation_data,
                                                       test_data=test_data)
+        sess.run(tf.initialize_all_variables())
         random_ids = np.random.choice(
             gpu_policy_grads.validationDataForMDP.routingDataset.labelList.shape[0],
             250, replace=False)
@@ -101,16 +102,23 @@ def test_gpu_implementation():
                                 routing_data=gpu_policy_grads.validationDataForMDP,
                                 state_sample_count=None,
                                 samples_per_state=1000,
-                                select_argmax=False,
+                                select_argmax=True,
                                 ignore_invalid_actions=False,
                                 state_ids=random_ids)
         history_cpu = cpu_policy_grads.sample_trajectories(sess=sess,
                                                            routing_data=gpu_policy_grads.validationDataForMDP,
                                                            state_sample_count=None,
                                                            samples_per_state=1000,
-                                                           select_argmax=False,
+                                                           select_argmax=True,
                                                            ignore_invalid_actions=False,
                                                            state_ids=random_ids)
+        assert np.array_equal(history_gpu.stateIds, history_cpu.stateIds)
+        for t in range(network.depth - 1):
+            assert np.allclose(history_gpu.states[t], history_cpu.states[t])
+            assert np.allclose(history_gpu.policies[t], history_cpu.policies[t])
+            assert np.array_equal(history_gpu.actions[t], history_cpu.actions[t])
+            assert np.array_equal(history_gpu.rewards[t], history_cpu.rewards[t])
+            assert np.array_equal(history_gpu.routingDecisions[t], history_cpu.routingDecisions[t])
         tf.reset_default_graph()
 
 
