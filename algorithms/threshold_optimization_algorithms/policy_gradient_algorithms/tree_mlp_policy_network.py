@@ -3,6 +3,8 @@ import numpy as np
 
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.full_gpu_tree_policy_network import \
     FullGpuTreePolicyGradientsNetwork
+from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.tree_depth_policy_network import \
+    TreeDepthPolicyNetwork
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
@@ -34,11 +36,7 @@ class TreeMlpPolicyNetwork(FullGpuTreePolicyGradientsNetwork):
         self.resultsDict["logPolicies_{0}".format(time_step)] = self.logPolicies[time_step]
 
 
-def main():
-    # run_id = 715
-    # network_name = "Cifar100_CIGN_MultiGpuSingleLateExit"
-    # iteration = 119100
-
+def test_gpu_implementation():
     run_id = 453
     network_name = "FashionNet_Lite"
     iteration = 43680
@@ -63,7 +61,7 @@ def main():
         l2_wd = tpl[0]
         state_sample_count = tpl[1]
         samples_per_state = tpl[2]
-        policy_gradients_routing_optimizer = \
+        gpu_policy_grads = \
             TreeMlpPolicyNetwork(l2_lambda=l2_wd,
                                  network=network,
                                  network_name=network_name,
@@ -78,18 +76,40 @@ def main():
                                  hidden_layers=[[128], [256]],
                                  validation_data=validation_data,
                                  test_data=test_data)
-
+        cpu_policy_grads = TreeDepthPolicyNetwork(l2_lambda=l2_wd,
+                                                  network=network,
+                                                  network_name=network_name,
+                                                  run_id=run_id,
+                                                  iteration=iteration,
+                                                  degree_list=[2, 2],
+                                                  output_names=output_names,
+                                                  used_feature_names=used_output_names,
+                                                  use_baselines=True,
+                                                  state_sample_count=state_sample_count,
+                                                  trajectory_per_state_sample_count=samples_per_state,
+                                                  hidden_layers=[[128], [256]],
+                                                  validation_data=validation_data,
+                                                  test_data=test_data)
         random_ids = np.random.choice(
-            policy_gradients_routing_optimizer.validationDataForMDP.routingDataset.labelList.shape[0],
-            250, replace=False)
-        policy_gradients_routing_optimizer.\
-            sample_trajectories(routing_data=policy_gradients_routing_optimizer.validationDataForMDP,
+            gpu_policy_grads.validationDataForMDP.routingDataset.labelList.shape[0],
+            1, replace=False)
+        history_gpu = gpu_policy_grads. \
+            sample_trajectories(routing_data=gpu_policy_grads.validationDataForMDP,
                                 state_sample_count=None,
-                                samples_per_state=1000,
+                                samples_per_state=1000000,
                                 select_argmax=False,
                                 ignore_invalid_actions=False,
                                 state_ids=random_ids)
-        # policy_gradients_routing_optimizer.train(max_num_of_iterations=15000)
+        history_cpu = cpu_policy_grads.sample_trajectories(routing_data=gpu_policy_grads.validationDataForMDP,
+                                                           state_sample_count=None,
+                                                           samples_per_state=1000000,
+                                                           select_argmax=False,
+                                                           ignore_invalid_actions=False,
+                                                           state_ids=random_ids)
+
+
+def main():
+    test_gpu_implementation()
 
 
 if __name__ == "__main__":

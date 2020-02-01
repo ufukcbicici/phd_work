@@ -100,8 +100,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                     self.validationRewards.append(rewards_arr)
                 else:
                     self.testRewards.append(rewards_arr)
-        self.validationDataForMDP.rewardsTensors = self.validationRewards
-        self.testDataForMDP.rewardsTensors = self.testRewards
+        self.validationDataForMDP.rewardTensors = self.validationRewards
+        self.testDataForMDP.rewardTensors = self.testRewards
 
     def build_state_inputs(self, time_step):
         ordered_nodes_at_level = self.network.orderedNodesPerLevel[time_step]
@@ -135,7 +135,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 list_of_indices.append(routing_indices)
                 route_coefficients = tf.gather_nd(routing_decisions, routing_indices)
                 list_of_coefficients.append(route_coefficients)
-                weighted_state_inputs.append(tf.cast(route_coefficients, dtype=tf.float32) * state_input)
+                weighted_state_inputs.append(tf.cast(tf.expand_dims(route_coefficients, axis=1), dtype=tf.float32)
+                                             * state_input)
             assert len(self.stateInputTransformed) == time_step
             self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=1))
             self.resultsDict["routing_indices_{0}".format(time_step)] = list_of_indices
@@ -232,7 +233,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         # Prepare all state inputs for all time steps
         feed_dict = {self.isSamplingTrajectory: not select_argmax,
                      self.ignoreInvalidActions: ignore_invalid_actions,
-                     self.softmaxDecay: 1.0}
+                     self.softmaxDecay: 1.0,
+                     self.stateIds: history.stateIds}
         for t in range(self.get_max_trajectory_length()):
             # State inputs
             for idx, state_input in enumerate(self.stateInputs[t]):
@@ -241,6 +243,15 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 feed_dict[state_input] = features
             # Reward inputs
             feed_dict[self.rewardTensorsTf[t]] = routing_data.rewardTensors[t]
+        results = self.tfSession.run(self.resultsDict, feed_dict)
+        # Build the history object
+        history.states = []
+        for t in range(self.get_max_trajectory_length()):
+            # State inputs
+            history.states.append(results["stateInputTransformed_{0}".format(t)])
+            history.policies.append(results["policies_{0}".format(t)])
+            history.actions.append(results["finalActions_{0}".format(t)])
+            history.routingDecisions.append(results["selected_rewards_{0}".format(t)])
         return history
 
         # max_trajectory_length = self.get_max_trajectory_length()
