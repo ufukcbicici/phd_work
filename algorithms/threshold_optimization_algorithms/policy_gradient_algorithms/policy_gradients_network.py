@@ -73,7 +73,6 @@ class PolicyGradientsNetwork:
         self.stateSampleCount = state_sample_count
         self.trajectoryPerStateSampleCount = trajectory_per_state_sample_count
         self.useBaselines = use_baselines
-        self.tfSession = tf.Session()
         self.networkName = network_name
         self.networkRunId = run_id
         self.networkIteration = iteration
@@ -114,8 +113,6 @@ class PolicyGradientsNetwork:
         self.get_evaluation_costs()
         self.get_reachability_matrices()
         self.build_networks()
-        init = tf.global_variables_initializer()
-        self.tfSession.run(init)
 
     # OK
     def prepare_state_features(self, data):
@@ -209,7 +206,7 @@ class PolicyGradientsNetwork:
         pass
 
     # OK
-    def sample_from_policy(self, routing_data, history, time_step, select_argmax, ignore_invalid_actions):
+    def sample_from_policy(self, sess, routing_data, history, time_step, select_argmax, ignore_invalid_actions):
         pass
 
     # OK
@@ -221,7 +218,7 @@ class PolicyGradientsNetwork:
         pass
 
     # OK
-    def sample_trajectories(self, routing_data, state_sample_count, samples_per_state,
+    def sample_trajectories(self, sess, routing_data, state_sample_count, samples_per_state,
                             select_argmax, ignore_invalid_actions, state_ids) \
             -> TrajectoryHistory:
         # if state_ids is None, sample from state distribution
@@ -233,7 +230,7 @@ class PolicyGradientsNetwork:
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
             # Sample from a_t ~ p(a_t|history(t))
-            self.sample_from_policy(routing_data=routing_data, history=history, time_step=t,
+            self.sample_from_policy(sess=sess, routing_data=routing_data, history=history, time_step=t,
                                     select_argmax=select_argmax, ignore_invalid_actions=ignore_invalid_actions)
             # Get the reward: r_t ~ p(r_t|history(t))
             self.reward_calculation(routing_data=routing_data, history=history, time_step=t)
@@ -343,7 +340,7 @@ class PolicyGradientsNetwork:
         print("test_ml_accuracy={0}".format(test_ml_accuracy))
         return val_ml_accuracy, test_ml_accuracy
 
-    def train(self, max_num_of_iterations):
+    def train(self, sess, max_num_of_iterations):
         pass
         # # State stateInputs and reward stateInputs
         # for t in range(self.trajectoryMaxLength):

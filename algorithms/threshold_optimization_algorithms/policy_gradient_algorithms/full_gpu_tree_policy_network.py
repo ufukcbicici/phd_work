@@ -221,7 +221,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             self.calculate_reward(time_step=t)
         self.calculate_policy_value_tf()
 
-    def sample_trajectories(self, routing_data, state_sample_count, samples_per_state,
+    def sample_trajectories(self, sess, routing_data, state_sample_count, samples_per_state,
                             select_argmax, ignore_invalid_actions, state_ids) \
             -> TrajectoryHistory:
         # if state_ids is None, sample from state distribution
@@ -243,7 +243,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 feed_dict[state_input] = features
             # Reward inputs
             feed_dict[self.rewardTensorsTf[t]] = routing_data.rewardTensors[t]
-        results = self.tfSession.run(self.resultsDict, feed_dict)
+        results = sess.run(self.resultsDict, feed_dict)
         # Build the history object
         history.states = []
         for t in range(self.get_max_trajectory_length()):

@@ -149,17 +149,17 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                         reachability_matrix_t[action_t_minus_one_id, actions_t_id] = is_valid_selection
             self.reachabilityMatrices.append(reachability_matrix_t)
 
-    def sample_from_policy(self, routing_data, history, time_step, select_argmax, ignore_invalid_actions):
+    def sample_from_policy(self, sess, routing_data, history, time_step, select_argmax, ignore_invalid_actions):
         assert len(history.states) == time_step + 1
         assert len(history.actions) == time_step
         feed_dict = {self.stateInputs[t]: history.states[t] for t in range(time_step + 1)}
         if not select_argmax:
             # sampling_op = self.policyArgMaxSamples[time_step] if select_argmax else self.policySamples[time_step]
-            results = self.tfSession.run([self.policies[time_step], self.policySamples[time_step]], feed_dict=feed_dict)
+            results = sess.run([self.policies[time_step], self.policySamples[time_step]], feed_dict=feed_dict)
             policies = results[0]
             policy_samples = results[-1]
         else:
-            results = self.tfSession.run([self.policies[time_step]], feed_dict=feed_dict)
+            results = sess.run([self.policies[time_step]], feed_dict=feed_dict)
             policies = results[0]
             # Determine valid actions
             actions_t_minus_one = self.get_previous_actions(history=history, time_step=time_step)
@@ -260,7 +260,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             self.baselinesNp[t] = np.where(nan_mask, new_baseline_arr, self.baselinesNp[t])
             # self.baselinesNp[t] += gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
 
-    def train(self, max_num_of_iterations=15000):
+    def train(self, sess, max_num_of_iterations=15000):
+        sess.run(tf.initialize_all_variables())
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values()
         self.evaluate_routing_accuracies()
@@ -288,14 +289,14 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                 feed_dict[self.baselinesTf[t]] = self.baselinesNp[t][history.stateIds, actions_t_minus_one]
             feed_dict[self.l2LambdaTf] = self.l2Lambda
 
-            results = self.tfSession.run([self.logPolicies,
-                                          self.policies,
-                                          self.selectedLogPolicySamples,
-                                          self.cumulativeRewards,
-                                          self.proxyLossTrajectories,
-                                          self.proxyLossVector,
-                                          self.proxyLoss,
-                                          self.optimizer], feed_dict=feed_dict)
+            results = sess.run([self.logPolicies,
+                                self.policies,
+                                self.selectedLogPolicySamples,
+                                self.cumulativeRewards,
+                                self.proxyLossTrajectories,
+                                self.proxyLossVector,
+                                self.proxyLoss,
+                                self.optimizer], feed_dict=feed_dict)
             # Update baselines
             if self.useBaselines:
                 self.update_baselines(history=history)
@@ -373,6 +374,7 @@ def main():
                                                                           samples_per_state_list])
 
     for tpl in cartesian_product:
+        sess = tf.Session()
         l2_wd = tpl[0]
         state_sample_count = tpl[1]
         samples_per_state = tpl[2]
@@ -390,7 +392,8 @@ def main():
                                                                     hidden_layers=[[128], [256]],
                                                                     validation_data=validation_data,
                                                                     test_data=test_data)
-        policy_gradients_routing_optimizer.train(max_num_of_iterations=15000)
+        policy_gradients_routing_optimizer.train(sess=sess, max_num_of_iterations=15000)
+        tf.reset_default_graph()
 
 
 if __name__ == "__main__":

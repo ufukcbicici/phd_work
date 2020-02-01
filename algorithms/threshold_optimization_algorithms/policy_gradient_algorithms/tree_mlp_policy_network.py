@@ -58,54 +58,60 @@ def test_gpu_implementation():
                                                                           samples_per_state_list])
 
     for tpl in cartesian_product:
+        sess = tf.Session()
         l2_wd = tpl[0]
         state_sample_count = tpl[1]
         samples_per_state = tpl[2]
-        gpu_policy_grads = \
-            TreeMlpPolicyNetwork(l2_lambda=l2_wd,
-                                 network=network,
-                                 network_name=network_name,
-                                 run_id=run_id,
-                                 iteration=iteration,
-                                 degree_list=[2, 2],
-                                 output_names=output_names,
-                                 used_feature_names=used_output_names,
-                                 use_baselines=True,
-                                 state_sample_count=state_sample_count,
-                                 trajectory_per_state_sample_count=samples_per_state,
-                                 hidden_layers=[[128], [256]],
-                                 validation_data=validation_data,
-                                 test_data=test_data)
-        cpu_policy_grads = TreeDepthPolicyNetwork(l2_lambda=l2_wd,
-                                                  network=network,
-                                                  network_name=network_name,
-                                                  run_id=run_id,
-                                                  iteration=iteration,
-                                                  degree_list=[2, 2],
-                                                  output_names=output_names,
-                                                  used_feature_names=used_output_names,
-                                                  use_baselines=True,
-                                                  state_sample_count=state_sample_count,
-                                                  trajectory_per_state_sample_count=samples_per_state,
-                                                  hidden_layers=[[128], [256]],
-                                                  validation_data=validation_data,
-                                                  test_data=test_data)
+        with tf.variable_scope("test"):
+            gpu_policy_grads = \
+                TreeMlpPolicyNetwork(l2_lambda=l2_wd,
+                                     network=network,
+                                     network_name=network_name,
+                                     run_id=run_id,
+                                     iteration=iteration,
+                                     degree_list=[2, 2],
+                                     output_names=output_names,
+                                     used_feature_names=used_output_names,
+                                     use_baselines=True,
+                                     state_sample_count=state_sample_count,
+                                     trajectory_per_state_sample_count=samples_per_state,
+                                     hidden_layers=[[128], [256]],
+                                     validation_data=validation_data,
+                                     test_data=test_data)
+        with tf.variable_scope("test", reuse=True):
+            cpu_policy_grads = TreeDepthPolicyNetwork(l2_lambda=l2_wd,
+                                                      network=network,
+                                                      network_name=network_name,
+                                                      run_id=run_id,
+                                                      iteration=iteration,
+                                                      degree_list=[2, 2],
+                                                      output_names=output_names,
+                                                      used_feature_names=used_output_names,
+                                                      use_baselines=True,
+                                                      state_sample_count=state_sample_count,
+                                                      trajectory_per_state_sample_count=samples_per_state,
+                                                      hidden_layers=[[128], [256]],
+                                                      validation_data=validation_data,
+                                                      test_data=test_data)
         random_ids = np.random.choice(
             gpu_policy_grads.validationDataForMDP.routingDataset.labelList.shape[0],
-            1, replace=False)
+            250, replace=False)
         history_gpu = gpu_policy_grads. \
-            sample_trajectories(routing_data=gpu_policy_grads.validationDataForMDP,
+            sample_trajectories(sess=sess,
+                                routing_data=gpu_policy_grads.validationDataForMDP,
                                 state_sample_count=None,
-                                samples_per_state=1000000,
+                                samples_per_state=1000,
                                 select_argmax=False,
                                 ignore_invalid_actions=False,
                                 state_ids=random_ids)
-        history_cpu = cpu_policy_grads.sample_trajectories(routing_data=gpu_policy_grads.validationDataForMDP,
+        history_cpu = cpu_policy_grads.sample_trajectories(sess=sess,
+                                                           routing_data=gpu_policy_grads.validationDataForMDP,
                                                            state_sample_count=None,
-                                                           samples_per_state=1000000,
+                                                           samples_per_state=1000,
                                                            select_argmax=False,
                                                            ignore_invalid_actions=False,
                                                            state_ids=random_ids)
+        tf.reset_default_graph()
 
 
 def main():
