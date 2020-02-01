@@ -23,7 +23,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay", shape=[])
         self.isSamplingTrajectory = tf.placeholder(dtype=tf.bool, name="isSamplingTrajectory")
         self.ignoreInvalidActions = tf.placeholder(dtype=tf.bool, name="ignoreInvalidActions")
-        self.rewardTensors = []
+        self.rewardTensorsTf = []
         self.selectedRewards = []
         self.cumRewards = []
         self.trajectoryValues = None
@@ -57,7 +57,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         for t in range(self.get_max_trajectory_length()):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
-            self.rewardTensors.append(
+            self.rewardTensorsTf.append(
                 tf.placeholder(dtype=tf.float32, name="rewardTensors_{0}".format(t),
                                shape=(None, action_count_t_minus_one, action_count_t)))
             self.reachabilityMatricesTf.append(tf.constant(self.reachabilityMatrices[t]))
@@ -100,6 +100,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                     self.validationRewards.append(rewards_arr)
                 else:
                     self.testRewards.append(rewards_arr)
+        self.validationDataForMDP.rewardsTensors = self.validationRewards
+        self.testDataForMDP.rewardsTensors = self.testRewards
 
     def build_state_inputs(self, time_step):
         ordered_nodes_at_level = self.network.orderedNodesPerLevel[time_step]
@@ -166,8 +168,9 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         reachability_matrix = tf.gather_nd(self.reachabilityMatricesTf[time_step],
                                            tf.expand_dims(actions_t_minus_one, axis=1))
         argmax_actions_all = tf.cast(tf.argmax(self.policies[time_step], axis=1), dtype=tf.int32)
-        argmax_actions_only_valid = tf.cast(tf.argmax(self.policies[time_step] * reachability_matrix, axis=1),
-                                            dtype=tf.int32)
+        argmax_actions_only_valid = tf.cast(
+            tf.argmax(self.policies[time_step] * tf.cast(reachability_matrix, dtype=tf.float32), axis=1),
+            dtype=tf.int32)
         argmax_actions = tf.where(self.ignoreInvalidActions, argmax_actions_only_valid, argmax_actions_all)
         samples = tf.where(self.isSamplingTrajectory, sampled_actions, argmax_actions)
         routing_decisions = tf.gather_nd(self.actionSpacesTf[time_step], tf.expand_dims(samples, axis=1))
@@ -188,7 +191,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         actions_t_minus_one = tf.zeros_like(self.stateIds) if time_step == 0 else self.finalActions[time_step - 1]
         actions_t = self.finalActions[time_step]
         reward_indices = tf.stack([self.stateIds, actions_t_minus_one, actions_t], axis=1)
-        reward_tensor = self.rewardTensors[time_step]
+        reward_tensor = self.rewardTensorsTf[time_step]
         selected_rewards = tf.gather_nd(reward_tensor, reward_indices)
         self.selectedRewards.append(selected_rewards)
         self.resultsDict["selected_rewards_{0}".format(time_step)] = selected_rewards
@@ -227,15 +230,18 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                                              samples_per_state=samples_per_state,
                                              state_ids=state_ids)
         # Prepare all state inputs for all time steps
-        feed_dict = {}
-        for t in range(self.get_max_trajectory_length() - 1):
+        feed_dict = {self.isSamplingTrajectory: not select_argmax,
+                     self.ignoreInvalidActions: ignore_invalid_actions,
+                     self.softmaxDecay: 1.0}
+        for t in range(self.get_max_trajectory_length()):
+            # State inputs
             for idx, state_input in enumerate(self.stateInputs[t]):
-                features = routing_data.featuresDict[self.network.orderedNodesPerLevel[t][idx].index][history.stateIds]
+                features = \
+                    routing_data.featuresDict[self.network.orderedNodesPerLevel[t][idx].index][history.stateIds, :]
                 feed_dict[state_input] = features
+            # Reward inputs
+            feed_dict[self.rewardTensorsTf[t]] = routing_data.rewardTensors[t]
         return history
-
-
-
 
         # max_trajectory_length = self.get_max_trajectory_length()
         # for t in range(max_trajectory_length):

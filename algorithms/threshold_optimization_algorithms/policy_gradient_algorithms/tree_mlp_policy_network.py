@@ -78,7 +78,18 @@ def main():
                                  hidden_layers=[[128], [256]],
                                  validation_data=validation_data,
                                  test_data=test_data)
-        policy_gradients_routing_optimizer.train(max_num_of_iterations=15000)
+
+        random_ids = np.random.choice(
+            policy_gradients_routing_optimizer.validationDataForMDP.routingDataset.labelList.shape[0],
+            250, replace=False)
+        policy_gradients_routing_optimizer.\
+            sample_trajectories(routing_data=policy_gradients_routing_optimizer.validationDataForMDP,
+                                state_sample_count=None,
+                                samples_per_state=1000,
+                                select_argmax=False,
+                                ignore_invalid_actions=False,
+                                state_ids=random_ids)
+        # policy_gradients_routing_optimizer.train(max_num_of_iterations=15000)
 
 
 if __name__ == "__main__":

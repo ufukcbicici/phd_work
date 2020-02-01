@@ -29,6 +29,7 @@ class RoutingDataForMDP:
         self.featuresDict = features_dict
         self.mlPaths = ml_paths
         self.posteriorsTensor = posteriors_tensor
+        self.rewardTensors = None
 
 
 class PolicyGradientsNetwork:
