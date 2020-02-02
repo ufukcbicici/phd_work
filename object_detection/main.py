@@ -9,11 +9,11 @@ from object_detection.object_detection_data_manager import ObjectDetectionDataMa
 def main():
     curr_path = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(os.path.join(os.path.join(curr_path, ".."), "data"), "tuborgData")
-    dataset = ObjectDetectionDataManager(path=path)
-    dataset.read_data()
-    dataset.preprocess_data()
-    dataset.save_processed_data()
-    # dataset = ObjectDetectionDataManager.load_processed_data(data_path=path)
+    # dataset = ObjectDetectionDataManager(path=path)
+    # dataset.read_data()
+    # dataset.preprocess_data()
+    # dataset.save_processed_data()
+    dataset = ObjectDetectionDataManager.load_processed_data(data_path=path)
     # dataset.show_image(img_obj=dataset.dataList[10], scale=640)
     bb_clustering_algorithm = BBClustering(dataset=dataset)
     bb_clustering_algorithm.run(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD,

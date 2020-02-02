@@ -69,7 +69,7 @@ class ObjectDetectionDataManager(object):
                 img_obj.imageScales[img_width] = cv2.resize(img_obj.imgArr, (new_width, new_height))
         indices = np.array(range(self.dataList.shape[0]))
         self.trainingImageIndices, self.testImageIndices = train_test_split(indices, test_size=test_ratio)
-        self.detect_outlier_bbs()
+        # self.detect_outlier_bbs()
 
     def save_processed_data(self):
         pickle_out_file = open(os.path.join(self.dataPath, "processed_dataset.sav"), "wb")
