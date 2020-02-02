@@ -2,4 +2,4 @@ class Constants:
     def __init__(self):
         pass
 
-    IMG_WIDTHS = [300, 400, 500, 600, 700, 800]
+    IMG_WIDTHS = [320, 480, 640]
