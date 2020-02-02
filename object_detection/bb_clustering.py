@@ -14,11 +14,17 @@ class BBClustering:
         roi_list = np.concatenate(roi_list, axis=0)
         coverage = 0.0
         roi_comparison_list = []
+        max_covering_bb_list = []
         for idx, bb in enumerate(roi_list):
             iou_list = np.array(
                 sorted([BBClustering.get_iou_of_bbs(bb, roi_list[j]) for j in range(roi_list.shape[0])],
                        reverse=True))
             roi_comparison_list.append(iou_list[iou_list >= iou_threshold])
+        while coverage < max_coverage:
+            max_covering_bb_idx = np.argmax(np.array([len(iou_list) for iou_list in roi_comparison_list]))
+            max_covering_bb_list.append(roi_list[max_covering_bb_idx])
+            print("X")
+
         print("X")
 
     @staticmethod
