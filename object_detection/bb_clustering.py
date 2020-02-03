@@ -12,21 +12,39 @@ class BBClustering:
         for img_obj in training_objects:
             roi_list.append(img_obj.roiMatrix[:, 3:])
         roi_list = np.concatenate(roi_list, axis=0)
-        coverage = 0.0
-        roi_comparison_list = []
-        max_covering_bb_list = []
+        # Build the distance matrix
+        iou_distance_matrix = np.zeros(shape=(roi_list.shape[0], roi_list.shape[0]))
         for idx, bb in enumerate(roi_list):
-            # iou_list = np.array(
-            #     sorted([BBClustering.get_iou_of_bbs(bb, roi_list[j]) for j in range(roi_list.shape[0])],
-            #            reverse=True))
-            iou_list = np.array(sorted(BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=roi_list), reverse=True))
-            # assert np.allclose(iou_list, iou_list_vec)
-            roi_comparison_list.append(iou_list[iou_list >= iou_threshold])
-        while coverage < max_coverage:
-            max_covering_bb_idx = int(np.argmax(np.array([len(iou_list) for iou_list in roi_comparison_list])))
-            max_covering_bb_list.append(roi_list[max_covering_bb_idx])
-            roi_comparison_list.pop(max_covering_bb_idx)
-            print("X")
+            iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=roi_list)
+            iou_distance_matrix[idx, :] = iou_vec
+
+        coverage = 0.0
+        medoids = []
+        # while coverage < max_coverage:
+
+    def k_medoids(self, medoid_count, roi_list, iou_distance_matrix, max_num_of_iterations=100):
+        medoid_indices = np.random.choice(iou_distance_matrix.shape[0], medoid_count, replace=False)
+        medoids = roi_list[medoid_indices]
+        iteration_id = 0
+        for iteration_id in range(max_num_of_iterations):
+
+
+
+        # coverage = 0.0
+        # roi_comparison_list = []
+        # max_covering_bb_list = []
+        # for idx, bb in enumerate(roi_list):
+        #     # iou_list = np.array(
+        #     #     sorted([BBClustering.get_iou_of_bbs(bb, roi_list[j]) for j in range(roi_list.shape[0])],
+        #     #            reverse=True))
+        #     iou_list = np.array(sorted(BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=roi_list), reverse=True))
+        #     # assert np.allclose(iou_list, iou_list_vec)
+        #     roi_comparison_list.append(iou_list[iou_list >= iou_threshold])
+        # while coverage < max_coverage:
+        #     max_covering_bb_idx = int(np.argmax(np.array([len(iou_list) for iou_list in roi_comparison_list])))
+        #     max_covering_bb_list.append(roi_list[max_covering_bb_idx])
+        #     roi_comparison_list.pop(max_covering_bb_idx)
+        #     print("X")
 
         print("X")
 
