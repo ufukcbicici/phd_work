@@ -17,6 +17,7 @@ class BBClustering:
         for idx, bb in enumerate(roi_list):
             iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=roi_list)
             iou_distance_matrix[idx, :] = iou_vec
+        iou_distance_matrix = 1.0 - iou_distance_matrix
 
         coverage = 0.0
         medoids = []
@@ -24,9 +25,26 @@ class BBClustering:
 
     def k_medoids(self, medoid_count, roi_list, iou_distance_matrix, max_num_of_iterations=100):
         medoid_indices = np.random.choice(iou_distance_matrix.shape[0], medoid_count, replace=False)
-        medoids = roi_list[medoid_indices]
+        # medoids = roi_list[medoid_indices]
         iteration_id = 0
-        for iteration_id in range(max_num_of_iterations):
+
+        def get_configuration_cost(distances_to_medoids):
+            medoid_assignments = np.argmin(distances_to_medoids, axis=1)
+            total_cost = 0.0
+            for medoid_id in range(distances_to_medoids.shape[0]):
+                distances = distances_to_medoids[medoid_assignments == medoid_id]
+                total_cost += np.sum(distances)
+            return total_cost
+
+
+        # for iteration_id in range(max_num_of_iterations):
+        #     # Medoid assignment step
+        #     distances_to_medoids = iou_distance_matrix[medoid_indices]
+        #     medoid_assignments = np.argmin(distances_to_medoids, axis=1)
+
+
+
+
 
 
 
