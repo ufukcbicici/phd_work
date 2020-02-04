@@ -1,5 +1,7 @@
 import numpy as np
 
+from auxillary.general_utility_funcs import UtilityFuncs
+
 
 class BBClustering:
     def __init__(self, dataset):
@@ -13,28 +15,32 @@ class BBClustering:
             roi_list.append(img_obj.roiMatrix[:, 3:])
         roi_list = np.concatenate(roi_list, axis=0)
         # Build the distance matrix
-        iou_distance_matrix = np.zeros(shape=(roi_list.shape[0], roi_list.shape[0]))
+        iou_similarity_matrix = np.zeros(shape=(roi_list.shape[0], roi_list.shape[0]))
         for idx, bb in enumerate(roi_list):
             iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=roi_list)
-            iou_distance_matrix[idx, :] = iou_vec
-        iou_distance_matrix = 1.0 - iou_distance_matrix
+            iou_similarity_matrix[idx, :] = iou_vec
+        iou_distance_matrix = 1.0 - iou_similarity_matrix
+        self.k_medoids(medoid_count=5, iou_distance_matrix=iou_distance_matrix)
 
-        coverage = 0.0
-        medoids = []
-        # while coverage < max_coverage:
+    @staticmethod
+    def get_configuration_cost(distances_to_medoids):
+        medoid_assignments = np.argmin(distances_to_medoids, axis=1)
+        total_cost = 0.0
+        for medoid_id in range(distances_to_medoids.shape[1]):
+            distances = distances_to_medoids[medoid_assignments == medoid_id]
+            total_cost += np.sum(distances)
+        return total_cost
 
-    def k_medoids(self, medoid_count, roi_list, iou_distance_matrix, max_num_of_iterations=100):
-        medoid_indices = np.random.choice(iou_distance_matrix.shape[0], medoid_count, replace=False)
-        # medoids = roi_list[medoid_indices]
-        iteration_id = 0
+    def k_medoids(self, medoid_count, iou_distance_matrix, max_num_of_iterations=100):
+        curr_medoids = np.sort(np.random.choice(iou_distance_matrix.shape[0], medoid_count, replace=False))
+        best_cost = BBClustering.get_configuration_cost(iou_distance_matrix[:, curr_medoids])
+        for iteration_id in range(max_num_of_iterations):
+            medoid_member_pairs = UtilityFuncs.get_cartesian_product(
+                [curr_medoids, np.arange(iou_distance_matrix.shape[0])])
+            for mo_pair in medoid_member_pairs:
+                print("X")
 
-        def get_configuration_cost(distances_to_medoids):
-            medoid_assignments = np.argmin(distances_to_medoids, axis=1)
-            total_cost = 0.0
-            for medoid_id in range(distances_to_medoids.shape[0]):
-                distances = distances_to_medoids[medoid_assignments == medoid_id]
-                total_cost += np.sum(distances)
-            return total_cost
+
 
 
         # for iteration_id in range(max_num_of_iterations):
