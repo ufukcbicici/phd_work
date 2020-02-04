@@ -27,7 +27,7 @@ class BBClustering:
         medoid_assignments = np.argmin(distances_to_medoids, axis=1)
         total_cost = 0.0
         for medoid_id in range(distances_to_medoids.shape[1]):
-            distances = distances_to_medoids[medoid_assignments == medoid_id]
+            distances = distances_to_medoids[medoid_assignments == medoid_id, medoid_id]
             total_cost += np.sum(distances)
         return total_cost
 
