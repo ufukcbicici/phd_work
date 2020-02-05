@@ -36,9 +36,13 @@ class BBClustering:
         best_cost = BBClustering.get_configuration_cost(iou_distance_matrix[:, curr_medoids])
         for iteration_id in range(max_num_of_iterations):
             medoid_member_pairs = UtilityFuncs.get_cartesian_product(
-                [curr_medoids, np.arange(iou_distance_matrix.shape[0])])
+                [np.arange(medoid_count), np.arange(iou_distance_matrix.shape[0])])
             for mo_pair in medoid_member_pairs:
-                print("X")
+                medoid_idx = mo_pair[0]
+                object_idx = mo_pair[1]
+                new_medoids = np.copy(curr_medoids)
+                new_medoids[medoid_idx] = object_idx
+
 
 
 
