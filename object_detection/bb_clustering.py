@@ -4,13 +4,12 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class BBClustering:
-    def __init__(self, dataset):
-        self.dataset = dataset
 
-    def run(self, iou_threshold, max_coverage):
+    @staticmethod
+    def run(training_objects, iou_threshold, max_coverage, trial_count=10):
         # Build a total list of all rois
+        global medoids, cost
         roi_list = []
-        training_objects = self.dataset.dataList[self.dataset.trainingImageIndices]
         for img_obj in training_objects:
             roi_list.append(img_obj.roiMatrix[:, 3:])
         roi_list = np.concatenate(roi_list, axis=0)
@@ -23,22 +22,32 @@ class BBClustering:
         # Apply clustering until enough coverage is reached.
         curr_coverage = 0.0
         curr_medoid_count = 1
-        while curr_coverage < max_coverage:
-            medoids, best_cost = self.k_medoids(medoid_count=curr_medoid_count, iou_distance_matrix=iou_distance_matrix)
-            curr_coverage = self.get_coverage(medoids=medoids, iou_distance_matrix=iou_distance_matrix,
-                                              iou_threshold=iou_threshold)
-            print("Current Medoid Count={0} Current Coverage={1}".format(curr_medoid_count, curr_coverage))
-            curr_medoid_count += 1
+        best_cost = 1e10
+        best_medoids = None
+        for trial_id in range(trial_count):
+            while curr_coverage < max_coverage:
+                medoids, cost = BBClustering.k_medoids(medoid_count=curr_medoid_count,
+                                                       iou_distance_matrix=iou_distance_matrix)
+                curr_coverage = BBClustering.get_coverage(medoids=medoids, iou_distance_matrix=iou_distance_matrix,
+                                                          iou_threshold=iou_threshold)
+                print("Current Medoid Count={0} Current Coverage={1}".format(curr_medoid_count, curr_coverage))
+                curr_medoid_count += 1
+            if cost < best_cost:
+                best_cost = cost
+                best_medoids = medoids
+        medoid_rois = roi_list[best_medoids]
+        return medoid_rois
+
         # The following is for testing
-        medoid_rois = roi_list[medoids]
-        medoid_similarity_matrix = np.zeros(shape=(roi_list.shape[0], medoid_rois.shape[0]))
-        for idx, bb in enumerate(roi_list):
-            iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=medoid_rois)
-            medoid_similarity_matrix[idx, :] = iou_vec
-        medoid_distance_matrix = 1.0 - medoid_similarity_matrix
-        cost = BBClustering.get_configuration_cost(distances_to_medoids=medoid_distance_matrix)
-        assert np.allclose(cost, best_cost)
-        print("X")
+        # medoid_rois = roi_list[medoids]
+        # medoid_similarity_matrix = np.zeros(shape=(roi_list.shape[0], medoid_rois.shape[0]))
+        # for idx, bb in enumerate(roi_list):
+        #     iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=medoid_rois)
+        #     medoid_similarity_matrix[idx, :] = iou_vec
+        # medoid_distance_matrix = 1.0 - medoid_similarity_matrix
+        # cost = BBClustering.get_configuration_cost(distances_to_medoids=medoid_distance_matrix)
+        # assert np.allclose(cost, best_cost)
+        # print("X")
 
     @staticmethod
     def get_configuration_cost(distances_to_medoids):
@@ -49,7 +58,8 @@ class BBClustering:
             total_cost += np.sum(distances)
         return total_cost
 
-    def k_medoids(self, medoid_count, iou_distance_matrix, max_num_of_iterations=100):
+    @staticmethod
+    def k_medoids(medoid_count, iou_distance_matrix, max_num_of_iterations=100):
         curr_medoids = np.random.choice(iou_distance_matrix.shape[0], medoid_count, replace=False)
         best_cost = BBClustering.get_configuration_cost(iou_distance_matrix[:, curr_medoids])
         for iteration_id in range(max_num_of_iterations):
@@ -75,7 +85,8 @@ class BBClustering:
                 break
         return curr_medoids, best_cost
 
-    def get_coverage(self, medoids, iou_distance_matrix, iou_threshold):
+    @staticmethod
+    def get_coverage(medoids, iou_distance_matrix, iou_threshold):
         distances_to_medoids = iou_distance_matrix[:, medoids]
         min_distances = np.min(distances_to_medoids, axis=1)
         similarities = 1.0 - min_distances

@@ -6,6 +6,8 @@ import pandas as pd
 from os import listdir
 from os.path import isfile, join
 from sklearn.model_selection import train_test_split
+
+from object_detection.bb_clustering import BBClustering
 from object_detection.constants import Constants
 from sklearn.preprocessing import StandardScaler
 
@@ -24,6 +26,7 @@ class ObjectDetectionDataManager(object):
         self.dataList = None
         self.trainingImageIndices = None
         self.testImageIndices = None
+        self.medoidRois = None
 
     def read_data(self):
         onlyfiles = [f for f in listdir(self.dataPath) if isfile(join(self.dataPath, f))]
@@ -61,15 +64,20 @@ class ObjectDetectionDataManager(object):
             data_dict[filename].roiMatrix = roi_arr
         self.dataList = np.array(list(data_dict.values()))
 
-    def preprocess_data(self, test_ratio=0.15):
+    def process_data(self, iou_threshold, max_coverage, test_ratio=0.15):
+        # Create image scales and split into training and test sets.
         for img_obj in self.dataList:
             for img_width in Constants.IMG_WIDTHS:
-                new_width = img_width # int(img_obj.imgArr.shape[1] * scale_percent / 100)
+                new_width = img_width  # int(img_obj.imgArr.shape[1] * scale_percent / 100)
                 new_height = int((float(img_width) / img_obj.imgArr.shape[1]) * img_obj.imgArr.shape[0])
                 img_obj.imageScales[img_width] = cv2.resize(img_obj.imgArr, (new_width, new_height))
         indices = np.array(range(self.dataList.shape[0]))
         self.trainingImageIndices, self.testImageIndices = train_test_split(indices, test_size=test_ratio)
-        # self.detect_outlier_bbs()
+        # Cluster Bounding Boxes
+        training_objects = self.dataList[self.trainingImageIndices]
+        self.medoidRois = BBClustering.run(training_objects=training_objects,
+                                           iou_threshold=iou_threshold,
+                                           max_coverage=max_coverage)
 
     def save_processed_data(self):
         pickle_out_file = open(os.path.join(self.dataPath, "processed_dataset.sav"), "wb")
