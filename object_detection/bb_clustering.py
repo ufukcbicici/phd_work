@@ -32,7 +32,7 @@ class BBClustering:
         # The following is for testing
         medoid_rois = roi_list[medoids]
         medoid_similarity_matrix = np.zeros(shape=(roi_list.shape[0], medoid_rois.shape[0]))
-        for idx, bb in enumerate(medoid_rois):
+        for idx, bb in enumerate(roi_list):
             iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=medoid_rois)
             medoid_similarity_matrix[idx, :] = iou_vec
         medoid_distance_matrix = 1.0 - medoid_similarity_matrix
