@@ -20,7 +20,25 @@ class BBClustering:
             iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=roi_list)
             iou_similarity_matrix[idx, :] = iou_vec
         iou_distance_matrix = 1.0 - iou_similarity_matrix
-        self.k_medoids(medoid_count=5, iou_distance_matrix=iou_distance_matrix)
+        # Apply clustering until enough coverage is reached.
+        curr_coverage = 0.0
+        curr_medoid_count = 1
+        while curr_coverage < max_coverage:
+            medoids, best_cost = self.k_medoids(medoid_count=curr_medoid_count, iou_distance_matrix=iou_distance_matrix)
+            curr_coverage = self.get_coverage(medoids=medoids, iou_distance_matrix=iou_distance_matrix,
+                                              iou_threshold=iou_threshold)
+            print("Current Medoid Count={0} Current Coverage={1}".format(curr_medoid_count, curr_coverage))
+            curr_medoid_count += 1
+        # The following is for testing
+        medoid_rois = roi_list[medoids]
+        medoid_similarity_matrix = np.zeros(shape=(roi_list.shape[0], medoid_rois.shape[0]))
+        for idx, bb in enumerate(medoid_rois):
+            iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=medoid_rois)
+            medoid_similarity_matrix[idx, :] = iou_vec
+        medoid_distance_matrix = 1.0 - medoid_similarity_matrix
+        cost = BBClustering.get_configuration_cost(distances_to_medoids=medoid_distance_matrix)
+        assert np.allclose(cost, best_cost)
+        print("X")
 
     @staticmethod
     def get_configuration_cost(distances_to_medoids):
@@ -55,7 +73,14 @@ class BBClustering:
                     medoids_changed = True
             if not medoids_changed:
                 break
-        return curr_medoids
+        return curr_medoids, best_cost
+
+    def get_coverage(self, medoids, iou_distance_matrix, iou_threshold):
+        distances_to_medoids = iou_distance_matrix[:, medoids]
+        min_distances = np.min(distances_to_medoids, axis=1)
+        similarities = 1.0 - min_distances
+        coverage = np.sum(similarities >= iou_threshold) / float(iou_distance_matrix.shape[0])
+        return coverage
 
     @staticmethod
     def get_iou_of_bbs(bb_1, bb_2):
