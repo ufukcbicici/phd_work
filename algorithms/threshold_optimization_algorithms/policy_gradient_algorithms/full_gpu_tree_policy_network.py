@@ -198,6 +198,14 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.resultsDict["selected_rewards_{0}".format(time_step)] = selected_rewards
         self.resultsDict["reward_indices_{0}".format(time_step)] = reward_indices
 
+    def calculate_cumulative_rewards_tf(self):
+        # Cumulative Rewards
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t1 in range(max_trajectory_length):
+            rew_list = [self.selectedRewards[t2] for t2 in range(t1, max_trajectory_length, 1)]
+            cum_sum = tf.add_n(rew_list)
+            self.cumulativeRewards.append(cum_sum)
+
     def calculate_policy_value_tf(self):
         self.trajectoryValues = tf.add_n(self.selectedRewards)
         self.trajectoryValuesSum = tf.reduce_sum(self.trajectoryValues)
@@ -205,6 +213,16 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.resultsDict["trajectoryValues"] = self.trajectoryValues
         self.resultsDict["trajectoryValuesSum"] = self.trajectoryValuesSum
         self.resultsDict["policyValue"] = self.policyValue
+
+    def build_baselines_tf(self, time_step):
+        baseline_input = tf.placeholder(dtype=tf.float32, shape=[None], name="baselines_{0}".format(time_step))
+        self.baselinesTf.append(baseline_input)
+        if time_step - 1 < 0:
+            baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0], 1))
+        else:
+            baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0],
+                                          self.actionSpaces[time_step - 1].shape[0]))
+        self.baselinesNp.append(baseline_np)
 
     def build_networks(self):
         self.calculate_reward_tensors()
@@ -219,7 +237,10 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             self.sample_from_policy_tf(time_step=t)
             # Select a reward r_t = r(s_t, a_t)
             self.calculate_reward(time_step=t)
+            # Baselines for variance reduction
+            self.build_baselines_tf(time_step=t)
         self.calculate_policy_value_tf()
+        self.calculate_cumulative_rewards_tf()
 
     def sample_trajectories(self, sess, routing_data, state_sample_count, samples_per_state,
                             select_argmax, ignore_invalid_actions, state_ids) \

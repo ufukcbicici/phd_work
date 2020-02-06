@@ -20,11 +20,11 @@ class BBClustering:
             iou_similarity_matrix[idx, :] = iou_vec
         iou_distance_matrix = 1.0 - iou_similarity_matrix
         # Apply clustering until enough coverage is reached.
-        curr_coverage = 0.0
-        curr_medoid_count = 1
         best_cost = 1e10
         best_medoids = None
         for trial_id in range(trial_count):
+            curr_coverage = 0.0
+            curr_medoid_count = 1
             while curr_coverage < max_coverage:
                 medoids, cost = BBClustering.k_medoids(medoid_count=curr_medoid_count,
                                                        iou_distance_matrix=iou_distance_matrix)
@@ -32,7 +32,7 @@ class BBClustering:
                                                           iou_threshold=iou_threshold)
                 print("Current Medoid Count={0} Current Coverage={1}".format(curr_medoid_count, curr_coverage))
                 curr_medoid_count += 1
-            if cost < best_cost:
+            if cost < best_cost and (best_medoids is None or medoids.shape[0] <= best_medoids.shape[0]):
                 best_cost = cost
                 best_medoids = medoids
         medoid_rois = roi_list[best_medoids]
