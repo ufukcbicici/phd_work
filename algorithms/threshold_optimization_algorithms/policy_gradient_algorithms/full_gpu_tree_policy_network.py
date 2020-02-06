@@ -224,6 +224,19 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                                           self.actionSpaces[time_step - 1].shape[0]))
         self.baselinesNp.append(baseline_np)
 
+    def build_policy_gradient_loss(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            selected_policy_indices = tf.stack([tf.range(0, self.trajectoryCount, 1), self.finalActions[t]],
+                                               axis=1)
+            log_selected_policies = tf.gather_nd(self.logPolicies[t], selected_policy_indices)
+            self.selectedLogPolicySamples.append(log_selected_policies)
+            # TODO: ADD BASELINE HERE WHEN THE TIME COMES
+            proxy_loss_step_t = self.selectedLogPolicySamples[t] * (self.cumulativeRewards[t] - self.baselinesTf[t])
+            self.proxyLossTrajectories.append(proxy_loss_step_t)
+        self.proxyLossVector = tf.add_n(self.proxyLossTrajectories)
+        self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
+
     def build_networks(self):
         self.calculate_reward_tensors()
         max_trajectory_length = self.get_max_trajectory_length()
@@ -241,6 +254,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             self.build_baselines_tf(time_step=t)
         self.calculate_policy_value_tf()
         self.calculate_cumulative_rewards_tf()
+        self.build_policy_gradient_loss()
 
     def sample_trajectories(self, sess, routing_data, state_sample_count, samples_per_state,
                             select_argmax, ignore_invalid_actions, state_ids) \
