@@ -205,6 +205,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             rew_list = [self.selectedRewards[t2] for t2 in range(t1, max_trajectory_length, 1)]
             cum_sum = tf.add_n(rew_list)
             self.cumulativeRewards.append(cum_sum)
+            self.resultsDict["cumulativeRewards_{0}".format(t1)] = cum_sum
 
     def calculate_policy_value_tf(self):
         self.trajectoryValues = tf.add_n(self.selectedRewards)
@@ -236,6 +237,10 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             self.proxyLossTrajectories.append(proxy_loss_step_t)
         self.proxyLossVector = tf.add_n(self.proxyLossTrajectories)
         self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
+        self.resultsDict["loss_selectedLogPolicySamples"] = self.selectedLogPolicySamples
+        self.resultsDict["loss_proxyLossTrajectories"] = self.proxyLossTrajectories
+        self.resultsDict["loss_proxyLossVector"] = self.proxyLossVector
+        self.resultsDict["loss_proxyLoss"] = self.proxyLoss
 
     def build_networks(self):
         self.calculate_reward_tensors()
@@ -278,7 +283,9 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 feed_dict[state_input] = features
             # Reward inputs
             feed_dict[self.rewardTensorsTf[t]] = routing_data.rewardTensors[t]
-        results = sess.run(self.resultsDict, feed_dict)
+
+        results_dict = {k: v for k, v in self.resultsDict.items() if "loss_" not in k}
+        results = sess.run(results_dict, feed_dict)
         # Build the history object
         history.states = []
         for t in range(self.get_max_trajectory_length()):
@@ -290,6 +297,36 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             history.routingDecisions.append(results["routingDecisions_{0}".format(t)])
             history.validPolicies.append(results["valid_policies_{0}".format(t)])
         return history
+
+    # def calculate_policy_value(self, sess, routing_data, state_batch_size, samples_per_state):
+    #     # self, data, features_dict, ml_selections_arr, posteriors_tensor,
+    #     # state_sample_count, samples_per_state, state_ids = None
+    #     # curr_state_id = 0
+    #     total_rewards = 0.0
+    #     trajectory_count = 0.0
+    #     data_count = routing_data.routingDataset.labelList.shape[0]
+    #     id_list = list(range(data_count))
+    #     for idx in range(0, data_count, state_batch_size):
+    #         curr_sample_ids = id_list[idx:idx + state_batch_size]
+    #         history = self.sample_trajectories(routing_data=routing_data,
+    #                                            state_sample_count=None,
+    #                                            samples_per_state=samples_per_state,
+    #                                            select_argmax=False,
+    #                                            ignore_invalid_actions=False,
+    #                                            state_ids=curr_sample_ids,
+    #                                            sess=sess)
+    #         rewards_matrix = np.stack([history.rewards[t] for t in range(self.get_max_trajectory_length())], axis=1)
+    #         total_rewards += np.sum(rewards_matrix)
+    #         trajectory_count += rewards_matrix.shape[0]
+    #     expected_policy_value = total_rewards / trajectory_count
+    #     return expected_policy_value
+
+
+        # history = self.sample_initial_states(routing_data=routing_data,
+        #                                      state_sample_count=state_sample_count,
+        #                                      samples_per_state=samples_per_state,
+        #                                      state_ids=state_ids)
+
 
         # max_trajectory_length = self.get_max_trajectory_length()
         # for t in range(max_trajectory_length):

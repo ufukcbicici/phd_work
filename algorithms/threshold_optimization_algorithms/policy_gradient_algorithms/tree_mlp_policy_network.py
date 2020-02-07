@@ -111,6 +111,11 @@ def test_gpu_implementation():
                                     select_argmax=True,
                                     ignore_invalid_actions=ignore_invalid_actions,
                                     state_ids=random_ids)
+            val_policy_value_gpu = gpu_policy_grads.\
+                calculate_policy_value(sess=sess,
+                                       routing_data=gpu_policy_grads.validationDataForMDP,
+                                       state_batch_size=100,
+                                       samples_per_state=10000)
             t1 = time.time()
             history_cpu = cpu_policy_grads.sample_trajectories(sess=sess,
                                                                routing_data=gpu_policy_grads.validationDataForMDP,
@@ -119,6 +124,13 @@ def test_gpu_implementation():
                                                                select_argmax=True,
                                                                ignore_invalid_actions=ignore_invalid_actions,
                                                                state_ids=random_ids)
+            val_policy_value_cpu = cpu_policy_grads.\
+                calculate_policy_value(sess=sess,
+                                       routing_data=gpu_policy_grads.validationDataForMDP,
+                                       state_batch_size=100,
+                                       samples_per_state=10000)
+            print("val_policy_value_gpu={0}".format(val_policy_value_gpu))
+            print("val_policy_value_cpu={0}".format(val_policy_value_cpu))
             t2 = time.time()
             gpu_time += (t1 - t0)
             cpu_time += (t2 - t1)

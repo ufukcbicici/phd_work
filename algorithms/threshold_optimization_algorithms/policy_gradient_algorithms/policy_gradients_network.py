@@ -258,7 +258,7 @@ class PolicyGradientsNetwork:
         return validity_of_predictions_vec
 
     # OK
-    def calculate_policy_value(self, routing_data, state_batch_size, samples_per_state):
+    def calculate_policy_value(self, sess, routing_data, state_batch_size, samples_per_state):
         # self, data, features_dict, ml_selections_arr, posteriors_tensor,
         # state_sample_count, samples_per_state, state_ids = None
         # curr_state_id = 0
@@ -273,7 +273,8 @@ class PolicyGradientsNetwork:
                                                samples_per_state=samples_per_state,
                                                select_argmax=False,
                                                ignore_invalid_actions=False,
-                                               state_ids=curr_sample_ids)
+                                               state_ids=curr_sample_ids,
+                                               sess=sess)
             rewards_matrix = np.stack([history.rewards[t] for t in range(self.get_max_trajectory_length())], axis=1)
             total_rewards += np.sum(rewards_matrix)
             trajectory_count += rewards_matrix.shape[0]
