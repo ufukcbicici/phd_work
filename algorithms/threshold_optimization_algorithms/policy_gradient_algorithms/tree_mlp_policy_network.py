@@ -37,7 +37,7 @@ class TreeMlpPolicyNetwork(FullGpuTreePolicyGradientsNetwork):
         self.resultsDict["logPolicies_{0}".format(time_step)] = self.logPolicies[time_step]
 
 
-def test_gpu_implementation():
+def compare_gpu_implementation():
     run_id = 453
     network_name = "FashionNet_Lite"
     iteration = 43680
@@ -151,7 +151,7 @@ def test_gpu_implementation():
 
 
 def main():
-    test_gpu_implementation()
+    compare_gpu_implementation()
 
 
 if __name__ == "__main__":

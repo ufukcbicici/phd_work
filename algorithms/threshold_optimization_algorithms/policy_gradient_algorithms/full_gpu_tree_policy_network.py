@@ -232,7 +232,6 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                                                axis=1)
             log_selected_policies = tf.gather_nd(self.logPolicies[t], selected_policy_indices)
             self.selectedLogPolicySamples.append(log_selected_policies)
-            # TODO: ADD BASELINE HERE WHEN THE TIME COMES
             proxy_loss_step_t = self.selectedLogPolicySamples[t] * (self.cumulativeRewards[t] - self.baselinesTf[t])
             self.proxyLossTrajectories.append(proxy_loss_step_t)
         self.proxyLossVector = tf.add_n(self.proxyLossTrajectories)
@@ -260,6 +259,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.calculate_policy_value_tf()
         self.calculate_cumulative_rewards_tf()
         self.build_policy_gradient_loss()
+        self.get_l2_loss()
+        self.build_optimizer()
 
     def sample_trajectories(self, sess, routing_data, state_sample_count, samples_per_state,
                             select_argmax, ignore_invalid_actions, state_ids) \
@@ -297,168 +298,3 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             history.routingDecisions.append(results["routingDecisions_{0}".format(t)])
             history.validPolicies.append(results["valid_policies_{0}".format(t)])
         return history
-
-    # def calculate_policy_value(self, sess, routing_data, state_batch_size, samples_per_state):
-    #     # self, data, features_dict, ml_selections_arr, posteriors_tensor,
-    #     # state_sample_count, samples_per_state, state_ids = None
-    #     # curr_state_id = 0
-    #     total_rewards = 0.0
-    #     trajectory_count = 0.0
-    #     data_count = routing_data.routingDataset.labelList.shape[0]
-    #     id_list = list(range(data_count))
-    #     for idx in range(0, data_count, state_batch_size):
-    #         curr_sample_ids = id_list[idx:idx + state_batch_size]
-    #         history = self.sample_trajectories(routing_data=routing_data,
-    #                                            state_sample_count=None,
-    #                                            samples_per_state=samples_per_state,
-    #                                            select_argmax=False,
-    #                                            ignore_invalid_actions=False,
-    #                                            state_ids=curr_sample_ids,
-    #                                            sess=sess)
-    #         rewards_matrix = np.stack([history.rewards[t] for t in range(self.get_max_trajectory_length())], axis=1)
-    #         total_rewards += np.sum(rewards_matrix)
-    #         trajectory_count += rewards_matrix.shape[0]
-    #     expected_policy_value = total_rewards / trajectory_count
-    #     return expected_policy_value
-
-
-        # history = self.sample_initial_states(routing_data=routing_data,
-        #                                      state_sample_count=state_sample_count,
-        #                                      samples_per_state=samples_per_state,
-        #                                      state_ids=state_ids)
-
-
-        # max_trajectory_length = self.get_max_trajectory_length()
-        # for t in range(max_trajectory_length):
-        #     # Sample from a_t ~ p(a_t|history(t))
-        #     self.sample_from_policy(routing_data=routing_data, history=history, time_step=t,
-        #                             select_argmax=select_argmax, ignore_invalid_actions=ignore_invalid_actions)
-        #     # Get the reward: r_t ~ p(r_t|history(t))
-        #     self.reward_calculation(routing_data=routing_data, history=history, time_step=t)
-        #     # State transition s_{t+1} ~ p(s_{t+1}|history(t))
-        #     if t < max_trajectory_length - 1:
-        #         self.state_transition(routing_data=routing_data, history=history, time_step=t)
-        # return history
-        #     # self.build_state_transition(time_step=t)
-        # # self.build_state_inputs(time_step=0)
-        # # self.build_policy_networks(time_step=0)
-        # # self.sample_from_policy_tf(time_step=0)
-        # # self.build_state_transition(time_step=0)
-        # init = tf.global_variables_initializer()
-        # self.tfSession.run(init)
-        # _x = self.validationFeaturesDict[0][0:1000, :]
-        # results = self.tfSession.run(self.resultsDict, feed_dict={self.stateInputs[0][0]: _x, self.softmaxDecay: 1.0})
-        # assert np.array_equal(self.actionSpaces[0][results["policy_samples_0"], :], results["routing_decisions_0"])
-        # print("X")
-
-    # def build_state_transition(self, time_step):
-    #     routing_decisions = self.routingDecisions[time_step]
-    #     list_of_indices = []
-    #     list_of_coefficients = []
-    #     weighted_state_inputs = []
-    #     for action_id, state_input in enumerate(self.stateInputs[time_step]):
-    #         routing_indices = tf.stack([self.rangeIndex, action_id * tf.ones_like(self.rangeIndex)], axis=1)
-    #         list_of_indices.append(routing_indices)
-    #         route_coefficients = tf.gather_nd(routing_decisions, routing_indices)
-    #         list_of_coefficients.append(route_coefficients)
-    #         weighted_state_inputs.append(route_coefficients * state_input)
-    #     self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=1))
-    #     assert len(self.stateInputTransformed) == time_step + 1
-    #     self.resultsDict["routing_indices_{0}".format(time_step)] = list_of_indices
-    #     self.resultsDict["routing_weights_{0}".format(time_step)] = list_of_coefficients
-    #     self.resultsDict["stateInputTransformed_{0}".format(time_step + 1)] = self.stateInputTransformed[time_step + 1]
-
-    #     reward_input = tf.placeholder(dtype=tf.float32, shape=[None], name="rewards_{0}".format(t))
-    #     self.rewards.append(reward_input)
-    #     baseline_input = tf.placeholder(dtype=tf.float32, shape=[None], name="baselines_{0}".format(t))
-    #     self.baselinesTf.append(baseline_input)
-    #     if t - 1 < 0:
-    #         baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0], 1))
-    #     else:
-    #         baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0],
-    #                                       self.actionSpaces[t - 1].shape[0]))
-    #     self.baselinesNp.append(baseline_np)
-    #     # Policy sampling
-    #     sampler = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[t])
-    #     self.policySamples.append(sampler)
-    #     selected_policy_input = tf.placeholder(dtype=tf.int32, shape=[None],
-    #                                            name="selected_policy_input_{0}".format(t))
-    #     self.selectedPolicyInputs.append(selected_policy_input)
-    #     # Argmax actions
-    #     argmax_actions = tf.argmax(self.policies[t], axis=1)
-    #     self.policyArgMaxSamples.append(argmax_actions)
-    # # Get the total number of trajectories
-    # state_input_shape = tf.shape(self.stateInputs[0])
-    # self.trajectoryCount = tf.gather_nd(state_input_shape, [0])
-    # # Cumulative Rewards
-    # for t1 in range(max_trajectory_length):
-    #     rew_list = [self.rewards[t2] for t2 in range(t1, max_trajectory_length, 1)]
-    #     cum_sum = tf.add_n(rew_list)
-    #     self.cumulativeRewards.append(cum_sum)
-    # # Building the proxy loss and the policy gradient
-    # self.build_policy_gradient_loss()
-    # self.get_l2_loss()
-    # self.build_optimizer()
-
-    # Prevent policies from reaching exactly to 1.0
-    # def clamp_policies(self, time_step):
-    #     epsilon = 1e-30
-    #     policy = self.policies[time_step]
-    #     policy_count = self.actionSpaces[time_step].shape[1]
-    #     inf_mask = tf.greater_equal(policy, 1.0 - epsilon)
-    #     inf_detection_vector = tf.reduce_any(inf_mask, axis=1)
-    #     # inf_detection_vector =
-    #
-    #
-    #
-    #     self.resultsDict["inf_mask_{0}".format(time_step)] = inf_mask
-    #     self.resultsDict["inf_detection_vector_{0}".format(time_step)] = inf_detection_vector
-
-    # state_input_t = self.stateInputTransformed[time_step]
-    # hidden_layers = list(self.hiddenLayers[time_step])
-    # hidden_layers.append(self.actionSpaces[time_step].shape[0])
-    # net = state_input_t
-    # for layer_id, layer_dim in enumerate(hidden_layers):
-    #     if layer_id < len(hidden_layers) - 1:
-    #         net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
-    #     else:
-    #         net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
-    # _logits = net
-    # _logits = _logits / self.softmaxDecay
-    # self.logits.append(_logits)
-    # self.policies.append(tf.nn.softmax(_logits))
-    # self.logPolicies.append(tf.log(self.policies[-1]))
-
-    # def sample_initial_states(self, routing_data, state_sample_count, samples_per_state, state_ids=None) \
-    #         -> TrajectoryHistory:
-    #     history = self.sample_initial_states(routing_data=routing_data,
-    #                                          state_sample_count=state_sample_count,
-    #                                          samples_per_state=samples_per_state,
-    #                                          state_ids=state_ids)
-    #     for t in range(1, self.get_max_trajectory_length()):
-    #         nodes_in_level = self.network.orderedNodesPerLevel[t]
-    #         feature_arrays = [routing_data.featuresDict[node.index][history.stateIds] for node in nodes_in_level]
-    #
-    #
-    #     return history
-    #
-    # def sample_trajectories(self, routing_data, state_sample_count, samples_per_state,
-    #                         select_argmax, ignore_invalid_actions, state_ids) \
-    #         -> TrajectoryHistory:
-    #     # if state_ids is None, sample from state distribution
-    #     # Sample from s1 ~ p(s1)
-    #     history = self.sample_initial_states(routing_data=routing_data,
-    #                                          state_sample_count=state_sample_count,
-    #                                          samples_per_state=samples_per_state,
-    #                                          state_ids=state_ids)
-    #     max_trajectory_length = self.get_max_trajectory_length()
-    #     for t in range(max_trajectory_length):
-    #         # Sample from a_t ~ p(a_t|history(t))
-    #         self.sample_from_policy(routing_data=routing_data, history=history, time_step=t,
-    #                                 select_argmax=select_argmax, ignore_invalid_actions=ignore_invalid_actions)
-    #         # Get the reward: r_t ~ p(r_t|history(t))
-    #         self.reward_calculation(routing_data=routing_data, history=history, time_step=t)
-    #         # State transition s_{t+1} ~ p(s_{t+1}|history(t))
-    #         if t < max_trajectory_length - 1:
-    #             self.state_transition(routing_data=routing_data, history=history, time_step=t)
-    #     return history
