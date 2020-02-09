@@ -202,8 +202,10 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         # If in the last step, calculate reward according to the accuracy + computation cost
         if time_step == self.get_max_trajectory_length() - 1:
             # Prediction Rewards
-            validity_of_predictions_vec = self.calculate_accuracy_of_trajectories(routing_data=routing_data,
-                                                                                  history=history)
+            validity_of_predictions_vec = \
+                self.calculate_accuracy_of_trajectories(routing_data=routing_data,
+                                                        history=history,
+                                                        combine_with_ig=False)
             validity_of_prediction_rewards = np.array([TreeDepthPolicyNetwork.INVALID_PREDICTION_PENALTY,
                                                        TreeDepthPolicyNetwork.VALID_PREDICTION_REWARD])
             prediction_rewards = validity_of_prediction_rewards[validity_of_predictions_vec]
@@ -214,30 +216,32 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             rewards_arr += activation_cost_arr
         history.rewards.append(rewards_arr)
 
-    def calculate_routing_accuracy(self, routing_data, state_batch_size):
-        data_count = routing_data.routingDataset.labelList.shape[0]
-        id_list = list(range(data_count))
-        ignore_invalid_action_flags = [False, True]
-        accuracy_types_list = ["All Actions", "Only Valid Actions"]
-        accuracy_dict = {}
-        for ignore_invalid_actions, accuracy_type in zip(ignore_invalid_action_flags, accuracy_types_list):
-            validity_vectors = []
-            for idx in range(0, data_count, state_batch_size):
-                curr_sample_ids = id_list[idx:idx + state_batch_size]
-                history = self.sample_trajectories(routing_data=routing_data,
-                                                   state_sample_count=None,
-                                                   samples_per_state=1,
-                                                   state_ids=curr_sample_ids,
-                                                   select_argmax=True,
-                                                   ignore_invalid_actions=ignore_invalid_actions)
-                validity_of_predictions_vec = \
-                    self.calculate_accuracy_of_trajectories(routing_data=routing_data, history=history)
-                validity_vectors.append(validity_of_predictions_vec)
-            validity_vector = np.concatenate(validity_vectors)
-            total_correct_count = np.sum(validity_vector)
-            accuracy = total_correct_count / validity_vector.shape[0]
-            accuracy_dict[accuracy_type] = accuracy
-        return accuracy_dict
+    # def calculate_routing_accuracy(self, sess, routing_data, state_batch_size):
+    #     data_count = routing_data.routingDataset.labelList.shape[0]
+    #     id_list = list(range(data_count))
+    #     ignore_invalid_action_flags = [False, True]
+    #     accuracy_types_list = ["All Actions", "Only Valid Actions"]
+    #     accuracy_dict = {}
+    #     for ignore_invalid_actions, accuracy_type in zip(ignore_invalid_action_flags, accuracy_types_list):
+    #         validity_vectors = []
+    #         for idx in range(0, data_count, state_batch_size):
+    #             curr_sample_ids = id_list[idx:idx + state_batch_size]
+    #             history = self.sample_trajectories(routing_data=routing_data,
+    #                                                state_sample_count=None,
+    #                                                samples_per_state=1,
+    #                                                state_ids=curr_sample_ids,
+    #                                                select_argmax=True,
+    #                                                ignore_invalid_actions=ignore_invalid_actions,
+    #                                                sess=sess)
+    #             validity_of_predictions_vec = \
+    #                 self.calculate_accuracy_of_trajectories(routing_data=routing_data, history=history,
+    #                                                         combine_with_ig=False)
+    #             validity_vectors.append(validity_of_predictions_vec)
+    #         validity_vector = np.concatenate(validity_vectors)
+    #         total_correct_count = np.sum(validity_vector)
+    #         accuracy = total_correct_count / validity_vector.shape[0]
+    #         accuracy_dict[accuracy_type] = accuracy
+    #     return accuracy_dict
 
     def update_baselines(self, history):
         max_trajectory_length = self.get_max_trajectory_length()
@@ -263,8 +267,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     def train(self, sess, max_num_of_iterations=15000):
         sess.run(tf.initialize_all_variables())
         self.evaluate_ml_routing_accuracies()
-        self.evaluate_policy_values()
-        self.evaluate_routing_accuracies()
+        self.evaluate_policy_values(sess=sess)
+        self.evaluate_routing_accuracies(sess=sess)
 
         exp_str = self.get_explanation()
         run_id = DbLogger.get_run_id()
@@ -277,7 +281,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                                                samples_per_state=self.trajectoryPerStateSampleCount,
                                                state_ids=None,
                                                select_argmax=False,
-                                               ignore_invalid_actions=False)
+                                               ignore_invalid_actions=False,
+                                               sess=sess)
             # Calculate the policy gradient, update the network.
             # Fill the feed dict
             feed_dict = {}
@@ -305,8 +310,8 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             # self.evaluate_ml_routing_accuracies()
             if iteration_id % 100 == 0 or iteration_id == max_num_of_iterations - 1:
                 print("***********Iteration {0}***********".format(iteration_id))
-                validation_policy_value, test_policy_value = self.evaluate_policy_values()
-                validation_accuracy, test_accuracy = self.evaluate_routing_accuracies()
+                validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
+                validation_accuracy, test_accuracy = self.evaluate_routing_accuracies(sess=sess)
                 DbLogger.write_into_table(rows=[(run_id,
                                                  iteration_id,
                                                  validation_policy_value,

@@ -298,3 +298,62 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             history.routingDecisions.append(results["routingDecisions_{0}".format(t)])
             history.validPolicies.append(results["valid_policies_{0}".format(t)])
         return history
+
+    def calculate_routing_accuracy(self, sess, routing_data, state_batch_size) -> (dict, dict):
+        data_count = routing_data.routingDataset.labelList.shape[0]
+        id_list = list(range(data_count))
+        ignore_invalid_action_flags = [False, True]
+        combine_with_ig_list = [False, True]
+        accuracy_dict = {}
+        computation_overload_dict = {}
+        cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False, True], [False, True]])
+        for tpl in cartesian_product:
+            ignore_invalid_actions = tpl[0]
+            combine_with_ig = tpl[1]
+            validity_vectors = []
+            overload_vectors = []
+            for idx in range(0, data_count, state_batch_size):
+                curr_sample_ids = id_list[idx:idx + state_batch_size]
+                history = self.sample_trajectories(routing_data=routing_data,
+                                                   state_sample_count=None,
+                                                   samples_per_state=1,
+                                                   state_ids=curr_sample_ids,
+                                                   select_argmax=True,
+                                                   ignore_invalid_actions=ignore_invalid_actions,
+                                                   sess=sess)
+                validity_of_predictions_vec, computation_overload_vec = \
+                    self.calculate_accuracy_of_trajectories(routing_data=routing_data, history=history,
+                                                            combine_with_ig=combine_with_ig)
+                validity_vectors.append(validity_of_predictions_vec)
+                overload_vectors.append(computation_overload_vec)
+            validity_vector = np.concatenate(validity_vectors)
+            total_correct_count = np.sum(validity_vector)
+            accuracy = total_correct_count / validity_vector.shape[0]
+            accuracy_dict[(ignore_invalid_actions, combine_with_ig)] = accuracy
+            overload_vector = np.concatenate(overload_vectors)
+            assert validity_vector.shape == overload_vector.shape
+            mean_overload = np.sum(overload_vectors) / overload_vector.shape[0]
+            computation_overload_dict[(ignore_invalid_actions, combine_with_ig)] = mean_overload
+        return accuracy_dict, computation_overload_dict
+
+    def evaluate_routing_accuracies(self, sess):
+        validation_accuracy, val_computation_overload_dict = \
+            self.calculate_routing_accuracy(sess=sess,
+                                            routing_data=self.validationDataForMDP,
+                                            state_batch_size=1000)
+        test_accuracy, test_computation_overload_dict = \
+            self.calculate_routing_accuracy(sess=sess, routing_data=self.testDataForMDP,
+                                            state_batch_size=100)
+        print("validation_accuracy={0}".format(validation_accuracy))
+        print("test_accuracy={0}".format(test_accuracy))
+        print("val_computation_overload_dict={0}".format(val_computation_overload_dict))
+        print("test_computation_overload_dict={0}".format(test_computation_overload_dict))
+        return validation_accuracy, test_accuracy, val_computation_overload_dict, test_computation_overload_dict
+
+    def train(self, sess, max_num_of_iterations=15000):
+        sess.run(tf.initialize_all_variables())
+        self.evaluate_ml_routing_accuracies()
+        self.evaluate_policy_values(sess=sess)
+        self.evaluate_routing_accuracies(sess=sess)
+
+        print("X")

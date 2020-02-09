@@ -33,6 +33,15 @@ class RoutingDataForMDP:
         self.rewardTensors = None
 
 
+class TrajectoryAccuracy:
+    def __init__(self):
+        self.accuracyAllActions = None
+        self.accuracyValidActions = None
+        self.accuracyCombinedWithIG = None
+        self.computationLoad = None
+        self.computationLoadWithIG = None
+
+
 class PolicyGradientsNetwork:
     def __init__(self, validation_data, test_data, l2_lambda,
                  network, network_name, run_id, iteration, degree_list, output_names, used_feature_names,
@@ -68,6 +77,7 @@ class PolicyGradientsNetwork:
         self.validationFeaturesDict = {}
         self.testFeaturesDict = {}
         self.networkActivationCosts = None
+        self.networkActivationCostsDict = {}
         self.baseEvaluationCost = None
         self.reachabilityMatrices = []
         self.optimizer = None
@@ -243,19 +253,50 @@ class PolicyGradientsNetwork:
     def update_baselines(self, history):
         pass
 
-    # OK
-    def calculate_accuracy_of_trajectories(self, routing_data, history):
+    # def calculate_accuracy_of_trajectories_with_ig(self, routing_data, history):
+    #     min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+    #     routing_decisions = np.copy(history.routingDecisions[-1])
+    #     leaf_ids = routing_data.mlPaths[history.stateIds, -1] - min_leaf_id
+    #     routing_decisions[:, leaf_ids] = 1.0
+    #     validity_of_predictions_vec = self.calculate_accuracy_of_trajectories(routing_data=routing_data,
+    #                                                                           history=history,
+    #                                                                           routing_decisions=routing_decisions)
+    #     return validity_of_predictions_vec
+
+    def calculate_accuracy_of_trajectories(self, routing_data, history, combine_with_ig):
         true_labels = routing_data.routingDataset.labelList[history.stateIds]
         posteriors = routing_data.posteriorsTensor[history.stateIds, :]
-        routing_decisions_t = history.routingDecisions[-1]
-        assert routing_decisions_t.shape[1] == posteriors.shape[2]
-        routing_weights = np.reciprocal(np.sum(routing_decisions_t.astype(np.float32), axis=1))
-        routing_decisions_t_weighted = routing_decisions_t * np.expand_dims(routing_weights, axis=1)
+        routing_decisions = np.copy(history.routingDecisions[-1])
+        assert routing_decisions.shape[1] == posteriors.shape[2]
+        if combine_with_ig:
+            min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+            routing_decisions = np.copy(history.routingDecisions[-1])
+            leaf_ids = routing_data.mlPaths[history.stateIds, -1] - min_leaf_id
+            routing_decisions[np.arange(routing_decisions.shape[0]), leaf_ids] = 1.0
+        routing_weights = np.reciprocal(np.sum(routing_decisions.astype(np.float32), axis=1))
+        routing_decisions_t_weighted = routing_decisions * np.expand_dims(routing_weights, axis=1)
         weighted_posteriors = posteriors * np.expand_dims(routing_decisions_t_weighted, axis=1)
         final_posteriors = np.sum(weighted_posteriors, axis=2)
         predicted_labels = np.argmax(final_posteriors, axis=1)
         validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
-        return validity_of_predictions_vec
+        # Calculate the computation overload
+        computation_overload_vector = np.apply_along_axis(lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
+                                                          arr=routing_decisions)
+        return validity_of_predictions_vec, computation_overload_vector
+
+    # OK
+    # def calculate_accuracy_of_trajectories(self, routing_data, history):
+    #     true_labels = routing_data.routingDataset.labelList[history.stateIds]
+    #     posteriors = routing_data.posteriorsTensor[history.stateIds, :]
+    #     routing_decisions_t = history.routingDecisions[-1]
+    #     assert routing_decisions_t.shape[1] == posteriors.shape[2]
+    #     routing_weights = np.reciprocal(np.sum(routing_decisions_t.astype(np.float32), axis=1))
+    #     routing_decisions_t_weighted = routing_decisions_t * np.expand_dims(routing_weights, axis=1)
+    #     weighted_posteriors = posteriors * np.expand_dims(routing_decisions_t_weighted, axis=1)
+    #     final_posteriors = np.sum(weighted_posteriors, axis=2)
+    #     predicted_labels = np.argmax(final_posteriors, axis=1)
+    #     validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+    #     return validity_of_predictions_vec
 
     # OK
     def calculate_policy_value(self, sess, routing_data, state_batch_size, samples_per_state):
@@ -282,7 +323,7 @@ class PolicyGradientsNetwork:
         return expected_policy_value
 
     # OK
-    def calculate_routing_accuracy(self, routing_data, state_batch_size):
+    def calculate_routing_accuracy(self, sess, routing_data, state_batch_size):
         pass
 
     def get_max_likelihood_accuracy(self, routing_data):
@@ -318,19 +359,22 @@ class PolicyGradientsNetwork:
         return accuracy
 
     # OK
-    def evaluate_policy_values(self):
+    def evaluate_policy_values(self, sess):
         validation_policy_value = self.calculate_policy_value(routing_data=self.validationDataForMDP,
-                                                              state_batch_size=1000, samples_per_state=100)
+                                                              state_batch_size=1000, samples_per_state=100,
+                                                              sess=sess)
         test_policy_value = self.calculate_policy_value(routing_data=self.testDataForMDP,
-                                                        state_batch_size=1000, samples_per_state=100)
+                                                        state_batch_size=1000, samples_per_state=100, sess=sess)
         print("validation_policy_value={0}".format(validation_policy_value))
         print("test_policy_value={0}".format(test_policy_value))
         return validation_policy_value, test_policy_value
 
-    def evaluate_routing_accuracies(self):
-        validation_accuracy = self.calculate_routing_accuracy(routing_data=self.validationDataForMDP,
+    def evaluate_routing_accuracies(self, sess):
+        validation_accuracy = self.calculate_routing_accuracy(sess=sess,
+                                                              routing_data=self.validationDataForMDP,
                                                               state_batch_size=1000)
-        test_accuracy = self.calculate_routing_accuracy(routing_data=self.testDataForMDP, state_batch_size=100)
+        test_accuracy = self.calculate_routing_accuracy(sess=sess,
+                                                        routing_data=self.testDataForMDP, state_batch_size=100)
         print("validation_accuracy={0}".format(validation_accuracy))
         print("test_accuracy={0}".format(test_accuracy))
         return validation_accuracy, test_accuracy
@@ -380,6 +424,8 @@ class PolicyGradientsNetwork:
                     processed_nodes_set.add(ancestor.index)
             total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
             self.networkActivationCosts.append(total_cost)
+            self.networkActivationCostsDict[tuple(self.actionSpaces[-1][action_id])] = \
+                total_cost / self.baseEvaluationCost
         self.networkActivationCosts = np.array(self.networkActivationCosts) * (1.0 / self.baseEvaluationCost)
 
     def get_l2_loss(self):

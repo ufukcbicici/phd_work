@@ -111,7 +111,7 @@ def compare_gpu_implementation():
                                     select_argmax=True,
                                     ignore_invalid_actions=ignore_invalid_actions,
                                     state_ids=random_ids)
-            val_policy_value_gpu = gpu_policy_grads.\
+            val_policy_value_gpu = gpu_policy_grads. \
                 calculate_policy_value(sess=sess,
                                        routing_data=gpu_policy_grads.validationDataForMDP,
                                        state_batch_size=100,
@@ -124,7 +124,7 @@ def compare_gpu_implementation():
                                                                select_argmax=True,
                                                                ignore_invalid_actions=ignore_invalid_actions,
                                                                state_ids=random_ids)
-            val_policy_value_cpu = cpu_policy_grads.\
+            val_policy_value_cpu = cpu_policy_grads. \
                 calculate_policy_value(sess=sess,
                                        routing_data=gpu_policy_grads.validationDataForMDP,
                                        state_batch_size=100,
@@ -150,8 +150,54 @@ def compare_gpu_implementation():
         tf.reset_default_graph()
 
 
+def train_policy_gradients_network():
+    run_id = 453
+    network_name = "FashionNet_Lite"
+    iteration = 43680
+
+    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
+                    "pre_branch_feature"]
+    used_output_names = ["pre_branch_feature"]
+    network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
+    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test",
+                                             output_names=output_names)
+    validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
+
+    wd_list = [0.0] * 10
+    # [0.0, 0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005]
+    state_sample_count_list = [1000]
+    samples_per_state_list = [1]
+    ignore_invalid_actions = False
+    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
+                                                                          state_sample_count_list,
+                                                                          samples_per_state_list])
+
+    for tpl in cartesian_product:
+        sess = tf.Session()
+        l2_wd = tpl[0]
+        state_sample_count = tpl[1]
+        samples_per_state = tpl[2]
+        gpu_policy_grads = \
+            TreeMlpPolicyNetwork(l2_lambda=l2_wd,
+                                 network=network,
+                                 network_name=network_name,
+                                 run_id=run_id,
+                                 iteration=iteration,
+                                 degree_list=[2, 2],
+                                 output_names=output_names,
+                                 used_feature_names=used_output_names,
+                                 use_baselines=True,
+                                 state_sample_count=state_sample_count,
+                                 trajectory_per_state_sample_count=samples_per_state,
+                                 hidden_layers=[[128], [256]],
+                                 validation_data=validation_data,
+                                 test_data=test_data)
+        gpu_policy_grads.train(sess=sess)
+
+
 def main():
-    compare_gpu_implementation()
+    # compare_gpu_implementation()
+    train_policy_gradients_network()
 
 
 if __name__ == "__main__":
