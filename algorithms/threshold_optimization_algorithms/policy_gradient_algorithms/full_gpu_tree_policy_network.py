@@ -5,6 +5,7 @@ from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.pol
     TrajectoryHistory
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.tree_depth_policy_network import \
     TreeDepthPolicyNetwork
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
@@ -216,24 +217,31 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.resultsDict["policyValue"] = self.policyValue
 
     def build_baselines_tf(self, time_step):
-        baseline_input = tf.placeholder(dtype=tf.float32, shape=[None], name="baselines_{0}".format(time_step))
-        self.baselinesTf.append(baseline_input)
         if time_step - 1 < 0:
+            baseline_tf = tf.placeholder(dtype=tf.float32, shape=[None, 1], name="baselines_{0}".format(time_step))
             baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0], 1))
         else:
+            baseline_tf = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[time_step - 1].shape[0]],
+                                         name="baselines_{0}".format(time_step))
             baseline_np = np.zeros(shape=(self.validationDataForMDP.routingDataset.labelList.shape[0],
                                           self.actionSpaces[time_step - 1].shape[0]))
+        self.baselinesTf.append(baseline_tf)
         self.baselinesNp.append(baseline_np)
 
     def build_policy_gradient_loss(self):
         max_trajectory_length = self.get_max_trajectory_length()
         for t in range(max_trajectory_length):
-            selected_policy_indices = tf.stack([tf.range(0, self.trajectoryCount, 1), self.finalActions[t]],
-                                               axis=1)
+            actions_t_minus_one = tf.zeros_like(self.stateIds) if t == 0 else self.finalActions[t - 1]
+            actions_t = self.finalActions[t]
+            selected_policy_indices = tf.stack([tf.range(0, self.trajectoryCount, 1), actions_t], axis=1)
             log_selected_policies = tf.gather_nd(self.logPolicies[t], selected_policy_indices)
             self.selectedLogPolicySamples.append(log_selected_policies)
-            proxy_loss_step_t = self.selectedLogPolicySamples[t] * (self.cumulativeRewards[t] - self.baselinesTf[t])
+            baseline_indices = tf.stack([tf.range(0, self.trajectoryCount, 1), actions_t_minus_one], axis=1)
+            baseline_t = tf.gather_nd(self.baselinesTf[t], baseline_indices)
+            proxy_loss_step_t = self.selectedLogPolicySamples[t] * (self.cumulativeRewards[t] - baseline_t)
             self.proxyLossTrajectories.append(proxy_loss_step_t)
+            self.resultsDict["loss_baseline_indices_{0}".format(t)] = baseline_indices
+            self.resultsDict["loss_baseline_{0}".format(t)] = baseline_t
         self.proxyLossVector = tf.add_n(self.proxyLossTrajectories)
         self.proxyLoss = tf.reduce_mean(self.proxyLossVector)
         self.resultsDict["loss_selectedLogPolicySamples"] = self.selectedLogPolicySamples
@@ -262,6 +270,18 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.get_l2_loss()
         self.build_optimizer()
 
+    def populate_history(self, history, results):
+        history.states = []
+        for t in range(self.get_max_trajectory_length()):
+            # State inputs
+            history.states.append(results["stateInputTransformed_{0}".format(t)])
+            history.policies.append(results["policies_{0}".format(t)])
+            history.actions.append(results["finalActions_{0}".format(t)])
+            history.rewards.append(results["selected_rewards_{0}".format(t)])
+            history.routingDecisions.append(results["routingDecisions_{0}".format(t)])
+            history.validPolicies.append(results["valid_policies_{0}".format(t)])
+        return history
+
     def sample_trajectories(self, sess, routing_data, state_sample_count, samples_per_state,
                             select_argmax, ignore_invalid_actions, state_ids) \
             -> TrajectoryHistory:
@@ -288,15 +308,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         results_dict = {k: v for k, v in self.resultsDict.items() if "loss_" not in k}
         results = sess.run(results_dict, feed_dict)
         # Build the history object
-        history.states = []
-        for t in range(self.get_max_trajectory_length()):
-            # State inputs
-            history.states.append(results["stateInputTransformed_{0}".format(t)])
-            history.policies.append(results["policies_{0}".format(t)])
-            history.actions.append(results["finalActions_{0}".format(t)])
-            history.rewards.append(results["selected_rewards_{0}".format(t)])
-            history.routingDecisions.append(results["routingDecisions_{0}".format(t)])
-            history.validPolicies.append(results["valid_policies_{0}".format(t)])
+        history = self.populate_history(history=history, results=results)
         return history
 
     def calculate_routing_accuracy(self, sess, routing_data, state_batch_size) -> (dict, dict):
@@ -355,5 +367,134 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values(sess=sess)
         self.evaluate_routing_accuracies(sess=sess)
+        routing_data = self.validationDataForMDP
+        exp_str = self.get_explanation()
+        run_id = DbLogger.get_run_id()
+        DbLogger.write_into_table(rows=[(run_id, exp_str)], table=DbLogger.runMetaData, col_count=2)
+        for iteration_id in range(max_num_of_iterations):
+            # Sample a set of trajectories
+            # Sample from s1 ~ p(s1)
+            history = self.sample_initial_states(routing_data=routing_data,
+                                                 state_sample_count=self.stateSampleCount,
+                                                 samples_per_state=self.trajectoryPerStateSampleCount,
+                                                 state_ids=None)
+            # Prepare all state inputs for all time steps, the reward matrices and the baselines
+            feed_dict = {self.isSamplingTrajectory: True,
+                         self.ignoreInvalidActions: False,
+                         self.softmaxDecay: 1.0,
+                         self.stateIds: history.stateIds,
+                         self.l2LambdaTf: self.l2Lambda}
+            for t in range(self.get_max_trajectory_length()):
+                # State inputs
+                for idx, state_input in enumerate(self.stateInputs[t]):
+                    features = \
+                        routing_data.featuresDict[self.network.orderedNodesPerLevel[t][idx].index][history.stateIds, :]
+                    feed_dict[state_input] = features
+                # Reward inputs
+                feed_dict[self.rewardTensorsTf[t]] = routing_data.rewardTensors[t]
+                # Baseline inputs
+                feed_dict[self.baselinesTf[t]] = self.baselinesNp[t]
+            # Execute the optimizer
+            run_dict = {k: v for k, v in self.resultsDict.items() if "loss" in k}
+            run_dict.update({k: v for k, v in self.resultsDict.items() if "stateInputTransformed" in k})
+            run_dict.update({k: v for k, v in self.resultsDict.items() if "policies" in k})
+            run_dict.update({k: v for k, v in self.resultsDict.items() if "finalActions" in k})
+            run_dict.update({k: v for k, v in self.resultsDict.items() if "selected_rewards" in k})
+            run_dict.update({k: v for k, v in self.resultsDict.items() if "routingDecisions" in k})
+            run_dict.update({k: v for k, v in self.resultsDict.items() if "valid_policies" in k})
+            run_dict.update({k: v for k, v in self.resultsDict.items() if "log_policies" in k})
+            run_dict["optimizer"] = self.optimizer
+            results = sess.run(run_dict, feed_dict=feed_dict)
+            # Populate the history object
+            # Build the history object
+            history = self.populate_history(history=history, results=results)
+            # Update baselines
+            if self.useBaselines:
+                self.update_baselines(history=history)
+            log_policy_arrays = [v for k, v in results.items() if "log_policies" in k]
+            if any([np.any(np.isinf(log_policy_arr)) for log_policy_arr in log_policy_arrays]):
+                print("Contains inf!!!")
+            print("X")
+            if iteration_id % 100 == 0 or iteration_id == max_num_of_iterations - 1:
+                print("***********Iteration {0}***********".format(iteration_id))
+                validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
+                validation_accuracy, test_accuracy, val_computation_overload_dict, test_computation_overload_dict = \
+                    self.evaluate_routing_accuracies(sess=sess)
+                cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False, True], [False, True]])
+                for tpl in cartesian_product:
+                    ignore_invalid_actions = tpl[0]
+                    combine_with_ig = tpl[1]
+                    DbLogger.write_into_table(rows=[(run_id,
+                                                     iteration_id,
+                                                     validation_policy_value,
+                                                     test_policy_value,
+                                                     validation_accuracy["All Actions"],
+                                                     test_accuracy["All Actions"],
+                                                     validation_accuracy["Only Valid Actions"],
+                                                     test_accuracy["Only Valid Actions"])],
+                                              table="policy_gradients_results", col_count=8)
+                print("***********Iteration {0}***********".format(iteration_id))
+            # print("X")
 
-        print("X")
+            #     for t in range(self.get_max_trajectory_length()):
+            #         feed_dict[self.stateInputs[t]] = history.states[t]
+            #         feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
+            #         feed_dict[self.rewards[t]] = history.rewards[t]
+            #         actions_t_minus_one = self.get_previous_actions(history=history, time_step=t)
+            #         feed_dict[self.baselinesTf[t]] = self.baselinesNp[t][history.stateIds, actions_t_minus_one]
+            #     feed_dict[self.l2LambdaTf] = self.l2Lambda
+
+
+
+
+
+        #     history = self.sample_trajectories(routing_data=self.validationDataForMDP,
+        #                                        state_sample_count=self.stateSampleCount,
+        #                                        samples_per_state=self.trajectoryPerStateSampleCount,
+        #                                        state_ids=None,
+        #                                        select_argmax=False,
+        #                                        ignore_invalid_actions=False,
+        #                                        sess=sess)
+        #     # Calculate the policy gradient, update the network.
+        #     # Fill the feed dict
+        #     feed_dict = {}
+        #     for t in range(self.get_max_trajectory_length()):
+        #         feed_dict[self.stateInputs[t]] = history.states[t]
+        #         feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
+        #         feed_dict[self.rewards[t]] = history.rewards[t]
+        #         actions_t_minus_one = self.get_previous_actions(history=history, time_step=t)
+        #         feed_dict[self.baselinesTf[t]] = self.baselinesNp[t][history.stateIds, actions_t_minus_one]
+        #     feed_dict[self.l2LambdaTf] = self.l2Lambda
+        #
+        #     results = sess.run([self.logPolicies,
+        #                         self.policies,
+        #                         self.selectedLogPolicySamples,
+        #                         self.cumulativeRewards,
+        #                         self.proxyLossTrajectories,
+        #                         self.proxyLossVector,
+        #                         self.proxyLoss,
+        #                         self.optimizer], feed_dict=feed_dict)
+        #     # Update baselines
+        #     if self.useBaselines:
+        #         self.update_baselines(history=history)
+        #     if any([np.any(np.isinf(log_policy_arr)) for log_policy_arr in results[0]]):
+        #         print("Contains inf!!!")
+        #     # self.evaluate_ml_routing_accuracies()
+        #     if iteration_id % 100 == 0 or iteration_id == max_num_of_iterations - 1:
+        #         print("***********Iteration {0}***********".format(iteration_id))
+        #         validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
+        #         validation_accuracy, test_accuracy = self.evaluate_routing_accuracies(sess=sess)
+        #         DbLogger.write_into_table(rows=[(run_id,
+        #                                          iteration_id,
+        #                                          validation_policy_value,
+        #                                          test_policy_value,
+        #                                          validation_accuracy["All Actions"],
+        #                                          test_accuracy["All Actions"],
+        #                                          validation_accuracy["Only Valid Actions"],
+        #                                          test_accuracy["Only Valid Actions"])],
+        #                                   table="policy_gradients_results", col_count=8)
+        #         print("***********Iteration {0}***********".format(iteration_id))
+        #     # print("X")
+        # print("X")
+        #
+        # print("X")
