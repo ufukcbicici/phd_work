@@ -7,11 +7,15 @@ class BBClustering:
 
     @staticmethod
     def run(training_objects, iou_threshold, max_coverage, trial_count=10):
+        # Use the smallest width length as the shared length for all images. Crop RoIs accordingly.
+        smallest_scale = min(training_objects[0].imageScales.keys())
         # Build a total list of all rois
         global medoids, cost
         roi_list = []
         for img_obj in training_objects:
-            roi_list.append(img_obj.roiMatrix[:, 3:])
+            img_shape = np.expand_dims(np.array([img_obj.imageScales[smallest_scale].shape[1],
+                                                 img_obj.imageScales[smallest_scale].shape[0]]), axis=0)
+            roi_list.append(img_obj.roiMatrix[:, 3:] * img_shape)
         roi_list = np.concatenate(roi_list, axis=0)
         # Build the distance matrix
         iou_similarity_matrix = np.zeros(shape=(roi_list.shape[0], roi_list.shape[0]))
