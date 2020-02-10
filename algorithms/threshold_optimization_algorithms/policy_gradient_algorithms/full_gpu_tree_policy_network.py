@@ -362,6 +362,19 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         print("test_computation_overload_dict={0}".format(test_computation_overload_dict))
         return validation_accuracy, test_accuracy, val_computation_overload_dict, test_computation_overload_dict
 
+    def save_results_to_db(self, run_id, iteration_id, validation_policy_value, test_policy_value,
+        is_test, accuracy_dict, computation_overload_dict):
+        DbLogger.write_into_table(rows=[(run_id,
+                                         iteration_id,
+                                         validation_policy_value,
+                                         test_policy_value,
+                                         validation_accuracy["All Actions"],
+                                         test_accuracy["All Actions"],
+                                         validation_accuracy["Only Valid Actions"],
+                                         test_accuracy["Only Valid Actions"])],
+                                  table="policy_gradients_results", col_count=8)
+
+
     def train(self, sess, max_num_of_iterations=15000):
         sess.run(tf.initialize_all_variables())
         self.evaluate_ml_routing_accuracies()
