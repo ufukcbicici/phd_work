@@ -6,7 +6,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 class BBClustering:
 
     @staticmethod
-    def run(training_objects, iou_threshold, max_coverage, trial_count=10):
+    def run(training_objects, iou_threshold, max_coverage, max_medoid_count=8, trial_count=5):
         # Use the smallest width length as the shared length for all images. Crop RoIs accordingly.
         smallest_scale = min(training_objects[0].imageScales.keys())
         # Build a total list of all rois
@@ -29,7 +29,7 @@ class BBClustering:
         for trial_id in range(trial_count):
             curr_coverage = 0.0
             curr_medoid_count = 1
-            while curr_coverage < max_coverage:
+            while curr_coverage < max_coverage and curr_medoid_count <= max_medoid_count:
                 medoids, cost = BBClustering.k_medoids(medoid_count=curr_medoid_count,
                                                        iou_distance_matrix=iou_distance_matrix)
                 curr_coverage = BBClustering.get_coverage(medoids=medoids, iou_distance_matrix=iou_distance_matrix,

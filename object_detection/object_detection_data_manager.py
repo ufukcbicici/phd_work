@@ -91,7 +91,9 @@ class ObjectDetectionDataManager(object):
         pickle_in_file.close()
         return dataset
 
-    def create_image_batch(self, batch_size):
+    def create_image_batch(self, batch_size, roi_sample_count, positive_sample_ratio):
+        positive_roi_count = int(roi_sample_count * positive_sample_ratio)
+        negative_roi_count = roi_sample_count - positive_roi_count
         # Sample scales
         selected_scale = np.asscalar(np.random.choice(np.array(Constants.IMG_WIDTHS), size=1))
         # Select images
@@ -99,7 +101,7 @@ class ObjectDetectionDataManager(object):
         selected_img_objects = self.dataList[selected_image_indices]
         # Select a RoI size
         selected_roi = self.medoidRois[np.random.choice(self.medoidRois.shape[0], size=1)]
-        # Zero - pad images accordingly
+        # Zero - pad images accordingly and pack them into a single numpy array
         max_height = max([img.imageScales[selected_scale].shape[0] for img in selected_img_objects])
         assert len(set([img.imageScales[selected_scale].shape[1] for img in selected_img_objects])) == 1
         channel_count = set([img.imageScales[selected_scale].shape[2] for img in selected_img_objects])
@@ -109,18 +111,28 @@ class ObjectDetectionDataManager(object):
         for idx in range(batch_size):
             img_height = selected_img_objects[idx].imageScales[selected_scale].shape[0]
             images[idx, 0:img_height, :, :] = selected_img_objects[idx].imageScales[selected_scale]
-            y = 0
-            for roi in self.medoidRois:
-                roi_scale = selected_scale / min(Constants.IMG_WIDTHS)
-                scaled_roi = roi_scale * roi
-                cv2.rectangle(images[idx],
-                              pt1=(int(selected_scale / 2.0) - int(scaled_roi[0] / 2.0), y),
-                              pt2=(int(selected_scale / 2.0) + int(scaled_roi[0] / 2.0), y + int(scaled_roi[1])),
-                              color=(0, 0, 255),
-                              thickness=3)
-                y += int(scaled_roi[1])
-                print("X")
-            cv2.imwrite("Image{0}.png".format(idx), images[idx])
+            # ********** This is for visualizing **********
+            # y = 0
+            # for roi in self.medoidRois:
+            #     roi_scale = selected_scale / min(Constants.IMG_WIDTHS)
+            #     scaled_roi = roi_scale * roi
+            #     cv2.rectangle(images[idx],
+            #                   pt1=(int(selected_scale / 2.0) - int(scaled_roi[0] / 2.0), y),
+            #                   pt2=(int(selected_scale / 2.0) + int(scaled_roi[0] / 2.0), y + int(scaled_roi[1])),
+            #                   color=(0, 0, 255),
+            #                   thickness=3)
+            #     y += int(scaled_roi[1])
+            #     print("X")
+            # cv2.imwrite("Image{0}.png".format(idx), images[idx])
+            # ********** This is for visualizing **********
+            #  Sample bounding boxes
+            found_positive_rois = 0
+            while found_positive_rois < positive_roi_count:
+                x_coords = np.random.uniform(low=0, high=selected_scale - selected_roi[0], size=(roi_sample_count, ))
+                y_coords = np.random.uniform(low=0, high=img_height - selected_roi[1], size=(roi_sample_count,))
+                roi_list = np.stack([x_coords, y_coords], axis=1)
+
+
 
     # def detect_outlier_bbs(self):
     #     training_images = self.dataList[self.trainingImageIndices]
