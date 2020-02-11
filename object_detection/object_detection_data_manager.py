@@ -91,6 +91,14 @@ class ObjectDetectionDataManager(object):
         pickle_in_file.close()
         return dataset
 
+    def create_image_batch(self, batch_size):
+        # Sample scales
+        selected_scale = np.random.choice(np.array(Constants.IMG_WIDTHS), size=1)
+        # Select images
+        selected_image_indices = np.random.choice(self.trainingImageIndices, size=batch_size)
+
+
+
     # def detect_outlier_bbs(self):
     #     training_images = self.dataList[self.trainingImageIndices]
     #     roi_list = []
