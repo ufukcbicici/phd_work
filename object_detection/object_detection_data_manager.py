@@ -96,8 +96,10 @@ class ObjectDetectionDataManager(object):
         selected_scale = np.random.choice(np.array(Constants.IMG_WIDTHS), size=1)
         # Select images
         selected_image_indices = np.random.choice(self.trainingImageIndices, size=batch_size)
-
-
+        selected_img_objects = self.dataList[selected_image_indices]
+        # Zero - pad images accordingly
+        max_height = max([img.imageScales[selected_scale].shape[1] for img in selected_img_objects])
+        assert len(set([img.imageScales[selected_scale].shape[0] for img in selected_img_objects])) == 1
 
     # def detect_outlier_bbs(self):
     #     training_images = self.dataList[self.trainingImageIndices]
