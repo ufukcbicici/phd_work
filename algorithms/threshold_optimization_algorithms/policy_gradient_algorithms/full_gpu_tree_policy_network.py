@@ -349,31 +349,36 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         return accuracy_dict, computation_overload_dict
 
     def evaluate_routing_accuracies(self, sess):
-        validation_accuracy, val_computation_overload_dict = \
+        validation_accuracy_dict, val_computation_overload_dict = \
             self.calculate_routing_accuracy(sess=sess,
                                             routing_data=self.validationDataForMDP,
                                             state_batch_size=1000)
-        test_accuracy, test_computation_overload_dict = \
+        test_accuracy_dict, test_computation_overload_dict = \
             self.calculate_routing_accuracy(sess=sess, routing_data=self.testDataForMDP,
                                             state_batch_size=100)
-        print("validation_accuracy={0}".format(validation_accuracy))
-        print("test_accuracy={0}".format(test_accuracy))
+        print("validation_accuracy={0}".format(validation_accuracy_dict))
+        print("test_accuracy={0}".format(test_accuracy_dict))
         print("val_computation_overload_dict={0}".format(val_computation_overload_dict))
         print("test_computation_overload_dict={0}".format(test_computation_overload_dict))
-        return validation_accuracy, test_accuracy, val_computation_overload_dict, test_computation_overload_dict
+        return validation_accuracy_dict, test_accuracy_dict, \
+               val_computation_overload_dict, test_computation_overload_dict
 
     def save_results_to_db(self, run_id, iteration_id, validation_policy_value, test_policy_value,
-        is_test, accuracy_dict, computation_overload_dict):
-        DbLogger.write_into_table(rows=[(run_id,
-                                         iteration_id,
-                                         validation_policy_value,
-                                         test_policy_value,
-                                         validation_accuracy["All Actions"],
-                                         test_accuracy["All Actions"],
-                                         validation_accuracy["Only Valid Actions"],
-                                         test_accuracy["Only Valid Actions"])],
-                                  table="policy_gradients_results", col_count=8)
-
+                           is_test, accuracy_dict, computation_overload_dict):
+        cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False, True], [False, True]])
+        for tpl in cartesian_product:
+            ignore_invalid_actions = tpl[0]
+            combine_with_ig = tpl[1]
+            DbLogger.write_into_table(rows=[(run_id,
+                                             iteration_id,
+                                             validation_policy_value,
+                                             test_policy_value,
+                                             is_test,
+                                             ignore_invalid_actions,
+                                             combine_with_ig,
+                                             accuracy_dict[(ignore_invalid_actions, combine_with_ig)],
+                                             computation_overload_dict[(ignore_invalid_actions, combine_with_ig)])],
+                                      table="policy_gradients_results", col_count=9)
 
     def train(self, sess, max_num_of_iterations=15000):
         sess.run(tf.initialize_all_variables())
@@ -431,83 +436,20 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             if iteration_id % 100 == 0 or iteration_id == max_num_of_iterations - 1:
                 print("***********Iteration {0}***********".format(iteration_id))
                 validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
-                validation_accuracy, test_accuracy, val_computation_overload_dict, test_computation_overload_dict = \
-                    self.evaluate_routing_accuracies(sess=sess)
-                cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False, True], [False, True]])
-                for tpl in cartesian_product:
-                    ignore_invalid_actions = tpl[0]
-                    combine_with_ig = tpl[1]
-                    DbLogger.write_into_table(rows=[(run_id,
-                                                     iteration_id,
-                                                     validation_policy_value,
-                                                     test_policy_value,
-                                                     validation_accuracy["All Actions"],
-                                                     test_accuracy["All Actions"],
-                                                     validation_accuracy["Only Valid Actions"],
-                                                     test_accuracy["Only Valid Actions"])],
-                                              table="policy_gradients_results", col_count=8)
+                validation_accuracy_dict, test_accuracy_dict, val_computation_overload_dict, \
+                    test_computation_overload_dict = self.evaluate_routing_accuracies(sess=sess)
+                self.save_results_to_db(run_id=run_id,
+                                        iteration_id=iteration_id,
+                                        validation_policy_value=validation_policy_value,
+                                        test_policy_value=test_policy_value,
+                                        is_test=False,
+                                        accuracy_dict=validation_accuracy_dict,
+                                        computation_overload_dict=val_computation_overload_dict)
+                self.save_results_to_db(run_id=run_id,
+                                        iteration_id=iteration_id,
+                                        validation_policy_value=validation_policy_value,
+                                        test_policy_value=test_policy_value,
+                                        is_test=True,
+                                        accuracy_dict=test_accuracy_dict,
+                                        computation_overload_dict=test_computation_overload_dict)
                 print("***********Iteration {0}***********".format(iteration_id))
-            # print("X")
-
-            #     for t in range(self.get_max_trajectory_length()):
-            #         feed_dict[self.stateInputs[t]] = history.states[t]
-            #         feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
-            #         feed_dict[self.rewards[t]] = history.rewards[t]
-            #         actions_t_minus_one = self.get_previous_actions(history=history, time_step=t)
-            #         feed_dict[self.baselinesTf[t]] = self.baselinesNp[t][history.stateIds, actions_t_minus_one]
-            #     feed_dict[self.l2LambdaTf] = self.l2Lambda
-
-
-
-
-
-        #     history = self.sample_trajectories(routing_data=self.validationDataForMDP,
-        #                                        state_sample_count=self.stateSampleCount,
-        #                                        samples_per_state=self.trajectoryPerStateSampleCount,
-        #                                        state_ids=None,
-        #                                        select_argmax=False,
-        #                                        ignore_invalid_actions=False,
-        #                                        sess=sess)
-        #     # Calculate the policy gradient, update the network.
-        #     # Fill the feed dict
-        #     feed_dict = {}
-        #     for t in range(self.get_max_trajectory_length()):
-        #         feed_dict[self.stateInputs[t]] = history.states[t]
-        #         feed_dict[self.selectedPolicyInputs[t]] = history.actions[t]
-        #         feed_dict[self.rewards[t]] = history.rewards[t]
-        #         actions_t_minus_one = self.get_previous_actions(history=history, time_step=t)
-        #         feed_dict[self.baselinesTf[t]] = self.baselinesNp[t][history.stateIds, actions_t_minus_one]
-        #     feed_dict[self.l2LambdaTf] = self.l2Lambda
-        #
-        #     results = sess.run([self.logPolicies,
-        #                         self.policies,
-        #                         self.selectedLogPolicySamples,
-        #                         self.cumulativeRewards,
-        #                         self.proxyLossTrajectories,
-        #                         self.proxyLossVector,
-        #                         self.proxyLoss,
-        #                         self.optimizer], feed_dict=feed_dict)
-        #     # Update baselines
-        #     if self.useBaselines:
-        #         self.update_baselines(history=history)
-        #     if any([np.any(np.isinf(log_policy_arr)) for log_policy_arr in results[0]]):
-        #         print("Contains inf!!!")
-        #     # self.evaluate_ml_routing_accuracies()
-        #     if iteration_id % 100 == 0 or iteration_id == max_num_of_iterations - 1:
-        #         print("***********Iteration {0}***********".format(iteration_id))
-        #         validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
-        #         validation_accuracy, test_accuracy = self.evaluate_routing_accuracies(sess=sess)
-        #         DbLogger.write_into_table(rows=[(run_id,
-        #                                          iteration_id,
-        #                                          validation_policy_value,
-        #                                          test_policy_value,
-        #                                          validation_accuracy["All Actions"],
-        #                                          test_accuracy["All Actions"],
-        #                                          validation_accuracy["Only Valid Actions"],
-        #                                          test_accuracy["Only Valid Actions"])],
-        #                                   table="policy_gradients_results", col_count=8)
-        #         print("***********Iteration {0}***********".format(iteration_id))
-        #     # print("X")
-        # print("X")
-        #
-        # print("X")
