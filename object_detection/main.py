@@ -24,12 +24,11 @@ def load_dataset():
 
 
 def main():
-    dataset = load_dataset()
-    dataset.create_image_batch(batch_size=3)
+    # dataset = load_dataset()
+    # dataset.create_image_batch(batch_size=3)
 
-
-    # create_dataset(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD, max_coverage=Constants.MAX_INCLUSIVENESS_BB,
-    #                test_ratio=0.15)
+    create_dataset(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD, max_coverage=Constants.MAX_INCLUSIVENESS_BB,
+                   test_ratio=0.15)
 
     # curr_path = os.path.dirname(os.path.abspath(__file__))
     # path = os.path.join(os.path.join(os.path.join(curr_path, ".."), "data"), "tuborgData")
