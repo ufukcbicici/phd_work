@@ -93,13 +93,34 @@ class ObjectDetectionDataManager(object):
 
     def create_image_batch(self, batch_size):
         # Sample scales
-        selected_scale = np.random.choice(np.array(Constants.IMG_WIDTHS), size=1)
+        selected_scale = np.asscalar(np.random.choice(np.array(Constants.IMG_WIDTHS), size=1))
         # Select images
         selected_image_indices = np.random.choice(self.trainingImageIndices, size=batch_size)
         selected_img_objects = self.dataList[selected_image_indices]
+        # Select a RoI size
+        selected_roi = self.medoidRois[np.random.choice(self.medoidRois.shape[0], size=1)]
         # Zero - pad images accordingly
-        max_height = max([img.imageScales[selected_scale].shape[1] for img in selected_img_objects])
-        assert len(set([img.imageScales[selected_scale].shape[0] for img in selected_img_objects])) == 1
+        max_height = max([img.imageScales[selected_scale].shape[0] for img in selected_img_objects])
+        assert len(set([img.imageScales[selected_scale].shape[1] for img in selected_img_objects])) == 1
+        channel_count = set([img.imageScales[selected_scale].shape[2] for img in selected_img_objects])
+        assert len(list(channel_count)) == 1
+        images = np.zeros(shape=(batch_size, max_height, selected_scale, list(channel_count)[0]),
+                          dtype=selected_img_objects[0].imageScales[selected_scale].dtype)
+        for idx in range(batch_size):
+            img_height = selected_img_objects[idx].imageScales[selected_scale].shape[0]
+            images[idx, 0:img_height, :, :] = selected_img_objects[idx].imageScales[selected_scale]
+            y = 0
+            for roi in self.medoidRois:
+                roi_scale = selected_scale / min(Constants.IMG_WIDTHS)
+                scaled_roi = roi_scale * roi
+                cv2.rectangle(images[idx],
+                              pt1=(int(selected_scale / 2.0) - int(scaled_roi[0] / 2.0), y),
+                              pt2=(int(selected_scale / 2.0) + int(scaled_roi[0] / 2.0), y + int(scaled_roi[1])),
+                              color=(0, 0, 255),
+                              thickness=3)
+                y += int(scaled_roi[1])
+                print("X")
+            cv2.imwrite("Image{0}.png".format(idx), images[idx])
 
     # def detect_outlier_bbs(self):
     #     training_images = self.dataList[self.trainingImageIndices]
