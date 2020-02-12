@@ -443,7 +443,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             run_dict.update({k: v for k, v in self.resultsDict.items() if "routingDecisions" in k})
             run_dict.update({k: v for k, v in self.resultsDict.items() if "valid_policies" in k})
             run_dict.update({k: v for k, v in self.resultsDict.items() if "log_policies" in k})
-            run_dict.update({k: v for k, v in self.resultsDict.items() if "reachability_matrix" in k})
+            # run_dict.update({k: v for k, v in self.resultsDict.items() if "reachability_matrix" in k})
             run_dict["optimizer"] = self.optimizer
             results = sess.run(run_dict, feed_dict=feed_dict)
             # Populate the history object
