@@ -380,7 +380,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                                              computation_overload_dict[(ignore_invalid_actions, combine_with_ig)])],
                                       table="policy_gradients_results", col_count=9)
 
-    def train(self, sess, max_num_of_iterations=15000):
+    def train(self, sess, max_num_of_iterations=20000):
         sess.run(tf.initialize_all_variables())
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values(sess=sess)
@@ -432,7 +432,6 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             log_policy_arrays = [v for k, v in results.items() if "log_policies" in k]
             if any([np.any(np.isinf(log_policy_arr)) for log_policy_arr in log_policy_arrays]):
                 print("Contains inf!!!")
-            print("X")
             if iteration_id % 100 == 0 or iteration_id == max_num_of_iterations - 1:
                 print("***********Iteration {0}***********".format(iteration_id))
                 validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
