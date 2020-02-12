@@ -291,7 +291,7 @@ class GlobalConstants:
                                        first_conv_filter_size=3, relu_leakiness=0.1,
                                        strides=[1, 2, 2], activate_before_residual=[True, False, False])
 
-    INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "pre_branch_feature", "branching_feature"]
+    INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "branching_feature"]
     LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor", "final_feature_final", "logits",
                                     "final_feature_late_exit", "logits_late_exit", "posterior_probs_late"]
 
