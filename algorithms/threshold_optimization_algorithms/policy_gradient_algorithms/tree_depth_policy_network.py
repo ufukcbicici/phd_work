@@ -202,7 +202,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         # If in the last step, calculate reward according to the accuracy + computation cost
         if time_step == self.get_max_trajectory_length() - 1:
             # Prediction Rewards
-            validity_of_predictions_vec = \
+            validity_of_predictions_vec, computation_overload_vector = \
                 self.calculate_accuracy_of_trajectories(routing_data=routing_data,
                                                         history=history,
                                                         combine_with_ig=False)
@@ -264,7 +264,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             self.baselinesNp[t] = np.where(nan_mask, new_baseline_arr, self.baselinesNp[t])
             # self.baselinesNp[t] += gamma * self.baselinesNp[t] + (1.0 - gamma) * mean_delta_arr
 
-    def train(self, sess, max_num_of_iterations=15000):
+    def train(self, sess, max_num_of_iterations=1000):
         sess.run(tf.initialize_all_variables())
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values(sess=sess)
@@ -320,7 +320,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                                                  test_accuracy["All Actions"],
                                                  validation_accuracy["Only Valid Actions"],
                                                  test_accuracy["Only Valid Actions"])],
-                                          table="policy_gradients_results", col_count=8)
+                                          table="policy_gradients_results_cpu", col_count=8)
                 print("***********Iteration {0}***********".format(iteration_id))
             # print("X")
         print("X")

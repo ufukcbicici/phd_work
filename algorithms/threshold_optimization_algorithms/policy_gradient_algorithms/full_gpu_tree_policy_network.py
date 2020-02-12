@@ -18,7 +18,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     BASELINE_UPDATE_GAMMA = 0.99
 
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
-                 output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
+                 output_names, used_feature_names, policy_network_func, hidden_layers, use_baselines, state_sample_count,
                  trajectory_per_state_sample_count):
         self.stateInputTransformed = []
         self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay", shape=[])
@@ -40,6 +40,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.finalActions = []
         self.resultsDict = {}
         self.stateIds = tf.placeholder(dtype=tf.int32, name="stateIds", shape=[None])
+        self.policyNetworkFunc = policy_network_func
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
                          trajectory_per_state_sample_count)
@@ -161,8 +162,24 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     #     self.resultsDict["stateInputTransformed_{0}".format(time_step + 1)] = self.stateInputTransformed[time_step + 1]
 
     # Override this for different type of policy network implementations
-    def build_policy_networks(self, time_step):
-        pass
+    def build_mlp_policy_networks(self, time_step):
+        hidden_layers = list(self.hiddenLayers[time_step])
+        hidden_layers.append(self.actionSpaces[time_step].shape[0])
+        net = self.stateInputTransformed[time_step]
+        for layer_id, layer_dim in enumerate(hidden_layers):
+            if layer_id < len(hidden_layers) - 1:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+            else:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
+        _logits = net
+        self.logits.append(_logits)
+
+    def build_policy_generators(self, time_step):
+        self.policies.append(tf.nn.softmax(self.logits[time_step] / self.softmaxDecay))
+        self.logPolicies.append(tf.log(self.policies[-1]))
+        self.resultsDict["logits_{0}".format(time_step)] = self.logits[time_step]
+        self.resultsDict["policies_{0}".format(time_step)] = self.policies[time_step]
+        self.resultsDict["logPolicies_{0}".format(time_step)] = self.logPolicies[time_step]
 
     def sample_from_policy_tf(self, time_step):
         sampled_actions = FastTreeNetwork.sample_from_categorical_v2(probs=self.policies[time_step])
@@ -256,7 +273,11 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             # Handle the first step: s_0 and state transitions s_{t} = f(s_{t-1},a_{t-1})
             self.build_state_inputs(time_step=t)
             # Build the network generating the policy at time step t: \pi_t(a_t|s_t)
-            self.build_policy_networks(time_step=t)
+            if self.policyNetworkFunc == "mlp":
+                self.build_mlp_policy_networks(time_step=t)
+            else:
+                raise NotImplementedError()
+            self.build_policy_generators(time_step=t)
             # Sample actions from the policy network: a_t ~ \pi_t(a_t|s_t)
             # Or select the maximum likely action: a_t = argmax_{a_t} \pi_t(a_t|s_t)
             self.sample_from_policy_tf(time_step=t)
@@ -422,6 +443,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             run_dict.update({k: v for k, v in self.resultsDict.items() if "routingDecisions" in k})
             run_dict.update({k: v for k, v in self.resultsDict.items() if "valid_policies" in k})
             run_dict.update({k: v for k, v in self.resultsDict.items() if "log_policies" in k})
+            # run_dict.update({k: v for k, v in self.resultsDict.items() if "reachability_matrix" in k})
             run_dict["optimizer"] = self.optimizer
             results = sess.run(run_dict, feed_dict=feed_dict)
             # Populate the history object
