@@ -366,19 +366,20 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     def save_results_to_db(self, run_id, iteration_id, validation_policy_value, test_policy_value,
                            is_test, accuracy_dict, computation_overload_dict):
         cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[[False, True], [False, True]])
+        rows = []
         for tpl in cartesian_product:
             ignore_invalid_actions = tpl[0]
             combine_with_ig = tpl[1]
-            DbLogger.write_into_table(rows=[(run_id,
-                                             iteration_id,
-                                             validation_policy_value,
-                                             test_policy_value,
-                                             is_test,
-                                             ignore_invalid_actions,
-                                             combine_with_ig,
-                                             accuracy_dict[(ignore_invalid_actions, combine_with_ig)],
-                                             computation_overload_dict[(ignore_invalid_actions, combine_with_ig)])],
-                                      table="policy_gradients_results", col_count=9)
+            rows.append((run_id,
+                         iteration_id,
+                         validation_policy_value,
+                         test_policy_value,
+                         is_test,
+                         ignore_invalid_actions,
+                         combine_with_ig,
+                         accuracy_dict[(ignore_invalid_actions, combine_with_ig)],
+                         computation_overload_dict[(ignore_invalid_actions, combine_with_ig)]))
+        DbLogger.write_into_table(rows=rows, table="policy_gradients_results", col_count=9)
 
     def train(self, sess, max_num_of_iterations=20000):
         sess.run(tf.initialize_all_variables())
@@ -436,7 +437,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 print("***********Iteration {0}***********".format(iteration_id))
                 validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
                 validation_accuracy_dict, test_accuracy_dict, val_computation_overload_dict, \
-                    test_computation_overload_dict = self.evaluate_routing_accuracies(sess=sess)
+                test_computation_overload_dict = self.evaluate_routing_accuracies(sess=sess)
                 self.save_results_to_db(run_id=run_id,
                                         iteration_id=iteration_id,
                                         validation_policy_value=validation_policy_value,
