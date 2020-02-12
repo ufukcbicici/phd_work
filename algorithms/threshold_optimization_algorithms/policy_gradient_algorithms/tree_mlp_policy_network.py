@@ -164,7 +164,7 @@ def train_policy_gradients_network():
     validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
 
     wd_list = [0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * 10
-    state_sample_count_list = [500]
+    state_sample_count_list = [1000]
     samples_per_state_list = [1]
     ignore_invalid_actions = False
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
@@ -191,7 +191,25 @@ def train_policy_gradients_network():
                                  hidden_layers=[[128], [256]],
                                  validation_data=validation_data,
                                  test_data=test_data)
-        gpu_policy_grads.train(sess=sess)
+        gpu_policy_grads.train(sess=sess, max_num_of_iterations=20000)
+        tf.reset_default_graph()
+        sess = tf.Session()
+        cpu_policy_grads = TreeDepthPolicyNetwork(l2_lambda=l2_wd,
+                                                  network=network,
+                                                  network_name=network_name,
+                                                  run_id=run_id,
+                                                  iteration=iteration,
+                                                  degree_list=[2, 2],
+                                                  output_names=output_names,
+                                                  used_feature_names=used_output_names,
+                                                  use_baselines=True,
+                                                  state_sample_count=state_sample_count,
+                                                  trajectory_per_state_sample_count=samples_per_state,
+                                                  hidden_layers=[[128], [256]],
+                                                  validation_data=validation_data,
+                                                  test_data=test_data)
+        cpu_policy_grads.train(sess=sess, max_num_of_iterations=20000)
+        tf.reset_default_graph()
 
 
 def main():
