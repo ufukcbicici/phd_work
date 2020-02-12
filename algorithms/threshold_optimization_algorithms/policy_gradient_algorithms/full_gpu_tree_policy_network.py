@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+from collections import Counter
 
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.policy_gradients_network import \
     TrajectoryHistory
@@ -14,7 +15,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_ACTION_PENALTY = -10.0
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
-    LAMBDA_MAC_COST = 0.1
+    LAMBDA_MAC_COST = 0.0
     BASELINE_UPDATE_GAMMA = 0.99
 
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
@@ -360,6 +361,9 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                                                    select_argmax=True,
                                                    ignore_invalid_actions=ignore_invalid_actions,
                                                    sess=sess)
+                for t in range(self.get_max_trajectory_length()):
+                    counter = Counter(history.actions[t])
+                    print("{0}: Actions:{1}".format(t, counter))
                 validity_of_predictions_vec, computation_overload_vec = \
                     self.calculate_accuracy_of_trajectories(routing_data=routing_data, history=history,
                                                             combine_with_ig=combine_with_ig)
@@ -452,6 +456,9 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             # run_dict.update({k: v for k, v in self.resultsDict.items() if "reachability_matrix" in k})
             run_dict["optimizer"] = self.optimizer
             results = sess.run(run_dict, feed_dict=feed_dict)
+            # for t in range(self.get_max_trajectory_length()):
+            #     counter = Counter(results["finalActions_{0}".format(t)])
+            #     print("{0}: Actions:{1}".format(t, counter))
             # Populate the history object
             # Build the history object
             history = self.populate_history(history=history, results=results)
