@@ -14,7 +14,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_ACTION_PENALTY = -10.0
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
-    LAMBDA_MAC_COST = 0.0
+    LAMBDA_MAC_COST = 0.1
     BASELINE_UPDATE_GAMMA = 0.99
 
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
@@ -173,6 +173,12 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
         _logits = net
         self.logits.append(_logits)
+
+    def build_cnn_policy_networks(self, time_step):
+        hidden_layers = list(self.hiddenLayers[time_step])
+
+
+
 
     def build_policy_generators(self, time_step):
         self.policies.append(tf.nn.softmax(self.logits[time_step] / self.softmaxDecay))
