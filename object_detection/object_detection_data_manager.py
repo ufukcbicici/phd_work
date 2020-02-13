@@ -91,6 +91,27 @@ class ObjectDetectionDataManager(object):
         pickle_in_file.close()
         return dataset
 
+    def sample_rois(self, medoids, img, true_height, roi_matrix, positive_roi_count, negative_roi_count):
+        #  Get medoid distribution
+        found_positive_rois = 0
+        found_negative_rois = 0
+        total_rois = positive_roi_count + negative_roi_count
+        selected_medoids = medoids[np.random.choice(medoids.shape[0], total_rois)]
+        img_width = img.shape[1]
+        img_height = true_height
+        while True:
+            left_coord_upper_limits = img_width - selected_medoids[:, 0]
+            roi_left_coords = np.random.uniform(low=0, high=left_coord_upper_limits, size=total_rois)
+            roi_right_coords = roi_left_coords + selected_medoids[:, 0]
+            top_coord_upper_limits = img_height - selected_medoids[:, 1]
+            roi_top_coords = np.random.uniform(low=0, high=top_coord_upper_limits, size=total_rois)
+            roi_bottom_coords = roi_top_coords + selected_medoids[:, 1]
+            sampled_rois = np.stack([roi_left_coords, roi_top_coords, roi_right_coords, roi_bottom_coords], axis=1)
+            calculated_rois = np.stack(
+                [sampled_rois[:, 2] - sampled_rois[:, 0], sampled_rois[:, 3] - sampled_rois[:, 1]], axis=1)
+            assert np.allclose(selected_medoids, calculated_rois)
+            print("X")
+
     def create_image_batch(self, batch_size, roi_sample_count, positive_sample_ratio):
         positive_roi_count = int(roi_sample_count * positive_sample_ratio)
         negative_roi_count = roi_sample_count - positive_roi_count
@@ -123,8 +144,6 @@ class ObjectDetectionDataManager(object):
             reshaped_roi_matrix[:, 4] = (roi_matrix[:, 2] + 0.5 * roi_matrix[:, 4]) * float(img_height)
             reshaped_roi_matrix = np.copy(reshaped_roi_matrix).astype(np.int32)
             roi_matrices.append(reshaped_roi_matrix)
-            #
-
             # ********** This is for visualizing **********
             # ObjectDetectionDataManager.print_img_with_final_rois(img_name="roi_img_{0}".format(idx), img=images[idx],
             #                                                      roi_matrix=reshaped_roi_matrix)
@@ -145,9 +164,10 @@ class ObjectDetectionDataManager(object):
             #     print("X")
             # cv2.imwrite("Image{0}.png".format(idx), images[idx])
             # ********** This is for visualizing **********
+            self.sample_rois(medoids=self.medoidRois, img=images[idx], true_height=img_height,
+                             roi_matrix=reshaped_roi_matrix, positive_roi_count=positive_roi_count,
+                             negative_roi_count=negative_roi_count)
 
-            #  Get medoid distribution
-            found_positive_rois = 0
 
             # while found_positive_rois < positive_roi_count:
             #     x_coords = np.random.uniform(low=0, high=selected_scale - selected_roi[0], size=(roi_sample_count, ))
