@@ -106,6 +106,7 @@ class ObjectDetectionDataManager(object):
         assert len(list(channel_count)) == 1
         images = np.zeros(shape=(batch_size, max_height, selected_scale, list(channel_count)[0]),
                           dtype=selected_img_objects[0].imageScales[selected_scale].dtype)
+        roi_matrices = []
         for idx in range(batch_size):
             img_height = selected_img_objects[idx].imageScales[selected_scale].shape[0]
             images[idx, 0:img_height, :, :] = selected_img_objects[idx].imageScales[selected_scale]
@@ -121,9 +122,15 @@ class ObjectDetectionDataManager(object):
             # Bottom Coords:Include the coefficient coming from the zero padding as well.
             reshaped_roi_matrix[:, 4] = (roi_matrix[:, 2] + 0.5 * roi_matrix[:, 4]) * float(img_height)
             reshaped_roi_matrix = np.copy(reshaped_roi_matrix).astype(np.int32)
-            ObjectDetectionDataManager.print_img_with_final_rois(img_name="roi_img_{0}".format(idx), img=images[idx],
-                                                                 roi_matrix=reshaped_roi_matrix)
-            self.show_image(img_obj=selected_img_objects[idx], scale=selected_scale)
+            roi_matrices.append(reshaped_roi_matrix)
+            #
+
+            # ********** This is for visualizing **********
+            # ObjectDetectionDataManager.print_img_with_final_rois(img_name="roi_img_{0}".format(idx), img=images[idx],
+            #                                                      roi_matrix=reshaped_roi_matrix)
+            # self.show_image(img_obj=selected_img_objects[idx], scale=selected_scale)
+            # ********** This is for visualizing **********
+
             # ********** This is for visualizing **********
             # y = 0
             # for roi in self.medoidRois:
