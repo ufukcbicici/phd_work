@@ -198,11 +198,11 @@ class PolicyGradientsNetwork:
     def build_optimizer(self):
         self.learningRate = tf.constant(0.0001)
         self.totalLoss = (-1.0 * self.proxyLoss) + self.l2Loss
-        # self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
-        boundaries = [10000]
-        values = [0.0001, 0.00001]
-        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
-            self.totalLoss, global_step=self.globalStep)
+        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+        # boundaries = [10000]
+        # values = [0.0001, 0.00001]
+        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
+        #     self.totalLoss, global_step=self.globalStep)
 
         # self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
         # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
