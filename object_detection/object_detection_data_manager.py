@@ -99,8 +99,6 @@ class ObjectDetectionDataManager(object):
         # Select images
         selected_image_indices = np.random.choice(self.trainingImageIndices, size=batch_size)
         selected_img_objects = self.dataList[selected_image_indices]
-        # Select a RoI size
-        selected_roi = self.medoidRois[np.random.choice(self.medoidRois.shape[0], size=1)]
         # Zero - pad images accordingly and pack them into a single numpy array
         max_height = max([img.imageScales[selected_scale].shape[0] for img in selected_img_objects])
         assert len(set([img.imageScales[selected_scale].shape[1] for img in selected_img_objects])) == 1
@@ -111,6 +109,21 @@ class ObjectDetectionDataManager(object):
         for idx in range(batch_size):
             img_height = selected_img_objects[idx].imageScales[selected_scale].shape[0]
             images[idx, 0:img_height, :, :] = selected_img_objects[idx].imageScales[selected_scale]
+            # Calculate actual roi bounding box sizes
+            roi_matrix = selected_img_objects[idx].roiMatrix
+            reshaped_roi_matrix = np.copy(roi_matrix)
+            # Left Coords
+            reshaped_roi_matrix[:, 1] = (roi_matrix[:, 1] - 0.5 * roi_matrix[:, 3]) * selected_scale
+            # Top Coords: Include the coefficient coming from the zero padding as well.
+            reshaped_roi_matrix[:, 2] = (roi_matrix[:, 2] - 0.5 * roi_matrix[:, 4]) * float(img_height)
+            # Right Coords
+            reshaped_roi_matrix[:, 3] = (roi_matrix[:, 1] + 0.5 * roi_matrix[:, 3]) * selected_scale
+            # Bottom Coords:Include the coefficient coming from the zero padding as well.
+            reshaped_roi_matrix[:, 4] = (roi_matrix[:, 2] + 0.5 * roi_matrix[:, 4]) * float(img_height)
+            reshaped_roi_matrix = np.copy(reshaped_roi_matrix).astype(np.int32)
+            ObjectDetectionDataManager.print_img_with_final_rois(img_name="roi_img_{0}".format(idx), img=images[idx],
+                                                                 roi_matrix=reshaped_roi_matrix)
+            self.show_image(img_obj=selected_img_objects[idx], scale=selected_scale)
             # ********** This is for visualizing **********
             # y = 0
             # for roi in self.medoidRois:
@@ -125,14 +138,14 @@ class ObjectDetectionDataManager(object):
             #     print("X")
             # cv2.imwrite("Image{0}.png".format(idx), images[idx])
             # ********** This is for visualizing **********
-            #  Sample bounding boxes
+
+            #  Get medoid distribution
             found_positive_rois = 0
-            while found_positive_rois < positive_roi_count:
-                x_coords = np.random.uniform(low=0, high=selected_scale - selected_roi[0], size=(roi_sample_count, ))
-                y_coords = np.random.uniform(low=0, high=img_height - selected_roi[1], size=(roi_sample_count,))
-                roi_list = np.stack([x_coords, y_coords], axis=1)
 
-
+            # while found_positive_rois < positive_roi_count:
+            #     x_coords = np.random.uniform(low=0, high=selected_scale - selected_roi[0], size=(roi_sample_count, ))
+            #     y_coords = np.random.uniform(low=0, high=img_height - selected_roi[1], size=(roi_sample_count,))
+            #     roi_list = np.stack([x_coords, y_coords], axis=1)
 
     # def detect_outlier_bbs(self):
     #     training_images = self.dataList[self.trainingImageIndices]
@@ -162,6 +175,15 @@ class ObjectDetectionDataManager(object):
             cv2.putText(img_canvas, "{0}".format(int(roi_row[0])),
                         (middle_point_x, middle_point_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                         color=(0, 0, 255), thickness=0, lineType=cv2.LINE_AA)
-        cv2.imshow("Image:{0}_Scale:{1}".format(img_obj.imgName, scale), img_canvas)
-        cv2.waitKey()
+        # cv2.imshow("Image:{0}_Scale:{1}".format(img_obj.imgName, scale), img_canvas)
+        # cv2.waitKey()
+        cv2.imwrite("Image_{0}.png".format(img_obj.imgName), img_canvas)
         print("X")
+
+    @staticmethod
+    def print_img_with_final_rois(img_name, img, roi_matrix):
+        img_canvas = np.copy(img)
+        for roi_row in roi_matrix:
+            cv2.rectangle(img_canvas, (roi_row[1], roi_row[2]), (roi_row[3], roi_row[4]), color=(0, 0, 255),
+                          thickness=1)
+        cv2.imwrite("{0}.png".format(img_name), img_canvas)
