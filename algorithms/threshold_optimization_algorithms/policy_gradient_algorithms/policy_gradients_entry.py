@@ -168,7 +168,7 @@ def train_policy_gradients_network():
     wd_list = [0.0001]
     # [0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * 10
     state_sample_count_list = [1000]
-    samples_per_state_list = [2]
+    samples_per_state_list = [1]
     ignore_invalid_actions = False
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
                                                                           state_sample_count_list,
@@ -194,8 +194,8 @@ def train_policy_gradients_network():
                                               hidden_layers=[[128], [256]],
                                               validation_data=validation_data,
                                               test_data=test_data,
-                                              policy_network_func="mlp")
-        gpu_policy_grads.train(sess=sess, max_num_of_iterations=10000)
+                                              policy_network_func="cnn")
+        gpu_policy_grads.train(sess=sess, max_num_of_iterations=1000000)
         tf.reset_default_graph()
         # sess = tf.Session()
         # cpu_policy_grads = TreeDepthPolicyNetwork(l2_lambda=l2_wd,

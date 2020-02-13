@@ -198,9 +198,12 @@ class PolicyGradientsNetwork:
     def build_optimizer(self):
         self.learningRate = tf.constant(0.0001)
         self.totalLoss = (-1.0 * self.proxyLoss) + self.l2Loss
-        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
-        # boundaries = [1000, 10000]
-        # values = [0.1, 0.01, 0.001]
+        # self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+        boundaries = [10000]
+        values = [0.0001, 0.00001]
+        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
+            self.totalLoss, global_step=self.globalStep)
+
         # self.learningRate = tf.train.piecewise_constant(self.globalStep, boundaries, values)
         # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(
         #     self.totalLoss, global_step=self.globalStep)
@@ -361,10 +364,10 @@ class PolicyGradientsNetwork:
     # OK
     def evaluate_policy_values(self, sess):
         validation_policy_value = self.calculate_policy_value(routing_data=self.validationDataForMDP,
-                                                              state_batch_size=1000, samples_per_state=100,
+                                                              state_batch_size=100, samples_per_state=10,
                                                               sess=sess)
         test_policy_value = self.calculate_policy_value(routing_data=self.testDataForMDP,
-                                                        state_batch_size=1000, samples_per_state=100, sess=sess)
+                                                        state_batch_size=100, samples_per_state=10, sess=sess)
         print("validation_policy_value={0}".format(validation_policy_value))
         print("test_policy_value={0}".format(test_policy_value))
         return validation_policy_value, test_policy_value

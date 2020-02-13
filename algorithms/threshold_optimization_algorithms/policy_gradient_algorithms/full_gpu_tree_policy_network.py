@@ -17,6 +17,11 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_PREDICTION_PENALTY = 0.0
     LAMBDA_MAC_COST = 0.0
     BASELINE_UPDATE_GAMMA = 0.99
+    CONV_FEATURES = [[8], [16]]
+    HIDDEN_LAYERS = [[16], [32]]
+    FILTER_SIZES = [[3], [3]]
+    STRIDES = [[1], [1]]
+    MAX_POOL = [[2], [2]]
 
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                  output_names, used_feature_names, policy_network_func, hidden_layers, use_baselines, state_sample_count,
@@ -51,6 +56,30 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         for t in range(self.get_max_trajectory_length()):
             self.actionSpacesTf.append(tf.constant(self.actionSpaces[t]))
         self.resultsDict["actionSpacesTf"] = self.actionSpacesTf
+
+    def prepare_state_features(self, data):
+        # if self.policyNetworkFunc == "mlp":
+        #     super().prepare_state_features(data=data)
+        # elif self.policyNetworkFunc == "cnn":
+        root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
+        assert len(root_node) == 1
+        features_dict = {}
+        for node in self.innerNodes:
+            # array_list = [data.get_dict(feature_name)[node.index] for feature_name in self.networkFeatureNames]
+            array_list = []
+            for feature_name in self.usedFeatureNames:
+                feature_arr = data.get_dict(feature_name)[node.index]
+                if self.policyNetworkFunc == "mlp":
+                    if len(feature_arr.shape) > 2:
+                        shape_as_list = list(feature_arr.shape)
+                        mean_axes = tuple([i for i in range(1, len(shape_as_list) - 1, 1)])
+                        feature_arr = np.mean(feature_arr, axis=mean_axes)
+                elif self.policyNetworkFunc == "cnn":
+                    assert len(feature_arr.shape) == 4
+                array_list.append(feature_arr)
+            feature_vectors = np.concatenate(array_list, axis=-1)
+            features_dict[node.index] = feature_vectors
+        return features_dict
 
     def calculate_reward_tensors(self):
         invalid_action_penalty = FullGpuTreePolicyGradientsNetwork.INVALID_ACTION_PENALTY
@@ -138,10 +167,14 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 list_of_indices.append(routing_indices)
                 route_coefficients = tf.gather_nd(routing_decisions, routing_indices)
                 list_of_coefficients.append(route_coefficients)
-                weighted_state_inputs.append(tf.cast(tf.expand_dims(route_coefficients, axis=1), dtype=tf.float32)
+                # weighted_state_inputs.append(tf.cast(tf.expand_dims(route_coefficients, axis=1), dtype=tf.float32)
+                #                              * state_input)
+                for _ in range(len(state_input.get_shape().as_list()) - 1):
+                    route_coefficients = tf.expand_dims(route_coefficients, axis=-1)
+                weighted_state_inputs.append(tf.cast(route_coefficients, dtype=tf.float32)
                                              * state_input)
             assert len(self.stateInputTransformed) == time_step
-            self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=1))
+            self.stateInputTransformed.append(tf.concat(values=weighted_state_inputs, axis=-1))
             self.resultsDict["routing_indices_{0}".format(time_step)] = list_of_indices
             self.resultsDict["routing_weights_{0}".format(time_step)] = list_of_coefficients
             self.resultsDict["stateInputTransformed_{0}".format(time_step)] = self.stateInputTransformed[time_step]
@@ -176,10 +209,37 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.logits.append(_logits)
 
     def build_cnn_policy_networks(self, time_step):
-        hidden_layers = list(self.hiddenLayers[time_step])
+        hidden_layers = FullGpuTreePolicyGradientsNetwork.HIDDEN_LAYERS[time_step]
+        hidden_layers.append(self.actionSpaces[time_step].shape[0])
+        conv_features = FullGpuTreePolicyGradientsNetwork.CONV_FEATURES[time_step]
+        filter_sizes = FullGpuTreePolicyGradientsNetwork.FILTER_SIZES[time_step]
+        strides = FullGpuTreePolicyGradientsNetwork.STRIDES[time_step]
+        pools = FullGpuTreePolicyGradientsNetwork.MAX_POOL[time_step]
 
-
-
+        net = self.stateInputTransformed[time_step]
+        conv_layer_id = 0
+        for conv_feature, filter_size, stride, max_pool in zip(conv_features, filter_sizes, strides, pools):
+            in_filters = net.get_shape().as_list()[-1]
+            out_filters = conv_feature
+            kernel = [filter_size, filter_size, in_filters, out_filters]
+            strides = [1, stride, stride, 1]
+            W = tf.get_variable("conv_layer_W{0}_t{1}".format(conv_layer_id, time_step), kernel, trainable=True)
+            b = tf.get_variable("conv_layer_b{0}_t{1}".format(conv_layer_id, time_step), [kernel[-1]], trainable=True)
+            net = tf.nn.conv2d(net, W, strides, padding='SAME')
+            net = tf.nn.bias_add(net, b)
+            net = tf.nn.relu(net)
+            if max_pool is not None:
+                net = tf.nn.max_pool(net, ksize=[1, max_pool, max_pool, 1], strides=[1, max_pool, max_pool, 1],
+                                     padding='SAME')
+            conv_layer_id += 1
+        net = tf.contrib.layers.flatten(net)
+        for layer_id, layer_dim in enumerate(hidden_layers):
+            if layer_id < len(hidden_layers) - 1:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+            else:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
+        _logits = net
+        self.logits.append(_logits)
 
     def build_policy_generators(self, time_step):
         self.policies.append(tf.nn.softmax(self.logits[time_step] / self.softmaxDecay))
@@ -283,7 +343,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             if self.policyNetworkFunc == "mlp":
                 self.build_mlp_policy_networks(time_step=t)
             else:
-                raise NotImplementedError()
+                self.build_cnn_policy_networks(time_step=t)
             self.build_policy_generators(time_step=t)
             # Sample actions from the policy network: a_t ~ \pi_t(a_t|s_t)
             # Or select the maximum likely action: a_t = argmax_{a_t} \pi_t(a_t|s_t)
@@ -361,9 +421,10 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                                                    select_argmax=True,
                                                    ignore_invalid_actions=ignore_invalid_actions,
                                                    sess=sess)
-                for t in range(self.get_max_trajectory_length()):
-                    counter = Counter(history.actions[t])
-                    print("{0}: Actions:{1}".format(t, counter))
+                if not combine_with_ig:
+                    for t in range(self.get_max_trajectory_length()):
+                        counter = Counter(history.actions[t])
+                        print("{0}: Actions:{1}".format(t, counter))
                 validity_of_predictions_vec, computation_overload_vec = \
                     self.calculate_accuracy_of_trajectories(routing_data=routing_data, history=history,
                                                             combine_with_ig=combine_with_ig)
@@ -380,13 +441,15 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         return accuracy_dict, computation_overload_dict
 
     def evaluate_routing_accuracies(self, sess):
+        print("Validation")
         validation_accuracy_dict, val_computation_overload_dict = \
             self.calculate_routing_accuracy(sess=sess,
                                             routing_data=self.validationDataForMDP,
-                                            state_batch_size=1000)
+                                            state_batch_size=9000)
+        print("Test")
         test_accuracy_dict, test_computation_overload_dict = \
             self.calculate_routing_accuracy(sess=sess, routing_data=self.testDataForMDP,
-                                            state_batch_size=100)
+                                            state_batch_size=1000)
         print("validation_accuracy={0}".format(validation_accuracy_dict))
         print("test_accuracy={0}".format(test_accuracy_dict))
         print("val_computation_overload_dict={0}".format(val_computation_overload_dict))
@@ -456,9 +519,10 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             # run_dict.update({k: v for k, v in self.resultsDict.items() if "reachability_matrix" in k})
             run_dict["optimizer"] = self.optimizer
             results = sess.run(run_dict, feed_dict=feed_dict)
-            # for t in range(self.get_max_trajectory_length()):
-            #     counter = Counter(results["finalActions_{0}".format(t)])
-            #     print("{0}: Actions:{1}".format(t, counter))
+            print("Training")
+            for t in range(self.get_max_trajectory_length()):
+                counter = Counter(results["finalActions_{0}".format(t)])
+                print("{0}: Actions:{1}".format(t, counter))
             # Populate the history object
             # Build the history object
             history = self.populate_history(history=history, results=results)
