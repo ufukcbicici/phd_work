@@ -17,8 +17,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_PREDICTION_PENALTY = 0.0
     LAMBDA_MAC_COST = 0.0
     BASELINE_UPDATE_GAMMA = 0.99
-    CONV_FEATURES = [[8], [16]]
-    HIDDEN_LAYERS = [[16], [32]]
+    CONV_FEATURES = [[32], [64]]
+    HIDDEN_LAYERS = [[128], [256]]
     FILTER_SIZES = [[3], [3]]
     STRIDES = [[1], [1]]
     MAX_POOL = [[2], [2]]
@@ -223,8 +223,10 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             out_filters = conv_feature
             kernel = [filter_size, filter_size, in_filters, out_filters]
             strides = [1, stride, stride, 1]
-            W = tf.get_variable("conv_layer_W{0}_t{1}".format(conv_layer_id, time_step), kernel, trainable=True)
-            b = tf.get_variable("conv_layer_b{0}_t{1}".format(conv_layer_id, time_step), [kernel[-1]], trainable=True)
+            W = tf.get_variable("conv_layer_kernel_{0}_t{1}".format(conv_layer_id, time_step), kernel,
+                                trainable=True)
+            b = tf.get_variable("conv_layer_bias_{0}_t{1}".format(conv_layer_id, time_step), [kernel[-1]],
+                                trainable=True)
             net = tf.nn.conv2d(net, W, strides, padding='SAME')
             net = tf.nn.bias_add(net, b)
             net = tf.nn.relu(net)
@@ -232,7 +234,11 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 net = tf.nn.max_pool(net, ksize=[1, max_pool, max_pool, 1], strides=[1, max_pool, max_pool, 1],
                                      padding='SAME')
             conv_layer_id += 1
-        net = tf.contrib.layers.flatten(net)
+        # net = tf.contrib.layers.flatten(net)
+        net_shape = net.get_shape().as_list()
+        net = tf.nn.avg_pool(net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
+        net_shape = net.get_shape().as_list()
+        net = tf.reshape(net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
         for layer_id, layer_dim in enumerate(hidden_layers):
             if layer_id < len(hidden_layers) - 1:
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)

@@ -165,7 +165,7 @@ def train_policy_gradients_network():
                                              output_names=output_names)
     validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
 
-    wd_list = [0.0001]
+    wd_list = [1.0]
     # [0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * 10
     state_sample_count_list = [1000]
     samples_per_state_list = [1]
