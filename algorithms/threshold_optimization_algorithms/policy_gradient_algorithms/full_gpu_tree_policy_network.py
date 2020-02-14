@@ -16,7 +16,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_ACTION_PENALTY = 0.0
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
-    LAMBDA_MAC_COST = 0.0
+    LAMBDA_MAC_COST = 0.1
     BASELINE_UPDATE_GAMMA = 0.99
     CONV_FEATURES = [[32], [64]]
     HIDDEN_LAYERS = [[128], [256]]
@@ -81,6 +81,28 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             feature_vectors = np.concatenate(array_list, axis=-1)
             features_dict[node.index] = feature_vectors
         return features_dict
+
+    def get_explanation(self):
+        explanation = ""
+        explanation += "INVALID_ACTION_PENALTY={0}\n".format(FullGpuTreePolicyGradientsNetwork.INVALID_ACTION_PENALTY)
+        explanation += "VALID_PREDICTION_REWARD={0}\n".format(FullGpuTreePolicyGradientsNetwork.VALID_PREDICTION_REWARD)
+        explanation += "INVALID_PREDICTION_PENALTY={0}\n".format(FullGpuTreePolicyGradientsNetwork.INVALID_PREDICTION_PENALTY)
+        explanation += "LAMBDA_MAC_COST={0}\n".format(FullGpuTreePolicyGradientsNetwork.LAMBDA_MAC_COST)
+        explanation += "BASELINE_UPDATE_GAMMA={0}\n".format(FullGpuTreePolicyGradientsNetwork.BASELINE_UPDATE_GAMMA)
+        explanation += "Hidden Layers={0}\n".format(self.hiddenLayers)
+        explanation += "Network Name:{0}\n".format(self.networkName)
+        explanation += "Network Run Id:{0}\n".format(self.networkRunId)
+        explanation += "Network Iteration:{0}\n".format(self.networkIteration)
+        explanation += "Use Baselines:{0}\n".format(self.useBaselines)
+        explanation += "stateSampleCount:{0}\n".format(self.stateSampleCount)
+        explanation += "trajectoryPerStateSampleCount:{0}\n".format(self.trajectoryPerStateSampleCount)
+        explanation += "validation Data Count:{0}\n".format(self.validationData.labelList.shape[0])
+        explanation += "test Data Count:{0}\n".format(self.testData.labelList.shape[0])
+        explanation += "l2Lambda:{0}\n".format(self.l2Lambda)
+        val_ml_accuracy, test_ml_accuracy = self.evaluate_ml_routing_accuracies()
+        explanation += "val_ml_accuracy:{0}\n".format(val_ml_accuracy)
+        explanation += "test_ml_accuracy:{0}\n".format(test_ml_accuracy)
+        return explanation
 
     def calculate_reward_tensors(self):
         invalid_action_penalty = FullGpuTreePolicyGradientsNetwork.INVALID_ACTION_PENALTY
