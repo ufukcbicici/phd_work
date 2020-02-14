@@ -12,7 +12,8 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
 class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
-    INVALID_ACTION_PENALTY = -10.0
+    INCLUDE_IG_IN_REWARD_CALCULATIONS = True
+    INVALID_ACTION_PENALTY = 0.0
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
     LAMBDA_MAC_COST = 0.0
@@ -105,29 +106,39 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                     # Prediction Rewards:
                     # Calculate the prediction results for every state and for every routing decision
                     prediction_correctness_vec_list = []
+                    calculation_cost_vec_list = []
+                    min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[t + 1]])
+                    ig_indices = dataset.mlPaths[:, -1] - min_leaf_id
                     for action_id in range(self.actionSpaces[t].shape[0]):
                         routing_decision = self.actionSpaces[t][action_id, :]
-                        weight = 1.0 / np.sum(routing_decision)
-                        routing_decision_weighted = weight * routing_decision
-                        assert routing_decision.shape[0] == dataset.posteriorsTensor.shape[2]
-                        weighted_posteriors = dataset.posteriorsTensor * routing_decision_weighted
+                        routing_matrix = np.repeat(routing_decision[np.newaxis, :], axis=0,
+                                                   repeats=true_labels.shape[0])
+                        if FullGpuTreePolicyGradientsNetwork.INCLUDE_IG_IN_REWARD_CALCULATIONS:
+                            # Set Information Gain routed leaf nodes to 1. They are always evaluated.
+                            routing_matrix[np.arange(true_labels.shape[0]), ig_indices] = 1
+                        weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
+                        routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
+                        assert routing_matrix.shape[1] == dataset.posteriorsTensor.shape[2]
+                        weighted_posteriors = dataset.posteriorsTensor * routing_matrix_weighted[:, np.newaxis, :]
                         final_posteriors = np.sum(weighted_posteriors, axis=2)
                         predicted_labels = np.argmax(final_posteriors, axis=1)
                         validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
                         prediction_correctness_vec_list.append(validity_of_predictions_vec)
+                        # Get the calculation costs
+                        computation_overload_vector = np.apply_along_axis(
+                            lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
+                            arr=routing_matrix)
+                        calculation_cost_vec_list.append(computation_overload_vector)
                     prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
                     prediction_correctness_tensor = np.repeat(
                         np.expand_dims(prediction_correctness_matrix, axis=1), axis=1, repeats=action_count_t_minus_one)
+                    computation_overload_matrix = np.stack(calculation_cost_vec_list, axis=1)
+                    computation_overload_tensor = np.repeat(
+                        np.expand_dims(computation_overload_matrix, axis=1), axis=1, repeats=action_count_t_minus_one)
+                    # Add to the rewards tensor
                     rewards_arr += (prediction_correctness_tensor == 1).astype(np.float32) * valid_prediction_reward
                     rewards_arr += (prediction_correctness_tensor == 0).astype(np.float32) * invalid_prediction_penalty
-                    # Calculation Cost Rewards (Penalties):
-                    # Calculate the Cost for every last layer routing combination
-                    cost_arr = np.expand_dims(self.networkActivationCosts, axis=0)
-                    cost_arr = np.repeat(cost_arr, axis=0, repeats=action_count_t_minus_one)
-                    cost_arr = np.expand_dims(cost_arr, axis=0)
-                    cost_arr = np.repeat(cost_arr, axis=0, repeats=true_labels.shape[0])
-                    cost_arr = calculation_cost_modifier * cost_arr
-                    rewards_arr -= cost_arr
+                    rewards_arr -= calculation_cost_modifier * computation_overload_tensor
                 if dataset == self.validationDataForMDP:
                     self.validationRewards.append(rewards_arr)
                 else:

@@ -5,17 +5,11 @@ from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.ful
 
 
 class FullGpuTreePolicyTreeNetworkValidActions(FullGpuTreePolicyGradientsNetwork):
-    INVALID_ACTION_PENALTY = 0.0
-    VALID_PREDICTION_REWARD = 1.0
-    INVALID_PREDICTION_PENALTY = 0.0
-    LAMBDA_MAC_COST = 0.0
-    BASELINE_UPDATE_GAMMA = 0.99
-
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                  output_names, used_feature_names, policy_network_func, hidden_layers, use_baselines,
                  state_sample_count, trajectory_per_state_sample_count):
         self.passiveWeight = tf.constant(-1e+10)
-        self.epsilonProb = tf.constant(1e-3)
+        self.epsilonProb = tf.constant(1e-10)
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, policy_network_func, hidden_layers, use_baselines,
                          state_sample_count, trajectory_per_state_sample_count)

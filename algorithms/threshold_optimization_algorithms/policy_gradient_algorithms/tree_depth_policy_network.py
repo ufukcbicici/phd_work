@@ -137,15 +137,22 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
                                         if node_selection_vec_t_minus_one[i] != 0]
                     next_level_nodes = self.network.orderedNodesPerLevel[t + 1]
                     reachable_next_level_node_ids = set()
+                    next_level_reached_dict = {}
                     for parent_node in selected_nodes_t:
                         child_nodes = {c_node.index for c_node in self.network.dagObject.children(node=parent_node)}
                         reachable_next_level_node_ids = reachable_next_level_node_ids.union(child_nodes)
+                        next_level_reached_dict[parent_node.index] = child_nodes
 
                     for actions_t_id in range(actions_t.shape[0]):
+                        # All selected nodes should have their parents selected in the previous depth
                         node_selection_vec_t = actions_t[actions_t_id]
                         reached_nodes = {node.index for is_reached, node in zip(node_selection_vec_t, next_level_nodes)
                                          if is_reached != 0}
                         is_valid_selection = int(len(reached_nodes.difference(reachable_next_level_node_ids)) == 0)
+                        # All selected nodes in the previous depth must have at least one child selected in next depth
+                        for parent_node in selected_nodes_t:
+                            selection_arr = [_n in reached_nodes for _n in next_level_reached_dict[parent_node.index]]
+                            is_valid_selection = is_valid_selection and any(selection_arr)
                         reachability_matrix_t[action_t_minus_one_id, actions_t_id] = is_valid_selection
             self.reachabilityMatrices.append(reachability_matrix_t)
 
