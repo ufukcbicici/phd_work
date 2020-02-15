@@ -11,6 +11,8 @@ from object_detection.bb_clustering import BBClustering
 from object_detection.constants import Constants
 from sklearn.preprocessing import StandardScaler
 
+from object_detection.utilities import Utilities
+
 
 class DetectionImage(object):
     def __init__(self, img_name, img_arr):
@@ -91,7 +93,8 @@ class ObjectDetectionDataManager(object):
         pickle_in_file.close()
         return dataset
 
-    def sample_rois(self, medoids, img, true_height, roi_matrix, positive_roi_count, negative_roi_count):
+    def sample_rois(self, medoids, img, true_height, roi_matrix, positive_iou_threshold,
+                    positive_roi_count, negative_roi_count):
         #  Get medoid distribution
         found_positive_rois = 0
         found_negative_rois = 0
@@ -99,6 +102,8 @@ class ObjectDetectionDataManager(object):
         selected_medoids = medoids[np.random.choice(medoids.shape[0], total_rois)]
         img_width = img.shape[1]
         img_height = true_height
+        medoid_scale = img_width / min(Constants.IMG_WIDTHS)
+        selected_medoids = medoid_scale * selected_medoids
         while True:
             left_coord_upper_limits = img_width - selected_medoids[:, 0]
             roi_left_coords = np.random.uniform(low=0, high=left_coord_upper_limits, size=total_rois)
@@ -107,12 +112,28 @@ class ObjectDetectionDataManager(object):
             roi_top_coords = np.random.uniform(low=0, high=top_coord_upper_limits, size=total_rois)
             roi_bottom_coords = roi_top_coords + selected_medoids[:, 1]
             sampled_rois = np.stack([roi_left_coords, roi_top_coords, roi_right_coords, roi_bottom_coords], axis=1)
-            calculated_rois = np.stack(
-                [sampled_rois[:, 2] - sampled_rois[:, 0], sampled_rois[:, 3] - sampled_rois[:, 1]], axis=1)
-            assert np.allclose(selected_medoids, calculated_rois)
+            # calculated_rois = np.stack(
+            #     [sampled_rois[:, 2] - sampled_rois[:, 0], sampled_rois[:, 3] - sampled_rois[:, 1]], axis=1)
+            # assert np.allclose(selected_medoids, calculated_rois)
+            # Check if colludes with ground truths in the images
+            iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, roi_matrix[:, 1:5]),
+                                             axis=1, arr=sampled_rois)
+            max_ious = np.max(iou_matrix, axis=1)
+            non_zero_indices = np.nonzero(max_ious >= positive_iou_threshold)[0]
+            if np.max(iou_matrix) >= 0.5:
+                print("X")
+            # For visualization
+            roi_matrix_v2 = np.concatenate([sampled_rois.astype(np.int32), roi_matrix[:, 1:5]], axis=0)
+            colors = [(255, 0, 0)] * sampled_rois.shape[0]
+            for idx in non_zero_indices:
+                colors[idx] = (255, 0, 255)
+            colors.extend([(0, 0, 255)] * roi_matrix.shape[0])
+            ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp", img=img, roi_matrix=roi_matrix_v2,
+                                                                 colors=colors)
+            # For visualization
             print("X")
 
-    def create_image_batch(self, batch_size, roi_sample_count, positive_sample_ratio):
+    def create_image_batch(self, batch_size, positive_iou_threshold, roi_sample_count, positive_sample_ratio):
         positive_roi_count = int(roi_sample_count * positive_sample_ratio)
         negative_roi_count = roi_sample_count - positive_roi_count
         # Sample scales
@@ -165,7 +186,8 @@ class ObjectDetectionDataManager(object):
             # cv2.imwrite("Image{0}.png".format(idx), images[idx])
             # ********** This is for visualizing **********
             self.sample_rois(medoids=self.medoidRois, img=images[idx], true_height=img_height,
-                             roi_matrix=reshaped_roi_matrix, positive_roi_count=positive_roi_count,
+                             roi_matrix=reshaped_roi_matrix, positive_iou_threshold=positive_iou_threshold,
+                             positive_roi_count=positive_roi_count,
                              negative_roi_count=negative_roi_count)
 
 
@@ -208,9 +230,9 @@ class ObjectDetectionDataManager(object):
         print("X")
 
     @staticmethod
-    def print_img_with_final_rois(img_name, img, roi_matrix):
+    def print_img_with_final_rois(img_name, img, roi_matrix, colors):
         img_canvas = np.copy(img)
-        for roi_row in roi_matrix:
-            cv2.rectangle(img_canvas, (roi_row[1], roi_row[2]), (roi_row[3], roi_row[4]), color=(0, 0, 255),
+        for idx, roi_row in enumerate(roi_matrix):
+            cv2.rectangle(img_canvas, (roi_row[0], roi_row[1]), (roi_row[2], roi_row[3]), color=colors[idx],
                           thickness=1)
         cv2.imwrite("{0}.png".format(img_name), img_canvas)

@@ -8,6 +8,7 @@ class Utilities:
     # Vectorized BB vs BB List IoU calculation
     @staticmethod
     def get_iou_with_list(bb, bb_y_matrix):
+        assert bb.shape[0] == 4 and bb_y_matrix.shape[1] == 4
         bb_x_matrix = np.repeat(np.expand_dims(bb, axis=0), axis=0, repeats=bb_y_matrix.shape[0])
         intersection_left = np.max(np.stack([bb_x_matrix[:, 0], bb_y_matrix[:, 0]], axis=1), axis=1)
         intersection_top = np.max(np.stack([bb_x_matrix[:, 1], bb_y_matrix[:, 1]], axis=1), axis=1)
@@ -55,4 +56,4 @@ class Utilities:
         print("X")
 
 
-Utilities.test_vectorized_iou()
+# Utilities.test_vectorized_iou()
