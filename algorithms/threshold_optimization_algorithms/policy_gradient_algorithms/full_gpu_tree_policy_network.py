@@ -18,11 +18,11 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_PREDICTION_PENALTY = 0.0
     LAMBDA_MAC_COST = 0.1
     BASELINE_UPDATE_GAMMA = 0.99
-    CONV_FEATURES = [[32], [64]]
-    HIDDEN_LAYERS = [[128], [256]]
-    FILTER_SIZES = [[3], [3]]
-    STRIDES = [[1], [1]]
-    MAX_POOL = [[2], [2]]
+    CONV_FEATURES = [[], []]
+    HIDDEN_LAYERS = [[128, 64], [256, 128]]
+    FILTER_SIZES = [[], []]
+    STRIDES = [[], []]
+    MAX_POOL = [[], []]
 
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                  output_names, used_feature_names, policy_network_func, hidden_layers, use_baselines, state_sample_count,
@@ -455,9 +455,9 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 curr_sample_ids = id_list[idx:idx + state_batch_size]
                 history = self.sample_trajectories(routing_data=routing_data,
                                                    state_sample_count=None,
-                                                   samples_per_state=1,
+                                                   samples_per_state=10,
                                                    state_ids=curr_sample_ids,
-                                                   select_argmax=True,
+                                                   select_argmax=False,
                                                    ignore_invalid_actions=ignore_invalid_actions,
                                                    sess=sess)
                 if not combine_with_ig:
@@ -484,11 +484,11 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         validation_accuracy_dict, val_computation_overload_dict = \
             self.calculate_routing_accuracy(sess=sess,
                                             routing_data=self.validationDataForMDP,
-                                            state_batch_size=9000)
+                                            state_batch_size=100)
         print("Test")
         test_accuracy_dict, test_computation_overload_dict = \
             self.calculate_routing_accuracy(sess=sess, routing_data=self.testDataForMDP,
-                                            state_batch_size=1000)
+                                            state_batch_size=100)
         print("validation_accuracy={0}".format(validation_accuracy_dict))
         print("test_accuracy={0}".format(test_accuracy_dict))
         print("val_computation_overload_dict={0}".format(val_computation_overload_dict))
@@ -571,7 +571,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             log_policy_arrays = [v for k, v in results.items() if "log_policies" in k]
             if any([np.any(np.isinf(log_policy_arr)) for log_policy_arr in log_policy_arrays]):
                 print("Contains inf!!!")
-            if iteration_id % 100 == 0 or iteration_id == max_num_of_iterations - 1:
+            if iteration_id % 1000 == 0 or iteration_id == max_num_of_iterations - 1:
                 print("***********Iteration {0}***********".format(iteration_id))
                 validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
                 validation_accuracy_dict, test_accuracy_dict, val_computation_overload_dict, \
