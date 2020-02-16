@@ -6,6 +6,7 @@ import pandas as pd
 from os import listdir
 from os.path import isfile, join
 from sklearn.model_selection import train_test_split
+from collections import Counter
 
 from object_detection.bb_clustering import BBClustering
 from object_detection.constants import Constants
@@ -29,6 +30,7 @@ class ObjectDetectionDataManager(object):
         self.trainingImageIndices = None
         self.testImageIndices = None
         self.medoidRois = None
+        self.backgroundLabel = None
 
     def read_data(self):
         onlyfiles = [f for f in listdir(self.dataPath) if isfile(join(self.dataPath, f))]
@@ -80,6 +82,15 @@ class ObjectDetectionDataManager(object):
         self.medoidRois = BBClustering.run(training_objects=training_objects,
                                            iou_threshold=iou_threshold,
                                            max_coverage=max_coverage)
+        self.calculate_label_distribution()
+
+    def calculate_label_distribution(self):
+        labels = [obj.roiMatrix[:, 0] for obj in self.dataList]
+        labels = np.concatenate(labels, axis=0)
+        c = Counter(labels)
+        assert all([idx in c for idx in range(len(c))])
+        assert len(c) not in c
+        self.backgroundLabel = len(c)
 
     def save_processed_data(self):
         pickle_out_file = open(os.path.join(self.dataPath, "processed_dataset.sav"), "wb")
@@ -106,10 +117,12 @@ class ObjectDetectionDataManager(object):
         selected_medoids = medoid_scale * selected_medoids
         roi_centers = np.stack([0.5 * roi_matrix[:, 1] + 0.5 * roi_matrix[:, 3],
                                 0.5 * roi_matrix[:, 2] + 0.5 * roi_matrix[:, 4]], axis=1)
+        roi_labels = roi_matrix[:, 0]
+        roi_centers = np.concatenate([roi_labels[:, np.newaxis], roi_centers], axis=1)
         # Select positive regions: Put every medoid (anchor) at the center of every positive bounding box. Then
         # translate them by random (Gaussian) amounts.
         # Keep the ones as positive which have IoU with the bounding box larger than > 0.5
-        std = 10.0
+        std = medoid_scale * Constants.POSITIVE_PROPOSAL_SAMPLING_STD
         repeat_count = 1 * medoids.shape[0]
         positive_proposals_all = None
         negative_proposals_all = None
@@ -118,20 +131,21 @@ class ObjectDetectionDataManager(object):
             proposal_centers = np.repeat(roi_centers, repeats=repeat_count, axis=0)
             noise = np.random.multivariate_normal(mean=np.array([0, 0]), cov=np.array([[std, 0.0], [0.0, std]]),
                                                   size=(proposal_centers.shape[0],))
-            proposal_centers = proposal_centers + noise
+            proposal_centers[:, 1:] = proposal_centers[:, 1:] + noise
             repeated_medoids = medoid_scale * np.concatenate([medoids] *
                                                              int(proposal_centers.shape[0] / medoids.shape[0]), axis=0)
             assert proposal_centers.shape[0] == repeated_medoids.shape[0]
             # left_coords = proposal_centers[:, 0] - 0.5 * repeated_medoids[:, 0]
             # left_coords = np.clip(left_coords, a_min=0.0, a_max=img_width)
             proposals = np.stack(
-                [np.clip(proposal_centers[:, 0] - 0.5 * repeated_medoids[:, 0], a_min=0.0, a_max=img_width),
-                 np.clip(proposal_centers[:, 1] - 0.5 * repeated_medoids[:, 1], a_min=0.0, a_max=img_height),
-                 np.clip(proposal_centers[:, 0] + 0.5 * repeated_medoids[:, 0], a_min=0.0, a_max=img_width),
-                 np.clip(proposal_centers[:, 1] + 0.5 * repeated_medoids[:, 1], a_min=0.0, a_max=img_height)],
+                [proposal_centers[:, 0],
+                 np.clip(proposal_centers[:, 1] - 0.5 * repeated_medoids[:, 0], a_min=0.0, a_max=img_width),
+                 np.clip(proposal_centers[:, 2] - 0.5 * repeated_medoids[:, 1], a_min=0.0, a_max=img_height),
+                 np.clip(proposal_centers[:, 1] + 0.5 * repeated_medoids[:, 0], a_min=0.0, a_max=img_width),
+                 np.clip(proposal_centers[:, 2] + 0.5 * repeated_medoids[:, 1], a_min=0.0, a_max=img_height)],
                 axis=1)
             iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, roi_matrix[:, 1:5]),
-                                             axis=1, arr=proposals)
+                                             axis=1, arr=proposals[:, 1:5])
             max_ious = np.max(iou_matrix, axis=1)
             positive_roi_indices = np.nonzero(max_ious >= Constants.POSITIVE_IOU_THRESHOLD)[0]
             positive_proposals = proposals[positive_roi_indices]
@@ -163,11 +177,11 @@ class ObjectDetectionDataManager(object):
             iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, roi_matrix[:, 1:5]),
                                              axis=1, arr=proposals)
             max_ious = np.max(iou_matrix, axis=1)
-            positive_roi_indices = np.nonzero(max_ious >= Constants.POSITIVE_IOU_THRESHOLD)[0]
+            # positive_roi_indices = np.nonzero(max_ious >= Constants.POSITIVE_IOU_THRESHOLD)[0]
             negative_roi_indices = np.nonzero(max_ious < Constants.NEGATIVE_IOU_THRESHOLD)[0]
-            positive_proposals = proposals[positive_roi_indices]
+            # positive_proposals = proposals[positive_roi_indices]
             negative_proposals = proposals[negative_roi_indices]
-            positive_proposals_all = np.concatenate([positive_proposals_all, positive_proposals], axis=0)
+            # positive_proposals_all = np.concatenate([positive_proposals_all, positive_proposals], axis=0)
             if negative_proposals_all is None:
                 negative_proposals_all = negative_proposals
             else:

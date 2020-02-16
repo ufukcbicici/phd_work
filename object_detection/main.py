@@ -25,6 +25,7 @@ def load_dataset():
 
 def main():
     dataset = load_dataset()
+    dataset.calculate_label_distribution()
     dataset.create_image_batch(
         batch_size=Constants.IMAGE_COUNT_PER_BATCH,
         positive_iou_threshold=Constants.POSITIVE_IOU_THRESHOLD,
