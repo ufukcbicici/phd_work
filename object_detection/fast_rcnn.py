@@ -6,9 +6,18 @@ from object_detection.residual_network_generator import ResidualNetworkGenerator
 
 
 class FastRcnn:
-    def __init__(self):
+    def __init__(self, backbone_type):
         self.imageInputs = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 3], name='input')
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
+        self.backboneType = backbone_type
+        self.backboneNetworkOutput = None
+
+    def build_network(self):
+        # Build the backbone
+        if self.backboneType == "Resnet":
+            self.backboneNetworkOutput = self.build_resnet_backbone()
+        else:
+            raise NotImplementedError()
 
     def build_resnet_backbone(self):
         # ResNet Parameters
@@ -24,7 +33,7 @@ class FastRcnn:
         # Input layer
         x = ResidualNetworkGenerator.get_input(input=self.imageInputs, out_filters=num_of_feature_maps_per_block[0],
                                                first_conv_filter_size=first_conv_filter_size)
-        # Loop over blocks
+        # Loop over blocks, the resnet trunk
         for block_id in range(len(num_of_feature_maps_per_block) - 1):
             with tf.variable_scope("block_{0}_0".format(block_id)):
                 x = ResidualNetworkGenerator.bottleneck_residual(
@@ -47,7 +56,8 @@ class FastRcnn:
                         relu_leakiness=relu_leakiness,
                         is_train=self.isTrain,
                         bn_momentum=Constants.BATCH_NORM_DECAY)
-            print("X")
+        return x
+
 
 # net = imageInputs
 # in_filters = imageInputs.get_shape().as_list()[-1]
