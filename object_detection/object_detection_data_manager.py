@@ -104,28 +104,32 @@ class ObjectDetectionDataManager(object):
         img_height = true_height
         medoid_scale = img_width / min(Constants.IMG_WIDTHS)
         selected_medoids = medoid_scale * selected_medoids
-        roi_centers = np.stack([0.5*roi_matrix[:, 1] + 0.5*roi_matrix[:, 3],
-                                0.5*roi_matrix[:, 2] + 0.5*roi_matrix[:, 4]], axis=1)
+        roi_centers = np.stack([0.5 * roi_matrix[:, 1] + 0.5 * roi_matrix[:, 3],
+                                0.5 * roi_matrix[:, 2] + 0.5 * roi_matrix[:, 4]], axis=1)
         # Select positive regions: Put every medoid (anchor) at the center of every positive bounding box. Then
         # translate them by random (Gaussian) amounts.
         # Keep the ones as positive which have IoU with the bounding box larger than > 0.5
         std = 10.0
         repeat_count = 1 * medoids.shape[0]
         positive_proposals_all = None
+        negative_proposals_all = None
         while True:
             # Calculate new roi centers
             proposal_centers = np.repeat(roi_centers, repeats=repeat_count, axis=0)
-            noise = np.random.multivariate_normal(mean=np.array([0, 0]),  cov=np.array([[std, 0.0], [0.0, std]]),
-                                                  size=(proposal_centers.shape[0], ))
+            noise = np.random.multivariate_normal(mean=np.array([0, 0]), cov=np.array([[std, 0.0], [0.0, std]]),
+                                                  size=(proposal_centers.shape[0],))
             proposal_centers = proposal_centers + noise
             repeated_medoids = medoid_scale * np.concatenate([medoids] *
                                                              int(proposal_centers.shape[0] / medoids.shape[0]), axis=0)
             assert proposal_centers.shape[0] == repeated_medoids.shape[0]
+            # left_coords = proposal_centers[:, 0] - 0.5 * repeated_medoids[:, 0]
+            # left_coords = np.clip(left_coords, a_min=0.0, a_max=img_width)
             proposals = np.stack(
-                [proposal_centers[:, 0] - 0.5*repeated_medoids[:, 0],
-                 proposal_centers[:, 1] - 0.5*repeated_medoids[:, 1],
-                 proposal_centers[:, 0] + 0.5*repeated_medoids[:, 0],
-                 proposal_centers[:, 1] + 0.5*repeated_medoids[:, 1]], axis=1)
+                [np.clip(proposal_centers[:, 0] - 0.5 * repeated_medoids[:, 0], a_min=0.0, a_max=img_width),
+                 np.clip(proposal_centers[:, 1] - 0.5 * repeated_medoids[:, 1], a_min=0.0, a_max=img_height),
+                 np.clip(proposal_centers[:, 0] + 0.5 * repeated_medoids[:, 0], a_min=0.0, a_max=img_width),
+                 np.clip(proposal_centers[:, 1] + 0.5 * repeated_medoids[:, 1], a_min=0.0, a_max=img_height)],
+                axis=1)
             iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, roi_matrix[:, 1:5]),
                                              axis=1, arr=proposals)
             max_ious = np.max(iou_matrix, axis=1)
@@ -136,65 +140,54 @@ class ObjectDetectionDataManager(object):
             else:
                 positive_proposals_all = np.concatenate([positive_proposals_all, positive_proposals], axis=0)
             if positive_proposals_all.shape[0] >= positive_roi_count:
-                bb_matrix = np.concatenate([positive_proposals_all, roi_matrix[:, 1:5]], axis=0).astype(np.int32)
-                colors = [(255, 0, 0)] * positive_proposals_all.shape[0]
-                colors.extend([(0, 0, 255)] * roi_matrix.shape[0])
-                ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp3", img=img, roi_matrix=bb_matrix,
-                                                                     colors=colors)
+                # bb_matrix = np.concatenate([positive_proposals_all, roi_matrix[:, 1:5]], axis=0).astype(np.int32)
+                # colors = [(255, 0, 0)] * positive_proposals_all.shape[0]
+                # colors.extend([(0, 0, 255)] * roi_matrix.shape[0])
+                # ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp3", img=img, roi_matrix=bb_matrix,
+                #                                                      colors=colors)
                 break
-
-
-
-
-            # proposal_centers = np.repeat(proposal_centers, repeats=medoids.shape[0], axis=0)
-            # repeated_medoids = np.repeat(medoids, repeats=original_proposal_count, axis=0)
-            # proposals = np.stack(
-            #     [proposal_centers[:, 0] - 0.5*repeated_medoids[:, 0],
-            #      proposal_centers[:, 1] - 0.5*repeated_medoids[:, 1],
-            #      proposal_centers[:, 0] + 0.5*repeated_medoids[:, 0],
-            #      proposal_centers[:, 1] + 0.5*repeated_medoids[:, 0]], axis=1)
-            print("X")
-
-
-
-
-
-        # while True:
-        #     left_coord_upper_limits = img_width - selected_medoids[:, 0]
-        #     roi_left_coords = np.random.uniform(low=0, high=left_coord_upper_limits, size=total_rois)
-        #     roi_right_coords = roi_left_coords + selected_medoids[:, 0]
-        #     top_coord_upper_limits = img_height - selected_medoids[:, 1]
-        #     roi_top_coords = np.random.uniform(low=0, high=top_coord_upper_limits, size=total_rois)
-        #     roi_bottom_coords = roi_top_coords + selected_medoids[:, 1]
-        #     sampled_rois = np.stack([roi_left_coords, roi_top_coords, roi_right_coords, roi_bottom_coords], axis=1)
-        #     # calculated_rois = np.stack(
-        #     #     [sampled_rois[:, 2] - sampled_rois[:, 0], sampled_rois[:, 3] - sampled_rois[:, 1]], axis=1)
-        #     # assert np.allclose(selected_medoids, calculated_rois)
-        #     # Check if colludes with ground truths in the images
-        #     iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, roi_matrix[:, 1:5]),
-        #                                      axis=1, arr=sampled_rois)
-        #     max_ious = np.max(iou_matrix, axis=1)
-        #     positive_roi_indices = np.nonzero(max_ious >= Constants.POSITIVE_IOU_THRESHOLD)[0]
-        #     negative_roi_indices = np.nonzero(max_ious < Constants.NEGATIVE_IOU_THRESHOLD)[0]
-        #     positive_rois = sampled_rois[positive_roi_indices]
-        #     negative_rois = sampled_rois[negative_roi_indices]
-        #     print("X")
-
-
-
-            # non_zero_indices = np.nonzero(max_ious >= positive_iou_threshold)[0]
-            # if np.max(iou_matrix) >= 0.5:
-            #     print("X")
-            # # For visualization
-            # roi_matrix_v2 = np.concatenate([sampled_rois.astype(np.int32), roi_matrix[:, 1:5]], axis=0)
-            # colors = [(255, 0, 0)] * sampled_rois.shape[0]
-            # for idx in non_zero_indices:
-            #     colors[idx] = (255, 0, 255)
-            # colors.extend([(0, 0, 255)] * roi_matrix.shape[0])
-            # ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp", img=img, roi_matrix=roi_matrix_v2,
-            #                                                      colors=colors)
-            # For visualization
-            print("X")
+        # Select negative regions
+        sample_count = total_rois
+        while True:
+            left_coord_upper_limits = img_width - selected_medoids[:, 0]
+            roi_left_coords = np.random.uniform(low=0, high=left_coord_upper_limits, size=sample_count)
+            roi_right_coords = roi_left_coords + selected_medoids[:, 0]
+            top_coord_upper_limits = img_height - selected_medoids[:, 1]
+            roi_top_coords = np.random.uniform(low=0, high=top_coord_upper_limits, size=sample_count)
+            roi_bottom_coords = roi_top_coords + selected_medoids[:, 1]
+            proposals = np.stack([roi_left_coords, roi_top_coords, roi_right_coords, roi_bottom_coords], axis=1)
+            # calculated_rois = np.stack(
+            #     [sampled_rois[:, 2] - sampled_rois[:, 0], sampled_rois[:, 3] - sampled_rois[:, 1]], axis=1)
+            # assert np.allclose(selected_medoids, calculated_rois)
+            # Check if colludes with ground truths in the images
+            iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, roi_matrix[:, 1:5]),
+                                             axis=1, arr=proposals)
+            max_ious = np.max(iou_matrix, axis=1)
+            positive_roi_indices = np.nonzero(max_ious >= Constants.POSITIVE_IOU_THRESHOLD)[0]
+            negative_roi_indices = np.nonzero(max_ious < Constants.NEGATIVE_IOU_THRESHOLD)[0]
+            positive_proposals = proposals[positive_roi_indices]
+            negative_proposals = proposals[negative_roi_indices]
+            positive_proposals_all = np.concatenate([positive_proposals_all, positive_proposals], axis=0)
+            if negative_proposals_all is None:
+                negative_proposals_all = negative_proposals
+            else:
+                negative_proposals_all = np.concatenate([negative_proposals_all, negative_proposals], axis=0)
+            if negative_proposals_all.shape[0] >= negative_roi_count:
+                # bb_matrix = np.concatenate([positive_proposals_all, roi_matrix[:, 1:5]], axis=0).astype(np.int32)
+                # colors = [(255, 0, 0)] * positive_proposals_all.shape[0]
+                # colors.extend([(0, 0, 255)] * roi_matrix.shape[0])
+                # ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp3", img=img, roi_matrix=bb_matrix,
+                #                                                      colors=colors)
+                break
+        # Build the roi batch
+        # First: Sample positive rois
+        positive_proposals_selected_idx = np.random.choice(positive_proposals_all.shape[0], positive_roi_count,
+                                                           replace=False)
+        negative_proposals_selected_idx = np.random.choice(negative_proposals_all.shape[0], negative_roi_count,
+                                                           replace=False)
+        positive_proposals_selected = positive_proposals_all[positive_proposals_selected_idx]
+        negative_proposals_selected = negative_proposals_all[negative_proposals_selected_idx]
+        print("X")
 
     def create_image_batch(self, batch_size, positive_iou_threshold, roi_sample_count, positive_sample_ratio):
         positive_roi_count = int(roi_sample_count * positive_sample_ratio)
@@ -252,7 +245,6 @@ class ObjectDetectionDataManager(object):
                              roi_matrix=reshaped_roi_matrix, positive_iou_threshold=positive_iou_threshold,
                              positive_roi_count=positive_roi_count,
                              negative_roi_count=negative_roi_count)
-
 
             # while found_positive_rois < positive_roi_count:
             #     x_coords = np.random.uniform(low=0, high=selected_scale - selected_roi[0], size=(roi_sample_count, ))
