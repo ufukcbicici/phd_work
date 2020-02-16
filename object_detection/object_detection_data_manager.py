@@ -181,12 +181,21 @@ class ObjectDetectionDataManager(object):
                 break
         # Build the roi batch
         # First: Sample positive rois
+
+        def assert_func(bb_arr):
+            assert np.sum(bb_arr[:, 0] < 0) == 0 and \
+                   np.sum(bb_arr[:, 1] < 0) == 0 and \
+                   np.sum(bb_arr[:, 2] > img_width) == 0 and \
+                   np.sum(bb_arr[:, 3] > img_height) == 0
+
         positive_proposals_selected_idx = np.random.choice(positive_proposals_all.shape[0], positive_roi_count,
                                                            replace=False)
         negative_proposals_selected_idx = np.random.choice(negative_proposals_all.shape[0], negative_roi_count,
                                                            replace=False)
         positive_proposals_selected = positive_proposals_all[positive_proposals_selected_idx]
+        assert_func(positive_proposals_selected)
         negative_proposals_selected = negative_proposals_all[negative_proposals_selected_idx]
+        assert_func(negative_proposals_selected)
         print("X")
 
     def create_image_batch(self, batch_size, positive_iou_threshold, roi_sample_count, positive_sample_ratio):
