@@ -181,6 +181,8 @@ class ObjectDetectionDataManager(object):
             negative_roi_indices = np.nonzero(max_ious < Constants.NEGATIVE_IOU_THRESHOLD)[0]
             # positive_proposals = proposals[positive_roi_indices]
             negative_proposals = proposals[negative_roi_indices]
+            negative_proposals = np.concatenate(
+                [self.backgroundLabel * np.ones(shape=(negative_proposals.shape[0], 1)), negative_proposals], axis=1)
             # positive_proposals_all = np.concatenate([positive_proposals_all, positive_proposals], axis=0)
             if negative_proposals_all is None:
                 negative_proposals_all = negative_proposals
@@ -208,22 +210,21 @@ class ObjectDetectionDataManager(object):
         negative_proposals_selected_idx = np.random.choice(negative_proposals_all.shape[0], negative_roi_count,
                                                            replace=False)
         positive_proposals_selected = positive_proposals_all[positive_proposals_selected_idx]
-        assert_func(positive_proposals_selected)
+        assert_func(positive_proposals_selected[:, 1:5])
         negative_proposals_selected = negative_proposals_all[negative_proposals_selected_idx]
-        assert_func(negative_proposals_selected)
+        assert_func(negative_proposals_selected[:, 1:15])
         all_proposals = np.concatenate([positive_proposals_selected, negative_proposals_selected], axis=0)
-        labels = [1] * positive_proposals_selected.shape[0]
-        labels.extend([0] * negative_proposals_selected.shape[0])
-        labels = np.array(labels)
         # Visualize
-        bb_matrix = np.concatenate([positive_proposals_selected, negative_proposals_selected, roi_matrix[:, 1:5]],
+        bb_matrix = np.concatenate([positive_proposals_selected[:, 1:5],
+                                    negative_proposals_selected[:, 1:5],
+                                    roi_matrix[:, 1:5]],
                                    axis=0).astype(np.int32)
         colors = [(255, 0, 0)] * positive_proposals_selected.shape[0]
         colors.extend([(0, 0, 255)] * negative_proposals_selected.shape[0])
         colors.extend([(255, 0, 255)] * negative_proposals_selected.shape[0])
         ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp4", img=img, roi_matrix=bb_matrix,
                                                              colors=colors)
-        return all_proposals, labels
+        return all_proposals
 
     def create_image_batch(self, batch_size, positive_iou_threshold, roi_sample_count, positive_sample_ratio):
         positive_roi_count = int(roi_sample_count * positive_sample_ratio)
@@ -279,16 +280,14 @@ class ObjectDetectionDataManager(object):
             #     print("X")
             # cv2.imwrite("Image{0}.png".format(idx), images[idx])
             # ********** This is for visualizing **********
-            roi_proposals, labels = self.sample_rois(medoids=self.medoidRois, img=images[idx], true_height=img_height,
-                                                     roi_matrix=reshaped_roi_matrix,
-                                                     positive_iou_threshold=positive_iou_threshold,
-                                                     positive_roi_count=positive_roi_count,
-                                                     negative_roi_count=negative_roi_count)
+            roi_proposals = self.sample_rois(medoids=self.medoidRois, img=images[idx], true_height=img_height,
+                                             roi_matrix=reshaped_roi_matrix,
+                                             positive_iou_threshold=positive_iou_threshold,
+                                             positive_roi_count=positive_roi_count,
+                                             negative_roi_count=negative_roi_count)
             roi_proposals_tensor.append(roi_proposals)
-            label_matrix.append(labels)
         roi_proposals_tensor = np.stack(roi_proposals_tensor, axis=0)
-        label_matrix = np.stack(label_matrix, axis=0)
-        return images, roi_proposals_tensor, label_matrix
+        return images, roi_proposals_tensor
 
     # def detect_outlier_bbs(self):
     #     training_images = self.dataList[self.trainingImageIndices]
