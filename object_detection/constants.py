@@ -19,3 +19,4 @@ class Constants:
     RELU_LEAKINESS = 0.1
     FILTER_STRIDES = [1, 2, 2]
     ACTIVATE_BEFORE_RESIDUALS = [True, True, False]
+    BATCH_NORM_DECAY = 0.9

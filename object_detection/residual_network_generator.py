@@ -1,13 +1,8 @@
 import numpy as np
 import tensorflow as tf
 
-from algorithms.custom_batch_norm_algorithms import CustomBatchNormAlgorithms
-from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.global_params import GlobalConstants
 
-
-class ResnetGenerator:
+class ResidualNetworkGenerator:
     # BottleneckGroup = namedtuple('BottleneckGroup', ['num_blocks', 'num_filters', 'bottleneck_size', 'down_sample'])
 
     # MultiGpu OK
@@ -62,51 +57,51 @@ class ResnetGenerator:
     # MultiGpu OK
     @staticmethod
     def bottleneck_residual(x, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual,
-                            bn_momentum, node):
+                            bn_momentum):
         """Bottleneck residual unit with 3 sub layers."""
         if activate_before_residual:
             with tf.variable_scope("common_bn_relu"):
-                x = ResnetGenerator.batch_norm("init_bn", x, is_train, bn_momentum)
-                x = ResnetGenerator.relu(x, relu_leakiness)
+                x = ResidualNetworkGenerator.batch_norm("init_bn", x, is_train, bn_momentum)
+                x = ResidualNetworkGenerator.relu(x, relu_leakiness)
                 orig_x = x
         else:
             with tf.variable_scope("residual_bn_relu"):
                 orig_x = x
-                x = ResnetGenerator.batch_norm("init_bn", x, is_train, bn_momentum)
-                x = ResnetGenerator.relu(x, relu_leakiness)
+                x = ResidualNetworkGenerator.batch_norm("init_bn", x, is_train, bn_momentum)
+                x = ResidualNetworkGenerator.relu(x, relu_leakiness)
 
         with tf.variable_scope("sub1"):
-            x = ResnetGenerator.conv("conv_1", x, 1, in_filter, out_filter / 4, stride)
+            x = ResidualNetworkGenerator.conv("conv_1", x, 1, in_filter, out_filter / 4, stride)
 
         with tf.variable_scope("sub2"):
-            x = ResnetGenerator.batch_norm("bn2", x, is_train, bn_momentum)
-            x = ResnetGenerator.relu(x, relu_leakiness)
-            x = ResnetGenerator.conv("conv2", x, 3, out_filter / 4, out_filter / 4, [1, 1, 1, 1])
+            x = ResidualNetworkGenerator.batch_norm("bn2", x, is_train, bn_momentum)
+            x = ResidualNetworkGenerator.relu(x, relu_leakiness)
+            x = ResidualNetworkGenerator.conv("conv2", x, 3, out_filter / 4, out_filter / 4, [1, 1, 1, 1])
 
         with tf.variable_scope("sub3"):
-            x = ResnetGenerator.batch_norm("bn3", x, is_train, bn_momentum)
-            x = ResnetGenerator.relu(x, relu_leakiness)
-            x = ResnetGenerator.conv("conv3", x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
+            x = ResidualNetworkGenerator.batch_norm("bn3", x, is_train, bn_momentum)
+            x = ResidualNetworkGenerator.relu(x, relu_leakiness)
+            x = ResidualNetworkGenerator.conv("conv3", x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
 
         with tf.variable_scope("sub_add"):
             if in_filter != out_filter or not all([d == 1 for d in stride]):
-                orig_x = ResnetGenerator.conv("project", orig_x, 1, in_filter, out_filter, stride)
+                orig_x = ResidualNetworkGenerator.conv("project", orig_x, 1, in_filter, out_filter, stride)
             x += orig_x
         return x
 
     # MultiGpu OK
     @staticmethod
-    def get_input(input, out_filters, first_conv_filter_size, node):
+    def get_input(input, out_filters, first_conv_filter_size):
         assert input.get_shape().ndims == 4
         input_filters = input.get_shape().as_list()[-1]
-        x = ResnetGenerator.conv("init_conv", input, first_conv_filter_size, input_filters, out_filters,
-                                 ResnetGenerator.stride_arr(1))
+        x = ResidualNetworkGenerator.conv("init_conv", input, first_conv_filter_size, input_filters, out_filters,
+                                          ResidualNetworkGenerator.stride_arr(1))
         return x
 
     # MultiGpu OK
     @staticmethod
     def get_output(x, is_train, leakiness, bn_momentum):
-        x = ResnetGenerator.batch_norm("final_bn", x, is_train, bn_momentum)
-        x = ResnetGenerator.relu(x, leakiness)
-        x = ResnetGenerator.global_avg_pool(x)
+        x = ResidualNetworkGenerator.batch_norm("final_bn", x, is_train, bn_momentum)
+        x = ResidualNetworkGenerator.relu(x, leakiness)
+        x = ResidualNetworkGenerator.global_avg_pool(x)
         return x

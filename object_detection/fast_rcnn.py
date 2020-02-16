@@ -1,13 +1,14 @@
 import tensorflow as tf
 import numpy as np
 
-from algorithms.resnet.resnet_generator import ResnetGenerator
 from object_detection.constants import Constants
+from object_detection.residual_network_generator import ResidualNetworkGenerator
 
 
 class FastRcnn:
     def __init__(self):
         self.imageInputs = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 3], name='input')
+        self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
 
     def build_resnet_backbone(self):
         # ResNet Parameters
@@ -18,20 +19,35 @@ class FastRcnn:
         stride_list = Constants.FILTER_STRIDES
         active_before_residuals = Constants.ACTIVATE_BEFORE_RESIDUALS
 
-
-        # strides = GlobalConstants.RESNET_HYPERPARAMS.strides
-        # activate_before_residual = GlobalConstants.RESNET_HYPERPARAMS.activate_before_residual
-        # filters = GlobalConstants.RESNET_HYPERPARAMS.num_of_features_per_block
-        # num_of_units_per_block = Constants.num_residual_units
-        # relu_leakiness = GlobalConstants.RESNET_HYPERPARAMS.relu_leakiness
-        # first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_size
-
+        assert len(num_of_feature_maps_per_block) == len(stride_list) + 1 and \
+               len(num_of_feature_maps_per_block) == len(active_before_residuals) + 1
         # Input layer
-        x = ResnetGenerator.get_input(input=self.imageInputs, out_filters=num_of_feature_maps_per_block[0],
-                                      first_conv_filter_size=first_conv_filter_size, node=node)
-
-
-
+        x = ResidualNetworkGenerator.get_input(input=self.imageInputs, out_filters=num_of_feature_maps_per_block[0],
+                                               first_conv_filter_size=first_conv_filter_size)
+        # Loop over blocks
+        for block_id in range(len(num_of_feature_maps_per_block) - 1):
+            with tf.variable_scope("block_{0}_0".format(block_id)):
+                x = ResidualNetworkGenerator.bottleneck_residual(
+                    x=x,
+                    in_filter=num_of_feature_maps_per_block[block_id],
+                    out_filter=num_of_feature_maps_per_block[block_id + 1],
+                    stride=ResidualNetworkGenerator.stride_arr(stride_list[block_id]),
+                    activate_before_residual=active_before_residuals[block_id],
+                    relu_leakiness=relu_leakiness,
+                    is_train=self.isTrain,
+                    bn_momentum=Constants.BATCH_NORM_DECAY)
+            for i in range(num_of_units_per_block - 1):
+                with tf.variable_scope("block_{0}_{1}".format(block_id, i + 1)):
+                    x = ResidualNetworkGenerator.bottleneck_residual(
+                        x=x,
+                        in_filter=num_of_feature_maps_per_block[block_id + 1],
+                        out_filter=num_of_feature_maps_per_block[block_id + 1],
+                        stride=ResidualNetworkGenerator.stride_arr(1),
+                        activate_before_residual=False,
+                        relu_leakiness=relu_leakiness,
+                        is_train=self.isTrain,
+                        bn_momentum=Constants.BATCH_NORM_DECAY)
+            print("X")
 
 # net = imageInputs
 # in_filters = imageInputs.get_shape().as_list()[-1]
