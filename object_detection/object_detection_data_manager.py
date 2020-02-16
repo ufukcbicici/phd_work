@@ -215,15 +215,15 @@ class ObjectDetectionDataManager(object):
         assert_func(negative_proposals_selected[:, 1:15])
         all_proposals = np.concatenate([positive_proposals_selected, negative_proposals_selected], axis=0)
         # Visualize
-        bb_matrix = np.concatenate([positive_proposals_selected[:, 1:5],
-                                    negative_proposals_selected[:, 1:5],
-                                    roi_matrix[:, 1:5]],
-                                   axis=0).astype(np.int32)
-        colors = [(255, 0, 0)] * positive_proposals_selected.shape[0]
-        colors.extend([(0, 0, 255)] * negative_proposals_selected.shape[0])
-        colors.extend([(255, 0, 255)] * negative_proposals_selected.shape[0])
-        ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp4", img=img, roi_matrix=bb_matrix,
-                                                             colors=colors)
+        # bb_matrix = np.concatenate([positive_proposals_selected[:, 1:5],
+        #                             negative_proposals_selected[:, 1:5],
+        #                             roi_matrix[:, 1:5]],
+        #                            axis=0).astype(np.int32)
+        # colors = [(255, 0, 0)] * positive_proposals_selected.shape[0]
+        # colors.extend([(0, 0, 255)] * negative_proposals_selected.shape[0])
+        # colors.extend([(255, 0, 255)] * negative_proposals_selected.shape[0])
+        # ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp4", img=img, roi_matrix=bb_matrix,
+        #                                                      colors=colors)
         return all_proposals
 
     def create_image_batch(self, batch_size, positive_iou_threshold, roi_sample_count, positive_sample_ratio):

@@ -20,12 +20,12 @@ def load_dataset():
     curr_path = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(os.path.join(os.path.join(curr_path, ".."), "data"), "tuborgData")
     dataset = ObjectDetectionDataManager.load_processed_data(data_path=path)
+    dataset.calculate_label_distribution()
     return dataset
 
 
 def main():
     dataset = load_dataset()
-    dataset.calculate_label_distribution()
     dataset.create_image_batch(
         batch_size=Constants.IMAGE_COUNT_PER_BATCH,
         positive_iou_threshold=Constants.POSITIVE_IOU_THRESHOLD,
