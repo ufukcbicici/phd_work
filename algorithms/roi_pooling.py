@@ -57,8 +57,11 @@ class RoIPooling:
     def pool_roi_single_f_map_single_roi(feature_map, roi, pooled_height, pooled_width):
         # Feature map: Single feature map
         # roi: Single region of interest
-        feature_map_height = int(feature_map.shape[0])
-        feature_map_width = int(feature_map.shape[1])
+        feature_map_shape = tf.shape(feature_map)
+        feature_map_height = tf.cast(tf.gather_nd(feature_map_shape, [0]), "float32")
+        feature_map_width = tf.cast(tf.gather_nd(feature_map_shape, [1]), "float32")
+        # feature_map_height = int(feature_map.shape[0])
+        # feature_map_width = int(feature_map.shape[1])
         h_start = tf.cast(feature_map_height * roi[0], 'int32')
         w_start = tf.cast(feature_map_width * roi[1], 'int32')
         h_end = tf.cast(feature_map_height * roi[2], 'int32')
@@ -122,23 +125,20 @@ def get_dummy_roi_tensor():
 def test_roi_pooling_layer():
     pooled_height = 7
     pooled_width = 7
-    input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, IMG_W, IMG_H, FEATURE_COUNT])
+    input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, None, None, FEATURE_COUNT])
     rois_tensor = tf.placeholder(tf.float32, shape=(None, NUM_ROIS, 4))
+    # Network
+    roi_output = RoIPooling.roi_pool(x=[input_tensor, rois_tensor],
+                                     pooled_height=pooled_height, pooled_width=pooled_width)
     sess = tf.Session()
     for iteration_id in range(1000):
         # Prepare dummy image data
         random_imgs = np.random.uniform(size=(BATCH_SIZE, IMG_W, IMG_H, FEATURE_COUNT))
         # Prepare dummy roi data
         roi_arr = get_dummy_roi_tensor()
-
-        # Network
-        roi_output = RoIPooling.roi_pool(x=[input_tensor, rois_tensor],
-                                         pooled_height=pooled_height, pooled_width=pooled_width)
-
         # Get the Tensorflow result.
         results = sess.run([roi_output], feed_dict={input_tensor: random_imgs, rois_tensor: roi_arr})
         tf_result = results[0]
-
         # Calculate a manual simulation, with very basic for loops
         pooled_imgs = []
         for img_idx in range(random_imgs.shape[0]):

@@ -31,6 +31,7 @@ class ObjectDetectionDataManager(object):
         self.testImageIndices = None
         self.medoidRois = None
         self.backgroundLabel = None
+        self.maxHeight = None
 
     def read_data(self):
         onlyfiles = [f for f in listdir(self.dataPath) if isfile(join(self.dataPath, f))]

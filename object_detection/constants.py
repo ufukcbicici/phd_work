@@ -2,6 +2,7 @@ class Constants:
     def __init__(self):
         pass
 
+    # FAST RCNN - RoI Sampling Parameters
     IMG_WIDTHS = [320, 480, 640]
     POSITIVE_IOU_THRESHOLD = 0.7
     NEGATIVE_IOU_THRESHOLD = 0.4
@@ -11,3 +12,10 @@ class Constants:
     ROI_SAMPLE_COUNT_PER_IMAGE = 128
     POSITIVE_SAMPLE_RATIO_PER_IMAGE = 0.25
 
+    # ResNet Parameters
+    NUM_OF_RESIDUAL_UNITS = 5
+    NUM_OF_FEATURES_PER_BLOCK = [16, 32, 64, 128]
+    FIRST_CONV_FILTER_SIZE = 3
+    RELU_LEAKINESS = 0.1
+    FILTER_STRIDES = [1, 2, 2]
+    ACTIVATE_BEFORE_RESIDUALS = [True, True, False]
