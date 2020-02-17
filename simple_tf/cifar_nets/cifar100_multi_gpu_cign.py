@@ -16,7 +16,7 @@ class Cifar100_MultiGpuCign(CignMultiGpu):
         total_param_count = 0
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
-        explanation = "Resnet-50 Multi Gpu CIGN v2\n"
+        explanation = "Resnet-50 Multi Gpu CIGN Policy Gradients\n"
         # explanation = "Resnet-50 CIGN Random Sampling Routing Tests\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)

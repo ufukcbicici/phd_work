@@ -24,6 +24,7 @@ class Cifar100_Cign(FastTreeNetwork):
     @staticmethod
     def apply_router_transformation(network, net, node, decision_feature_size):
         h_net = net
+        node.evalDict[network.get_variable_name(name="pre_branch_feature", node=node)] = h_net
         net_shape = h_net.get_shape().as_list()
         # Global Average Pooling
         h_net = tf.nn.avg_pool(h_net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')

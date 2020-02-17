@@ -16,12 +16,12 @@ from simple_tf.cifar_nets.cifar100_resnet_baseline import Cifar100_Baseline
 from simple_tf.cign.cign_multi_gpu_early_exit import CignMultiGpuEarlyExit
 from simple_tf.global_params import GlobalConstants
 
-use_multi_gpu = False
+use_multi_gpu = True
 use_multi_gpu_single_late_exit = False
 use_multi_gpu_early_exit = False
 use_sampling = False
 use_random_sampling = False
-use_baseline = True
+use_baseline = False
 
 
 def get_network(dataset, network_name):
@@ -54,7 +54,7 @@ def get_network(dataset, network_name):
 def cifar_100_training():
     import sys
     print(sys.version)
-    network_name = "Cifar100_MultiGpu_CignEarlyExit_[2,2]_[64,64,64]_IG1.0"
+    network_name = "Cifar100_MultiGPU_[2,2]_IG1.0"
     # classification_wd = [0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd = [0.00025, 0.0003, 0.00035, 0.0004] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR
     # classification_wd.extend([0.0004, 0.00045, 0.0005, 0.00055, 0.0006] * GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
