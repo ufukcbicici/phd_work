@@ -126,7 +126,7 @@ def test_roi_pooling_layer():
     pooled_height = 7
     pooled_width = 7
     input_tensor = tf.placeholder(dtype=tf.float32, shape=[None, None, None, FEATURE_COUNT])
-    rois_tensor = tf.placeholder(tf.float32, shape=(None, NUM_ROIS, 4))
+    rois_tensor = tf.placeholder(tf.float32, shape=(None, None, 4))
     # Network
     roi_output = RoIPooling.roi_pool(x=[input_tensor, rois_tensor],
                                      pooled_height=pooled_height, pooled_width=pooled_width)

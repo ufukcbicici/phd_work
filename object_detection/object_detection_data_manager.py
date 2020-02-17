@@ -105,7 +105,7 @@ class ObjectDetectionDataManager(object):
         pickle_in_file.close()
         return dataset
 
-    def sample_rois(self, medoids, img, true_height, roi_matrix, positive_iou_threshold,
+    def sample_rois(self, medoids, img, true_height, roi_matrix,
                     positive_roi_count, negative_roi_count):
         #  Get medoid distribution
         found_positive_rois = 0
@@ -227,7 +227,7 @@ class ObjectDetectionDataManager(object):
         #                                                      colors=colors)
         return all_proposals
 
-    def create_image_batch(self, batch_size, positive_iou_threshold, roi_sample_count, positive_sample_ratio):
+    def create_image_batch(self, batch_size, roi_sample_count, positive_sample_ratio):
         positive_roi_count = int(roi_sample_count * positive_sample_ratio)
         negative_roi_count = roi_sample_count - positive_roi_count
         # Sample scales
@@ -283,11 +283,14 @@ class ObjectDetectionDataManager(object):
             # ********** This is for visualizing **********
             roi_proposals = self.sample_rois(medoids=self.medoidRois, img=images[idx], true_height=img_height,
                                              roi_matrix=reshaped_roi_matrix,
-                                             positive_iou_threshold=positive_iou_threshold,
                                              positive_roi_count=positive_roi_count,
                                              negative_roi_count=negative_roi_count)
             roi_proposals_tensor.append(roi_proposals)
         roi_proposals_tensor = np.stack(roi_proposals_tensor, axis=0)
+        # Convert to normalized coordinates
+        roi_proposals_tensor[:, :, [1, 3]] = roi_proposals_tensor[:, :, [1, 3]] / images.shape[2]
+        roi_proposals_tensor[:, :, [2, 4]] = roi_proposals_tensor[:, :, [2, 4]] / images.shape[1]
+        assert np.sum(roi_proposals_tensor[:, :, 1:] < 0) == 0 and np.sum(roi_proposals_tensor[:, :, 1:] > 1) == 0
         return images, roi_proposals_tensor
 
     # def detect_outlier_bbs(self):

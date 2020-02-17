@@ -1,23 +1,29 @@
 import tensorflow as tf
 import numpy as np
 
+from algorithms.roi_pooling import RoIPooling
 from object_detection.constants import Constants
 from object_detection.residual_network_generator import ResidualNetworkGenerator
 
 
 class FastRcnn:
-    def __init__(self, backbone_type):
+    def __init__(self, backbone_type="ResNet"):
         self.imageInputs = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 3], name='input')
+        self.roiInputs = tf.placeholder(tf.float32, shape=(None, None, 4))
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
         self.backboneType = backbone_type
         self.backboneNetworkOutput = None
+        self.roiPoolingOutput = None
 
     def build_network(self):
         # Build the backbone
-        if self.backboneType == "Resnet":
-            self.backboneNetworkOutput = self.build_resnet_backbone()
-        else:
-            raise NotImplementedError()
+        with tf.variable_scope("Backbone_Network"):
+            if self.backboneType == "ResNet":
+                self.backboneNetworkOutput = self.build_resnet_backbone()
+            else:
+                raise NotImplementedError()
+        # Build the roi pooling phase
+        self.build_roi_pooling()
 
     def build_resnet_backbone(self):
         # ResNet Parameters
@@ -58,6 +64,31 @@ class FastRcnn:
                         bn_momentum=Constants.BATCH_NORM_DECAY)
         return x
 
+    def build_roi_pooling(self):
+        with tf.control_dependencies([self.backboneNetworkOutput]):
+            self.roiPoolingOutput = RoIPooling.roi_pool(x=[self.backboneNetworkOutput, self.roiInputs],
+                                                        pooled_height=Constants.POOLED_HEIGHT,
+                                                        pooled_width=Constants.POOLED_WIDTH)
+
+    def train(self, dataset):
+        sess = tf.Session()
+        sess.run(tf.initialize_all_variables())
+
+        while True:
+            # Extract sample images and roi proposals per image.
+            images, roi_proposals_tensor = dataset.create_image_batch(
+                batch_size=Constants.IMAGE_COUNT_PER_BATCH,
+                roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
+                positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
+
+            roi_labels = roi_proposals_tensor[:, :, 0].astype(np.int32)
+            roi_proposals = roi_proposals_tensor[:, :, 1:]
+
+            feed_dict = {self.imageInputs: images,
+                         self.isTrain: 1,
+                         self.roiInputs: roi_proposals}
+            results = sess.run([self.backboneNetworkOutput, self.roiPoolingOutput], feed_dict=feed_dict)
+            print("X")
 
 # net = imageInputs
 # in_filters = imageInputs.get_shape().as_list()[-1]

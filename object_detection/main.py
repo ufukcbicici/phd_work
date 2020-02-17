@@ -3,6 +3,7 @@ import numpy as np
 
 from object_detection.bb_clustering import BBClustering
 from object_detection.constants import Constants
+from object_detection.fast_rcnn import FastRcnn
 from object_detection.object_detection_data_manager import ObjectDetectionDataManager
 
 
@@ -24,13 +25,23 @@ def load_dataset():
     return dataset
 
 
-def main():
+def train_fast_rcnn_detector():
     dataset = load_dataset()
-    dataset.create_image_batch(
-        batch_size=Constants.IMAGE_COUNT_PER_BATCH,
-        positive_iou_threshold=Constants.POSITIVE_IOU_THRESHOLD,
-        roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
-        positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
+    detector = FastRcnn()
+    detector.build_network()
+    detector.train(dataset=dataset)
+
+
+def main():
+    train_fast_rcnn_detector()
+
+
+    # dataset = load_dataset()
+    # dataset.create_image_batch(
+    #     batch_size=Constants.IMAGE_COUNT_PER_BATCH,
+    #     positive_iou_threshold=Constants.POSITIVE_IOU_THRESHOLD,
+    #     roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
+    #     positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
 
     # create_dataset(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD, max_coverage=Constants.MAX_INCLUSIVENESS_BB,
     #                test_ratio=0.15)
