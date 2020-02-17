@@ -62,17 +62,18 @@ class RoIPooling:
         feature_map_width = tf.cast(tf.gather_nd(feature_map_shape, [1]), "float32")
         # feature_map_height = int(feature_map.shape[0])
         # feature_map_width = int(feature_map.shape[1])
-        h_start = tf.cast(feature_map_height * roi[0], 'int32')
-        w_start = tf.cast(feature_map_width * roi[1], 'int32')
-        h_end = tf.cast(feature_map_height * roi[2], 'int32')
-        w_end = tf.cast(feature_map_width * roi[3], 'int32')
+        h_start = tf.cast(feature_map_height * roi[1], 'int32')
+        w_start = tf.cast(feature_map_width * roi[0], 'int32')
+        h_end = tf.cast(feature_map_height * roi[3], 'int32')
+        w_end = tf.cast(feature_map_width * roi[2], 'int32')
         region = feature_map[h_start:h_end, w_start:w_end, :]
         # Divide the region into non overlapping areas
         region_height = h_end - h_start
         region_width = w_end - w_start
         h_step = tf.cast(region_height / pooled_height, 'int32')
         w_step = tf.cast(region_width / pooled_width, 'int32')
-        areas = [[(i * h_step, j * w_step,
+        areas = [[(i * h_step,
+                   j * w_step,
                    (i + 1) * h_step if i + 1 < pooled_height else region_height,
                    (j + 1) * w_step if j + 1 < pooled_width else region_width)
                   for j in range(pooled_width)]
