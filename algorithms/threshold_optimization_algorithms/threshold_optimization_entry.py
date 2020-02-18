@@ -19,7 +19,7 @@ from simple_tf.global_params import GlobalConstants
 
 # run_id = 1613
 # # network_name = "Cifar100_CIGN_Sampling"
-network_name = "dblogger.db"
+network_name = "FashionNet_Lite"
 # iteration = 48000
 # routing_data_dict = {}
 # max_num_of_iterations = 10000
@@ -97,7 +97,7 @@ def main():
     # weighted_score_list = [False]
     # balance_list = [1.0]
 
-    run_ids = [307]
+    run_ids = [451]
     iterations = [119700, 119800, 119900, 120000]
     xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 10
     weighted_score_list = [False]

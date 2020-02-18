@@ -16,7 +16,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_ACTION_PENALTY = 0.0
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
-    LAMBDA_MAC_COST = 0.1
+    LAMBDA_MAC_COST = 0.5
     BASELINE_UPDATE_GAMMA = 0.99
     CONV_FEATURES = [[], []]
     HIDDEN_LAYERS = [[128, 64], [256, 128]]
@@ -25,7 +25,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     MAX_POOL = [[], []]
 
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
-                 output_names, used_feature_names, policy_network_func, hidden_layers, use_baselines, state_sample_count,
+                 output_names, used_feature_names, policy_network_func, hidden_layers, use_baselines,
+                 state_sample_count,
                  trajectory_per_state_sample_count):
         self.stateInputTransformed = []
         self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay", shape=[])
@@ -86,7 +87,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         explanation = ""
         explanation += "INVALID_ACTION_PENALTY={0}\n".format(FullGpuTreePolicyGradientsNetwork.INVALID_ACTION_PENALTY)
         explanation += "VALID_PREDICTION_REWARD={0}\n".format(FullGpuTreePolicyGradientsNetwork.VALID_PREDICTION_REWARD)
-        explanation += "INVALID_PREDICTION_PENALTY={0}\n".format(FullGpuTreePolicyGradientsNetwork.INVALID_PREDICTION_PENALTY)
+        explanation += "INVALID_PREDICTION_PENALTY={0}\n".format(
+            FullGpuTreePolicyGradientsNetwork.INVALID_PREDICTION_PENALTY)
         explanation += "LAMBDA_MAC_COST={0}\n".format(FullGpuTreePolicyGradientsNetwork.LAMBDA_MAC_COST)
         explanation += "BASELINE_UPDATE_GAMMA={0}\n".format(FullGpuTreePolicyGradientsNetwork.BASELINE_UPDATE_GAMMA)
         explanation += "Hidden Layers={0}\n".format(self.hiddenLayers)
@@ -514,15 +516,23 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                          computation_overload_dict[(ignore_invalid_actions, combine_with_ig)]))
         DbLogger.write_into_table(rows=rows, table="policy_gradients_results", col_count=9)
 
+    def save_parameters_to_db(self, fold_id, network_id, network_name, state_sample_count,
+                              trajectory_per_sample_count, lambda_mac_cost, l2_lambda):
+        val_ml_accuracy, test_ml_accuracy = self.evaluate_ml_routing_accuracies()
+        exp_str = self.get_explanation()
+        run_id = DbLogger.get_run_id()
+        DbLogger.write_into_table(rows=[(run_id, exp_str)], table=DbLogger.runMetaData, col_count=2)
+        # Parameters table
+        rows = [(run_id, fold_id, network_id, network_name, state_sample_count, trajectory_per_sample_count,
+                 lambda_mac_cost, l2_lambda, val_ml_accuracy, test_ml_accuracy)]
+        DbLogger.write_into_table(rows=rows, table="policy_gradients_parameters", col_count=10)
+
     def train(self, sess, max_num_of_iterations=20000):
         sess.run(tf.initialize_all_variables())
         self.evaluate_ml_routing_accuracies()
         self.evaluate_policy_values(sess=sess)
         self.evaluate_routing_accuracies(sess=sess)
         routing_data = self.validationDataForMDP
-        exp_str = self.get_explanation()
-        run_id = DbLogger.get_run_id()
-        DbLogger.write_into_table(rows=[(run_id, exp_str)], table=DbLogger.runMetaData, col_count=2)
         for iteration_id in range(max_num_of_iterations):
             # Sample a set of trajectories
             # Sample from s1 ~ p(s1)

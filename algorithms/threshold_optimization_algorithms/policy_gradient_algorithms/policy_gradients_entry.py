@@ -8,6 +8,7 @@ from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.ful
     FullGpuTreePolicyTreeNetworkValidActions
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.tree_depth_policy_network import \
     TreeDepthPolicyNetwork
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
@@ -153,7 +154,7 @@ def compare_gpu_implementation():
 
 
 def train_policy_gradients_network():
-    run_id = 453
+    network_id = 453
     network_name = "FashionNet_Lite"
     iteration = 43680
 
@@ -161,42 +162,57 @@ def train_policy_gradients_network():
                     "pre_branch_feature"]
     used_output_names = ["pre_branch_feature"]
     network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test",
+    routing_data = network.load_routing_info(run_id=network_id, iteration=iteration, data_type="test",
                                              output_names=output_names)
-    validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
 
-    wd_list = [0.0001, 0.001, 0.1, 1.0, 5.0] * 10
-    # [0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * 10
-    state_sample_count_list = [1000]
-    samples_per_state_list = [1]
-    ignore_invalid_actions = False
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
-                                                                          state_sample_count_list,
-                                                                          samples_per_state_list])
+    # validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
+    validation_indices_list, test_indices_list = routing_data.obtain_splits(k_fold=10)
+    for fold_id, val_indices, test_indices in zip(range(10), validation_indices_list, test_indices_list):
+        validation_data, test_data = routing_data.split_dataset_with_indices(training_indices=val_indices,
+                                                                             test_indices=test_indices)
+        wd_list = [0.001] * 10
+        # [0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * 10
+        state_sample_count_list = [1000]
+        samples_per_state_list = [1]
+        mac_costs = [0.1, 0.25, 0.5]
+        ignore_invalid_actions = False
+        cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
+                                                                              state_sample_count_list,
+                                                                              samples_per_state_list,
+                                                                              mac_costs])
 
-    for tpl in cartesian_product:
-        sess = tf.Session()
-        l2_wd = tpl[0]
-        state_sample_count = tpl[1]
-        samples_per_state = tpl[2]
-        gpu_policy_grads = \
-            FullGpuTreePolicyTreeNetworkValidActions(l2_lambda=l2_wd,
-                                                     network=network,
-                                                     network_name=network_name,
-                                                     run_id=run_id,
-                                                     iteration=iteration,
-                                                     degree_list=[2, 2],
-                                                     output_names=output_names,
-                                                     used_feature_names=used_output_names,
-                                                     use_baselines=True,
-                                                     state_sample_count=state_sample_count,
-                                                     trajectory_per_state_sample_count=samples_per_state,
-                                                     hidden_layers=[[128], [256]],
-                                                     validation_data=validation_data,
-                                                     test_data=test_data,
-                                                     policy_network_func="cnn")
-        gpu_policy_grads.train(sess=sess, max_num_of_iterations=20000)
-        tf.reset_default_graph()
+        for tpl in cartesian_product:
+            sess = tf.Session()
+            l2_wd = tpl[0]
+            state_sample_count = tpl[1]
+            samples_per_state = tpl[2]
+            FullGpuTreePolicyTreeNetworkValidActions.LAMBDA_MAC_COST = tpl[3]
+            gpu_policy_grads = \
+                FullGpuTreePolicyTreeNetworkValidActions(l2_lambda=l2_wd,
+                                                         network=network,
+                                                         network_name=network_name,
+                                                         run_id=network_id,
+                                                         iteration=iteration,
+                                                         degree_list=[2, 2],
+                                                         output_names=output_names,
+                                                         used_feature_names=used_output_names,
+                                                         use_baselines=True,
+                                                         state_sample_count=state_sample_count,
+                                                         trajectory_per_state_sample_count=samples_per_state,
+                                                         hidden_layers=[[128], [256]],
+                                                         validation_data=validation_data,
+                                                         test_data=test_data,
+                                                         policy_network_func="cnn")
+            gpu_policy_grads.save_parameters_to_db(
+                fold_id=fold_id, network_id=network_id,
+                network_name=network_name,
+                state_sample_count=state_sample_count,
+                trajectory_per_sample_count=samples_per_state,
+                lambda_mac_cost=FullGpuTreePolicyTreeNetworkValidActions.LAMBDA_MAC_COST,
+                l2_lambda=l2_wd)
+
+            gpu_policy_grads.train(sess=sess, max_num_of_iterations=20000)
+            tf.reset_default_graph()
         # sess = tf.Session()
         # cpu_policy_grads = TreeDepthPolicyNetwork(l2_lambda=l2_wd,
         #                                           network=network,

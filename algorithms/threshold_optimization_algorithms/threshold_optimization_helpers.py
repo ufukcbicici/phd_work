@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 
 
 class BranchingInfo:
@@ -45,11 +46,17 @@ class RoutingDataset:
                     return False
         return True
 
-    def apply_validation_test_split(self, test_ratio):
+    def obtain_splits(self, k_fold):
+        kf = KFold(n_splits=k_fold, shuffle=True)
+        training_index_list = []
+        test_index_list = []
         indices = np.array(range(self.labelList.shape[0]))
-        val_indices, test_indices = train_test_split(indices, test_size=test_ratio)
-        split_sets = []
+        for train_indices, test_indices in kf.split(indices):
+            training_index_list.append(train_indices)
+            test_index_list.append(test_indices)
+        return training_index_list, test_index_list
 
+    def split_dataset_with_indices(self, training_indices, test_indices):
         def get_subset_of_dict(data_dict_, _i):
             subset_dict_ = {}
             for node_id, arr in data_dict_.items():
@@ -57,7 +64,8 @@ class RoutingDataset:
                 subset_dict_[node_id] = new_arr
             return subset_dict_
 
-        for idx in [val_indices, test_indices]:
+        split_sets = []
+        for idx in [training_indices, test_indices]:
             split_labels_list = np.copy(self.labelList[idx])
             dict_of_split_data = {}
             for data_name, data_dict in self.dictionaryOfRoutingData.items():
@@ -71,6 +79,12 @@ class RoutingDataset:
             split_sets.append(routing_data)
         val_data = split_sets[0]
         test_data = split_sets[1]
+        return val_data, test_data
+
+    def apply_validation_test_split(self, test_ratio):
+        indices = np.array(range(self.labelList.shape[0]))
+        val_indices, test_indices = train_test_split(indices, test_size=test_ratio)
+        val_data, test_data = self.split_dataset_with_indices(training_indices=val_indices, test_indices=test_indices)
         return val_data, test_data
 
     def get_dict(self, output_name):
