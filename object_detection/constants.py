@@ -44,3 +44,6 @@ class Constants:
     DETECTOR_FILTER_STRIDES = [1, 2]
     DETECTOR_ACTIVATE_BEFORE_RESIDUALS = [True, False]
     DETECTOR_BATCH_NORM_DECAY = 0.9
+
+    # Roi Feature Vector Transformations
+    CLASSIFIER_HIDDEN_LAYERS = [128]

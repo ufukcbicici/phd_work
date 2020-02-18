@@ -30,8 +30,10 @@ class ObjectDetectionDataManager(object):
         self.trainingImageIndices = None
         self.testImageIndices = None
         self.medoidRois = None
+        self.labelsDict = None
         self.backgroundLabel = None
         self.maxHeight = None
+        self.classCount = None
 
     def read_data(self):
         onlyfiles = [f for f in listdir(self.dataPath) if isfile(join(self.dataPath, f))]
@@ -89,10 +91,12 @@ class ObjectDetectionDataManager(object):
     def calculate_label_distribution(self):
         labels = [obj.roiMatrix[:, 0] for obj in self.dataList]
         labels = np.concatenate(labels, axis=0)
-        c = Counter(labels)
-        assert all([idx in c for idx in range(len(c))])
-        assert len(c) not in c
-        self.backgroundLabel = len(c)
+        self.labelsDict = Counter(labels)
+        assert all([idx in self.labelsDict for idx in range(len(self.labelsDict))])
+        assert len(self.labelsDict) not in self.labelsDict
+        self.backgroundLabel = len(self.labelsDict)
+        self.labelsDict[self.backgroundLabel] = 1
+        self.classCount = len(self.labelsDict)
 
     def save_processed_data(self):
         pickle_out_file = open(os.path.join(self.dataPath, "processed_dataset.sav"), "wb")

@@ -30,7 +30,7 @@ def load_dataset():
 
 def train_fast_rcnn_detector():
     dataset = load_dataset()
-    detector = FastRcnn()
+    detector = FastRcnn(class_count=dataset.classCount)
     detector.build_network()
     detector.train(dataset=dataset)
 

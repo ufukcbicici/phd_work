@@ -7,7 +7,7 @@ from object_detection.residual_network_generator import ResidualNetworkGenerator
 
 
 class FastRcnn:
-    def __init__(self, backbone_type="ResNet"):
+    def __init__(self, class_count, backbone_type="ResNet"):
         self.imageInputs = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 3], name='input')
         self.roiInputs = tf.placeholder(tf.float32, shape=(None, None, 4))
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
@@ -17,6 +17,10 @@ class FastRcnn:
         self.roiOutputShape = None
         self.newRoiShape = None
         self.detectorInput = None
+        self.detectorEndPoint = None
+        self.roiFeatureVector = None
+        self.classCount = class_count
+        self.logits = None
 
     def build_network(self):
         # Build the backbone
@@ -26,8 +30,10 @@ class FastRcnn:
             else:
                 raise NotImplementedError()
         # Build the roi pooling phase
-        self.build_roi_pooling()
-        # self.build_classifier_endpoint()
+        with tf.variable_scope("RoI_Pooling"):
+            self.build_roi_pooling()
+        with tf.variable_scope("Detector_Endpoint"):
+            self.build_detector_endpoint()
 
     def build_resnet_backbone(self):
         # ResNet Parameters
@@ -51,14 +57,14 @@ class FastRcnn:
             self.roiOutputShape = tf.shape(self.roiPoolingOutput)
             self.newRoiShape = tf.stack(
                 [tf.gather_nd(self.roiOutputShape, [0]) * tf.gather_nd(self.roiOutputShape, [1]),
-                 tf.gather_nd(self.roiOutputShape, [2]), tf.gather_nd(self.roiOutputShape, [3]),
-                 tf.gather_nd(self.roiOutputShape, [4])], axis=0)
+                 self.roiPoolingOutput.get_shape().as_list()[2],
+                 self.roiPoolingOutput.get_shape().as_list()[3],
+                 self.roiPoolingOutput.get_shape().as_list()[4]], axis=0)
             self.detectorInput = tf.reshape(self.roiPoolingOutput, shape=self.newRoiShape)
-            print("X")
 
-    def build_classifier_endpoint(self):
+    def build_detector_endpoint(self):
         x = ResidualNetworkGenerator.generate_resnet_blocks(
-            input_net=self.imageInputs,
+            input_net=self.detectorInput,
             num_of_units_per_block=Constants.DETECTOR_NUM_OF_RESIDUAL_UNITS,
             num_of_feature_maps_per_block=Constants.DETECTOR_NUM_OF_FEATURES_PER_BLOCK,
             first_conv_filter_size=Constants.DETECTOR_FIRST_CONV_FILTER_SIZE,
@@ -67,7 +73,18 @@ class FastRcnn:
             active_before_residuals=Constants.DETECTOR_ACTIVATE_BEFORE_RESIDUALS,
             is_train_tensor=self.isTrain,
             batch_norm_decay=Constants.BATCH_NORM_DECAY)
-        return x
+        self.detectorEndPoint = x
+        self.roiFeatureVector = ResidualNetworkGenerator.global_avg_pool(self.detectorEndPoint)
+        # MLP for detection
+        hidden_layers = list(Constants.CLASSIFIER_HIDDEN_LAYERS)
+        hidden_layers.append(self.classCount)
+        net = self.roiFeatureVector
+        for layer_id, layer_dim in enumerate(hidden_layers):
+            if layer_id < len(hidden_layers) - 1:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+            else:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
+        self.logits = net
 
     def test_roi_pooling(self, backbone_output, roi_pool_results, roi_proposals):
         pooled_imgs = []
