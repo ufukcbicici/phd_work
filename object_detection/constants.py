@@ -2,23 +2,45 @@ class Constants:
     def __init__(self):
         pass
 
-    # FAST RCNN - RoI Sampling Parameters
-    IMG_WIDTHS = [320, 480, 640]
+    # Image Scales
+    IMG_WIDTHS = [640]
+
+    # Test / Whole Dataset Ratio
+    TEST_RATIO = 0.15
+
+    # Bounding Box Clustering:
+    MAX_INCLUSIVENESS_BB = 0.975 # Coverage
+    MAX_MEDOID_COUNT = 8
+    MAX_IOU_DISTANCE = 0.5
+
+    # Object Detection and Testing: Positive and Negative Bounding Box Selection
     POSITIVE_IOU_THRESHOLD = 0.7
     NEGATIVE_IOU_THRESHOLD = 0.4
-    MAX_INCLUSIVENESS_BB = 0.99
+
+    # FAST RCNN - RoI Sampling Parameters
     POSITIVE_PROPOSAL_SAMPLING_STD = 20.0
-    IMAGE_COUNT_PER_BATCH = 3
+    IMAGE_COUNT_PER_BATCH = 2
     ROI_SAMPLE_COUNT_PER_IMAGE = 128
     POSITIVE_SAMPLE_RATIO_PER_IMAGE = 0.25
+
+    # ROI POOLING PARAMETERS
     POOLED_WIDTH = 7
     POOLED_HEIGHT = 7
 
-    # ResNet Parameters
-    NUM_OF_RESIDUAL_UNITS = 2
+    # BackBone ResNet Parameters
+    NUM_OF_RESIDUAL_UNITS = 3
     NUM_OF_FEATURES_PER_BLOCK = [16, 32, 64, 128]
     FIRST_CONV_FILTER_SIZE = 3
     RELU_LEAKINESS = 0.1
     FILTER_STRIDES = [1, 2, 2]
-    ACTIVATE_BEFORE_RESIDUALS = [True, True, False]
+    ACTIVATE_BEFORE_RESIDUALS = [True, False, False]
     BATCH_NORM_DECAY = 0.9
+
+    # Detector ResNet Parameters
+    DETECTOR_NUM_OF_RESIDUAL_UNITS = 3
+    DETECTOR_NUM_OF_FEATURES_PER_BLOCK = [128, 256, 512]
+    DETECTOR_FIRST_CONV_FILTER_SIZE = 3
+    DETECTOR_RELU_LEAKINESS = 0.1
+    DETECTOR_FILTER_STRIDES = [1, 2]
+    DETECTOR_ACTIVATE_BEFORE_RESIDUALS = [True, False]
+    DETECTOR_BATCH_NORM_DECAY = 0.9

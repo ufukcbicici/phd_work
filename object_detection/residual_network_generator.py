@@ -105,3 +105,43 @@ class ResidualNetworkGenerator:
         x = ResidualNetworkGenerator.relu(x, leakiness)
         x = ResidualNetworkGenerator.global_avg_pool(x)
         return x
+
+    @staticmethod
+    def generate_resnet_blocks(
+            input_net,
+            num_of_units_per_block,
+            num_of_feature_maps_per_block,
+            first_conv_filter_size,
+            relu_leakiness,
+            stride_list,
+            active_before_residuals,
+            is_train_tensor,
+            batch_norm_decay):
+        assert len(num_of_feature_maps_per_block) == len(stride_list) + 1 and \
+               len(num_of_feature_maps_per_block) == len(active_before_residuals) + 1
+        x = ResidualNetworkGenerator.get_input(input=input_net, out_filters=num_of_feature_maps_per_block[0],
+                                               first_conv_filter_size=first_conv_filter_size)
+        # Loop over blocks, the resnet trunk
+        for block_id in range(len(num_of_feature_maps_per_block) - 1):
+            with tf.variable_scope("block_{0}_0".format(block_id)):
+                x = ResidualNetworkGenerator.bottleneck_residual(
+                    x=x,
+                    in_filter=num_of_feature_maps_per_block[block_id],
+                    out_filter=num_of_feature_maps_per_block[block_id + 1],
+                    stride=ResidualNetworkGenerator.stride_arr(stride_list[block_id]),
+                    activate_before_residual=active_before_residuals[block_id],
+                    relu_leakiness=relu_leakiness,
+                    is_train=is_train_tensor,
+                    bn_momentum=batch_norm_decay)
+            for i in range(num_of_units_per_block - 1):
+                with tf.variable_scope("block_{0}_{1}".format(block_id, i + 1)):
+                    x = ResidualNetworkGenerator.bottleneck_residual(
+                        x=x,
+                        in_filter=num_of_feature_maps_per_block[block_id + 1],
+                        out_filter=num_of_feature_maps_per_block[block_id + 1],
+                        stride=ResidualNetworkGenerator.stride_arr(1),
+                        activate_before_residual=False,
+                        relu_leakiness=relu_leakiness,
+                        is_train=is_train_tensor,
+                        bn_momentum=batch_norm_decay)
+        return x

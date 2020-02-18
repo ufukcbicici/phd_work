@@ -69,7 +69,7 @@ class ObjectDetectionDataManager(object):
             data_dict[filename].roiMatrix = roi_arr
         self.dataList = np.array(list(data_dict.values()))
 
-    def process_data(self, iou_threshold, max_coverage, test_ratio=0.15):
+    def process_data(self, iou_threshold, max_coverage, max_num_of_medoids, test_ratio=0.15):
         # Create image scales and split into training and test sets.
         for img_obj in self.dataList:
             for img_width in Constants.IMG_WIDTHS:
@@ -82,6 +82,7 @@ class ObjectDetectionDataManager(object):
         training_objects = self.dataList[self.trainingImageIndices]
         self.medoidRois = BBClustering.run(training_objects=training_objects,
                                            iou_threshold=iou_threshold,
+                                           max_medoid_count=max_num_of_medoids,
                                            max_coverage=max_coverage)
         self.calculate_label_distribution()
 
@@ -213,7 +214,7 @@ class ObjectDetectionDataManager(object):
         positive_proposals_selected = positive_proposals_all[positive_proposals_selected_idx]
         assert_func(positive_proposals_selected[:, 1:5])
         negative_proposals_selected = negative_proposals_all[negative_proposals_selected_idx]
-        assert_func(negative_proposals_selected[:, 1:15])
+        assert_func(negative_proposals_selected[:, 1:5])
         all_proposals = np.concatenate([positive_proposals_selected, negative_proposals_selected], axis=0)
         # Visualize
         # bb_matrix = np.concatenate([positive_proposals_selected[:, 1:5],

@@ -14,6 +14,9 @@ class FastRcnn:
         self.backboneType = backbone_type
         self.backboneNetworkOutput = None
         self.roiPoolingOutput = None
+        self.roiOutputShape = None
+        self.newRoiShape = None
+        self.detectorInput = None
 
     def build_network(self):
         # Build the backbone
@@ -24,44 +27,20 @@ class FastRcnn:
                 raise NotImplementedError()
         # Build the roi pooling phase
         self.build_roi_pooling()
+        # self.build_classifier_endpoint()
 
     def build_resnet_backbone(self):
         # ResNet Parameters
-        num_of_units_per_block = Constants.NUM_OF_RESIDUAL_UNITS
-        num_of_feature_maps_per_block = Constants.NUM_OF_FEATURES_PER_BLOCK
-        first_conv_filter_size = Constants.FIRST_CONV_FILTER_SIZE
-        relu_leakiness = Constants.RELU_LEAKINESS
-        stride_list = Constants.FILTER_STRIDES
-        active_before_residuals = Constants.ACTIVATE_BEFORE_RESIDUALS
-
-        assert len(num_of_feature_maps_per_block) == len(stride_list) + 1 and \
-               len(num_of_feature_maps_per_block) == len(active_before_residuals) + 1
-        # Input layer
-        x = ResidualNetworkGenerator.get_input(input=self.imageInputs, out_filters=num_of_feature_maps_per_block[0],
-                                               first_conv_filter_size=first_conv_filter_size)
-        # Loop over blocks, the resnet trunk
-        for block_id in range(len(num_of_feature_maps_per_block) - 1):
-            with tf.variable_scope("block_{0}_0".format(block_id)):
-                x = ResidualNetworkGenerator.bottleneck_residual(
-                    x=x,
-                    in_filter=num_of_feature_maps_per_block[block_id],
-                    out_filter=num_of_feature_maps_per_block[block_id + 1],
-                    stride=ResidualNetworkGenerator.stride_arr(stride_list[block_id]),
-                    activate_before_residual=active_before_residuals[block_id],
-                    relu_leakiness=relu_leakiness,
-                    is_train=self.isTrain,
-                    bn_momentum=Constants.BATCH_NORM_DECAY)
-            for i in range(num_of_units_per_block - 1):
-                with tf.variable_scope("block_{0}_{1}".format(block_id, i + 1)):
-                    x = ResidualNetworkGenerator.bottleneck_residual(
-                        x=x,
-                        in_filter=num_of_feature_maps_per_block[block_id + 1],
-                        out_filter=num_of_feature_maps_per_block[block_id + 1],
-                        stride=ResidualNetworkGenerator.stride_arr(1),
-                        activate_before_residual=False,
-                        relu_leakiness=relu_leakiness,
-                        is_train=self.isTrain,
-                        bn_momentum=Constants.BATCH_NORM_DECAY)
+        x = ResidualNetworkGenerator.generate_resnet_blocks(
+            input_net=self.imageInputs,
+            num_of_units_per_block=Constants.NUM_OF_RESIDUAL_UNITS,
+            num_of_feature_maps_per_block=Constants.NUM_OF_FEATURES_PER_BLOCK,
+            first_conv_filter_size=Constants.FIRST_CONV_FILTER_SIZE,
+            relu_leakiness=Constants.RELU_LEAKINESS,
+            stride_list=Constants.FILTER_STRIDES,
+            active_before_residuals=Constants.ACTIVATE_BEFORE_RESIDUALS,
+            is_train_tensor=self.isTrain,
+            batch_norm_decay=Constants.BATCH_NORM_DECAY)
         return x
 
     def build_roi_pooling(self):
@@ -69,6 +48,26 @@ class FastRcnn:
             self.roiPoolingOutput = RoIPooling.roi_pool(x=[self.backboneNetworkOutput, self.roiInputs],
                                                         pooled_height=Constants.POOLED_HEIGHT,
                                                         pooled_width=Constants.POOLED_WIDTH)
+            self.roiOutputShape = tf.shape(self.roiPoolingOutput)
+            self.newRoiShape = tf.stack(
+                [tf.gather_nd(self.roiOutputShape, [0]) * tf.gather_nd(self.roiOutputShape, [1]),
+                 tf.gather_nd(self.roiOutputShape, [2]), tf.gather_nd(self.roiOutputShape, [3]),
+                 tf.gather_nd(self.roiOutputShape, [4])], axis=0)
+            self.detectorInput = tf.reshape(self.roiPoolingOutput, shape=self.newRoiShape)
+            print("X")
+
+    def build_classifier_endpoint(self):
+        x = ResidualNetworkGenerator.generate_resnet_blocks(
+            input_net=self.imageInputs,
+            num_of_units_per_block=Constants.DETECTOR_NUM_OF_RESIDUAL_UNITS,
+            num_of_feature_maps_per_block=Constants.DETECTOR_NUM_OF_FEATURES_PER_BLOCK,
+            first_conv_filter_size=Constants.DETECTOR_FIRST_CONV_FILTER_SIZE,
+            relu_leakiness=Constants.DETECTOR_RELU_LEAKINESS,
+            stride_list=Constants.DETECTOR_FILTER_STRIDES,
+            active_before_residuals=Constants.DETECTOR_ACTIVATE_BEFORE_RESIDUALS,
+            is_train_tensor=self.isTrain,
+            batch_norm_decay=Constants.BATCH_NORM_DECAY)
+        return x
 
     def test_roi_pooling(self, backbone_output, roi_pool_results, roi_proposals):
         pooled_imgs = []
@@ -110,27 +109,31 @@ class FastRcnn:
         assert np.allclose(roi_pool_results, np_result)
         print("Test Passed.")
 
+    def get_image_batch(self, dataset):
+        images, roi_proposals_tensor = dataset.create_image_batch(
+            batch_size=Constants.IMAGE_COUNT_PER_BATCH,
+            roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
+            positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
+        roi_labels = roi_proposals_tensor[:, :, 0].astype(np.int32)
+        roi_proposals = roi_proposals_tensor[:, :, 1:]
+        return images, roi_labels, roi_proposals
+
     def train(self, dataset):
         sess = tf.Session()
         sess.run(tf.initialize_all_variables())
 
         while True:
-            # Extract sample images and roi proposals per image.
-            images, roi_proposals_tensor = dataset.create_image_batch(
-                batch_size=Constants.IMAGE_COUNT_PER_BATCH,
-                roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
-                positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
-
-            roi_labels = roi_proposals_tensor[:, :, 0].astype(np.int32)
-            roi_proposals = roi_proposals_tensor[:, :, 1:]
-
+            images, roi_labels, roi_proposals = self.get_image_batch(dataset=dataset)
             feed_dict = {self.imageInputs: images,
                          self.isTrain: 1,
                          self.roiInputs: roi_proposals}
-            results = sess.run([self.backboneNetworkOutput, self.roiPoolingOutput], feed_dict=feed_dict)
+            results = sess.run([self.backboneNetworkOutput, self.roiPoolingOutput,
+                                self.roiOutputShape, self.newRoiShape, self.detectorInput],
+                               feed_dict=feed_dict)
+            # If this assertion fails, the the RoI pooled regions in the backbone output is smaller than
+            # POOLED_WIDTH x POOLED_HEIGHT. Consider increase the size of IMG_WIDTHS contents
             assert np.sum(np.isinf(results[1]) == True) == 0
             self.test_roi_pooling(backbone_output=results[0], roi_pool_results=results[1], roi_proposals=roi_proposals)
-            print("X")
 
 # net = imageInputs
 # in_filters = imageInputs.get_shape().as_list()[-1]
