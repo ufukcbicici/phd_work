@@ -10,6 +10,8 @@ class FastRcnn:
     def __init__(self, class_count, backbone_type="ResNet"):
         self.imageInputs = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 3], name='input')
         self.roiInputs = tf.placeholder(tf.float32, shape=(None, None, 4))
+        self.roiLabels = tf.placeholder(tf.float32, shape=(None, None))
+        self.reshapedLabels = None
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
         self.backboneType = backbone_type
         self.backboneNetworkOutput = None
@@ -21,6 +23,7 @@ class FastRcnn:
         self.roiFeatureVector = None
         self.classCount = class_count
         self.logits = None
+        self.crossEntropyLossTensors = None
 
     def build_network(self):
         # Build the backbone
@@ -61,6 +64,9 @@ class FastRcnn:
                  self.roiPoolingOutput.get_shape().as_list()[3],
                  self.roiPoolingOutput.get_shape().as_list()[4]], axis=0)
             self.detectorInput = tf.reshape(self.roiPoolingOutput, shape=self.newRoiShape)
+            labels_shape = tf.shape(self.roiLabels)
+            self.reshapedLabels = tf.reshape(self.roiLabels,
+                                             shape=[tf.gather_nd(labels_shape, [0]) * tf.gather_nd(labels_shape, [1])])
 
     def build_detector_endpoint(self):
         x = ResidualNetworkGenerator.generate_resnet_blocks(
@@ -85,6 +91,8 @@ class FastRcnn:
             else:
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
         self.logits = net
+        # self.crossEntropyLossTensors = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
+        #                                                                            logits=self.logits)
 
     def test_roi_pooling(self, backbone_output, roi_pool_results, roi_proposals):
         pooled_imgs = []
@@ -143,9 +151,11 @@ class FastRcnn:
             images, roi_labels, roi_proposals = self.get_image_batch(dataset=dataset)
             feed_dict = {self.imageInputs: images,
                          self.isTrain: 1,
-                         self.roiInputs: roi_proposals}
+                         self.roiInputs: roi_proposals,
+                         self.roiLabels: roi_labels}
             results = sess.run([self.backboneNetworkOutput, self.roiPoolingOutput,
-                                self.roiOutputShape, self.newRoiShape, self.detectorInput],
+                                self.roiOutputShape, self.newRoiShape, self.detectorInput,
+                                self.roiPoolingOutput, self.reshapedLabels],
                                feed_dict=feed_dict)
             # If this assertion fails, the the RoI pooled regions in the backbone output is smaller than
             # POOLED_WIDTH x POOLED_HEIGHT. Consider increase the size of IMG_WIDTHS contents
