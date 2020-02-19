@@ -156,7 +156,7 @@ def compare_gpu_implementation():
 def train_policy_gradients_network():
     network_id = 453
     network_name = "FashionNet_Lite"
-    iteration = 43680
+    iteration = 48000
 
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
