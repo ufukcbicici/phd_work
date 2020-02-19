@@ -49,6 +49,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.resultsDict = {}
         self.stateIds = tf.placeholder(dtype=tf.int32, name="stateIds", shape=[None])
         self.policyNetworkFunc = policy_network_func
+        self.runId = None
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
                          trajectory_per_state_sample_count)
@@ -520,10 +521,10 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                               trajectory_per_sample_count, lambda_mac_cost, l2_lambda):
         val_ml_accuracy, test_ml_accuracy = self.evaluate_ml_routing_accuracies()
         exp_str = self.get_explanation()
-        run_id = DbLogger.get_run_id()
-        DbLogger.write_into_table(rows=[(run_id, exp_str)], table=DbLogger.runMetaData, col_count=2)
+        self.runId = DbLogger.get_run_id()
+        DbLogger.write_into_table(rows=[(self.runId, exp_str)], table=DbLogger.runMetaData, col_count=2)
         # Parameters table
-        rows = [(run_id, fold_id, network_id, network_name, state_sample_count, trajectory_per_sample_count,
+        rows = [(self.runId, fold_id, network_id, network_name, state_sample_count, trajectory_per_sample_count,
                  lambda_mac_cost, l2_lambda, val_ml_accuracy, test_ml_accuracy)]
         DbLogger.write_into_table(rows=rows, table="policy_gradients_parameters", col_count=10)
 
@@ -586,14 +587,14 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
                 validation_accuracy_dict, test_accuracy_dict, val_computation_overload_dict, \
                 test_computation_overload_dict = self.evaluate_routing_accuracies(sess=sess)
-                self.save_results_to_db(run_id=run_id,
+                self.save_results_to_db(run_id=self.runId,
                                         iteration_id=iteration_id,
                                         validation_policy_value=validation_policy_value,
                                         test_policy_value=test_policy_value,
                                         is_test=False,
                                         accuracy_dict=validation_accuracy_dict,
                                         computation_overload_dict=val_computation_overload_dict)
-                self.save_results_to_db(run_id=run_id,
+                self.save_results_to_db(run_id=self.runId,
                                         iteration_id=iteration_id,
                                         validation_policy_value=validation_policy_value,
                                         test_policy_value=test_policy_value,

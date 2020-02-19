@@ -31,8 +31,8 @@ if __name__ == "__main__":
     # cifar_entry.cifar100_multi_gpu_training()
     # cifar_entry.cifar_100_training()
     # fashion_cign_entry.fashion_net_training()
-    threshold_optimization_entry.main()
+    # threshold_optimization_entry.main()
     # mode_class_visualization.main()
     # routing_visualizer.main()
-    # policy_gradients_entry.main()
+    policy_gradients_entry.main()
 
