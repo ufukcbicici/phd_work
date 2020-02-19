@@ -47,3 +47,7 @@ class Constants:
 
     # Roi Feature Vector Transformations
     CLASSIFIER_HIDDEN_LAYERS = [128]
+
+    # Parameters for testing
+    STRIDE_WIDTH = 8
+    STRIDE_HEIGHT = 8

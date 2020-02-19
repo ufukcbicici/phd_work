@@ -298,6 +298,16 @@ class ObjectDetectionDataManager(object):
         assert np.sum(roi_proposals_tensor[:, :, 1:] < 0) == 0 and np.sum(roi_proposals_tensor[:, :, 1:] > 1) == 0
         return images, roi_proposals_tensor
 
+    # def get_image_for_testing(self, use_train):
+    #     if use_train:
+    #         image_set = self.dataList[self.trainingImageIndices]
+    #     else:
+    #         image_set = self.dataList[self.testImageIndices]
+    #     for img in image_set:
+    #         for scale in img.imageScales:
+    #             # Prepare bounding boxes
+    #
+
     # def detect_outlier_bbs(self):
     #     training_images = self.dataList[self.trainingImageIndices]
     #     roi_list = []
