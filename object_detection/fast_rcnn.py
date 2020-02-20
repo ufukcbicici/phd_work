@@ -24,6 +24,10 @@ class FastRcnn:
         self.classCount = class_count
         self.logits = None
         self.crossEntropyLossTensors = None
+        self.classifierLoss = None
+        self.optimizer = None
+        self.totalLoss = None
+        self.globalStep = tf.Variable(0, name='global_step', trainable=False)
 
     def build_network(self):
         # Build the backbone
@@ -37,6 +41,8 @@ class FastRcnn:
             self.build_roi_pooling()
         with tf.variable_scope("Detector_Endpoint"):
             self.build_detector_endpoint()
+        with tf.variable_scope("Optimizer"):
+            self.build_optimizer()
 
     def build_resnet_backbone(self):
         # ResNet Parameters
@@ -91,8 +97,14 @@ class FastRcnn:
             else:
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
         self.logits = net
-        # self.crossEntropyLossTensors = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
-        #                                                                            logits=self.logits)
+        self.crossEntropyLossTensors = \
+            tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(self.reshapedLabels, 'int32'),
+                                                           logits=self.logits)
+        self.classifierLoss = tf.reduce_mean(self.crossEntropyLossTensors)
+        self.totalLoss = self.classifierLoss
+
+    def build_optimizer(self):
+        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
 
     def test_roi_pooling(self, backbone_output, roi_pool_results, roi_proposals):
         pooled_imgs = []
@@ -146,21 +158,28 @@ class FastRcnn:
     def train(self, dataset):
         sess = tf.Session()
         sess.run(tf.initialize_all_variables())
-
+        losses = []
         while True:
             images, roi_labels, roi_proposals = self.get_image_batch(dataset=dataset)
             feed_dict = {self.imageInputs: images,
                          self.isTrain: 1,
                          self.roiInputs: roi_proposals,
                          self.roiLabels: roi_labels}
-            results = sess.run([self.backboneNetworkOutput, self.roiPoolingOutput,
-                                self.roiOutputShape, self.newRoiShape, self.detectorInput,
-                                self.roiPoolingOutput, self.reshapedLabels],
-                               feed_dict=feed_dict)
+            # results = sess.run([self.backboneNetworkOutput, self.roiPoolingOutput,
+            #                     self.roiOutputShape, self.newRoiShape, self.detectorInput,
+            #                     self.roiPoolingOutput, self.reshapedLabels,
+            #                     self.logits,
+            #                     self.crossEntropyLossTensors,
+            #                     self.classifierLoss],
+            #                    feed_dict=feed_dict)
+            results = sess.run([self.optimizer, self.totalLoss], feed_dict=feed_dict)
+            losses.append(results[1])
             # If this assertion fails, the the RoI pooled regions in the backbone output is smaller than
             # POOLED_WIDTH x POOLED_HEIGHT. Consider increase the size of IMG_WIDTHS contents
             assert np.sum(np.isinf(results[1]) == True) == 0
-            self.test_roi_pooling(backbone_output=results[0], roi_pool_results=results[1], roi_proposals=roi_proposals)
+            if len(losses) == 10:
+                print("Loss:{0}".format(np.mean(np.array(losses))))
+            # self.test_roi_pooling(backbone_output=results[0], roi_pool_results=results[1], roi_proposals=roi_proposals)
 
 # net = imageInputs
 # in_filters = imageInputs.get_shape().as_list()[-1]
