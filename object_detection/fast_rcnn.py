@@ -159,8 +159,10 @@ class FastRcnn:
         sess = tf.Session()
         sess.run(tf.initialize_all_variables())
         losses = []
+        iteration = 0
         while True:
             images, roi_labels, roi_proposals = self.get_image_batch(dataset=dataset)
+            print("A")
             feed_dict = {self.imageInputs: images,
                          self.isTrain: 1,
                          self.roiInputs: roi_proposals,
@@ -172,13 +174,17 @@ class FastRcnn:
             #                     self.crossEntropyLossTensors,
             #                     self.classifierLoss],
             #                    feed_dict=feed_dict)
-            results = sess.run([self.optimizer, self.totalLoss], feed_dict=feed_dict)
-            losses.append(results[1])
+            results = sess.run([self.backboneNetworkOutput], feed_dict=feed_dict)
+            print("B")
+            losses.append(results[0])
             # If this assertion fails, the the RoI pooled regions in the backbone output is smaller than
             # POOLED_WIDTH x POOLED_HEIGHT. Consider increase the size of IMG_WIDTHS contents
-            assert np.sum(np.isinf(results[1]) == True) == 0
-            if len(losses) == 10:
-                print("Loss:{0}".format(np.mean(np.array(losses))))
+            # assert np.sum(np.isinf(results[1]) == True) == 0
+            iteration += 1
+            print("Iteration={0}".format(iteration))
+            # if len(losses) == 10:
+            #     print("Loss:{0}".format(np.mean(np.array(losses))))
+            #     losses = []
             # self.test_roi_pooling(backbone_output=results[0], roi_pool_results=results[1], roi_proposals=roi_proposals)
 
 # net = imageInputs

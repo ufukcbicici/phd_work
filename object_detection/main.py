@@ -25,6 +25,7 @@ def load_dataset():
     path = os.path.join(os.path.join(os.path.join(curr_path, ".."), "data"), "tuborgData")
     dataset = ObjectDetectionDataManager.load_processed_data(data_path=path)
     dataset.calculate_label_distribution()
+    dataset.filter_uncovered_images()
     return dataset
 
 
@@ -36,7 +37,7 @@ def train_fast_rcnn_detector():
 
 
 def main():
-    # create_dataset()
+    create_dataset()
 
     # dataset = load_dataset()
     # dataset.create_image_batch(
@@ -44,7 +45,7 @@ def main():
     #     roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
     #     positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
 
-    train_fast_rcnn_detector()
+    # train_fast_rcnn_detector()
 
     # create_dataset(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD, max_coverage=Constants.MAX_INCLUSIVENESS_BB,
     #                test_ratio=0.15)

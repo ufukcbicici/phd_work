@@ -14,7 +14,7 @@ class Constants:
     MAX_IOU_DISTANCE = 0.5
 
     # Object Detection and Testing: Positive and Negative Bounding Box Selection
-    POSITIVE_IOU_THRESHOLD = 0.7
+    POSITIVE_IOU_THRESHOLD = 0.5
     NEGATIVE_IOU_THRESHOLD = 0.4
 
     # FAST RCNN - RoI Sampling Parameters

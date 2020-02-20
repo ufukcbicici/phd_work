@@ -87,6 +87,7 @@ class ObjectDetectionDataManager(object):
                                            max_medoid_count=max_num_of_medoids,
                                            max_coverage=max_coverage)
         self.calculate_label_distribution()
+        self.filter_uncovered_images()
 
     def calculate_label_distribution(self):
         labels = [obj.roiMatrix[:, 0] for obj in self.dataList]
@@ -97,6 +98,29 @@ class ObjectDetectionDataManager(object):
         self.backgroundLabel = len(self.labelsDict)
         self.labelsDict[self.backgroundLabel] = 1
         self.classCount = len(self.labelsDict)
+
+    def filter_uncovered_images(self):
+        smallest_scale = min(Constants.IMG_WIDTHS)
+        # training_objects = self.dataList[self.trainingImageIndices]
+        accepted_training_indices = []
+        rejected_training_indices = []
+        for idx in self.trainingImageIndices:
+            img_obj = self.dataList[idx]
+            img_shape = np.expand_dims(np.array([img_obj.imageScales[smallest_scale].shape[1],
+                                                 img_obj.imageScales[smallest_scale].shape[0]]), axis=0)
+            roi_list = img_obj.roiMatrix[:, 3:] * img_shape
+            # Build the distance matrix
+            iou_similarity_matrix = np.zeros(shape=(roi_list.shape[0], self.medoidRois.shape[0]))
+            for idx, bb in enumerate(roi_list):
+                iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=self.medoidRois)
+                iou_similarity_matrix[idx, :] = iou_vec
+            max_ious = np.max(iou_similarity_matrix, axis=1)
+            positive_count = np.sum(max_ious >= Constants.POSITIVE_IOU_THRESHOLD)
+            if positive_count > 0:
+                accepted_training_indices.append(idx)
+            else:
+                rejected_training_indices.append(idx)
+        self.trainingImageIndices = accepted_training_indices
 
     def save_processed_data(self):
         pickle_out_file = open(os.path.join(self.dataPath, "processed_dataset.sav"), "wb")
