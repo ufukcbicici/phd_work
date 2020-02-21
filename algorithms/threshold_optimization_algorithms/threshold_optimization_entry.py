@@ -83,7 +83,7 @@ def main():
     # # node_costs = {0: 67391424.0, 2: 16754176.0, 6: 3735040.0, 5: 3735040.0, 1: 16754176.0, 4: 3735040.0, 3: 3735040.0}
     # node_costs = {0: 465152.0, 2: 2564352.0, 6: 124544.0, 5: 124544.0, 1: 2564352.0, 4: 124544.0, 3: 124544.0}
     #
-    # GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations"]
+    # GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations"]ppppppp8/7
     # GlobalConstants.LEAF_NODE_OUTPUTS_TO_COLLECT = ["posterior_probs", "label_tensor"]
     #
     # # GlobalConstants.INNER_NODE_OUTPUTS_TO_COLLECT = ["branch_probs", "activations", "branching_feature"]
@@ -98,7 +98,7 @@ def main():
     # balance_list = [1.0]
 
     run_ids = [451]
-    iterations = [43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000]
+    iterations = [43680] # [43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000]
     xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 10
     weighted_score_list = [False]
     balance_list = [1.0, 0.99, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6]
@@ -106,7 +106,7 @@ def main():
                                                                           xi_list, weighted_score_list, balance_list])
     # bayesian_process_runner(cartesian_product)
 
-    pool = Pool(processes=4)
+    pool = Pool(processes=1)
     pool.map(bayesian_process_runner, cartesian_product)
 
     # ThresholdAccuracyMeasurement.calculate_accuracy(run_id=67, iteration=119100, max_overload=10.0, max_limit=1)
