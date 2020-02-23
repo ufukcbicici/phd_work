@@ -187,9 +187,9 @@ class FastRcnn:
             roi_scale = img_width / min(Constants.IMG_WIDTHS)
             roi_list = (roi_scale * self.roiList).astype(np.int32)
             # Run the backbone first for this scale
-            feed_dict = {self.imageInputs: np.expand_dims(resized_img, axis=0),
-                         self.isTrain: 0}
-            backbone_output = self.session.run([self.backboneNetworkOutput], feed_dict=feed_dict)[0]
+            # feed_dict = {self.imageInputs: np.expand_dims(resized_img, axis=0),
+            #              self.isTrain: 0}
+            # backbone_output = self.session.run([self.backboneNetworkOutput], feed_dict=feed_dict)[0]
             # Create proposals
             proposals_list = []
             for idx, roi in enumerate(roi_list):
@@ -203,17 +203,16 @@ class FastRcnn:
                         proposals.append(np.array([left, top, right, bottom]))
                         top = top + Constants.STRIDE_HEIGHT
                     left = left + Constants.STRIDE_WIDTH
+                    # ObjectDetectionDataManager.print_img_with_final_rois(
+                    #     img_name="Proposals_{0}.png".format(idx),
+                    #     img=resized_img, roi_matrix=proposals,
+                    #     colors=np.random.uniform(low=0, high=255, size=(len(proposals), 3)))
                 proposals = np.stack(proposals, axis=0)
                 proposals_list.append(proposals)
-
-
-
-
                 # ObjectDetectionDataManager.print_img_with_final_rois(
                 #     img_name="Proposals_{0}.png".format(idx),
                 #     img=resized_img, roi_matrix=proposals, colors=[(0, 255, 0)] * proposals.shape[0])
-                # print("X")
-
+                print("X")
 
     def train(self, dataset):
         self.session.run(tf.initialize_all_variables())
