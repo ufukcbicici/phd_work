@@ -31,21 +31,32 @@ def load_dataset():
 
 def train_fast_rcnn_detector():
     dataset = load_dataset()
-    detector = FastRcnn(class_count=dataset.classCount)
+    detector = FastRcnn(roi_list=dataset.medoidRois, class_count=dataset.classCount)
     detector.build_network()
     detector.train(dataset=dataset)
 
 
-def main():
-    create_dataset()
+def image_detection_test():
+    dataset = load_dataset()
+    detector = FastRcnn(roi_list=dataset.medoidRois, class_count=dataset.classCount)
+    detector.build_network()
+    detect_image(detector, dataset.dataList[0].imgArr)
 
+
+def detect_image(detector, img):
+    detector.detect_single_image(img=img)
+
+
+def main():
+    # create_dataset()
+    # image_detection_test()
     # dataset = load_dataset()
     # dataset.create_image_batch(
     #     batch_size=Constants.IMAGE_COUNT_PER_BATCH,
     #     roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
     #     positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
 
-    # train_fast_rcnn_detector()
+    train_fast_rcnn_detector()
 
     # create_dataset(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD, max_coverage=Constants.MAX_INCLUSIVENESS_BB,
     #                test_ratio=0.15)

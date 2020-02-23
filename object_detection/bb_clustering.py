@@ -6,7 +6,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 class BBClustering:
 
     @staticmethod
-    def run(training_objects, iou_threshold, max_coverage, max_medoid_count=8, trial_count=3):
+    def run(training_objects, iou_threshold, max_coverage, max_medoid_count=8, trial_count=1):
         # Use the smallest width length as the shared length for all images. Crop RoIs accordingly.
         smallest_scale = min(training_objects[0].imageScales.keys())
         # Build a total list of all rois

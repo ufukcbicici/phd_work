@@ -28,7 +28,7 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # Lab
-    log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger3.db"
+    # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger3.db"
 
     # Home
     # log_db_path = "C://Users//t67rt//Desktop//phd_work//phd_work//simple_tf//dblogger.db"
@@ -49,7 +49,7 @@ class DbLogger:
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2_cign.db"
 
     # TRUBA 3
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger3_cign.db"
+    log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger3_cign.db"
 
     # TRUBA 4
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger4_cign.db"

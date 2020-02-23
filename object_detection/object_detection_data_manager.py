@@ -111,16 +111,18 @@ class ObjectDetectionDataManager(object):
             roi_list = img_obj.roiMatrix[:, 3:] * img_shape
             # Build the distance matrix
             iou_similarity_matrix = np.zeros(shape=(roi_list.shape[0], self.medoidRois.shape[0]))
-            for idx, bb in enumerate(roi_list):
+            for jdx, bb in enumerate(roi_list):
                 iou_vec = BBClustering.get_iou_of_bbs_vec(bb_x=bb, bb_y_list=self.medoidRois)
-                iou_similarity_matrix[idx, :] = iou_vec
+                iou_similarity_matrix[jdx, :] = iou_vec
             max_ious = np.max(iou_similarity_matrix, axis=1)
             positive_count = np.sum(max_ious >= Constants.POSITIVE_IOU_THRESHOLD)
             if positive_count > 0:
                 accepted_training_indices.append(idx)
             else:
                 rejected_training_indices.append(idx)
-        self.trainingImageIndices = accepted_training_indices
+        self.trainingImageIndices = np.array(accepted_training_indices)
+        c = Counter(self.trainingImageIndices)
+        assert len(c) == self.trainingImageIndices.shape[0]
 
     def save_processed_data(self):
         pickle_out_file = open(os.path.join(self.dataPath, "processed_dataset.sav"), "wb")
@@ -322,7 +324,7 @@ class ObjectDetectionDataManager(object):
         assert np.sum(roi_proposals_tensor[:, :, 1:] < 0) == 0 and np.sum(roi_proposals_tensor[:, :, 1:] > 1) == 0
         return images, roi_proposals_tensor
 
-    # def get_image_for_testing(self, use_train):
+    # def test_dataset(self, use_train):
     #     if use_train:
     #         image_set = self.dataList[self.trainingImageIndices]
     #     else:
@@ -330,7 +332,8 @@ class ObjectDetectionDataManager(object):
     #     for img in image_set:
     #         for scale in img.imageScales:
     #             # Prepare bounding boxes
-    #
+
+    # def
 
     # def detect_outlier_bbs(self):
     #     training_images = self.dataList[self.trainingImageIndices]

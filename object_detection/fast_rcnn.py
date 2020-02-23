@@ -1,17 +1,19 @@
 import tensorflow as tf
 import numpy as np
-
+import cv2
 from algorithms.roi_pooling import RoIPooling
 from object_detection.constants import Constants
+from object_detection.object_detection_data_manager import ObjectDetectionDataManager
 from object_detection.residual_network_generator import ResidualNetworkGenerator
 
 
 class FastRcnn:
-    def __init__(self, class_count, backbone_type="ResNet"):
+    def __init__(self, roi_list, class_count, backbone_type="ResNet"):
         self.imageInputs = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 3], name='input')
         self.roiInputs = tf.placeholder(tf.float32, shape=(None, None, 4))
         self.roiLabels = tf.placeholder(tf.float32, shape=(None, None))
         self.reshapedLabels = None
+        self.roiList = roi_list
         self.isTrain = tf.placeholder(name="is_train_flag", dtype=tf.int64)
         self.backboneType = backbone_type
         self.backboneNetworkOutput = None
@@ -28,12 +30,19 @@ class FastRcnn:
         self.optimizer = None
         self.totalLoss = None
         self.globalStep = tf.Variable(0, name='global_step', trainable=False)
+        self.backboneUpdateOps = None
+        self.detectorUpdateOps = None
+        self.roiPoolingInfMask = None
+        self.session = tf.Session()
 
     def build_network(self):
         # Build the backbone
         with tf.variable_scope("Backbone_Network"):
             if self.backboneType == "ResNet":
                 self.backboneNetworkOutput = self.build_resnet_backbone()
+                # self.backboneUpdateOps = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                # with tf.control_dependencies(self.backboneUpdateOps):
+                #     self.backboneNetworkOutput = tf.identity(self.backboneNetworkOutput)
             else:
                 raise NotImplementedError()
         # Build the roi pooling phase
@@ -59,20 +68,26 @@ class FastRcnn:
         return x
 
     def build_roi_pooling(self):
-        with tf.control_dependencies([self.backboneNetworkOutput]):
-            self.roiPoolingOutput = RoIPooling.roi_pool(x=[self.backboneNetworkOutput, self.roiInputs],
-                                                        pooled_height=Constants.POOLED_HEIGHT,
-                                                        pooled_width=Constants.POOLED_WIDTH)
-            self.roiOutputShape = tf.shape(self.roiPoolingOutput)
-            self.newRoiShape = tf.stack(
-                [tf.gather_nd(self.roiOutputShape, [0]) * tf.gather_nd(self.roiOutputShape, [1]),
-                 self.roiPoolingOutput.get_shape().as_list()[2],
-                 self.roiPoolingOutput.get_shape().as_list()[3],
-                 self.roiPoolingOutput.get_shape().as_list()[4]], axis=0)
-            self.detectorInput = tf.reshape(self.roiPoolingOutput, shape=self.newRoiShape)
-            labels_shape = tf.shape(self.roiLabels)
-            self.reshapedLabels = tf.reshape(self.roiLabels,
-                                             shape=[tf.gather_nd(labels_shape, [0]) * tf.gather_nd(labels_shape, [1])])
+        # with tf.control_dependencies([self.backboneNetworkOutput]):
+        self.roiPoolingOutput = RoIPooling.roi_pool(x=[self.backboneNetworkOutput, self.roiInputs],
+                                                    pooled_height=Constants.POOLED_HEIGHT,
+                                                    pooled_width=Constants.POOLED_WIDTH)
+        # In case there inf entries in the pooling output, due to the area is smaller than
+        # POOLED_WIDTH x POOLED_HEIGHT
+        self.roiPoolingInfMask = tf.is_inf(self.roiPoolingOutput)
+        self.roiPoolingOutput = tf.where(self.roiPoolingInfMask,
+                                         tf.zeros_like(self.roiPoolingOutput),
+                                         self.roiPoolingOutput)
+        self.roiOutputShape = tf.shape(self.roiPoolingOutput)
+        self.newRoiShape = tf.stack(
+            [tf.gather_nd(self.roiOutputShape, [0]) * tf.gather_nd(self.roiOutputShape, [1]),
+             self.roiPoolingOutput.get_shape().as_list()[2],
+             self.roiPoolingOutput.get_shape().as_list()[3],
+             self.roiPoolingOutput.get_shape().as_list()[4]], axis=0)
+        self.detectorInput = tf.reshape(self.roiPoolingOutput, shape=self.newRoiShape)
+        labels_shape = tf.shape(self.roiLabels)
+        self.reshapedLabels = tf.reshape(self.roiLabels,
+                                         shape=[tf.gather_nd(labels_shape, [0]) * tf.gather_nd(labels_shape, [1])])
 
     def build_detector_endpoint(self):
         x = ResidualNetworkGenerator.generate_resnet_blocks(
@@ -86,6 +101,10 @@ class FastRcnn:
             is_train_tensor=self.isTrain,
             batch_norm_decay=Constants.BATCH_NORM_DECAY)
         self.detectorEndPoint = x
+        # all_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # self.detectorUpdateOps = [op for op in all_update_ops if op not in set(self.backboneUpdateOps)]
+        # with tf.control_dependencies(self.detectorUpdateOps):
+        #     self.detectorEndPoint = tf.identity(self.detectorEndPoint)
         self.roiFeatureVector = ResidualNetworkGenerator.global_avg_pool(self.detectorEndPoint)
         # MLP for detection
         hidden_layers = list(Constants.CLASSIFIER_HIDDEN_LAYERS)
@@ -101,9 +120,14 @@ class FastRcnn:
             tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(self.reshapedLabels, 'int32'),
                                                            logits=self.logits)
         self.classifierLoss = tf.reduce_mean(self.crossEntropyLossTensors)
-        self.totalLoss = self.classifierLoss
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+            self.totalLoss = self.classifierLoss + 0
 
     def build_optimizer(self):
+        # self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
+        # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
+        # with tf.control_dependencies(self.extra_update_ops):
         self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
 
     def test_roi_pooling(self, backbone_output, roi_pool_results, roi_proposals):
@@ -155,14 +179,49 @@ class FastRcnn:
         roi_proposals = roi_proposals_tensor[:, :, 1:]
         return images, roi_labels, roi_proposals
 
+    def detect_single_image(self, img):
+        for img_width in Constants.IMG_WIDTHS:
+            new_width = img_width  # int(img_obj.imgArr.shape[1] * scale_percent / 100)
+            new_height = int((float(img_width) / img.shape[1]) * img.shape[0])
+            resized_img = cv2.resize(img, (new_width, new_height))
+            roi_scale = img_width / min(Constants.IMG_WIDTHS)
+            roi_list = (roi_scale * self.roiList).astype(np.int32)
+            # Run the backbone first for this scale
+            feed_dict = {self.imageInputs: np.expand_dims(resized_img, axis=0),
+                         self.isTrain: 0}
+            backbone_output = self.session.run([self.backboneNetworkOutput], feed_dict=feed_dict)[0]
+            # Create proposals
+            proposals_list = []
+            for idx, roi in enumerate(roi_list):
+                proposals = []
+                left = 0
+                while left + roi[0] <= resized_img.shape[1]:
+                    top = 0
+                    right = left + roi[0]
+                    while top + roi[1] <= resized_img.shape[0]:
+                        bottom = top + roi[1]
+                        proposals.append(np.array([left, top, right, bottom]))
+                        top = top + Constants.STRIDE_HEIGHT
+                    left = left + Constants.STRIDE_WIDTH
+                proposals = np.stack(proposals, axis=0)
+                proposals_list.append(proposals)
+
+
+
+
+                # ObjectDetectionDataManager.print_img_with_final_rois(
+                #     img_name="Proposals_{0}.png".format(idx),
+                #     img=resized_img, roi_matrix=proposals, colors=[(0, 255, 0)] * proposals.shape[0])
+                # print("X")
+
+
     def train(self, dataset):
-        sess = tf.Session()
-        sess.run(tf.initialize_all_variables())
+        self.session.run(tf.initialize_all_variables())
         losses = []
         iteration = 0
         while True:
             images, roi_labels, roi_proposals = self.get_image_batch(dataset=dataset)
-            print("A")
+            # print("A")
             feed_dict = {self.imageInputs: images,
                          self.isTrain: 1,
                          self.roiInputs: roi_proposals,
@@ -174,17 +233,17 @@ class FastRcnn:
             #                     self.crossEntropyLossTensors,
             #                     self.classifierLoss],
             #                    feed_dict=feed_dict)
-            results = sess.run([self.backboneNetworkOutput], feed_dict=feed_dict)
-            print("B")
+            results = self.session.run([self.totalLoss, self.optimizer, self.roiPoolingOutput], feed_dict=feed_dict)
+            # print("B")
             losses.append(results[0])
             # If this assertion fails, the the RoI pooled regions in the backbone output is smaller than
             # POOLED_WIDTH x POOLED_HEIGHT. Consider increase the size of IMG_WIDTHS contents
-            # assert np.sum(np.isinf(results[1]) == True) == 0
+            assert np.sum(np.isinf(results[-1]) == True) == 0
             iteration += 1
             print("Iteration={0}".format(iteration))
-            # if len(losses) == 10:
-            #     print("Loss:{0}".format(np.mean(np.array(losses))))
-            #     losses = []
+            if len(losses) == 10:
+                print("Loss:{0}".format(np.mean(np.array(losses))))
+                losses = []
             # self.test_roi_pooling(backbone_output=results[0], roi_pool_results=results[1], roi_proposals=roi_proposals)
 
 # net = imageInputs
