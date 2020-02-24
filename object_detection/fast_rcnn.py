@@ -25,6 +25,7 @@ class FastRcnn:
         self.roiFeatureVector = None
         self.classCount = class_count
         self.logits = None
+        self.classProbabilities = None
         self.crossEntropyLossTensors = None
         self.classifierLoss = None
         self.optimizer = None
@@ -52,6 +53,7 @@ class FastRcnn:
             self.build_detector_endpoint()
         with tf.variable_scope("Optimizer"):
             self.build_optimizer()
+        self.session.run(tf.initialize_all_variables())
 
     def build_resnet_backbone(self):
         # ResNet Parameters
@@ -116,6 +118,7 @@ class FastRcnn:
             else:
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
         self.logits = net
+        self.classProbabilities = tf.nn.softmax(self.logits)
         self.crossEntropyLossTensors = \
             tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(self.reshapedLabels, 'int32'),
                                                            logits=self.logits)
@@ -187,9 +190,9 @@ class FastRcnn:
             roi_scale = img_width / min(Constants.IMG_WIDTHS)
             roi_list = (roi_scale * self.roiList).astype(np.int32)
             # Run the backbone first for this scale
-            # feed_dict = {self.imageInputs: np.expand_dims(resized_img, axis=0),
-            #              self.isTrain: 0}
-            # backbone_output = self.session.run([self.backboneNetworkOutput], feed_dict=feed_dict)[0]
+            feed_dict = {self.imageInputs: np.expand_dims(resized_img, axis=0),
+                         self.isTrain: 0}
+            backbone_output = self.session.run([self.backboneNetworkOutput], feed_dict=feed_dict)[0]
             # Create proposals
             proposals_list = []
             for idx, roi in enumerate(roi_list):
@@ -207,15 +210,36 @@ class FastRcnn:
                     #     img_name="Proposals_{0}.png".format(idx),
                     #     img=resized_img, roi_matrix=proposals,
                     #     colors=np.random.uniform(low=0, high=255, size=(len(proposals), 3)))
-                proposals = np.stack(proposals, axis=0)
+                proposals = np.stack(proposals, axis=0).astype(np.float32)
+                proposals[:, [1, 3]] = proposals[:, [1, 3]] / float(resized_img.shape[0])
+                proposals[:, [0, 2]] = proposals[:, [0, 2]] / float(resized_img.shape[1])
                 proposals_list.append(proposals)
                 # ObjectDetectionDataManager.print_img_with_final_rois(
                 #     img_name="Proposals_{0}.png".format(idx),
                 #     img=resized_img, roi_matrix=proposals, colors=[(0, 255, 0)] * proposals.shape[0])
-                print("X")
+
+            # Send proposals for classification and regression
+            proposal_label_pairs = []
+            for proposals in proposals_list:
+                batch_id = 0
+                while True:
+                    proposal_batch = proposals[batch_id * Constants.TEST_BATCH_SIZE:
+                                               (batch_id + 1) * Constants.TEST_BATCH_SIZE]
+                    if np.prod(proposal_batch.shape) == 0:
+                        break
+                    results = self.session.run([self.classProbabilities],
+                                               feed_dict={self.backboneNetworkOutput: backbone_output,
+                                                          self.roiInputs: np.expand_dims(proposal_batch, axis=0),
+                                                          self.isTrain: 0})
+                    class_probs = results[0]
+                    predicted_classes = np.argmax(class_probs, axis=1)
+                    predictions = np.concatenate([np.expand_dims(predicted_classes, axis=1), proposal_batch], axis=1)
+                    proposal_label_pairs.append(predictions)
+                    batch_id += 1
+            proposal_label_pairs = np.concatenate(proposal_label_pairs, axis=0)
+            print("X")
 
     def train(self, dataset):
-        self.session.run(tf.initialize_all_variables())
         losses = []
         iteration = 0
         while True:
@@ -232,7 +256,8 @@ class FastRcnn:
             #                     self.crossEntropyLossTensors,
             #                     self.classifierLoss],
             #                    feed_dict=feed_dict)
-            results = self.session.run([self.totalLoss, self.optimizer, self.roiPoolingOutput], feed_dict=feed_dict)
+            results = self.session.run([self.totalLoss, self.classProbabilities,
+                                        self.optimizer, self.roiPoolingOutput], feed_dict=feed_dict)
             # print("B")
             losses.append(results[0])
             # If this assertion fails, the the RoI pooled regions in the backbone output is smaller than

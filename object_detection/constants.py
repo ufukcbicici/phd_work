@@ -50,4 +50,5 @@ class Constants:
 
     # Parameters for testing
     STRIDE_WIDTH = 8
-    STRIDE_HEIGHT = 8
+    STRIDE_HEIGHT = 16
+    TEST_BATCH_SIZE = 5000
