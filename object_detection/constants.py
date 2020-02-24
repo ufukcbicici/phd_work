@@ -2,6 +2,9 @@ class Constants:
     def __init__(self):
         pass
 
+    # Model Name
+    MODEL_NAME = "ResNet_Detector"
+
     # Image Scales
     IMG_WIDTHS = [640]
 
@@ -48,7 +51,13 @@ class Constants:
     # Roi Feature Vector Transformations
     CLASSIFIER_HIDDEN_LAYERS = [128]
 
+    # L2 Norm Regularizer Strength
+    L2_LAMBDA = 0.0005
+
     # Parameters for testing
-    STRIDE_WIDTH = 8
-    STRIDE_HEIGHT = 16
+    STRIDE_WIDTH = 10
+    STRIDE_HEIGHT = 25
     TEST_BATCH_SIZE = 5000
+    NMS_THRESHOLD = 0.5
+    RESULT_REPORTING_PERIOD = 10 # In Epochs
+    MODEL_SAVING_PERIOD = 100 # In Epochs

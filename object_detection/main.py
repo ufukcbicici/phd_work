@@ -31,14 +31,16 @@ def load_dataset():
 
 def train_fast_rcnn_detector():
     dataset = load_dataset()
-    detector = FastRcnn(roi_list=dataset.medoidRois, class_count=dataset.classCount)
+    detector = FastRcnn(roi_list=dataset.medoidRois,
+                        background_label=dataset.backgroundLabel, class_count=dataset.classCount)
     detector.build_network()
     detector.train(dataset=dataset)
 
 
 def image_detection_test():
     dataset = load_dataset()
-    detector = FastRcnn(roi_list=dataset.medoidRois, class_count=dataset.classCount)
+    detector = FastRcnn(roi_list=dataset.medoidRois,
+                        background_label=dataset.backgroundLabel, class_count=dataset.classCount)
     detector.build_network()
     detect_image(detector, dataset.dataList[0].imgArr)
 

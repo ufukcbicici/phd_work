@@ -1,14 +1,17 @@
 import tensorflow as tf
 import numpy as np
 import cv2
+import os
 from algorithms.roi_pooling import RoIPooling
 from object_detection.constants import Constants
 from object_detection.object_detection_data_manager import ObjectDetectionDataManager
 from object_detection.residual_network_generator import ResidualNetworkGenerator
+from object_detection.utilities import Utilities
+from tensorflow.contrib.framework.python.framework import checkpoint_utils
 
 
 class FastRcnn:
-    def __init__(self, roi_list, class_count, backbone_type="ResNet"):
+    def __init__(self, roi_list, class_count, background_label, backbone_type="ResNet"):
         self.imageInputs = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 3], name='input')
         self.roiInputs = tf.placeholder(tf.float32, shape=(None, None, 4))
         self.roiLabels = tf.placeholder(tf.float32, shape=(None, None))
@@ -24,9 +27,12 @@ class FastRcnn:
         self.detectorEndPoint = None
         self.roiFeatureVector = None
         self.classCount = class_count
+        self.backgroundLabel = background_label
         self.logits = None
         self.classProbabilities = None
         self.crossEntropyLossTensors = None
+        self.regularizerLoss = tf.constant(0.0)
+        self.l2Lambda = tf.placeholder(tf.float32)
         self.classifierLoss = None
         self.optimizer = None
         self.totalLoss = None
@@ -35,6 +41,7 @@ class FastRcnn:
         self.detectorUpdateOps = None
         self.roiPoolingInfMask = None
         self.session = tf.Session()
+        self.saver = tf.train.Saver()
 
     def build_network(self):
         # Build the backbone
@@ -123,8 +130,15 @@ class FastRcnn:
             tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(self.reshapedLabels, 'int32'),
                                                            logits=self.logits)
         self.classifierLoss = tf.reduce_mean(self.crossEntropyLossTensors)
+        self.build_l2_lambda_loss()
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            self.totalLoss = self.classifierLoss + 0
+            self.totalLoss = self.classifierLoss + self.regularizerLoss
+
+    def build_l2_lambda_loss(self):
+        vars = tf.trainable_variables()
+        for v in vars:
+            if "kernel" in v.name:
+                self.regularizerLoss += self.l2Lambda * tf.nn.l2_loss(v)
 
     def build_optimizer(self):
         # self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -132,6 +146,29 @@ class FastRcnn:
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
         # with tf.control_dependencies(self.extra_update_ops):
         self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
+
+    def get_checkpoint_path(self, iteration):
+        curr_path = os.path.dirname(os.path.abspath(__file__))
+        directory_path = os.path.abspath(os.path.join(
+            os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."), "saved_model"),
+            "checkpoint_{0}_iteration_{1}".format(Constants.MODEL_NAME, iteration)))
+        checkpoint_path = os.path.abspath(os.path.join(directory_path, "model.ckpt"))
+        return directory_path, checkpoint_path
+
+    def save_model(self, iteration):
+        directory_path, checkpoint_path = self.get_checkpoint_path(iteration=iteration)
+        os.mkdir(directory_path)
+        self.saver.save(self.session, checkpoint_path)
+
+    def load_model(self, iteration):
+        _, checkpoint_path = self.get_checkpoint_path(iteration=iteration)
+        saved_vars = checkpoint_utils.list_variables(checkpoint_dir=checkpoint_path)
+        all_vars = tf.global_variables()
+        for var in all_vars:
+            if "Adam" in var.name:
+                continue
+            source_array = checkpoint_utils.load_variable(checkpoint_dir=checkpoint_path, name=var.name)
+            tf.assign(var, source_array).eval(session=self.session)
 
     def test_roi_pooling(self, backbone_output, roi_pool_results, roi_proposals):
         pooled_imgs = []
@@ -232,12 +269,43 @@ class FastRcnn:
                                                           self.roiInputs: np.expand_dims(proposal_batch, axis=0),
                                                           self.isTrain: 0})
                     class_probs = results[0]
+                    max_probs = np.max(class_probs, axis=1)
                     predicted_classes = np.argmax(class_probs, axis=1)
-                    predictions = np.concatenate([np.expand_dims(predicted_classes, axis=1), proposal_batch], axis=1)
+                    predictions = np.concatenate(
+                        [np.expand_dims(predicted_classes, axis=1),
+                         np.expand_dims(max_probs, axis=1),
+                         proposal_batch], axis=1)
                     proposal_label_pairs.append(predictions)
                     batch_id += 1
-            proposal_label_pairs = np.concatenate(proposal_label_pairs, axis=0)
-            print("X")
+            proposal_results = np.concatenate(proposal_label_pairs, axis=0)
+            proposal_results[:, [3, 5]] = proposal_results[:, [3, 5]] * float(resized_img.shape[0])
+            proposal_results[:, [2, 4]] = proposal_results[:, [2, 4]] * float(resized_img.shape[1])
+            self.nms_algorithm(proposal_results=proposal_results)
+            print("Predicted")
+
+    def nms_algorithm(self, proposal_results):
+        # Eliminate all entries with background label
+        non_background_proposal_indices = proposal_results[:, 0] != self.backgroundLabel
+        object_proposals = proposal_results[non_background_proposal_indices]
+        iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, object_proposals[:, 2:]),
+                                         axis=1, arr=object_proposals[:, 2:])
+        final_proposals = []
+        while object_proposals.shape[0] > 0:
+            most_confident_id = np.argmax(object_proposals[:, 1], axis=0)
+            final_proposals.append(object_proposals[most_confident_id])
+            iou_distances = iou_matrix[most_confident_id, :]
+            non_overlapping_flags = iou_distances < Constants.NMS_THRESHOLD
+            object_proposals = object_proposals[non_overlapping_flags]
+            iou_matrix = iou_matrix[non_overlapping_flags, :]
+            iou_matrix = iou_matrix[:, non_overlapping_flags]
+        print("X")
+
+        # most_confident_id = np.argmax(object_proposals[:, 1], axis=0)
+        # final_proposals.append(object_proposals[most_confident_id])
+        # object_proposals = np.delete(object_proposals, most_confident_id, axis=0)
+        # print("X")
+
+        print("X")
 
     def train(self, dataset):
         losses = []
@@ -247,6 +315,7 @@ class FastRcnn:
             # print("A")
             feed_dict = {self.imageInputs: images,
                          self.isTrain: 1,
+                         self.l2Lambda: Constants.L2_LAMBDA,
                          self.roiInputs: roi_proposals,
                          self.roiLabels: roi_labels}
             # results = sess.run([self.backboneNetworkOutput, self.roiPoolingOutput,
@@ -265,9 +334,11 @@ class FastRcnn:
             assert np.sum(np.isinf(results[-1]) == True) == 0
             iteration += 1
             print("Iteration={0}".format(iteration))
-            if len(losses) == 10:
+            if len(losses) == Constants.RESULT_REPORTING_PERIOD:
                 print("Loss:{0}".format(np.mean(np.array(losses))))
                 losses = []
+            if (iteration + 1) % Constants.MODEL_SAVING_PERIOD == 0:
+                self.save_model(iteration=iteration)
             # self.test_roi_pooling(backbone_output=results[0], roi_pool_results=results[1], roi_proposals=roi_proposals)
 
 # net = imageInputs
