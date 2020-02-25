@@ -29,6 +29,15 @@ def load_dataset():
     return dataset
 
 
+def load_fast_rcnn_detector():
+    dataset = load_dataset()
+    detector = FastRcnn(roi_list=dataset.medoidRois,
+                        background_label=dataset.backgroundLabel, class_count=dataset.classCount)
+    detector.build_network()
+    detector.load_model(iteration=10)
+    detector.train(dataset=dataset)
+
+
 def train_fast_rcnn_detector():
     dataset = load_dataset()
     detector = FastRcnn(roi_list=dataset.medoidRois,
@@ -58,7 +67,9 @@ def main():
     #     roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
     #     positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
 
-    train_fast_rcnn_detector()
+    load_fast_rcnn_detector()
+
+    # load_fast_rcnn_detector()
 
     # create_dataset(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD, max_coverage=Constants.MAX_INCLUSIVENESS_BB,
     #                test_ratio=0.15)

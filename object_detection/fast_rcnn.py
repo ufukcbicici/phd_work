@@ -41,7 +41,7 @@ class FastRcnn:
         self.detectorUpdateOps = None
         self.roiPoolingInfMask = None
         self.session = tf.Session()
-        self.saver = tf.train.Saver()
+        self.saver = None
 
     def build_network(self):
         # Build the backbone
@@ -219,11 +219,15 @@ class FastRcnn:
         roi_proposals = roi_proposals_tensor[:, :, 1:]
         return images, roi_labels, roi_proposals
 
-    def detect_single_image(self, img):
+    # def calculate_accuracy_on_image(self, img, ground_truth_list):
+    #     final_proposals = self.detect_single_image(img=img)
+
+    def detect_single_image(self, original_img):
+        all_proposals = []
         for img_width in Constants.IMG_WIDTHS:
             new_width = img_width  # int(img_obj.imgArr.shape[1] * scale_percent / 100)
-            new_height = int((float(img_width) / img.shape[1]) * img.shape[0])
-            resized_img = cv2.resize(img, (new_width, new_height))
+            new_height = int((float(img_width) / original_img.shape[1]) * original_img.shape[0])
+            resized_img = cv2.resize(original_img, (new_width, new_height))
             roi_scale = img_width / min(Constants.IMG_WIDTHS)
             roi_list = (roi_scale * self.roiList).astype(np.int32)
             # Run the backbone first for this scale
@@ -256,7 +260,7 @@ class FastRcnn:
                 #     img=resized_img, roi_matrix=proposals, colors=[(0, 255, 0)] * proposals.shape[0])
 
             # Send proposals for classification and regression
-            proposal_label_pairs = []
+            predictions_list = []
             for proposals in proposals_list:
                 batch_id = 0
                 while True:
@@ -275,13 +279,15 @@ class FastRcnn:
                         [np.expand_dims(predicted_classes, axis=1),
                          np.expand_dims(max_probs, axis=1),
                          proposal_batch], axis=1)
-                    proposal_label_pairs.append(predictions)
+                    predictions_list.append(predictions)
                     batch_id += 1
-            proposal_results = np.concatenate(proposal_label_pairs, axis=0)
-            proposal_results[:, [3, 5]] = proposal_results[:, [3, 5]] * float(resized_img.shape[0])
-            proposal_results[:, [2, 4]] = proposal_results[:, [2, 4]] * float(resized_img.shape[1])
-            self.nms_algorithm(proposal_results=proposal_results)
-            print("Predicted")
+            proposal_results = np.concatenate(predictions_list, axis=0)
+            proposal_results[:, [3, 5]] = proposal_results[:, [3, 5]] * float(original_img.shape[0])
+            proposal_results[:, [2, 4]] = proposal_results[:, [2, 4]] * float(original_img.shape[1])
+            all_proposals.append(proposal_results)
+        all_proposals = np.concatenate(all_proposals, axis=0)
+        final_proposals = self.nms_algorithm(proposal_results=all_proposals)
+        return final_proposals
 
     def nms_algorithm(self, proposal_results):
         # Eliminate all entries with background label
@@ -298,18 +304,13 @@ class FastRcnn:
             object_proposals = object_proposals[non_overlapping_flags]
             iou_matrix = iou_matrix[non_overlapping_flags, :]
             iou_matrix = iou_matrix[:, non_overlapping_flags]
-        print("X")
-
-        # most_confident_id = np.argmax(object_proposals[:, 1], axis=0)
-        # final_proposals.append(object_proposals[most_confident_id])
-        # object_proposals = np.delete(object_proposals, most_confident_id, axis=0)
-        # print("X")
-
-        print("X")
+        final_proposals = np.stack(final_proposals, axis=1)
+        return final_proposals
 
     def train(self, dataset):
         losses = []
         iteration = 0
+        self.saver = tf.train.Saver()
         while True:
             images, roi_labels, roi_proposals = self.get_image_batch(dataset=dataset)
             # print("A")
@@ -338,7 +339,7 @@ class FastRcnn:
             if len(losses) == Constants.RESULT_REPORTING_PERIOD:
                 print("Loss:{0}".format(np.mean(np.array(losses))))
                 losses = []
-            if iteration  % Constants.MODEL_SAVING_PERIOD == 0:
+            if iteration % Constants.MODEL_SAVING_PERIOD == 0:
                 self.save_model(iteration=iteration)
             # self.test_roi_pooling(backbone_output=results[0], roi_pool_results=results[1], roi_proposals=roi_proposals)
 
