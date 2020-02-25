@@ -149,9 +149,9 @@ class FastRcnn:
 
     def get_checkpoint_path(self, iteration):
         curr_path = os.path.dirname(os.path.abspath(__file__))
-        directory_path = os.path.abspath(os.path.join(
-            os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."), "saved_model"),
-            "checkpoint_{0}_iteration_{1}".format(Constants.MODEL_NAME, iteration)))
+        directory_path = os.path.abspath(
+            os.path.join(os.path.join(curr_path, "saved_model"),
+                         "checkpoint_{0}_iteration_{1}".format(Constants.MODEL_NAME, iteration)))
         checkpoint_path = os.path.abspath(os.path.join(directory_path, "model.ckpt"))
         return directory_path, checkpoint_path
 
@@ -327,6 +327,7 @@ class FastRcnn:
             #                    feed_dict=feed_dict)
             results = self.session.run([self.totalLoss, self.classProbabilities,
                                         self.optimizer, self.roiPoolingOutput], feed_dict=feed_dict)
+            # self.save_model(iteration=iteration)
             # print("B")
             losses.append(results[0])
             # If this assertion fails, the the RoI pooled regions in the backbone output is smaller than
