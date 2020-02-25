@@ -338,7 +338,7 @@ class FastRcnn:
             if len(losses) == Constants.RESULT_REPORTING_PERIOD:
                 print("Loss:{0}".format(np.mean(np.array(losses))))
                 losses = []
-            if (iteration + 1) % Constants.MODEL_SAVING_PERIOD == 0:
+            if iteration  % Constants.MODEL_SAVING_PERIOD == 0:
                 self.save_model(iteration=iteration)
             # self.test_roi_pooling(backbone_output=results[0], roi_pool_results=results[1], roi_proposals=roi_proposals)
 
