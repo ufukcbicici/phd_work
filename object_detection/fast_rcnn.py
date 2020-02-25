@@ -219,8 +219,13 @@ class FastRcnn:
         roi_proposals = roi_proposals_tensor[:, :, 1:]
         return images, roi_labels, roi_proposals
 
-    # def calculate_accuracy_on_image(self, img, ground_truth_list):
-    #     final_proposals = self.detect_single_image(img=img)
+    def calculate_accuracy_on_image(self, img, ground_truth_list):
+        final_proposals = self.detect_single_image(original_img=img)
+        # Convert ground truths to actual rectangles
+        ground_truth_list[:, [0, ]]
+
+
+        print("X")
 
     def detect_single_image(self, original_img):
         all_proposals = []
@@ -304,7 +309,7 @@ class FastRcnn:
             object_proposals = object_proposals[non_overlapping_flags]
             iou_matrix = iou_matrix[non_overlapping_flags, :]
             iou_matrix = iou_matrix[:, non_overlapping_flags]
-        final_proposals = np.stack(final_proposals, axis=1)
+        final_proposals = np.stack(final_proposals, axis=0)
         return final_proposals
 
     def train(self, dataset):
