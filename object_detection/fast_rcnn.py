@@ -99,6 +99,7 @@ class FastRcnn:
         labels_shape = tf.shape(self.roiLabels)
         self.reshapedLabels = tf.reshape(self.roiLabels,
                                          shape=[tf.gather_nd(labels_shape, [0]) * tf.gather_nd(labels_shape, [1])])
+        self.reshapedLabels = tf.cast(self.reshapedLabels, 'int32')
 
     def build_detector_endpoint(self):
         x = ResidualNetworkGenerator.generate_resnet_blocks(
@@ -129,8 +130,7 @@ class FastRcnn:
         self.logits = net
         self.classProbabilities = tf.nn.softmax(self.logits)
         self.crossEntropyLossTensors = \
-            tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(self.reshapedLabels, 'int32'),
-                                                           logits=self.logits)
+            tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.reshapedLabels, logits=self.logits)
         self.classifierLoss = tf.reduce_mean(self.crossEntropyLossTensors)
 
     def build_l2_lambda_loss(self):
