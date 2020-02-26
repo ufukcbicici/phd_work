@@ -50,6 +50,7 @@ class Constants:
 
     # Roi Feature Vector Transformations
     CLASSIFIER_HIDDEN_LAYERS = [128]
+    BB_REGRESSION_HIDDEN_LAYERS = [128, 64]
 
     # L2 Norm Regularizer Strength
     L2_LAMBDA = 0.0005

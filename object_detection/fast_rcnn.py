@@ -58,6 +58,8 @@ class FastRcnn:
             self.build_roi_pooling()
         with tf.variable_scope("Detector_Endpoint"):
             self.build_detector_endpoint()
+        with tf.variable_scope("Lambda_Loss"):
+            self.build_l2_lambda_loss()
         with tf.variable_scope("Optimizer"):
             self.build_optimizer()
         self.session.run(tf.initialize_all_variables())
@@ -130,9 +132,6 @@ class FastRcnn:
             tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(self.reshapedLabels, 'int32'),
                                                            logits=self.logits)
         self.classifierLoss = tf.reduce_mean(self.crossEntropyLossTensors)
-        self.build_l2_lambda_loss()
-        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            self.totalLoss = self.classifierLoss + self.regularizerLoss
 
     def build_l2_lambda_loss(self):
         vars = tf.trainable_variables()
@@ -145,6 +144,8 @@ class FastRcnn:
         # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
         # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
         # with tf.control_dependencies(self.extra_update_ops):
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+            self.totalLoss = self.classifierLoss + self.regularizerLoss
         self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
 
     def get_checkpoint_path(self, iteration):
@@ -211,21 +212,21 @@ class FastRcnn:
         print("Test Passed.")
 
     def get_image_batch(self, dataset):
-        images, roi_proposals_tensor = dataset.create_image_batch(
+        images, roi_proposals_tensor, roi_proposals_tensor_real_coord, ground_truths = dataset.create_image_batch(
             batch_size=Constants.IMAGE_COUNT_PER_BATCH,
             roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
             positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
         roi_labels = roi_proposals_tensor[:, :, 0].astype(np.int32)
         roi_proposals = roi_proposals_tensor[:, :, 1:]
-        return images, roi_labels, roi_proposals
+        return images, roi_labels, roi_proposals, roi_proposals_tensor_real_coord, ground_truths
 
-    def calculate_accuracy_on_image(self, img, ground_truth_list):
-        final_proposals = self.detect_single_image(original_img=img)
-        # Convert ground truths to actual rectangles
-        ground_truth_list[:, [0, ]]
-
-
-        print("X")
+    # def calculate_accuracy_on_image(self, img, ground_truth_list):
+    #     final_proposals = self.detect_single_image(original_img=img)
+    #     # Convert ground truths to actual rectangles
+    #     ground_truth_list[:, [0, ]]
+    #
+    #
+    #     print("X")
 
     def detect_single_image(self, original_img):
         all_proposals = []
@@ -317,7 +318,8 @@ class FastRcnn:
         iteration = 0
         self.saver = tf.train.Saver()
         while True:
-            images, roi_labels, roi_proposals = self.get_image_batch(dataset=dataset)
+            images, roi_labels, roi_proposals, roi_proposals_tensor_real_coord, ground_truths = \
+                self.get_image_batch(dataset=dataset)
             # print("A")
             feed_dict = {self.imageInputs: images,
                          self.isTrain: 1,

@@ -15,6 +15,8 @@ from sklearn.preprocessing import StandardScaler
 from object_detection.utilities import Utilities
 
 
+# return images, roi_proposals_tensor, np.array(true_img_heights), bb_ground_truths_tensor
+
 class DetectionImage(object):
     def __init__(self, img_name, img_arr):
         self.imgName = img_name
@@ -157,6 +159,7 @@ class ObjectDetectionDataManager(object):
         std = medoid_scale * Constants.POSITIVE_PROPOSAL_SAMPLING_STD
         repeat_count = 1 * medoids.shape[0]
         positive_proposals_all = None
+        ground_truth_bounding_boxes_all = []
         negative_proposals_all = None
         while True:
             # Calculate new roi centers
@@ -179,12 +182,18 @@ class ObjectDetectionDataManager(object):
             iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, roi_matrix[:, 1:5]),
                                              axis=1, arr=proposals[:, 1:5])
             max_ious = np.max(iou_matrix, axis=1)
+            arg_max_iou = np.argmax(iou_matrix, axis=1)
             positive_roi_indices = np.nonzero(max_ious >= Constants.POSITIVE_IOU_THRESHOLD)[0]
+            ground_truths_indices = arg_max_iou[positive_roi_indices]
+            ground_truth_bounding_boxes = roi_matrix[ground_truths_indices, :]
             positive_proposals = proposals[positive_roi_indices]
             if positive_proposals_all is None:
                 positive_proposals_all = positive_proposals
+                ground_truth_bounding_boxes_all = ground_truth_bounding_boxes
             else:
                 positive_proposals_all = np.concatenate([positive_proposals_all, positive_proposals], axis=0)
+                ground_truth_bounding_boxes_all = np.concatenate(
+                    [ground_truth_bounding_boxes_all, ground_truth_bounding_boxes], axis=0)
             if positive_proposals_all.shape[0] >= positive_roi_count:
                 # bb_matrix = np.concatenate([positive_proposals_all, roi_matrix[:, 1:5]], axis=0).astype(np.int32)
                 # colors = [(255, 0, 0)] * positive_proposals_all.shape[0]
@@ -192,6 +201,7 @@ class ObjectDetectionDataManager(object):
                 # ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp3", img=img, roi_matrix=bb_matrix,
                 #                                                      colors=colors)
                 break
+            assert positive_proposals_all.shape[0] == ground_truth_bounding_boxes_all.shape[0]
         # Select negative regions
         sample_count = total_rois
         while True:
@@ -242,10 +252,14 @@ class ObjectDetectionDataManager(object):
         negative_proposals_selected_idx = np.random.choice(negative_proposals_all.shape[0], negative_roi_count,
                                                            replace=False)
         positive_proposals_selected = positive_proposals_all[positive_proposals_selected_idx]
+        ground_truths_selected = ground_truth_bounding_boxes_all[positive_proposals_selected_idx]
         assert_func(positive_proposals_selected[:, 1:5])
         negative_proposals_selected = negative_proposals_all[negative_proposals_selected_idx]
         assert_func(negative_proposals_selected[:, 1:5])
         all_proposals = np.concatenate([positive_proposals_selected, negative_proposals_selected], axis=0)
+        ground_truths = np.zeros(dtype=ground_truths_selected.dtype,
+                                 shape=(all_proposals.shape[0], ground_truths_selected.shape[1]))
+        ground_truths[0:ground_truths_selected.shape[0]] = ground_truths_selected
         # Visualize
         # bb_matrix = np.concatenate([positive_proposals_selected[:, 1:5],
         #                             negative_proposals_selected[:, 1:5],
@@ -256,7 +270,7 @@ class ObjectDetectionDataManager(object):
         # colors.extend([(255, 0, 255)] * negative_proposals_selected.shape[0])
         # ObjectDetectionDataManager.print_img_with_final_rois(img_name="Exp4", img=img, roi_matrix=bb_matrix,
         #                                                      colors=colors)
-        return all_proposals
+        return all_proposals, ground_truths
 
     def create_image_batch(self, batch_size, roi_sample_count, positive_sample_ratio):
         positive_roi_count = int(roi_sample_count * positive_sample_ratio)
@@ -275,9 +289,12 @@ class ObjectDetectionDataManager(object):
                           dtype=selected_img_objects[0].imageScales[selected_scale].dtype)
         roi_matrices = []
         roi_proposals_tensor = []
+        bb_ground_truths_tensor = []
+        true_img_heights = []
         label_matrix = []
         for idx in range(batch_size):
             img_height = selected_img_objects[idx].imageScales[selected_scale].shape[0]
+            true_img_heights.append(img_height)
             images[idx, 0:img_height, :, :] = selected_img_objects[idx].imageScales[selected_scale]
             # Calculate actual roi bounding box sizes
             roi_matrix = selected_img_objects[idx].roiMatrix
@@ -312,17 +329,21 @@ class ObjectDetectionDataManager(object):
             #     print("X")
             # cv2.imwrite("Image{0}.png".format(idx), images[idx])
             # ********** This is for visualizing **********
-            roi_proposals = self.sample_rois(medoids=self.medoidRois, img=images[idx], true_height=img_height,
-                                             roi_matrix=reshaped_roi_matrix,
-                                             positive_roi_count=positive_roi_count,
-                                             negative_roi_count=negative_roi_count)
+            roi_proposals, ground_truths = self.sample_rois(medoids=self.medoidRois, img=images[idx],
+                                                            true_height=img_height,
+                                                            roi_matrix=reshaped_roi_matrix,
+                                                            positive_roi_count=positive_roi_count,
+                                                            negative_roi_count=negative_roi_count)
             roi_proposals_tensor.append(roi_proposals)
+            bb_ground_truths_tensor.append(ground_truths)
         roi_proposals_tensor = np.stack(roi_proposals_tensor, axis=0)
+        bb_ground_truths_tensor = np.stack(bb_ground_truths_tensor, axis=0)
         # Convert to normalized coordinates
+        roi_proposals_tensor_real_coord = np.copy(roi_proposals_tensor)
         roi_proposals_tensor[:, :, [1, 3]] = roi_proposals_tensor[:, :, [1, 3]] / images.shape[2]
         roi_proposals_tensor[:, :, [2, 4]] = roi_proposals_tensor[:, :, [2, 4]] / images.shape[1]
         assert np.sum(roi_proposals_tensor[:, :, 1:] < 0) == 0 and np.sum(roi_proposals_tensor[:, :, 1:] > 1) == 0
-        return images, roi_proposals_tensor
+        return images, roi_proposals_tensor, roi_proposals_tensor_real_coord, bb_ground_truths_tensor
 
     # def test_dataset(self, use_train):
     #     if use_train:
