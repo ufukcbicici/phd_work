@@ -239,10 +239,11 @@ class FastRcnn:
                                          axis=1, arr=reshaped_roi_matrix[:, 1:])
         max_iou_indices = np.argmax(iou_matrix, axis=1)
         label_predictions = reshaped_roi_matrix[:, 0] == final_proposals[max_iou_indices, 0]
+        print("Accuracy:{0}".format(np.sum(label_predictions) / float(label_predictions.shape[0])))
         prediction_results = {i: pred for i, pred in zip(max_iou_indices, label_predictions)}
         # Draw all predictions: Ground Truths Blue, Correct Predictions Green, False Positives Red
-        predicted_boxes = final_proposals[2:].astype(np.int32)
-        ground_truths = reshaped_roi_matrix[1:].astype(np.int32)
+        predicted_boxes = final_proposals[:, 2:].astype(np.int32)
+        ground_truths = reshaped_roi_matrix[:, 1:].astype(np.int32)
         all_boxes = np.concatenate([predicted_boxes, ground_truths], axis=0)
         colors = []
         for idx in range(predicted_boxes.shape[0]):
@@ -252,10 +253,29 @@ class FastRcnn:
                 colors.append((0, 0, 255))
             else:
                 colors.append((0, 255, 0))
-        colors.extend([(255, 0, 0) * ground_truths.shape[0]])
-        ObjectDetectionDataManager.print_img_with_final_rois(img_name=img_name, img=img, roi_matrix=all_boxes,
+        colors.extend([(255, 0, 0)] * ground_truths.shape[0])
+        ObjectDetectionDataManager.print_img_with_final_rois(img_name="{0}_Test".format(img_name),
+                                                             img=img,
+                                                             roi_matrix=all_boxes,
                                                              colors=colors)
-        print("X")
+        with open("detections\\{0}.txt".format(img_name), 'a') as f:
+            for idx in range(final_proposals.shape[0]):
+                f.write("{0} {1} {2} {3} {4} {5}\n".format(
+                    final_proposals[idx, 0].astype(np.int32),
+                    final_proposals[idx, 1],
+                    final_proposals[idx, 2].astype(np.int32),
+                    final_proposals[idx, 3].astype(np.int32),
+                    final_proposals[idx, 4].astype(np.int32),
+                    final_proposals[idx, 5].astype(np.int32)))
+
+        with open("groundtruths\\{0}.txt".format(img_name), 'a') as f:
+            for idx in range(reshaped_roi_matrix.shape[0]):
+                f.write("{0} {1} {2} {3} {4}\n".format(
+                    reshaped_roi_matrix[idx, 0].astype(np.int32),
+                    reshaped_roi_matrix[idx, 1].astype(np.int32),
+                    reshaped_roi_matrix[idx, 2].astype(np.int32),
+                    reshaped_roi_matrix[idx, 3].astype(np.int32),
+                    reshaped_roi_matrix[idx, 4].astype(np.int32)))
 
     def detect_single_image(self, original_img):
         all_proposals = []
