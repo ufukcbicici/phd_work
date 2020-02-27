@@ -316,7 +316,7 @@ class FastRcnn:
     def train(self, dataset):
         losses = []
         iteration = 0
-        self.saver = tf.train.Saver()
+        self.saver = tf.train.Saver(max_to_keep=1000000)
         while True:
             images, roi_labels, roi_proposals, roi_proposals_tensor_real_coord, ground_truths = \
                 self.get_image_batch(dataset=dataset)

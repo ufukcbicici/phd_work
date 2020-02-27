@@ -55,6 +55,9 @@ class Constants:
     # L2 Norm Regularizer Strength
     L2_LAMBDA = 0.0005
 
+    # Coefficient for Bounding Box Regression
+    REGRESSION_LAMBDA = 1.0
+
     # Parameters for testing
     STRIDE_WIDTH = 10
     STRIDE_HEIGHT = 25
