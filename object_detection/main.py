@@ -38,14 +38,14 @@ def load_fast_rcnn_detector():
     global_detector = FastRcnn(roi_list=dataset.medoidRois,
                                background_label=dataset.backgroundLabel, class_count=dataset.classCount)
     global_detector.build_network()
-    global_detector.load_model(iteration=5000)
-    # global_detector.calculate_accuracy_on_image(img=dataset.dataList[0].imgArr,
-    #                                             ground_truth_list=dataset.dataList[0].roiMatrix)
-    predictions = global_detector.detect_single_image(original_img=dataset.dataList[0].imgArr)
-    dataset.print_img_with_final_rois(img_name="{0}_{1}".format(dataset.dataList[0].imgName, 5000),
-                                      img=dataset.dataList[0].imgArr,
-                                      roi_matrix=predictions[:, 2:].astype(np.int32),
-                                      colors=[(0, 255, 0)] * predictions.shape[0])
+    global_detector.load_model(iteration=51500)
+    global_detector.calculate_accuracy_on_image(img=dataset.dataList[0].imgArr,
+                                                roi_matrix=dataset.dataList[0].roiMatrix)
+    # predictions = global_detector.detect_single_image(original_img=dataset.dataList[0].imgArr)
+    # dataset.print_img_with_final_rois(img_name="{0}_{1}".format(dataset.dataList[0].imgName, 5000),
+    #                                   img=dataset.dataList[0].imgArr,
+    #                                   roi_matrix=predictions[:, 2:].astype(np.int32),
+    #                                   colors=[(0, 255, 0)] * predictions.shape[0])
 
 
 def train_fast_rcnn_detector():
@@ -85,8 +85,8 @@ def main():
     #     roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
     #     positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
 
-    train_fast_rcnn_detector_with_bb_regression()
-    # load_fast_rcnn_detector()
+    # train_fast_rcnn_detector_with_bb_regression()
+    load_fast_rcnn_detector()
 
     # train_fast_rcnn_detector_with_bb_regression()
     # create_dataset(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD, max_coverage=Constants.MAX_INCLUSIVENESS_BB,

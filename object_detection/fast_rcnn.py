@@ -220,13 +220,42 @@ class FastRcnn:
         roi_proposals = roi_proposals_tensor[:, :, 1:]
         return images, roi_labels, roi_proposals, roi_proposals_tensor_real_coord, ground_truths
 
-    # def calculate_accuracy_on_image(self, img, ground_truth_list):
-    #     final_proposals = self.detect_single_image(original_img=img)
-    #     # Convert ground truths to actual rectangles
-    #     ground_truth_list[:, [0, ]]
-    #
-    #
-    #     print("X")
+    def calculate_accuracy_on_image(self, img_name, img, roi_matrix):
+        final_proposals = self.detect_single_image(original_img=img)
+        img_width = img.shape[1]
+        img_height = img.shape[0]
+        # Convert ground truths to actual rectangles
+        reshaped_roi_matrix = np.copy(roi_matrix)
+        # Left Coords
+        reshaped_roi_matrix[:, 1] = (roi_matrix[:, 1] - 0.5 * roi_matrix[:, 3]) * float(img_width)
+        # Top Coords: Include the coefficient coming from the zero padding as well.
+        reshaped_roi_matrix[:, 2] = (roi_matrix[:, 2] - 0.5 * roi_matrix[:, 4]) * float(img_height)
+        # Right Coords
+        reshaped_roi_matrix[:, 3] = (roi_matrix[:, 1] + 0.5 * roi_matrix[:, 3]) * float(img_width)
+        # Bottom Coords:Include the coefficient coming from the zero padding as well.
+        reshaped_roi_matrix[:, 4] = (roi_matrix[:, 2] + 0.5 * roi_matrix[:, 4]) * float(img_height)
+        # reshaped_roi_matrix = np.copy(reshaped_roi_matrix).astype(np.int32)
+        iou_matrix = np.apply_along_axis(lambda x: Utilities.get_iou_with_list(x, final_proposals[:, 2:]),
+                                         axis=1, arr=reshaped_roi_matrix[:, 1:])
+        max_iou_indices = np.argmax(iou_matrix, axis=1)
+        label_predictions = reshaped_roi_matrix[:, 0] == final_proposals[max_iou_indices, 0]
+        prediction_results = {i: pred for i, pred in zip(max_iou_indices, label_predictions)}
+        # Draw all predictions: Ground Truths Blue, Correct Predictions Green, False Positives Red
+        predicted_boxes = final_proposals[2:].astype(np.int32)
+        ground_truths = reshaped_roi_matrix[1:].astype(np.int32)
+        all_boxes = np.concatenate([predicted_boxes, ground_truths], axis=0)
+        colors = []
+        for idx in range(predicted_boxes.shape[0]):
+            if idx not in prediction_results:
+                colors.append((0, 0, 255))
+            elif not prediction_results[idx]:
+                colors.append((0, 0, 255))
+            else:
+                colors.append((0, 255, 0))
+        colors.extend([(255, 0, 0) * ground_truths.shape[0]])
+        ObjectDetectionDataManager.print_img_with_final_rois(img_name=img_name, img=img, roi_matrix=all_boxes,
+                                                             colors=colors)
+        print("X")
 
     def detect_single_image(self, original_img):
         all_proposals = []
