@@ -8,7 +8,10 @@ from object_detection.fast_rcnn_with_bb_regression import FastRcnnWithBBRegressi
 from object_detection.object_detection_data_manager import ObjectDetectionDataManager
 
 # Global Detector Object
+from object_detection.planogram_measurement import PlanogramCompliance
+
 global_detector = None
+planogram_compliance = None
 
 
 # Fast R-CNN Module Entry Points
@@ -35,6 +38,8 @@ def load_dataset():
 
 def load_fast_rcnn_detector():
     global global_detector
+    global planogram_compliance
+    planogram_compliance = PlanogramCompliance("planogram.json")
     dataset = load_dataset()
     global_detector = FastRcnn(roi_list=dataset.medoidRois,
                                background_label=dataset.backgroundLabel, class_count=dataset.classCount)
@@ -44,6 +49,8 @@ def load_fast_rcnn_detector():
 
 def load_fast_rcnn_detector_with_bb_regression():
     global global_detector
+    global planogram_compliance
+    planogram_compliance = PlanogramCompliance("planogram.json")
     dataset = load_dataset()
     global_detector = FastRcnnWithBBRegression(roi_list=dataset.medoidRois,
                                                background_label=dataset.backgroundLabel, class_count=dataset.classCount)
@@ -85,18 +92,30 @@ def train_fast_rcnn_detector_with_bb_regression():
 #     detect_image(detector, dataset.dataList[0].imgArr)
 
 
-def detect_image(img):
+def detect_image(img, upper_left, upper_right, bottom_left, bottom_right):
     global global_detector
     json_file = global_detector.detect_single_image_json(original_img=img)
+    planogram_compliance.get_planogram_compliance(detection_json=json_file,
+                                                  upper_left=upper_left, upper_right=upper_right,
+                                                  bottom_left=bottom_left, bottom_right=bottom_right)
     return json_file
 
 
+def sample_call():
+    dataset = load_dataset()
+    load_fast_rcnn_detector()
+    upper_left = np.array([0, 0])
+    upper_right = np.array([0, dataset.dataList[0].imgArr.shape[1]])
+    bottom_left = np.array([dataset.dataList[0].imgArr.shape[0], 0])
+    bottom_right = np.array([dataset.dataList[0].imgArr.shape[0], dataset.dataList[0].imgArr.shape[1]])
+    json_file = detect_image(img=dataset.dataList[0].imgArr, upper_left=upper_left,
+                             upper_right=upper_right, bottom_left=bottom_left, bottom_right=bottom_right)
+
+
 def main():
-    # dataset = load_dataset()
-    # load_fast_rcnn_detector()
-    # json_file = detect_image(img=dataset.dataList[0].imgArr)
-    test_on_all_images()
-    print("X")
+    sample_call()
+    # test_on_all_images()
+    # print("X")
 
     # create_dataset()
     # image_detection_test()

@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class PlanogramVisualizer:
+class PlanogramCompliance:
 
     def __init__(self, json_path):
         with open(json_path) as f:
@@ -64,12 +64,36 @@ class PlanogramVisualizer:
         image = cv2.warpPerspective(image, h, (image.shape[1], image.shape[0]))
         return image
 
-    # def get_planogram_compliance(self, detection_json):
-    #     img_data = json.loads(x)
+    def get_planogram_compliance(self, detection_json, upper_left, upper_right, bottom_left, bottom_right):
+        img_data = json.loads(detection_json)
+        # Draw detection image
+        detection_image = np.zeros(shape=(img_data["image_height"], img_data["image_width"], 3), dtype=np.int32)
+        detection_image = cv2.rectangle(detection_image, (10, 20),
+                                        (250, 400),
+                                        (0, 255, 0),
+                                        thickness=-1)
+        cv2.imwrite("DetectionImage2.png", detection_image)
+        for detection in img_data["detections"]:
+            class_id = detection["class"]
+            left = int(detection["left"])
+            top = int(detection["top"])
+            right = int(detection["right"])
+            bottom = int(detection["bottom"])
+            if class_id not in self.productColorMapping:
+                detection_image = cv2.rectangle(detection_image, (left, top),
+                                      (right, bottom),
+                                      (1.0, 1.0, 1.0),
+                                      thickness=-1)
+            else:
+                detection_image = cv2.rectangle(detection_image, (left, top),
+                                      (right, bottom),
+                                      self.productColorMapping[class_id],
+                                      thickness=-1)
+        cv2.imwrite("DetectionImage.png", detection_image)
 
 
 if __name__ == "__main__":
-    planogram = PlanogramVisualizer("planogram.json")
+    planogram = PlanogramCompliance("planogram.json")
 
 
     # image = planogram.get_planogram_image()
