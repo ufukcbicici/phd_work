@@ -34,19 +34,18 @@ def load_dataset():
 
 
 def load_fast_rcnn_detector():
+    global global_detector
     dataset = load_dataset()
     global_detector = FastRcnn(roi_list=dataset.medoidRois,
                                background_label=dataset.backgroundLabel, class_count=dataset.classCount)
     global_detector.build_network()
-    global_detector.load_model(iteration=51500)
+    global_detector.load_model(iteration=Constants.MODEL_ID)
 
 
 def test_on_all_images():
     dataset = load_dataset()
-    global_detector = FastRcnn(roi_list=dataset.medoidRois,
-                               background_label=dataset.backgroundLabel, class_count=dataset.classCount)
     global_detector.build_network()
-    global_detector.load_model(iteration=51500)
+    global_detector.load_model(iteration=Constants.MODEL_ID)
     os.mkdir("groundtruths")
     os.mkdir("detections")
     for img_obj in dataset.dataList:
@@ -70,19 +69,26 @@ def train_fast_rcnn_detector_with_bb_regression():
     detector.train(dataset=dataset)
 
 
-def image_detection_test():
-    dataset = load_dataset()
-    detector = FastRcnn(roi_list=dataset.medoidRois,
-                        background_label=dataset.backgroundLabel, class_count=dataset.classCount)
-    detector.build_network()
-    detect_image(detector, dataset.dataList[0].imgArr)
+# def image_detection_test():
+#     dataset = load_dataset()
+#     detector = FastRcnn(roi_list=dataset.medoidRois,
+#                         background_label=dataset.backgroundLabel, class_count=dataset.classCount)
+#     detector.build_network()
+#     detect_image(detector, dataset.dataList[0].imgArr)
 
 
-def detect_image(detector, img):
-    detector.detect_single_image(img=img)
+def detect_image(img):
+    global global_detector
+    json_file = global_detector.detect_single_image_json(original_img=img)
+    return json_file
 
 
 def main():
+    dataset = load_dataset()
+    load_fast_rcnn_detector()
+    json_file = detect_image(img=dataset.dataList[0].imgArr)
+    print("X")
+
     # create_dataset()
     # image_detection_test()
     # dataset = load_dataset()
@@ -93,7 +99,7 @@ def main():
 
     # train_fast_rcnn_detector_with_bb_regression()
     # load_fast_rcnn_detector()
-    test_on_all_images()
+    # test_on_all_images()
     # train_fast_rcnn_detector_with_bb_regression()
     # create_dataset(iou_threshold=Constants.POSITIVE_IOU_THRESHOLD, max_coverage=Constants.MAX_INCLUSIVENESS_BB,
     #                test_ratio=0.15)

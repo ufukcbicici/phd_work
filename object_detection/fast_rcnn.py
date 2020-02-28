@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import cv2
 import os
+import json
 from algorithms.roi_pooling import RoIPooling
 from object_detection.constants import Constants
 from object_detection.object_detection_data_manager import ObjectDetectionDataManager
@@ -342,7 +343,23 @@ class FastRcnn:
             all_proposals.append(proposal_results)
         all_proposals = np.concatenate(all_proposals, axis=0)
         final_proposals = self.nms_algorithm(proposal_results=all_proposals)
+        # self.convert_proposals_to_json(proposals=final_proposals)
         return final_proposals
+
+    def detect_single_image_json(self, original_img):
+        proposals = self.detect_single_image(original_img=original_img)
+        json_dict = {"detections": []}
+        for idx in range(proposals.shape[0]):
+            object_info = {"class": int(proposals[idx][0]),
+                           "left": proposals[idx][2],
+                           "top": proposals[idx][3],
+                           "right": proposals[idx][4],
+                           "bottom": proposals[idx][5]}
+            json_dict["detections"].append(object_info)
+        json_dict["image_width"] = original_img.shape[1]
+        json_dict["image_height"] = original_img.shape[0]
+        json_file = json.dumps(json_dict)
+        return json_file
 
     def nms_algorithm(self, proposal_results):
         # Eliminate all entries with background label

@@ -8,6 +8,9 @@ class Constants:
     # Image Scales
     IMG_WIDTHS = [640]
 
+    # Model to load
+    MODEL_ID = 51500
+
     # Test / Whole Dataset Ratio
     TEST_RATIO = 0.15
 
