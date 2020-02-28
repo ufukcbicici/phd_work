@@ -9,7 +9,7 @@ class Constants:
     IMG_WIDTHS = [640]
 
     # Model to load
-    MODEL_ID = 51500
+    MODEL_ID = 57200
 
     # Test / Whole Dataset Ratio
     TEST_RATIO = 0.15

@@ -153,8 +153,10 @@ class FastRcnnWithBBRegression(FastRcnn):
                     predicted_offsets = predicted_regression_outputs[
                                         np.arange(predicted_regression_outputs.shape[0]), predicted_classes, :]
                     proposal_batch_original_size = np.copy(proposal_batch)
-                    proposal_batch_original_size[:, [1, 3]] = proposals[:, [1, 3]] * float(resized_img.shape[0])
-                    proposal_batch_original_size[:, [0, 2]] = proposals[:, [0, 2]] * float(resized_img.shape[1])
+                    proposal_batch_original_size[:, [1, 3]] = \
+                        proposal_batch_original_size[:, [1, 3]] * float(resized_img.shape[0])
+                    proposal_batch_original_size[:, [0, 2]] = \
+                        proposal_batch_original_size[:, [0, 2]] * float(resized_img.shape[1])
                     object_proposal_centers = np.stack(
                         [0.5 * proposal_batch_original_size[:, 0] + 0.5 * proposal_batch_original_size[:, 2],
                          0.5 * proposal_batch_original_size[:, 1] + 0.5 * proposal_batch_original_size[:, 3]], axis=1)

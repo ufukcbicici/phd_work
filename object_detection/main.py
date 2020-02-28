@@ -42,10 +42,18 @@ def load_fast_rcnn_detector():
     global_detector.load_model(iteration=Constants.MODEL_ID)
 
 
-def test_on_all_images():
+def load_fast_rcnn_detector_with_bb_regression():
+    global global_detector
     dataset = load_dataset()
+    global_detector = FastRcnnWithBBRegression(roi_list=dataset.medoidRois,
+                                               background_label=dataset.backgroundLabel, class_count=dataset.classCount)
     global_detector.build_network()
     global_detector.load_model(iteration=Constants.MODEL_ID)
+
+
+def test_on_all_images():
+    dataset = load_dataset()
+    load_fast_rcnn_detector_with_bb_regression()
     os.mkdir("groundtruths")
     os.mkdir("detections")
     for img_obj in dataset.dataList:
@@ -84,9 +92,10 @@ def detect_image(img):
 
 
 def main():
-    dataset = load_dataset()
-    load_fast_rcnn_detector()
-    json_file = detect_image(img=dataset.dataList[0].imgArr)
+    # dataset = load_dataset()
+    # load_fast_rcnn_detector()
+    # json_file = detect_image(img=dataset.dataList[0].imgArr)
+    test_on_all_images()
     print("X")
 
     # create_dataset()
