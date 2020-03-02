@@ -18,6 +18,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_PREDICTION_PENALTY = 0.0
     LAMBDA_MAC_COST = 0.5
     BASELINE_UPDATE_GAMMA = 0.99
+    SOFTMAX_DECAY = 5.0
     CONV_FEATURES = [[], []]
     HIDDEN_LAYERS = [[128, 64], [256, 128]]
     FILTER_SIZES = [[], []]
@@ -92,6 +93,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             FullGpuTreePolicyGradientsNetwork.INVALID_PREDICTION_PENALTY)
         explanation += "LAMBDA_MAC_COST={0}\n".format(FullGpuTreePolicyGradientsNetwork.LAMBDA_MAC_COST)
         explanation += "BASELINE_UPDATE_GAMMA={0}\n".format(FullGpuTreePolicyGradientsNetwork.BASELINE_UPDATE_GAMMA)
+        explanation += "SOFTMAX_DECAY={0}\n".format(FullGpuTreePolicyGradientsNetwork.SOFTMAX_DECAY)
         explanation += "Hidden Layers={0}\n".format(self.hiddenLayers)
         explanation += "Network Name:{0}\n".format(self.networkName)
         explanation += "Network Run Id:{0}\n".format(self.networkRunId)
@@ -424,7 +426,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         # Prepare all state inputs for all time steps
         feed_dict = {self.isSamplingTrajectory: not select_argmax,
                      self.ignoreInvalidActions: ignore_invalid_actions,
-                     self.softmaxDecay: 1.0,
+                     self.softmaxDecay: FullGpuTreePolicyGradientsNetwork.SOFTMAX_DECAY,
                      self.stateIds: history.stateIds}
         for t in range(self.get_max_trajectory_length()):
             # State inputs
@@ -544,7 +546,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
             # Prepare all state inputs for all time steps, the reward matrices and the baselines
             feed_dict = {self.isSamplingTrajectory: True,
                          self.ignoreInvalidActions: False,
-                         self.softmaxDecay: 1.0,
+                         self.softmaxDecay: FullGpuTreePolicyGradientsNetwork.SOFTMAX_DECAY,
                          self.stateIds: history.stateIds,
                          self.l2LambdaTf: self.l2Lambda}
             for t in range(self.get_max_trajectory_length()):
