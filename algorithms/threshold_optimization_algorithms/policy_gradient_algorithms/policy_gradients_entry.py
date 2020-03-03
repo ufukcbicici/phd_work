@@ -170,11 +170,11 @@ def train_policy_gradients_network():
     for fold_id, val_indices, test_indices in zip(range(10), validation_indices_list, test_indices_list):
         validation_data, test_data = routing_data.split_dataset_with_indices(training_indices=val_indices,
                                                                              test_indices=test_indices)
-        wd_list = [0.01]
+        wd_list = [0.01] * 50
         # [0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * 10
         state_sample_count_list = [1000]
         samples_per_state_list = [1]
-        mac_costs = [0.5]
+        mac_costs = [0.1, 0.25, 0.5, 0.75]
         ignore_invalid_actions = False
         cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
                                                                               state_sample_count_list,

@@ -587,6 +587,9 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 validation_policy_value, test_policy_value = self.evaluate_policy_values(sess=sess)
                 validation_accuracy_dict, test_accuracy_dict, val_computation_overload_dict, \
                 test_computation_overload_dict = self.evaluate_routing_accuracies(sess=sess)
+                # Exit the training if the model has not converged.
+                if iteration_id >= 3000 and test_computation_overload_dict[(True, True)] >= 0.4:
+                    return
                 self.save_results_to_db(run_id=self.runId,
                                         iteration_id=iteration_id,
                                         validation_policy_value=validation_policy_value,
