@@ -20,15 +20,15 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
     INVALID_ACTION_PENALTY = -10.0
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
-    LAMBDA_MAC_COST = 0.0
     BASELINE_UPDATE_GAMMA = 0.99
 
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                  output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
-                 trajectory_per_state_sample_count):
+                 trajectory_per_state_sample_count, lambda_mac_cost):
         self.hiddenLayers = hidden_layers
         self.network = network
         assert len(self.hiddenLayers) == self.get_max_trajectory_length()
+        self.lambdaMacCost = lambda_mac_cost
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, use_baselines, state_sample_count,
                          trajectory_per_state_sample_count)
@@ -219,7 +219,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
             rewards_arr += prediction_rewards
             # Computation Cost Penalties
             activation_cost_arr = self.networkActivationCosts[history.actions[time_step]]
-            activation_cost_arr = -TreeDepthPolicyNetwork.LAMBDA_MAC_COST * activation_cost_arr
+            activation_cost_arr = self.lambdaMacCost * activation_cost_arr
             rewards_arr += activation_cost_arr
         history.rewards.append(rewards_arr)
 
@@ -337,7 +337,7 @@ class TreeDepthPolicyNetwork(PolicyGradientsNetwork):
         explanation += "INVALID_ACTION_PENALTY={0}\n".format(TreeDepthPolicyNetwork.INVALID_ACTION_PENALTY)
         explanation += "VALID_PREDICTION_REWARD={0}\n".format(TreeDepthPolicyNetwork.VALID_PREDICTION_REWARD)
         explanation += "INVALID_PREDICTION_PENALTY={0}\n".format(TreeDepthPolicyNetwork.INVALID_PREDICTION_PENALTY)
-        explanation += "LAMBDA_MAC_COST={0}\n".format(TreeDepthPolicyNetwork.LAMBDA_MAC_COST)
+        explanation += "LAMBDA_MAC_COST={0}\n".format(self.lambdaMacCost)
         explanation += "BASELINE_UPDATE_GAMMA={0}\n".format(TreeDepthPolicyNetwork.BASELINE_UPDATE_GAMMA)
         explanation += "Hidden Layers={0}\n".format(self.hiddenLayers)
         explanation += "Network Name:{0}\n".format(self.networkName)

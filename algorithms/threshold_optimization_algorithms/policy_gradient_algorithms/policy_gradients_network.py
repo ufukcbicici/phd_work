@@ -428,8 +428,8 @@ class PolicyGradientsNetwork:
             total_cost = sum([self.network.nodeCosts[n_idx] for n_idx in processed_nodes_set])
             self.networkActivationCosts.append(total_cost)
             self.networkActivationCostsDict[tuple(self.actionSpaces[-1][action_id])] = \
-                total_cost / self.baseEvaluationCost
-        self.networkActivationCosts = np.array(self.networkActivationCosts) * (1.0 / self.baseEvaluationCost)
+                (total_cost / self.baseEvaluationCost) - 1.0
+        self.networkActivationCosts = (np.array(self.networkActivationCosts) * (1.0 / self.baseEvaluationCost)) - 1.0
 
     def get_l2_loss(self):
         # L2 Loss

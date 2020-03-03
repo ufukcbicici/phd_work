@@ -16,19 +16,18 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     INVALID_ACTION_PENALTY = 0.0
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
-    LAMBDA_MAC_COST = 0.5
     BASELINE_UPDATE_GAMMA = 0.99
     SOFTMAX_DECAY = 5.0
-    CONV_FEATURES = [[], []]
+    CONV_FEATURES = [[32], [64]]
     HIDDEN_LAYERS = [[128, 64], [256, 128]]
-    FILTER_SIZES = [[], []]
-    STRIDES = [[], []]
-    MAX_POOL = [[], []]
+    FILTER_SIZES = [[1], [1]]
+    STRIDES = [[1], [1]]
+    MAX_POOL = [[None], [None]]
 
     def __init__(self, validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                  output_names, used_feature_names, policy_network_func, hidden_layers, use_baselines,
                  state_sample_count,
-                 trajectory_per_state_sample_count):
+                 trajectory_per_state_sample_count, lambda_mac_cost):
         self.stateInputTransformed = []
         self.softmaxDecay = tf.placeholder(dtype=tf.float32, name="softmaxDecay", shape=[])
         self.isSamplingTrajectory = tf.placeholder(dtype=tf.bool, name="isSamplingTrajectory")
@@ -53,7 +52,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         self.runId = None
         super().__init__(validation_data, test_data, l2_lambda, network, network_name, run_id, iteration, degree_list,
                          output_names, used_feature_names, hidden_layers, use_baselines, state_sample_count,
-                         trajectory_per_state_sample_count)
+                         trajectory_per_state_sample_count, lambda_mac_cost)
 
     def build_action_spaces(self):
         super().build_action_spaces()
@@ -91,7 +90,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         explanation += "VALID_PREDICTION_REWARD={0}\n".format(FullGpuTreePolicyGradientsNetwork.VALID_PREDICTION_REWARD)
         explanation += "INVALID_PREDICTION_PENALTY={0}\n".format(
             FullGpuTreePolicyGradientsNetwork.INVALID_PREDICTION_PENALTY)
-        explanation += "LAMBDA_MAC_COST={0}\n".format(FullGpuTreePolicyGradientsNetwork.LAMBDA_MAC_COST)
+        explanation += "LAMBDA_MAC_COST={0}\n".format(self.lambdaMacCost)
         explanation += "BASELINE_UPDATE_GAMMA={0}\n".format(FullGpuTreePolicyGradientsNetwork.BASELINE_UPDATE_GAMMA)
         explanation += "SOFTMAX_DECAY={0}\n".format(FullGpuTreePolicyGradientsNetwork.SOFTMAX_DECAY)
         explanation += "Hidden Layers={0}\n".format(self.hiddenLayers)
@@ -113,7 +112,6 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
         invalid_action_penalty = FullGpuTreePolicyGradientsNetwork.INVALID_ACTION_PENALTY
         valid_prediction_reward = FullGpuTreePolicyGradientsNetwork.VALID_PREDICTION_REWARD
         invalid_prediction_penalty = FullGpuTreePolicyGradientsNetwork.INVALID_PREDICTION_PENALTY
-        calculation_cost_modifier = FullGpuTreePolicyGradientsNetwork.LAMBDA_MAC_COST
         for t in range(self.get_max_trajectory_length()):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
@@ -165,7 +163,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                     # Add to the rewards tensor
                     rewards_arr += (prediction_correctness_tensor == 1).astype(np.float32) * valid_prediction_reward
                     rewards_arr += (prediction_correctness_tensor == 0).astype(np.float32) * invalid_prediction_penalty
-                    rewards_arr -= calculation_cost_modifier * computation_overload_tensor
+                    rewards_arr -= self.lambdaMacCost * computation_overload_tensor
                 if dataset == self.validationDataForMDP:
                     self.validationRewards.append(rewards_arr)
                 else:

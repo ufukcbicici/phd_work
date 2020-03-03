@@ -170,11 +170,11 @@ def train_policy_gradients_network():
     for fold_id, val_indices, test_indices in zip(range(10), validation_indices_list, test_indices_list):
         validation_data, test_data = routing_data.split_dataset_with_indices(training_indices=val_indices,
                                                                              test_indices=test_indices)
-        wd_list = [0.001] * 10
+        wd_list = [0.01]
         # [0.00005, 0.0001, 0.00015, 0.0002, 0.00025, 0.0003, 0.00035, 0.0004, 0.00045, 0.0005] * 10
-        state_sample_count_list = [100]
+        state_sample_count_list = [1000]
         samples_per_state_list = [1]
-        mac_costs = [1.0]
+        mac_costs = [0.5]
         ignore_invalid_actions = False
         cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[wd_list,
                                                                               state_sample_count_list,
@@ -186,7 +186,7 @@ def train_policy_gradients_network():
             l2_wd = tpl[0]
             state_sample_count = tpl[1]
             samples_per_state = tpl[2]
-            FullGpuTreePolicyTreeNetworkValidActions.LAMBDA_MAC_COST = tpl[3]
+            lambda_mac_cost = tpl[3]
             gpu_policy_grads = \
                 FullGpuTreePolicyTreeNetworkValidActions(l2_lambda=l2_wd,
                                                          network=network,
@@ -202,13 +202,14 @@ def train_policy_gradients_network():
                                                          hidden_layers=[[128], [256]],
                                                          validation_data=validation_data,
                                                          test_data=test_data,
-                                                         policy_network_func="cnn")
+                                                         policy_network_func="cnn",
+                                                         lambda_mac_cost=lambda_mac_cost)
             gpu_policy_grads.save_parameters_to_db(
                 fold_id=fold_id, network_id=network_id,
                 network_name=network_name,
                 state_sample_count=state_sample_count,
                 trajectory_per_sample_count=samples_per_state,
-                lambda_mac_cost=FullGpuTreePolicyTreeNetworkValidActions.LAMBDA_MAC_COST,
+                lambda_mac_cost=lambda_mac_cost,
                 l2_lambda=l2_wd)
 
             gpu_policy_grads.train(sess=sess, max_num_of_iterations=20000)
