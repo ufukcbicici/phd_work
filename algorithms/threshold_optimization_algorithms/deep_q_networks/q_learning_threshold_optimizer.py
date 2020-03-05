@@ -254,7 +254,7 @@ class QLearningThresholdOptimizer:
         episode_count = kwargs["episode_count"]
         discount_factor = kwargs["discount_factor"]
         epsilon_discount_factor = kwargs["epsilon_discount_factor"]
-        epsilon = 1.0
+        epsilon = 0.6
         sample_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
         action_count_t = self.actionSpaces[level].shape[0]
@@ -280,6 +280,10 @@ class QLearningThresholdOptimizer:
             random_selection = np.random.choice(action_count_t, size=len(state_list))
             greedy_selection = np.argmax(Q_table, axis=1)
             selected_actions = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
+            # This was to control that np.where() works as intended
+            # assert all([selected_actions[idx] == random_selection[idx] if epsilon_greedy_sampling_choices[idx] == 1 else
+            #             selected_actions[idx] == greedy_selection[idx] for idx in
+            #             range(epsilon_greedy_sampling_choices.shape[0])])
             print("X")
 
             # for state in state_list:
