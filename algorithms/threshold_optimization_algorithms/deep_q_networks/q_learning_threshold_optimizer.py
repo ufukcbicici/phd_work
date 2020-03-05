@@ -21,7 +21,7 @@ class QLearningThresholdOptimizer:
         self.usedFeatureNames = used_feature_names
         self.qLearningFunc = q_learning_func
         self.actionSpaces = None
-        self.reachabilityMatrices = None
+        self.reachabilityMatrices = []
         self.baseEvaluationCost = None
         self.networkActivationCosts = None
         self.networkActivationCostsDict = None
@@ -133,6 +133,7 @@ class QLearningThresholdOptimizer:
             path_costs.append(sum([self.network.nodeCosts[ancestor.index] for ancestor in leaf_ancestors]))
         self.baseEvaluationCost = np.mean(np.array(path_costs))
         self.networkActivationCosts = []
+        self.networkActivationCostsDict = {}
         for action_id in range(self.actionSpaces[-1].shape[0]):
             node_selection = self.actionSpaces[-1][action_id]
             processed_nodes_set = set()
