@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms.policy_gradients_network import \
     RoutingDataForMDP
+from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class QLearningThresholdOptimizer:
@@ -57,6 +58,7 @@ class QLearningThresholdOptimizer:
         self.build_action_spaces()
         self.get_evaluation_costs()
         self.get_reachability_matrices()
+        self.calculate_reward_tensors()
 
     def get_max_likelihood_paths(self, branch_probs):
         sample_sizes = list(set([arr.shape[0] for arr in branch_probs.values()]))
@@ -187,7 +189,7 @@ class QLearningThresholdOptimizer:
     def calculate_reward_tensors(self):
         invalid_action_penalty = QLearningThresholdOptimizer.invalid_action_penalty
         valid_prediction_reward = QLearningThresholdOptimizer.valid_prediction_reward
-        invalid_prediction_penalty = QLearningThresholdOptimizer.invalid_action_penalty
+        invalid_prediction_penalty = QLearningThresholdOptimizer.invalid_prediction_penalty
 
         for t in range(self.get_max_trajectory_length()):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
@@ -243,3 +245,30 @@ class QLearningThresholdOptimizer:
                     self.testRewards.append(rewards_arr)
         self.validationDataForMDP.rewardTensors = self.validationRewards
         self.testDataForMDP.rewardTensors = self.testRewards
+
+    # Classic Off Policy Q Learning Implementation
+    def train(self, level, **kwargs):
+        if level != self.get_max_trajectory_length() - 1:
+            raise NotImplementedError()
+
+        episode_count = kwargs["episode_count"]
+        discount_factor = kwargs["discount_factor"]
+        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        epsilon = 1.0
+        sample_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
+        action_count_t = self.actionSpaces[level].shape[0]
+        Q_table = np.zeros(shape=(sample_count, action_count_t_minus_one, action_count_t), dtype=np.float32)
+
+        # Enumerate all state combinations
+        state_list = UtilityFuncs.get_cartesian_product(
+            [[sample_id for sample_id in range(sample_count)],
+             [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+
+        for episode_id in range(episode_count):
+            for state in state_list:
+                print("X")
+            epsilon *= epsilon_discount_factor
+
+
+        print("X")
