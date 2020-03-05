@@ -8,7 +8,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 class QLearningThresholdOptimizer:
     invalid_action_penalty = -100.0
-    valid_prediction_reward = 1.0
+    valid_prediction_reward = 100.0
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = True
 
@@ -258,17 +258,32 @@ class QLearningThresholdOptimizer:
         sample_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
         action_count_t = self.actionSpaces[level].shape[0]
-        Q_table = np.zeros(shape=(sample_count, action_count_t_minus_one, action_count_t), dtype=np.float32)
+        Q_table = np.zeros(shape=(sample_count * action_count_t_minus_one, action_count_t), dtype=np.float32)
+        rewards_tensor = self.validationRewards[level]
 
         # Enumerate all state combinations
         state_list = UtilityFuncs.get_cartesian_product(
             [[sample_id for sample_id in range(sample_count)],
              [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
-
+        state_matrix = np.array(state_list)
+        rewards_matrix = rewards_tensor[state_matrix[:, 0], state_matrix[:, 1], :]
+        # Check if we have correctly built the rewards matrix
+        assert all([
+            np.array_equal(rewards_tensor[s_id],
+                           rewards_matrix[action_count_t_minus_one * s_id:action_count_t_minus_one * (s_id + 1)])
+            for s_id in range(sample_count)])
         for episode_id in range(episode_count):
-            for state in state_list:
-                print("X")
-            epsilon *= epsilon_discount_factor
+            # Sample epsilon greedy for every state.
+            # If 1, choose uniformly over all actions. If 0, choose the best action.
+            epsilon_greedy_sampling_choices = np.random.choice(a=[0, 1], size=len(state_list),
+                                                               p=[1.0 - epsilon, epsilon])
+            random_selection = np.random.choice(action_count_t, size=len(state_list))
+            greedy_selection = np.argmax(Q_table, axis=1)
+            selected_actions = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
+            print("X")
 
+            # for state in state_list:
+            #     print("X")
+            epsilon *= epsilon_discount_factor
 
         print("X")
