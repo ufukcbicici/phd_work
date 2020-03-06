@@ -8,7 +8,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 class QLearningThresholdOptimizer:
     invalid_action_penalty = -100.0
-    valid_prediction_reward = 100.0
+    valid_prediction_reward = 1.0
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = True
 
@@ -124,6 +124,29 @@ class QLearningThresholdOptimizer:
                 action_space.append(binary_node_selection)
             action_space = np.stack(action_space, axis=0)
             self.actionSpaces.append(action_space)
+
+    def get_max_likelihood_accuracy(self, routing_data):
+        sample_counts_set = set()
+        sample_counts_set.add(routing_data.posteriorsTensor.shape[0])
+        sample_counts_set.add(routing_data.mlPaths.shape[0])
+        sample_counts_set.add(routing_data.routingDataset.labelList.shape[0])
+        assert len(sample_counts_set) == 1
+        correct_count = 0
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        for idx in range(routing_data.routingDataset.labelList.shape[0]):
+            leaf_id = routing_data.mlPaths[idx, -1]
+            posterior = routing_data.posteriorsTensor[idx, :, leaf_id - min_leaf_id]
+            predicted_label = np.argmax(posterior)
+            correct_count += float(predicted_label == routing_data.routingDataset.labelList[idx])
+        accuracy = correct_count / routing_data.routingDataset.labelList.shape[0]
+        return accuracy
+
+    def evaluate_ml_routing_accuracies(self):
+        val_ml_accuracy = self.get_max_likelihood_accuracy(routing_data=self.validationDataForMDP)
+        test_ml_accuracy = self.get_max_likelihood_accuracy(routing_data=self.testDataForMDP)
+        print("val_ml_accuracy={0}".format(val_ml_accuracy))
+        print("test_ml_accuracy={0}".format(test_ml_accuracy))
+        return val_ml_accuracy, test_ml_accuracy
 
     def get_evaluation_costs(self):
         list_of_lists = []
@@ -251,10 +274,12 @@ class QLearningThresholdOptimizer:
         if level != self.get_max_trajectory_length() - 1:
             raise NotImplementedError()
 
+        self.evaluate_ml_routing_accuracies()
         episode_count = kwargs["episode_count"]
         discount_factor = kwargs["discount_factor"]
         epsilon_discount_factor = kwargs["epsilon_discount_factor"]
-        epsilon = 0.6
+        learning_rate = kwargs["learning_rate"]
+        epsilon = 1.0
         sample_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
         action_count_t = self.actionSpaces[level].shape[0]
@@ -262,11 +287,12 @@ class QLearningThresholdOptimizer:
         rewards_tensor = self.validationRewards[level]
 
         # Enumerate all state combinations
-        state_list = UtilityFuncs.get_cartesian_product(
+        state_matrix = UtilityFuncs.get_cartesian_product(
             [[sample_id for sample_id in range(sample_count)],
              [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
-        state_matrix = np.array(state_list)
+        state_matrix = np.array(state_matrix)
         rewards_matrix = rewards_tensor[state_matrix[:, 0], state_matrix[:, 1], :]
+        state_list = np.arange(state_matrix.shape[0])
         # Check if we have correctly built the rewards matrix
         assert all([
             np.array_equal(rewards_tensor[s_id],
@@ -280,14 +306,20 @@ class QLearningThresholdOptimizer:
             random_selection = np.random.choice(action_count_t, size=len(state_list))
             greedy_selection = np.argmax(Q_table, axis=1)
             selected_actions = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
+            rewards = rewards_matrix[state_list, selected_actions]
+            update = learning_rate * (rewards - Q_table[state_list, selected_actions])
+            Q_table[state_list, selected_actions] = Q_table[state_list, selected_actions] + update
             # This was to control that np.where() works as intended
             # assert all([selected_actions[idx] == random_selection[idx] if epsilon_greedy_sampling_choices[idx] == 1 else
             #             selected_actions[idx] == greedy_selection[idx] for idx in
             #             range(epsilon_greedy_sampling_choices.shape[0])])
-            print("X")
-
-            # for state in state_list:
-            #     print("X")
+            print("episode_id:{0}".format(episode_id))
+            mean_policy_value = np.mean(np.max(Q_table, axis=1))
+            print("mean_policy_value:{0}".format(mean_policy_value))
+            mean_sample_policy_value = np.mean(
+                np.array([np.max(Q_table[3*idx:3*(idx+1)]) for idx in range(sample_count)])
+            )
+            print("mean_sample_policy_value:{0}".format(mean_sample_policy_value))
             epsilon *= epsilon_discount_factor
 
         print("X")
