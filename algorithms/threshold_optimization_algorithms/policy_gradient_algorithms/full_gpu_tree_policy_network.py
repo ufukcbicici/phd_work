@@ -17,7 +17,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
     VALID_PREDICTION_REWARD = 1.0
     INVALID_PREDICTION_PENALTY = 0.0
     BASELINE_UPDATE_GAMMA = 0.99
-    SOFTMAX_DECAY = 5.0
+    SOFTMAX_DECAY = 1.0
     CONV_FEATURES = [[32], [64]]
     HIDDEN_LAYERS = [[128, 64], [256, 128]]
     FILTER_SIZES = [[1], [1]]
@@ -86,6 +86,7 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
 
     def get_explanation(self):
         explanation = ""
+        explanation += "POLICY GRADIENTS EXPEERIMENT v3\n"
         explanation += "INVALID_ACTION_PENALTY={0}\n".format(FullGpuTreePolicyGradientsNetwork.INVALID_ACTION_PENALTY)
         explanation += "VALID_PREDICTION_REWARD={0}\n".format(FullGpuTreePolicyGradientsNetwork.VALID_PREDICTION_REWARD)
         explanation += "INVALID_PREDICTION_PENALTY={0}\n".format(
@@ -458,9 +459,9 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 curr_sample_ids = id_list[idx:idx + state_batch_size]
                 history = self.sample_trajectories(routing_data=routing_data,
                                                    state_sample_count=None,
-                                                   samples_per_state=10,
+                                                   samples_per_state=1,
                                                    state_ids=curr_sample_ids,
-                                                   select_argmax=False,
+                                                   select_argmax=True,
                                                    ignore_invalid_actions=ignore_invalid_actions,
                                                    sess=sess)
                 if not combine_with_ig:
@@ -588,7 +589,8 @@ class FullGpuTreePolicyGradientsNetwork(TreeDepthPolicyNetwork):
                 validation_accuracy_dict, test_accuracy_dict, val_computation_overload_dict, \
                 test_computation_overload_dict = self.evaluate_routing_accuracies(sess=sess)
                 # Exit the training if the model has not converged.
-                if iteration_id >= 3000 and test_computation_overload_dict[(True, True)] >= 0.4:
+                if iteration_id >= 5000 and test_computation_overload_dict[(True, True)] >= 0.4:
+                    print("NOT CONVERGED!!!")
                     return
                 self.save_results_to_db(run_id=self.runId,
                                         iteration_id=iteration_id,
