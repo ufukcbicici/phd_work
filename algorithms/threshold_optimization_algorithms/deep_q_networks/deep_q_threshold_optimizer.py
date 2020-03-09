@@ -79,14 +79,38 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         q_values = net
         self.qFuncs.append(q_values)
 
-    def sample_states(self, level, sample_count):
+    def get_state_features(self, state_matrix, level, type="validation"):
+        assert type in {"validation", "test"}
+        route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
+            self.actionSpaces[level - 1][state_matrix[:, 1]]
+        list_of_feature_tensors = [self.validationFeaturesDict[node.index] if type == "validation" else
+                                   self.testFeaturesDict[node.index] for node in
+                                   self.network.orderedNodesPerLevel[level]]
+        list_of_sampled_tensors = [feature_tensor[state_matrix[:, 0], :] for feature_tensor in list_of_feature_tensors]
+        list_of_coeffs = []
+        for idx in range(len(list_of_sampled_tensors)):
+            route_coeffs = route_decisions[:, idx]
+            for _ in range(len(list_of_sampled_tensors[idx].shape) - 1):
+                route_coeffs = np.expand_dims(route_coeffs, axis=-1)
+            list_of_coeffs.append(route_coeffs)
+        list_of_sparse_tensors = [feature_tensor * coeff_arr
+                                  for feature_tensor, coeff_arr in zip(list_of_sampled_tensors, list_of_coeffs)]
+        # This is for debugging
+        # manuel_route_matrix = np.stack([np.array([int(np.sum(tensor) != 0) for tensor in _l])
+        #                                 for _l in list_of_sparse_tensors], axis=1)
+        # assert np.array_equal(route_decisions, manuel_route_matrix)
+        state_features = np.concatenate(list_of_sparse_tensors, axis=-1)
+        return state_features
+
+    def sample_states(self, level, sample_count, type="validation"):
         state_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
         state_ids = np.random.choice(state_count, sample_count, replace=False)
         action_ids = np.random.choice(action_count_t_minus_one, sample_count)
         state_matrix = np.stack([state_ids, action_ids], axis=1)
-        route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
-            self.actionSpaces[level - 1][state_matrix[:, 1]]
+        state_features = self.get_state_features(state_matrix=state_matrix, level=level, type=type)
+        # route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
+        #     self.actionSpaces[level - 1][state_matrix[:, 1]]
         print("X")
 
     def train(self, level, **kwargs):
@@ -102,4 +126,3 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         # Fill the experience replay table: Solve the cold start problem.
         self.sample_states(level=level, sample_count=sample_count)
         # for episode_id in range(episode_count):
-
