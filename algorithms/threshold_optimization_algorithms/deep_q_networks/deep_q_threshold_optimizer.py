@@ -170,4 +170,8 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                                                 np.expand_dims(selected_actions, axis=1),
                                                 np.expand_dims(rewards, axis=1)], axis=1)
             self.add_to_the_experience_table(experience_matrix=experience_matrix)
+            # Sample batch of experiences from the table
+            experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count)
+            experiences_sampled = self.experienceReplayTable[experience_ids]
+            # Add Gradient Descent Step
 
