@@ -49,6 +49,13 @@ def train_deep_q_learning():
         validation_data=validation_data,
         test_data=test_data, network=network, network_name=network_name, run_id=network_id, lambda_mac_cost=0.0,
         q_learning_func="cnn", used_feature_names=used_output_names)
+    q_learning_threshold_optimizer.train(level=1,
+                                         sample_count=9000,
+                                         episode_count=1000000,
+                                         discount_factor=1.0,
+                                         epsilon_discount_factor=0.9999,
+                                         learning_rate=0.001
+                                         )
     print("X")
 
 
@@ -56,6 +63,7 @@ def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
     train_deep_q_learning()
+
 
 if __name__ == "__main__":
     main()

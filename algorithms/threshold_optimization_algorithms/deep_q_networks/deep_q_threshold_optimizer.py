@@ -38,6 +38,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
                 tf_state_input = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="inputs_{0}".format(level))
                 self.stateInputs.append(tf_state_input)
+                self.build_cnn_q_network(level=level)
 
     def build_cnn_q_network(self, level):
         hidden_layers = DeepQThresholdOptimizer.HIDDEN_LAYERS[level]
@@ -77,3 +78,28 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
         q_values = net
         self.qFuncs.append(q_values)
+
+    def sample_states(self, level, sample_count):
+        state_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
+        state_ids = np.random.choice(state_count, sample_count, replace=False)
+        action_ids = np.random.choice(action_count_t_minus_one, sample_count)
+        state_matrix = np.stack([state_ids, action_ids], axis=1)
+        route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
+            self.actionSpaces[level - 1][state_matrix[:, 1]]
+        print("X")
+
+    def train(self, level, **kwargs):
+        if level != self.get_max_trajectory_length() - 1:
+            raise NotImplementedError()
+
+        self.evaluate_ml_routing_accuracies()
+        sample_count = kwargs["sample_count"]
+        episode_count = kwargs["episode_count"]
+        discount_factor = kwargs["discount_factor"]
+        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        learning_rate = kwargs["learning_rate"]
+        # Fill the experience replay table: Solve the cold start problem.
+        self.sample_states(level=level, sample_count=sample_count)
+        # for episode_id in range(episode_count):
+
