@@ -156,6 +156,20 @@ class UtilityFuncs:
             #                     for k in range(C):
             #                         cost += 1
             return cost
+        elif type == "depth_seperable":
+            C = num_of_input_channels
+            H = height_of_input_map
+            W = width_of_input_map
+            R = height_of_filter
+            S = width_of_filter
+            M = num_of_output_channels
+            # E = height_of_output_map
+            # F = width_of_output_map
+            U = convolution_stride
+            E = (H - R + U) / U
+            F = (W - S + U) / U
+            cost = E * F * C * (R * S + M)
+            return cost
         elif type == "fc":
             C = num_of_input_channels
             H = 1

@@ -10,21 +10,32 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
-    CONV_FEATURES = [[], []]
+    CONV_FEATURES = [[32], [64]]
     HIDDEN_LAYERS = [[128, 64], [128, 64]]
-    FILTER_SIZES = [[], []]
-    STRIDES = [[], []]
+    FILTER_SIZES = [[1], [1]]
+    STRIDES = [[1], [1]]
     MAX_POOL = [[None], [None]]
 
     def __init__(self, validation_data, test_data, network, network_name, run_id, used_feature_names, q_learning_func,
-                 lambda_mac_cost):
+                 lambda_mac_cost, max_experience_count = 100000):
         super().__init__(validation_data, test_data, network, network_name, run_id, used_feature_names, q_learning_func,
                          lambda_mac_cost)
-        self.experienceReplayTable = deque(maxlen=1000000)
+        self.experienceReplayTable = None
+        self.maxExpCount = max_experience_count
         self.stateInputs = []
         self.qFuncs = []
         for level in range(self.get_max_trajectory_length()):
             self.build_q_function(level=level)
+        self.session = tf.Session()
+
+    def add_to_the_experience_table(self, experience_matrix):
+        if self.experienceReplayTable is None:
+            self.experienceReplayTable = np.copy(experience_matrix)
+        else:
+            self.experienceReplayTable = np.concatenate([self.experienceReplayTable, experience_matrix], axis=0)
+            if self.experienceReplayTable.shape[0] > self.maxExpCount:
+                num_rows_to_delete = self.experienceReplayTable.shape[0] - self.maxExpCount
+                self.experienceReplayTable = self.experienceReplayTable[num_rows_to_delete:]
 
     def build_q_function(self, level):
         if level != self.get_max_trajectory_length() - 1:
@@ -38,6 +49,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
                 tf_state_input = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="inputs_{0}".format(level))
                 self.stateInputs.append(tf_state_input)
+                self.build_cnn_q_network(level=level)
 
     def build_cnn_q_network(self, level):
         hidden_layers = DeepQThresholdOptimizer.HIDDEN_LAYERS[level]
@@ -77,3 +89,89 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
         q_values = net
         self.qFuncs.append(q_values)
+
+    def get_state_features(self, state_matrix, level, type="validation"):
+        assert type in {"validation", "test"}
+        route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
+            self.actionSpaces[level - 1][state_matrix[:, 1]]
+        list_of_feature_tensors = [self.validationFeaturesDict[node.index] if type == "validation" else
+                                   self.testFeaturesDict[node.index] for node in
+                                   self.network.orderedNodesPerLevel[level]]
+        list_of_sampled_tensors = [feature_tensor[state_matrix[:, 0], :] for feature_tensor in list_of_feature_tensors]
+        list_of_coeffs = []
+        for idx in range(len(list_of_sampled_tensors)):
+            route_coeffs = route_decisions[:, idx]
+            for _ in range(len(list_of_sampled_tensors[idx].shape) - 1):
+                route_coeffs = np.expand_dims(route_coeffs, axis=-1)
+            list_of_coeffs.append(route_coeffs)
+        list_of_sparse_tensors = [feature_tensor * coeff_arr
+                                  for feature_tensor, coeff_arr in zip(list_of_sampled_tensors, list_of_coeffs)]
+        # This is for debugging
+        # manuel_route_matrix = np.stack([np.array([int(np.sum(tensor) != 0) for tensor in _l])
+        #                                 for _l in list_of_sparse_tensors], axis=1)
+        # assert np.array_equal(route_decisions, manuel_route_matrix)
+        state_features = np.concatenate(list_of_sparse_tensors, axis=-1)
+        return state_features
+
+    # def sample_trajectory(self, level, sample_count, epsilon, type="validation"):
+    #     state_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
+    #     action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
+    #     state_ids = np.random.choice(state_count, sample_count, replace=False)
+    #     action_ids = np.random.choice(action_count_t_minus_one, sample_count)
+    #     state_matrix = np.stack([state_ids, action_ids], axis=1)
+    #     state_features = self.get_state_features(state_matrix=state_matrix, level=level, type=type)
+    #     state_q_values = self.session.run([self.qFuncs[level]],
+    #                                       feed_dict={
+    #                                           self.stateInputs[level]: state_features})[0]
+    #     rewards_tensor = self.validationRewards[level]
+    #     rewards_matrix = rewards_tensor[state_matrix[:, 0], state_matrix[:, 1], :]
+    #
+    #     # route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
+    #     #     self.actionSpaces[level - 1][state_matrix[:, 1]]
+    #     print("X")
+
+    def train(self, level, **kwargs):
+        if level != self.get_max_trajectory_length() - 1:
+            raise NotImplementedError()
+        self.session.run(tf.global_variables_initializer())
+        self.evaluate_ml_routing_accuracies()
+        sample_count = kwargs["sample_count"]
+        episode_count = kwargs["episode_count"]
+        discount_factor = kwargs["discount_factor"]
+        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        learning_rate = kwargs["learning_rate"]
+        # Fill the experience replay table: Solve the cold start problem.
+        # self.sample_trajectory(level=level, sample_count=sample_count)
+        state_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
+        action_count_t = self.actionSpaces[level].shape[0]
+        rewards_tensor = self.validationRewards[level]
+        epsilon = 1.0
+        for episode_id in range(episode_count):
+            # Sample (state,action,reward) tuples and store in the experience replay table
+            state_ids = np.random.choice(state_count, sample_count, replace=False)
+            action_ids = np.random.choice(action_count_t_minus_one, sample_count)
+            state_matrix = np.stack([state_ids, action_ids], axis=1)
+            rewards_matrix = rewards_tensor[state_matrix[:, 0], state_matrix[:, 1], :]
+            state_features = self.get_state_features(state_matrix=state_matrix, level=level, type="validation")
+            Q_table = self.session.run([self.qFuncs[level]],
+                                       feed_dict={
+                                           self.stateInputs[level]: state_features})[0]
+            # Sample epsilon greedy for every state.
+            # If 1, choose uniformly over all actions. If 0, choose the best action.
+            epsilon_greedy_sampling_choices = np.random.choice(a=[0, 1], size=state_matrix.shape[0],
+                                                               p=[1.0 - epsilon, epsilon])
+            random_selection = np.random.choice(action_count_t, size=len(state_matrix.shape[0]))
+            greedy_selection = np.argmax(Q_table, axis=1)
+            selected_actions = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
+            rewards = rewards_matrix[np.arange(state_matrix.shape[0]), selected_actions]
+            # Store into the experience replay table
+            experience_matrix = np.concatenate([state_matrix,
+                                                np.expand_dims(selected_actions, axis=1),
+                                                np.expand_dims(rewards, axis=1)], axis=1)
+            self.add_to_the_experience_table(experience_matrix=experience_matrix)
+            # Sample batch of experiences from the table
+            experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count)
+            experiences_sampled = self.experienceReplayTable[experience_ids]
+            # Add Gradient Descent Step
+

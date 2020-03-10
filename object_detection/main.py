@@ -110,7 +110,7 @@ def detect_image(img, upper_left, upper_right, bottom_left, bottom_right):
 
 def sample_call():
     dataset = load_dataset()
-    load_fast_rcnn_detector()
+    load_fast_rcnn_detector_with_bb_regression()
     upper_left = np.array([0, 0])
     upper_right = np.array([0, dataset.dataList[0].imgArr.shape[1]])
     bottom_left = np.array([dataset.dataList[0].imgArr.shape[0], 0])
