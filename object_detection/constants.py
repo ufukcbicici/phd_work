@@ -12,7 +12,7 @@ class Constants:
     MODEL_ID = 57200
 
     # Test / Whole Dataset Ratio
-    TEST_RATIO = 0.15
+    TEST_RATIO = 0.1
 
     # Bounding Box Clustering:
     MAX_INCLUSIVENESS_BB = 0.975 # Coverage
@@ -44,7 +44,7 @@ class Constants:
 
     # Detector ResNet Parameters
     DETECTOR_NUM_OF_RESIDUAL_UNITS = 3
-    DETECTOR_NUM_OF_FEATURES_PER_BLOCK = [32, 64, 128]
+    DETECTOR_NUM_OF_FEATURES_PER_BLOCK = [48, 96, 192]
     DETECTOR_FIRST_CONV_FILTER_SIZE = 3
     DETECTOR_RELU_LEAKINESS = 0.1
     DETECTOR_FILTER_STRIDES = [1, 2]
@@ -52,8 +52,8 @@ class Constants:
     DETECTOR_BATCH_NORM_DECAY = 0.9
 
     # Roi Feature Vector Transformations
-    CLASSIFIER_HIDDEN_LAYERS = [128]
-    BB_REGRESSION_HIDDEN_LAYERS = [128, 64]
+    CLASSIFIER_HIDDEN_LAYERS = [256]
+    BB_REGRESSION_HIDDEN_LAYERS = [256, 128]
 
     # L2 Norm Regularizer Strength
     L2_LAMBDA = 0.0005

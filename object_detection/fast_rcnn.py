@@ -221,7 +221,7 @@ class FastRcnn:
         roi_proposals = roi_proposals_tensor[:, :, 1:]
         return images, roi_labels, roi_proposals, roi_proposals_tensor_real_coord, ground_truths
 
-    def calculate_accuracy_on_image(self, img_name, img, roi_matrix):
+    def calculate_accuracy_on_image(self, img_name, img, roi_matrix, type):
         final_proposals = self.detect_single_image(original_img=img)
         img_width = img.shape[1]
         img_height = img.shape[0]
@@ -255,7 +255,7 @@ class FastRcnn:
             else:
                 colors.append((0, 255, 0))
         colors.extend([(255, 0, 0)] * ground_truths.shape[0])
-        ObjectDetectionDataManager.print_img_with_final_rois(img_name="{0}_Test".format(img_name),
+        ObjectDetectionDataManager.print_img_with_final_rois(img_name="{0}_{1}".format(img_name, type),
                                                              img=img,
                                                              roi_matrix=all_boxes,
                                                              colors=colors)

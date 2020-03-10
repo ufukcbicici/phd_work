@@ -58,14 +58,21 @@ def load_fast_rcnn_detector_with_bb_regression():
     global_detector.load_model(iteration=Constants.MODEL_ID)
 
 
-def test_on_all_images():
+def test_on_all_images(type="test"):
     dataset = load_dataset()
     load_fast_rcnn_detector_with_bb_regression()
     os.mkdir("groundtruths")
     os.mkdir("detections")
-    for img_obj in dataset.dataList:
+    if type == "test":
+        data_list = dataset.dataList[dataset.testImageIndices]
+    elif type == "train":
+        data_list = dataset.dataList[dataset.trainingImageIndices]
+    else:
+        data_list = dataset.dataList
+    for img_obj in data_list:
+        print("New Image")
         global_detector.calculate_accuracy_on_image(img_name=img_obj.imgName, img=img_obj.imgArr,
-                                                    roi_matrix=img_obj.roiMatrix)
+                                                    roi_matrix=img_obj.roiMatrix, type=type)
 
 
 def train_fast_rcnn_detector():
@@ -113,8 +120,8 @@ def sample_call():
 
 
 def main():
-    sample_call()
-    # test_on_all_images()
+    # sample_call()
+    # test_on_all_images(type="test")
     # print("X")
 
     # create_dataset()
@@ -125,7 +132,7 @@ def main():
     #     roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
     #     positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
 
-    # train_fast_rcnn_detector_with_bb_regression()
+    train_fast_rcnn_detector_with_bb_regression()
     # load_fast_rcnn_detector()
     # test_on_all_images()
     # train_fast_rcnn_detector_with_bb_regression()
