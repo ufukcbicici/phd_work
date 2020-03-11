@@ -200,6 +200,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         epsilon = 1.0
         losses = []
         for episode_id in range(episode_count):
+            print("episode_id:{0}".format(episode_id))
             # Sample (state,action,reward) tuples and store in the experience replay table
             state_ids = np.random.choice(state_count, sample_count, replace=False)
             action_ids = np.random.choice(action_count_t_minus_one, sample_count)
@@ -249,8 +250,25 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                                                   self.actionSelections[level]: sampled_actions,
                                                   self.rewardVectors[level]: sampled_rewards,
                                                   self.l2LambdaTf: 0.0})
+            epsilon *= epsilon_discount_factor
             total_loss = results[0]
             losses.append(total_loss)
             if len(losses) % 10 == 0:
                 print("MSE:{0}".format(np.mean(np.array(losses))))
-            print("X")
+                # Enumerate all state combinations
+                complete_state_matrix = UtilityFuncs.get_cartesian_product(
+                    [[sample_id for sample_id in range(sample_count)],
+                     [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+                complete_state_matrix = np.array(complete_state_matrix)
+                complete_state_features = self.get_state_features(state_matrix=complete_state_matrix,
+                                                                  level=level, type="validation")
+                complete_Q_table = self.session.run([self.qFuncs[level]],
+                                                    feed_dict={
+                                                        self.stateInputs[level]: complete_state_features})[0]
+                mean_policy_value = np.mean(np.max(complete_Q_table, axis=1))
+                print("mean_policy_value:{0}".format(mean_policy_value))
+                mean_sample_policy_value = np.mean(
+                    np.array([np.max(complete_Q_table[3 * idx:3 * (idx + 1)]) for idx in range(sample_count)])
+                )
+                print("mean_sample_policy_value:{0}".format(mean_sample_policy_value))
+
