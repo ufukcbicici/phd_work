@@ -29,6 +29,14 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         self.stateRange = tf.range(0, self.stateCount, 1)
         self.actionSelections = []
         self.selectionIndices = []
+        self.rewardVectors = []
+        self.lossVectors = []
+        self.lossValues = []
+        self.optimizers = []
+        self.totalLosses = []
+        self.globalStep = tf.Variable(0, name='global_step', trainable=False)
+        self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
+        self.l2Loss = None
         for level in range(self.get_max_trajectory_length()):
             self.build_q_function(level=level)
         self.session = tf.Session()
@@ -49,6 +57,11 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             self.actionSelections.append(None)
             self.selectedQValues.append(None)
             self.selectionIndices.append(None)
+            self.rewardVectors.append(None)
+            self.lossVectors.append(None)
+            self.lossValues.append(None)
+            self.totalLosses.append(None)
+            self.optimizers.append(None)
         else:
             if self.qLearningFunc == "cnn":
                 nodes_at_level = self.network.orderedNodesPerLevel[level]
@@ -58,13 +71,27 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 tf_state_input = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="inputs_{0}".format(level))
                 self.stateInputs.append(tf_state_input)
                 self.build_cnn_q_network(level=level)
-        # Get selected q values; build the regression loss
-        tf_selected_action_input = tf.placeholder(dtype=tf.int32, shape=[None], name="action_inputs_{0}".format(level))
-        self.actionSelections.append(tf_selected_action_input)
-        selection_matrix = tf.stack([self.stateRange, tf_selected_action_input], axis=1)
-        self.selectionIndices.append(selection_matrix)
-        selected_q_values = tf.gather_nd(self.qFuncs[level], selection_matrix)
-        self.selectedQValues.append(selected_q_values)
+            # Get selected q values; build the regression loss
+            tf_selected_action_input = tf.placeholder(dtype=tf.int32, shape=[None],
+                                                      name="action_inputs_{0}".format(level))
+            self.actionSelections.append(tf_selected_action_input)
+            selection_matrix = tf.stack([self.stateRange, tf_selected_action_input], axis=1)
+            self.selectionIndices.append(selection_matrix)
+            selected_q_values = tf.gather_nd(self.qFuncs[level], selection_matrix)
+            self.selectedQValues.append(selected_q_values)
+            reward_vector = tf.placeholder(dtype=tf.float32, shape=[None],
+                                           name="reward_vector_{0}".format(level))
+            self.rewardVectors.append(reward_vector)
+            # Loss functions
+            mse_vector = tf.square(selected_q_values - reward_vector)
+            self.lossVectors.append(mse_vector)
+            mse_loss = tf.reduce_mean(mse_vector)
+            self.lossValues.append(mse_loss)
+            self.get_l2_loss()
+            total_loss = mse_loss + self.l2Loss
+            self.totalLosses.append(total_loss)
+            optimizer = tf.train.AdamOptimizer().minimize(total_loss, global_step=self.globalStep)
+            self.optimizers.append(optimizer)
 
     def build_cnn_q_network(self, level):
         hidden_layers = DeepQThresholdOptimizer.HIDDEN_LAYERS[level]
@@ -104,6 +131,15 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
         q_values = net
         self.qFuncs.append(q_values)
+
+    def get_l2_loss(self):
+        # L2 Loss
+        tvars = tf.trainable_variables()
+        self.l2Loss = tf.constant(0.0)
+        for tv in tvars:
+            if 'kernel' in tv.name:
+                self.l2Loss += self.l2LambdaTf * tf.nn.l2_loss(tv)
+            # self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
 
     def get_state_features(self, state_matrix, level, type="validation"):
         assert type in {"validation", "test"}
@@ -162,6 +198,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         action_count_t = self.actionSpaces[level].shape[0]
         rewards_tensor = self.validationRewards[level]
         epsilon = 1.0
+        losses = []
         for episode_id in range(episode_count):
             # Sample (state,action,reward) tuples and store in the experience replay table
             state_ids = np.random.choice(state_count, sample_count, replace=False)
@@ -188,13 +225,32 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             # Sample batch of experiences from the table
             experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count, replace=False)
             experiences_sampled = self.experienceReplayTable[experience_ids]
+            sampled_state_ids = experiences_sampled[:, 0:2].astype(np.int32)
+            sampled_actions = experiences_sampled[:, 2].astype(np.int32)
+            sampled_rewards = experiences_sampled[:, 3]
             # Add Gradient Descent Step
-            sampled_state_features = self.get_state_features(state_matrix=experiences_sampled[:, 0:2].astype(np.int32),
-                                                             level=level, type="validation")
-            results = self.session.run(
-                [self.qFuncs[level],
-                 self.selectionIndices[level],
-                 self.selectedQValues[level]], feed_dict={self.stateInputs[level]: sampled_state_features,
-                                                          self.actionSelections[level]: experiences_sampled[2].astype(
-                                                              np.int32)})
+            sampled_state_features = self.get_state_features(state_matrix=sampled_state_ids, level=level,
+                                                             type="validation")
+            # results = self.session.run(
+            #     [self.qFuncs[level],
+            #      self.selectionIndices[level],
+            #      self.selectedQValues[level],
+            #      self.lossVectors[level],
+            #      self.lossValues[level],
+            #      self.totalLosses[level],
+            #      self.l2Loss], feed_dict={self.stateCount: experiences_sampled.shape[0],
+            #                               self.stateInputs[level]: sampled_state_features,
+            #                               self.actionSelections[level]: sampled_actions,
+            #                               self.rewardVectors[level]: sampled_rewards,
+            #                               self.l2LambdaTf: 0.0})
+            results = self.session.run([self.totalLosses[level], self.optimizers[level]],
+                                       feed_dict={self.stateCount: experiences_sampled.shape[0],
+                                                  self.stateInputs[level]: sampled_state_features,
+                                                  self.actionSelections[level]: sampled_actions,
+                                                  self.rewardVectors[level]: sampled_rewards,
+                                                  self.l2LambdaTf: 0.0})
+            total_loss = results[0]
+            losses.append(total_loss)
+            if len(losses) % 10 == 0:
+                print("MSE:{0}".format(np.mean(np.array(losses))))
             print("X")
