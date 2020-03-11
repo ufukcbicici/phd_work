@@ -17,13 +17,18 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
     MAX_POOL = [[None], [None]]
 
     def __init__(self, validation_data, test_data, network, network_name, run_id, used_feature_names, q_learning_func,
-                 lambda_mac_cost, max_experience_count = 100000):
+                 lambda_mac_cost, max_experience_count=100000):
         super().__init__(validation_data, test_data, network, network_name, run_id, used_feature_names, q_learning_func,
                          lambda_mac_cost)
         self.experienceReplayTable = None
         self.maxExpCount = max_experience_count
         self.stateInputs = []
         self.qFuncs = []
+        self.selectedQValues = []
+        self.stateCount = tf.placeholder(dtype=tf.int32, name="stateCount")
+        self.stateRange = tf.range(0, self.stateCount, 1)
+        self.actionSelections = []
+        self.selectionIndices = []
         for level in range(self.get_max_trajectory_length()):
             self.build_q_function(level=level)
         self.session = tf.Session()
@@ -41,6 +46,9 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         if level != self.get_max_trajectory_length() - 1:
             self.stateInputs.append(None)
             self.qFuncs.append(None)
+            self.actionSelections.append(None)
+            self.selectedQValues.append(None)
+            self.selectionIndices.append(None)
         else:
             if self.qLearningFunc == "cnn":
                 nodes_at_level = self.network.orderedNodesPerLevel[level]
@@ -50,6 +58,13 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 tf_state_input = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="inputs_{0}".format(level))
                 self.stateInputs.append(tf_state_input)
                 self.build_cnn_q_network(level=level)
+        # Get selected q values; build the regression loss
+        tf_selected_action_input = tf.placeholder(dtype=tf.int32, shape=[None], name="action_inputs_{0}".format(level))
+        self.actionSelections.append(tf_selected_action_input)
+        selection_matrix = tf.stack([self.stateRange, tf_selected_action_input], axis=1)
+        self.selectionIndices.append(selection_matrix)
+        selected_q_values = tf.gather_nd(self.qFuncs[level], selection_matrix)
+        self.selectedQValues.append(selected_q_values)
 
     def build_cnn_q_network(self, level):
         hidden_layers = DeepQThresholdOptimizer.HIDDEN_LAYERS[level]
@@ -161,7 +176,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             # If 1, choose uniformly over all actions. If 0, choose the best action.
             epsilon_greedy_sampling_choices = np.random.choice(a=[0, 1], size=state_matrix.shape[0],
                                                                p=[1.0 - epsilon, epsilon])
-            random_selection = np.random.choice(action_count_t, size=len(state_matrix.shape[0]))
+            random_selection = np.random.choice(action_count_t, size=state_matrix.shape[0])
             greedy_selection = np.argmax(Q_table, axis=1)
             selected_actions = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
             rewards = rewards_matrix[np.arange(state_matrix.shape[0]), selected_actions]
@@ -171,7 +186,10 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                                                 np.expand_dims(rewards, axis=1)], axis=1)
             self.add_to_the_experience_table(experience_matrix=experience_matrix)
             # Sample batch of experiences from the table
-            experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count)
+            experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count, replace=False)
             experiences_sampled = self.experienceReplayTable[experience_ids]
             # Add Gradient Descent Step
+            sampled_state_features = self.get_state_features(state_matrix=experiences_sampled[:, 0:2].astype(np.int32),
+                                                             level=level, type="validation")
 
+            print("X")
