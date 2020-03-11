@@ -191,5 +191,10 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             # Add Gradient Descent Step
             sampled_state_features = self.get_state_features(state_matrix=experiences_sampled[:, 0:2].astype(np.int32),
                                                              level=level, type="validation")
-
+            results = self.session.run(
+                [self.qFuncs[level],
+                 self.selectionIndices[level],
+                 self.selectedQValues[level]], feed_dict={self.stateInputs[level]: sampled_state_features,
+                                                          self.actionSelections[level]: experiences_sampled[2].astype(
+                                                              np.int32)})
             print("X")
