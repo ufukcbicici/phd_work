@@ -181,27 +181,12 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
     #     #     self.actionSpaces[level - 1][state_matrix[:, 1]]
     #     print("X")
 
-    def train(self, level, **kwargs):
-        if level != self.get_max_trajectory_length() - 1:
-            raise NotImplementedError()
-        self.session.run(tf.global_variables_initializer())
-        self.evaluate_ml_routing_accuracies()
-        sample_count = kwargs["sample_count"]
-        episode_count = kwargs["episode_count"]
-        discount_factor = kwargs["discount_factor"]
-        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
-        learning_rate = kwargs["learning_rate"]
-        # Fill the experience replay table: Solve the cold start problem.
-        # self.sample_trajectory(level=level, sample_count=sample_count)
+    def fill_experience_replay_table(self, level, batch_count, sample_count, epsilon):
         state_count = self.validationDataForMDP.routingDataset.labelList.shape[0]
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
         action_count_t = self.actionSpaces[level].shape[0]
         rewards_tensor = self.validationRewards[level]
-        epsilon = 1.0
-        losses = []
-        for episode_id in range(episode_count):
-            print("episode_id:{0}".format(episode_id))
-            # Sample (state,action,reward) tuples and store in the experience replay table
+        for batch_id in range(batch_count):
             state_ids = np.random.choice(state_count, sample_count, replace=False)
             action_ids = np.random.choice(action_count_t_minus_one, sample_count)
             state_matrix = np.stack([state_ids, action_ids], axis=1)
@@ -223,6 +208,51 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                                                 np.expand_dims(selected_actions, axis=1),
                                                 np.expand_dims(rewards, axis=1)], axis=1)
             self.add_to_the_experience_table(experience_matrix=experience_matrix)
+
+    def measure_performance(self, level, losses, data_type="validation"):
+        dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
+        state_count = dataset.routingDataset.labelList.shape[0]
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
+        action_count_t = self.actionSpaces[level].shape[0]
+        rewards_tensor = self.validationRewards[level] if data_type == "validation" else self.testRewards[level]
+        if len(losses) % 10 == 0:
+            print("MSE:{0}".format(np.mean(np.array(losses))))
+            # Enumerate all state combinations
+            complete_state_matrix = UtilityFuncs.get_cartesian_product(
+                [[sample_id for sample_id in range(state_count)],
+                 [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+            complete_state_matrix = np.array(complete_state_matrix)
+            complete_state_features = self.get_state_features(state_matrix=complete_state_matrix,
+                                                              level=level, type="validation")
+            complete_Q_table = self.session.run([self.qFuncs[level]],
+                                                feed_dict={
+                                                    self.stateInputs[level]: complete_state_features})[0]
+            mean_policy_value = np.mean(np.max(complete_Q_table, axis=1))
+            print("mean_policy_value:{0}".format(mean_policy_value))
+            mean_sample_policy_value = np.mean(
+                np.array([np.max(complete_Q_table[action_count_t_minus_one * idx:
+                                                  action_count_t_minus_one * (idx + 1)]) for idx in range(state_count)])
+            )
+            print("mean_sample_policy_value:{0}".format(mean_sample_policy_value))
+            # Measure routing accuracy
+
+    def train(self, level, **kwargs):
+        if level != self.get_max_trajectory_length() - 1:
+            raise NotImplementedError()
+        self.session.run(tf.global_variables_initializer())
+        self.evaluate_ml_routing_accuracies()
+        sample_count = kwargs["sample_count"]
+        episode_count = kwargs["episode_count"]
+        discount_factor = kwargs["discount_factor"]
+        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        learning_rate = kwargs["learning_rate"]
+        epsilon = 1.0
+        # Fill the experience replay table: Solve the cold start problem.
+        self.fill_experience_replay_table(level=level, batch_count=5, sample_count=sample_count, epsilon=epsilon)
+        losses = []
+        for episode_id in range(episode_count):
+            print("episode_id:{0}".format(episode_id))
+            self.fill_experience_replay_table(level=level, batch_count=1, sample_count=sample_count, epsilon=epsilon)
             # Sample batch of experiences from the table
             experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count, replace=False)
             experiences_sampled = self.experienceReplayTable[experience_ids]
@@ -253,22 +283,3 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             epsilon *= epsilon_discount_factor
             total_loss = results[0]
             losses.append(total_loss)
-            if len(losses) % 10 == 0:
-                print("MSE:{0}".format(np.mean(np.array(losses))))
-                # Enumerate all state combinations
-                complete_state_matrix = UtilityFuncs.get_cartesian_product(
-                    [[sample_id for sample_id in range(sample_count)],
-                     [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
-                complete_state_matrix = np.array(complete_state_matrix)
-                complete_state_features = self.get_state_features(state_matrix=complete_state_matrix,
-                                                                  level=level, type="validation")
-                complete_Q_table = self.session.run([self.qFuncs[level]],
-                                                    feed_dict={
-                                                        self.stateInputs[level]: complete_state_features})[0]
-                mean_policy_value = np.mean(np.max(complete_Q_table, axis=1))
-                print("mean_policy_value:{0}".format(mean_policy_value))
-                mean_sample_policy_value = np.mean(
-                    np.array([np.max(complete_Q_table[3 * idx:3 * (idx + 1)]) for idx in range(sample_count)])
-                )
-                print("mean_sample_policy_value:{0}".format(mean_sample_policy_value))
-
