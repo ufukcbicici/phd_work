@@ -50,10 +50,10 @@ def train_deep_q_learning():
         test_data=test_data, network=network, network_name=network_name, run_id=network_id, lambda_mac_cost=0.0,
         q_learning_func="cnn", used_feature_names=used_output_names)
     q_learning_threshold_optimizer.train(level=1,
-                                         sample_count=9000,
-                                         episode_count=1000000,
+                                         sample_count=512,
+                                         episode_count=25000,
                                          discount_factor=1.0,
-                                         epsilon_discount_factor=0.9999,
+                                         epsilon_discount_factor=0.99975,
                                          learning_rate=0.001
                                          )
     print("X")

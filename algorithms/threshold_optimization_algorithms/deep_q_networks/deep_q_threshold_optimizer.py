@@ -141,11 +141,11 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 self.l2Loss += self.l2LambdaTf * tf.nn.l2_loss(tv)
             # self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
 
-    def get_state_features(self, state_matrix, level, type="validation"):
-        assert type in {"validation", "test"}
+    def get_state_features(self, state_matrix, level, data_type="validation"):
+        assert data_type in {"validation", "test"}
         route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
             self.actionSpaces[level - 1][state_matrix[:, 1]]
-        list_of_feature_tensors = [self.validationFeaturesDict[node.index] if type == "validation" else
+        list_of_feature_tensors = [self.validationFeaturesDict[node.index] if data_type == "validation" else
                                    self.testFeaturesDict[node.index] for node in
                                    self.network.orderedNodesPerLevel[level]]
         list_of_sampled_tensors = [feature_tensor[state_matrix[:, 0], :] for feature_tensor in list_of_feature_tensors]
@@ -191,7 +191,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             action_ids = np.random.choice(action_count_t_minus_one, sample_count)
             state_matrix = np.stack([state_ids, action_ids], axis=1)
             rewards_matrix = rewards_tensor[state_matrix[:, 0], state_matrix[:, 1], :]
-            state_features = self.get_state_features(state_matrix=state_matrix, level=level, type="validation")
+            state_features = self.get_state_features(state_matrix=state_matrix, level=level, data_type="validation")
             Q_table = self.session.run([self.qFuncs[level]],
                                        feed_dict={
                                            self.stateInputs[level]: state_features})[0]
@@ -209,6 +209,54 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                                                 np.expand_dims(rewards, axis=1)], axis=1)
             self.add_to_the_experience_table(experience_matrix=experience_matrix)
 
+    def execute_bellman_equation(self, data_type="validation"):
+        dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
+        last_level = self.get_max_trajectory_length() - 1
+        state_count = dataset.routingDataset.labelList.shape[0]
+        action_count_t_minus_one = 1 if last_level == 0 else self.actionSpaces[last_level - 1].shape[0]
+        action_count_t = self.actionSpaces[last_level].shape[0]
+        rewards = self.validationRewards if data_type == "validation" else self.testRewards
+        # Execute the Bellman Equation
+        # Step 1: Get the Q*(s,a) for the last level.
+        complete_state_matrix = UtilityFuncs.get_cartesian_product(
+            [[sample_id for sample_id in range(state_count)],
+             [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+        complete_state_features = self.get_state_features(state_matrix=complete_state_matrix, level=last_level,
+                                                          data_type=data_type)
+        Q_table_T = self.session.run([self.qFuncs[last_level]],
+                                     feed_dict={
+                                         self.stateInputs[last_level]: complete_state_features})[0]
+        for t in range(last_level - 1, -1, -1):
+            action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+            action_count_t = self.actionSpaces[t].shape[0]
+            states_matrix = np.stack([np.array([sample_id for sample_id in range(state_count)]),
+                                      np.array([action_id for action_id in range(action_count_t_minus_one)])], axis=1)
+            expected_rewards = rewards[t][states_matrix[:, 0], states_matrix[:, 1], :]
+            for a in range(action_count_t):
+                # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
+                reward_vector = expected_rewards[:, a]
+                # \sum_{s_{t+1}} p(s_{t+1}|s_{t},a_{t}) max_{a_{t+1}} Q*(s_{t+1},a_{t+1})
+
+
+
+
+
+                                      # np.array([action_id for action_id in range(action_count_t_minus_one)]), axis=1)
+
+            # states_matrix = np.stack([np.array([sample_id for sample_id in range(state_count)]),
+            #                           np.array([action_id for action_id in range(action_count_t_minus_one)]), axis=1)
+
+            # actions_t = self.actionSpaces[t]
+            # num_of_possible_actions = actions_t.shape[1]
+            # states = np.array([sample_id for sample_id in range(state_count)])
+            # actions = np.array([a_t for a_t in range(num_of_possible_actions)])
+            # # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
+            # # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
+            # for a in actions:
+            #     expected_rewards = rewards[t][states, state_matrix_t[:, 1], :]
+
+            # expected_rewards = rewards[t][state_matrix_t[:, 0], state_matrix_t[:, 1], :]
+
     def measure_performance(self, level, losses, data_type="validation"):
         dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
         state_count = dataset.routingDataset.labelList.shape[0]
@@ -222,8 +270,8 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 [[sample_id for sample_id in range(state_count)],
                  [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
             complete_state_matrix = np.array(complete_state_matrix)
-            complete_state_features = self.get_state_features(state_matrix=complete_state_matrix,
-                                                              level=level, type="validation")
+            complete_state_features = self.get_state_features(state_matrix=complete_state_matrix, level=level,
+                                                              data_type=data_type)
             complete_Q_table = self.session.run([self.qFuncs[level]],
                                                 feed_dict={
                                                     self.stateInputs[level]: complete_state_features})[0]
@@ -235,6 +283,41 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             )
             print("mean_sample_policy_value:{0}".format(mean_sample_policy_value))
             # Measure routing accuracy
+            if level < self.get_max_trajectory_length() - 1:
+                return
+            complete_argmax_actions = np.argmax(complete_Q_table, axis=1)
+            action_counter = Counter(complete_argmax_actions)
+            print("{0} Actions:{1}".format(data_type, action_counter))
+            routing_decisions = self.actionSpaces[level][complete_argmax_actions, :]
+            if QLearningThresholdOptimizer.INCLUDE_IG_IN_REWARD_CALCULATIONS:
+                # Accuracy
+                posteriors_tensor = self.validationPosteriorsTensor \
+                    if data_type == "validation" else self.testPosteriorsTensor
+                min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+                information_gain_paths = dataset.mlPaths[complete_state_matrix[:, 0], :]
+                information_gain_leaf_ids = information_gain_paths[:, -1] - min_leaf_id
+                state_range = np.arange(routing_decisions.shape[0])
+                routing_decisions[state_range, information_gain_leaf_ids] = 1
+                posteriors_tensor = posteriors_tensor[complete_state_matrix[:, 0], :, :]
+                routing_weights = np.reciprocal(np.sum(routing_decisions, axis=1).astype(np.float32))
+                weighted_routing_decisions = np.expand_dims(routing_weights, axis=1) * routing_decisions
+                weighted_posteriors = posteriors_tensor * np.expand_dims(weighted_routing_decisions, axis=1)
+                final_posteriors = np.sum(weighted_posteriors, axis=2)
+                predictions = np.argmax(final_posteriors, axis=1)
+                true_labels = dataset.routingDataset.labelList[complete_state_matrix[:, 0]]
+                truth_vector = predictions == true_labels
+                routing_accuracy = np.sum(truth_vector) / true_labels.shape[0]
+                print("{0} Routing Accuracy:{1}".format(data_type, routing_accuracy))
+                truth_matrix = np.reshape(truth_vector[:, np.newaxis], newshape=(state_count, action_count_t_minus_one))
+                state_wise_truth_vector = np.any(truth_matrix, axis=1)
+                state_wise_accuracy = np.sum(state_wise_truth_vector) / state_wise_truth_vector.shape[0]
+                print("{0} State Wise Accuracy:{1}".format(data_type, state_wise_accuracy))
+                # Computation Cost
+                computation_overload_vector = np.apply_along_axis(lambda x: self.networkActivationCostsDict[tuple(x)],
+                                                                  axis=1,
+                                                                  arr=routing_decisions)
+                print("{0} Mean Computation Overload:{1}".format(data_type, np.mean(computation_overload_vector)))
+                self.execute_bellman_equation(data_type=data_type)
 
     def train(self, level, **kwargs):
         if level != self.get_max_trajectory_length() - 1:
@@ -261,7 +344,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             sampled_rewards = experiences_sampled[:, 3]
             # Add Gradient Descent Step
             sampled_state_features = self.get_state_features(state_matrix=sampled_state_ids, level=level,
-                                                             type="validation")
+                                                             data_type="validation")
             # results = self.session.run(
             #     [self.qFuncs[level],
             #      self.selectionIndices[level],
@@ -283,3 +366,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             epsilon *= epsilon_discount_factor
             total_loss = results[0]
             losses.append(total_loss)
+            if len(losses) % 100 == 0:
+                self.measure_performance(level=level, losses=losses, data_type="validation")
+                self.measure_performance(level=level, losses=losses, data_type="test")
+                losses = []
