@@ -218,44 +218,44 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         rewards = self.validationRewards if data_type == "validation" else self.testRewards
         # Execute the Bellman Equation
         # Step 1: Get the Q*(s,a) for the last level.
+        state_ids = np.array([sample_id for sample_id in range(state_count)])
         complete_state_matrix = UtilityFuncs.get_cartesian_product(
-            [[sample_id for sample_id in range(state_count)],
-             [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+            [state_ids, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+        complete_state_matrix = np.array(complete_state_matrix)
         complete_state_features = self.get_state_features(state_matrix=complete_state_matrix, level=last_level,
                                                           data_type=data_type)
         Q_table_T = self.session.run([self.qFuncs[last_level]],
                                      feed_dict={
                                          self.stateInputs[last_level]: complete_state_features})[0]
+        Q_tables = []
+        Q_t_plus_one = np.copy(Q_table_T)
+        assert np.prod(Q_t_plus_one.shape) == state_count * action_count_t_minus_one * action_count_t
+        Q_t_plus_one = np.reshape(Q_t_plus_one, newshape=(state_count, action_count_t_minus_one, action_count_t))
+        Q_tables.append(Q_t_plus_one)
         for t in range(last_level - 1, -1, -1):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
-            states_matrix = np.stack([np.array([sample_id for sample_id in range(state_count)]),
-                                      np.array([action_id for action_id in range(action_count_t_minus_one)])], axis=1)
+            states_matrix = UtilityFuncs.get_cartesian_product(
+                [[sample_id for sample_id in range(state_count)],
+                 [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+            states_matrix = np.array(states_matrix)
             expected_rewards = rewards[t][states_matrix[:, 0], states_matrix[:, 1], :]
+            Q_t = []
             for a in range(action_count_t):
+                # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
                 # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
                 reward_vector = expected_rewards[:, a]
                 # \sum_{s_{t+1}} p(s_{t+1}|s_{t},a_{t}) max_{a_{t+1}} Q*(s_{t+1},a_{t+1})
+                # Since in our case p(s_{t+1}|s_{t},a_{t}) is deterministic,
+                # it is a lookup into the Q*(s_{t+1},a_{t+1}) table.
+                Q_t_plus_one_given_a = Q_t_plus_one[state_ids, a * np.ones_like(state_ids), :]
+                assert reward_vector.shape[0] == Q_t_plus_one_given_a.shape[0] == state_count
+                assert Q_t_plus_one_given_a.shape[1] == self.actionSpaces[t + 1].shape[0]
+                q_values = np.max(Q_t_plus_one_given_a, axis=1)
+                Q_t.append(reward_vector + q_values)
+            Q_t = np.stack(Q_t, axis=1)
 
 
-
-
-
-                                      # np.array([action_id for action_id in range(action_count_t_minus_one)]), axis=1)
-
-            # states_matrix = np.stack([np.array([sample_id for sample_id in range(state_count)]),
-            #                           np.array([action_id for action_id in range(action_count_t_minus_one)]), axis=1)
-
-            # actions_t = self.actionSpaces[t]
-            # num_of_possible_actions = actions_t.shape[1]
-            # states = np.array([sample_id for sample_id in range(state_count)])
-            # actions = np.array([a_t for a_t in range(num_of_possible_actions)])
-            # # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
-            # # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
-            # for a in actions:
-            #     expected_rewards = rewards[t][states, state_matrix_t[:, 1], :]
-
-            # expected_rewards = rewards[t][state_matrix_t[:, 0], state_matrix_t[:, 1], :]
 
     def measure_performance(self, level, losses, data_type="validation"):
         dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
