@@ -225,8 +225,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         complete_state_features = self.get_state_features(state_matrix=complete_state_matrix, level=last_level,
                                                           data_type=data_type)
         Q_table_T = self.session.run([self.qFuncs[last_level]],
-                                     feed_dict={
-                                         self.stateInputs[last_level]: complete_state_features})[0]
+                                     feed_dict={self.stateInputs[last_level]: complete_state_features})[0]
         Q_tables = []
         Q_t_plus_one = np.copy(Q_table_T)
         assert np.prod(Q_t_plus_one.shape) == state_count * action_count_t_minus_one * action_count_t
@@ -249,13 +248,17 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                 # Since in our case p(s_{t+1}|s_{t},a_{t}) is deterministic,
                 # it is a lookup into the Q*(s_{t+1},a_{t+1}) table.
                 Q_t_plus_one_given_a = Q_t_plus_one[state_ids, a * np.ones_like(state_ids), :]
-                assert reward_vector.shape[0] == Q_t_plus_one_given_a.shape[0] == state_count
-                assert Q_t_plus_one_given_a.shape[1] == self.actionSpaces[t + 1].shape[0]
+                assert reward_vector.shape[0] == Q_t_plus_one_given_a.shape[0] * action_count_t_minus_one
+                Q_t_plus_one_given_a = np.repeat(Q_t_plus_one_given_a, axis=0, repeats=action_count_t_minus_one)
                 q_values = np.max(Q_t_plus_one_given_a, axis=1)
+                assert reward_vector.shape[0] == q_values.shape[0]
                 Q_t.append(reward_vector + q_values)
             Q_t = np.stack(Q_t, axis=1)
-
-
+            Q_t_plus_one = np.reshape(Q_t, newshape=(state_count, action_count_t_minus_one, action_count_t))
+            Q_tables.append(Q_t_plus_one)
+        Q_tables.reverse()
+        # Now we are ready to calculate the optimal trajectories and calculate the optimal accuracy and computation load
+        # for every state.
 
     def measure_performance(self, level, losses, data_type="validation"):
         dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
