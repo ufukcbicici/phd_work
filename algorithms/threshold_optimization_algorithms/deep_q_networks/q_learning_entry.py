@@ -23,7 +23,7 @@ def train_basic_q_learning():
     validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
     q_learning_threshold_optimizer = QLearningThresholdOptimizer(
         validation_data=validation_data,
-        test_data=test_data, network=network, network_name=network_name, run_id=network_id, lambda_mac_cost=0.0,
+        test_data=test_data, network=network, network_name=network_name, run_id=network_id, lambda_mac_cost=0.1,
         q_learning_func="cnn", used_feature_names=used_output_names)
     q_learning_threshold_optimizer.train(level=1,
                                          episode_count=1000000,
@@ -47,7 +47,7 @@ def train_deep_q_learning():
     validation_data, test_data = routing_data.apply_validation_test_split(test_ratio=0.1)
     q_learning_threshold_optimizer = DeepQThresholdOptimizer(
         validation_data=validation_data,
-        test_data=test_data, network=network, network_name=network_name, run_id=network_id, lambda_mac_cost=0.0,
+        test_data=test_data, network=network, network_name=network_name, run_id=network_id, lambda_mac_cost=0.5,
         q_learning_func="cnn", used_feature_names=used_output_names)
     q_learning_threshold_optimizer.train(level=1,
                                          sample_count=512,

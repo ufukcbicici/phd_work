@@ -261,27 +261,47 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         # for every state.
         states_matrix = UtilityFuncs.get_cartesian_product(
                 [[sample_id for sample_id in range(state_count)], [0]])
+        states_matrix = np.array(states_matrix)
         for t in range(self.get_max_trajectory_length()):
             Q_table = Q_tables[t][states_matrix[:, 0], states_matrix[:, 1], :]
             actions_t = np.argmax(Q_table, axis=1)
-            states_matrix[:, 1] = action_count_t
+            states_matrix[:, 1] = actions_t
+            print("Bellman Decision Distribution Level:{0}:{1}".format(t, Counter(states_matrix[:, 1])))
          # The last layer actions determine the routing decisions.
-        routing_decisions = self.actionSelections[-1][states_matrix[:, 1], :]
+        routing_decisions = self.actionSpaces[-1][states_matrix[:, 1], :]
+        truth_vector = self.calculate_results_from_routing_decisions(states_matrix[:, 0], routing_decisions, data_type)
+        return routing_decisions, truth_vector
 
-    def calculate_results_from_routing_decisions(self, routing_decisions, data_type):
+    def calculate_results_from_routing_decisions(self, state_ids, routing_decisions, data_type):
         dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
         state_count = dataset.routingDataset.labelList.shape[0]
-        state_ids = np.arange(state_count)
+        assert state_ids.shape[0] == routing_decisions.shape[0]
         posteriors_tensor = self.validationPosteriorsTensor \
             if data_type == "validation" else self.testPosteriorsTensor
-        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
-        information_gain_paths = dataset.mlPaths[state_ids, :]
-        information_gain_leaf_ids = information_gain_paths[:, -1] - min_leaf_id
-
-
+        if QLearningThresholdOptimizer.INCLUDE_IG_IN_REWARD_CALCULATIONS:
+            min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+            information_gain_paths = dataset.mlPaths[state_ids, :]
+            information_gain_leaf_ids = information_gain_paths[:, -1] - min_leaf_id
+            routing_decisions[state_ids, information_gain_leaf_ids] = 1
+        posteriors_tensor = posteriors_tensor[state_ids, :, :]
+        routing_weights = np.reciprocal(np.sum(routing_decisions, axis=1).astype(np.float32))
+        weighted_routing_decisions = np.expand_dims(routing_weights, axis=1) * routing_decisions
+        weighted_posteriors = posteriors_tensor * np.expand_dims(weighted_routing_decisions, axis=1)
+        final_posteriors = np.sum(weighted_posteriors, axis=2)
+        predictions = np.argmax(final_posteriors, axis=1)
+        true_labels = dataset.routingDataset.labelList[state_ids]
+        truth_vector = predictions == true_labels
+        routing_accuracy = np.sum(truth_vector) / true_labels.shape[0]
+        # Computation Cost
+        computation_overload_vector = np.apply_along_axis(lambda x: self.networkActivationCostsDict[tuple(x)],
+                                                          axis=1,
+                                                          arr=routing_decisions)
+        print("Bellman {0} Ideal Routing Accuracy:{1}".format(data_type, routing_accuracy))
+        print("Bellman {0} Mean Computation Overload:{1}".format(data_type, np.mean(computation_overload_vector)))
+        return truth_vector
 
     def measure_performance(self, level, losses, data_type="validation"):
-        self.execute_bellman_equation(data_type=data_type)
+        bellman_routing_decisions, bellman_truth_vector = self.execute_bellman_equation(data_type=data_type)
         dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
         state_count = dataset.routingDataset.labelList.shape[0]
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
@@ -309,38 +329,45 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
             # Measure routing accuracy
             if level < self.get_max_trajectory_length() - 1:
                 return
+
+            Q_table_reshaped = np.reshape(complete_Q_table,
+                                          newshape=(state_count, action_count_t_minus_one, action_count_t))
+            err_tensor = np.abs(Q_table_reshaped - rewards_tensor)
+            squared_err_tensor = np.square(err_tensor)
+            mean_squared_error = np.mean(squared_err_tensor)
+            print("{0} Real MSE:{1}".format(data_type, mean_squared_error))
             complete_argmax_actions = np.argmax(complete_Q_table, axis=1)
             action_counter = Counter(complete_argmax_actions)
             print("{0} Actions:{1}".format(data_type, action_counter))
             routing_decisions = self.actionSpaces[level][complete_argmax_actions, :]
+            posteriors_tensor = self.validationPosteriorsTensor \
+                if data_type == "validation" else self.testPosteriorsTensor
+            # Accuracy
             if QLearningThresholdOptimizer.INCLUDE_IG_IN_REWARD_CALCULATIONS:
-                # Accuracy
-                posteriors_tensor = self.validationPosteriorsTensor \
-                    if data_type == "validation" else self.testPosteriorsTensor
                 min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
                 information_gain_paths = dataset.mlPaths[complete_state_matrix[:, 0], :]
                 information_gain_leaf_ids = information_gain_paths[:, -1] - min_leaf_id
                 state_range = np.arange(routing_decisions.shape[0])
                 routing_decisions[state_range, information_gain_leaf_ids] = 1
-                posteriors_tensor = posteriors_tensor[complete_state_matrix[:, 0], :, :]
-                routing_weights = np.reciprocal(np.sum(routing_decisions, axis=1).astype(np.float32))
-                weighted_routing_decisions = np.expand_dims(routing_weights, axis=1) * routing_decisions
-                weighted_posteriors = posteriors_tensor * np.expand_dims(weighted_routing_decisions, axis=1)
-                final_posteriors = np.sum(weighted_posteriors, axis=2)
-                predictions = np.argmax(final_posteriors, axis=1)
-                true_labels = dataset.routingDataset.labelList[complete_state_matrix[:, 0]]
-                truth_vector = predictions == true_labels
-                routing_accuracy = np.sum(truth_vector) / true_labels.shape[0]
-                print("{0} Routing Accuracy:{1}".format(data_type, routing_accuracy))
-                truth_matrix = np.reshape(truth_vector[:, np.newaxis], newshape=(state_count, action_count_t_minus_one))
-                state_wise_truth_vector = np.any(truth_matrix, axis=1)
-                state_wise_accuracy = np.sum(state_wise_truth_vector) / state_wise_truth_vector.shape[0]
-                print("{0} State Wise Accuracy:{1}".format(data_type, state_wise_accuracy))
-                # Computation Cost
-                computation_overload_vector = np.apply_along_axis(lambda x: self.networkActivationCostsDict[tuple(x)],
-                                                                  axis=1,
-                                                                  arr=routing_decisions)
-                print("{0} Mean Computation Overload:{1}".format(data_type, np.mean(computation_overload_vector)))
+            posteriors_tensor = posteriors_tensor[complete_state_matrix[:, 0], :, :]
+            routing_weights = np.reciprocal(np.sum(routing_decisions, axis=1).astype(np.float32))
+            weighted_routing_decisions = np.expand_dims(routing_weights, axis=1) * routing_decisions
+            weighted_posteriors = posteriors_tensor * np.expand_dims(weighted_routing_decisions, axis=1)
+            final_posteriors = np.sum(weighted_posteriors, axis=2)
+            predictions = np.argmax(final_posteriors, axis=1)
+            true_labels = dataset.routingDataset.labelList[complete_state_matrix[:, 0]]
+            truth_vector = predictions == true_labels
+            routing_accuracy = np.sum(truth_vector) / true_labels.shape[0]
+            print("{0} Routing Accuracy:{1}".format(data_type, routing_accuracy))
+            truth_matrix = np.reshape(truth_vector[:, np.newaxis], newshape=(state_count, action_count_t_minus_one))
+            state_wise_truth_vector = np.any(truth_matrix, axis=1)
+            state_wise_accuracy = np.sum(state_wise_truth_vector) / state_wise_truth_vector.shape[0]
+            print("{0} State Wise Accuracy:{1}".format(data_type, state_wise_accuracy))
+            # Computation Cost
+            computation_overload_vector = np.apply_along_axis(lambda x: self.networkActivationCostsDict[tuple(x)],
+                                                              axis=1,
+                                                              arr=routing_decisions)
+            print("{0} Mean Computation Overload:{1}".format(data_type, np.mean(computation_overload_vector)))
 
     def train(self, level, **kwargs):
         if level != self.get_max_trajectory_length() - 1:

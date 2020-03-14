@@ -7,7 +7,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class QLearningThresholdOptimizer:
-    invalid_action_penalty = -100.0
+    invalid_action_penalty = -1.0
     valid_prediction_reward = 1.0
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = True
