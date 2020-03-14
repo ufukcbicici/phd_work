@@ -259,8 +259,29 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         Q_tables.reverse()
         # Now we are ready to calculate the optimal trajectories and calculate the optimal accuracy and computation load
         # for every state.
+        states_matrix = UtilityFuncs.get_cartesian_product(
+                [[sample_id for sample_id in range(state_count)], [0]])
+        for t in range(self.get_max_trajectory_length()):
+            Q_table = Q_tables[t][states_matrix[:, 0], states_matrix[:, 1], :]
+            actions_t = np.argmax(Q_table, axis=1)
+            states_matrix[:, 1] = action_count_t
+         # The last layer actions determine the routing decisions.
+        routing_decisions = self.actionSelections[-1][states_matrix[:, 1], :]
+
+    def calculate_results_from_routing_decisions(self, routing_decisions, data_type):
+        dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
+        state_count = dataset.routingDataset.labelList.shape[0]
+        state_ids = np.arange(state_count)
+        posteriors_tensor = self.validationPosteriorsTensor \
+            if data_type == "validation" else self.testPosteriorsTensor
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        information_gain_paths = dataset.mlPaths[state_ids, :]
+        information_gain_leaf_ids = information_gain_paths[:, -1] - min_leaf_id
+
+
 
     def measure_performance(self, level, losses, data_type="validation"):
+        self.execute_bellman_equation(data_type=data_type)
         dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
         state_count = dataset.routingDataset.labelList.shape[0]
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
@@ -320,7 +341,6 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                                                                   axis=1,
                                                                   arr=routing_decisions)
                 print("{0} Mean Computation Overload:{1}".format(data_type, np.mean(computation_overload_vector)))
-                self.execute_bellman_equation(data_type=data_type)
 
     def train(self, level, **kwargs):
         if level != self.get_max_trajectory_length() - 1:
