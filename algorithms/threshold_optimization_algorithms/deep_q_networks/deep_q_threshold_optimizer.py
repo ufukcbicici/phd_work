@@ -270,7 +270,23 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
          # The last layer actions determine the routing decisions.
         routing_decisions = self.actionSpaces[-1][states_matrix[:, 1], :]
         truth_vector = self.calculate_results_from_routing_decisions(states_matrix[:, 0], routing_decisions, data_type)
+        self.calculate_results_by_sampling(q_tables=Q_tables, state_ids=states_matrix[:, 0], data_type=data_type,
+                                           sample_count=1000)
         return routing_decisions, truth_vector
+
+    def calculate_results_by_sampling(self, q_tables, state_ids, data_type, sample_count):
+        batch_size = 100
+        batch_id = 0
+        while True:
+            batch_states = state_ids[batch_id*batch_size:(batch_id + 1)*batch_size]
+            if len(batch_states) == 0:
+                break
+            batch_states = np.repeat(batch_states, repeats=sample_count, axis=0)
+            # for t in range(self.get_max_trajectory_length()):
+            #     print("X")
+            batch_id += 1
+
+
 
     def calculate_results_from_routing_decisions(self, state_ids, routing_decisions, data_type):
         dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
@@ -412,7 +428,7 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
                                                   self.stateInputs[level]: sampled_state_features,
                                                   self.actionSelections[level]: sampled_actions,
                                                   self.rewardVectors[level]: sampled_rewards,
-                                                  self.l2LambdaTf: 0.0})
+                                                  self.l2LambdaTf: 0.0005})
             epsilon *= epsilon_discount_factor
             total_loss = results[0]
             losses.append(total_loss)
