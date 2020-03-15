@@ -10,7 +10,7 @@ network_name = "FashionNet_Lite"
 
 output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                 "pre_branch_feature"]
-used_output_names = ["pre_branch_feature", "activations", "branching_feature"]
+used_output_names = ["pre_branch_feature", "branching_feature"]
 iterations = sorted([43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000])
 
 
@@ -34,7 +34,9 @@ class DatasetLinkingAlgorithm:
         # Link all samples among all iterations
         for sample_id in range(sample_count):
             sample_id_in_iterations = {iterations[0]: sample_id}
+            print("*************Sample ID:{0}*************".format(sample_id_in_iterations))
             for idx, iteration in enumerate(iterations):
+                print("*************Iteration:{0}*************".format(iteration))
                 sample_id_in_curr_iteration = sample_id_in_iterations[iteration]
                 curr_iteration_data = data_dict[iterations[idx]]
                 next_iteration_data = data_dict[iterations[idx + 1]]
@@ -44,6 +46,7 @@ class DatasetLinkingAlgorithm:
                     assert set(curr_iteration_feature_dict.keys()) == set(next_iteration_feature_dict.keys())
                     node_ids = sorted(list(curr_iteration_feature_dict.keys()))
                     for node_id in node_ids:
+                        print("************************************************************************")
                         X_curr = curr_iteration_feature_dict[node_id]
                         X_next = next_iteration_feature_dict[node_id]
                         X_curr = np.reshape(X_curr, newshape=(X_curr.shape[0], np.prod(X_curr.shape[1:])))
@@ -59,7 +62,7 @@ class DatasetLinkingAlgorithm:
                         print("arg_sort_indices[0:10]:{0}".format(arg_sort_indices[0:10]))
                         print("squared_distances[arg_sort_indices[0:10]]:{0}".format(
                             squared_distances[arg_sort_indices[0:10]]))
-                        sample_id_in_next_iteration = arg_sort_indices[0]
+                        sample_id_in_next_iteration = np.asscalar(arg_sort_indices[0])
                         if iterations[idx + 1] not in sample_id_in_iterations:
                             sample_id_in_iterations[iterations[idx + 1]] = sample_id_in_next_iteration
                         else:
@@ -67,7 +70,7 @@ class DatasetLinkingAlgorithm:
                         x_next = X_next[sample_id_in_next_iteration]
                         assert np.allclose(np.sum(np.square(x_next - x_curr)),
                                            squared_distances[sample_id_in_next_iteration])
-                        print("X")
+                        print("************************************************************************")
 
 
 def main():
