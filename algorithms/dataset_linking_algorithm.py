@@ -10,7 +10,7 @@ network_name = "FashionNet_Lite"
 
 output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                 "pre_branch_feature"]
-used_output_names = ["pre_branch_feature", "branching_feature"]
+used_output_names = ["pre_branch_feature"]
 iterations = sorted([43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000])
 
 
@@ -37,6 +37,8 @@ class DatasetLinkingAlgorithm:
             print("*************Sample ID:{0}*************".format(sample_id_in_iterations))
             for idx, iteration in enumerate(iterations):
                 print("*************Iteration:{0}*************".format(iteration))
+                if iteration == iterations[-1]:
+                    break
                 sample_id_in_curr_iteration = sample_id_in_iterations[iteration]
                 curr_iteration_data = data_dict[iterations[idx]]
                 next_iteration_data = data_dict[iterations[idx + 1]]
