@@ -84,10 +84,66 @@ class DatasetLinkingAlgorithm:
                                         sample_id_in_curr_iteration))
             DbLogger.write_into_table(rows=db_rows, table="dataset_link", col_count=7)
 
+    @staticmethod
+    def link_dataset():
+        data_dict = {}
+        # Load all the data
+        for iteration in iterations:
+            network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
+            routing_data = network.load_routing_info(run_id=network_id, iteration=iteration, data_type="test",
+                                                     output_names=output_names)
+            data_dict[iteration] = routing_data
+        curr_path = os.path.dirname(os.path.abspath(__file__))
+        target_directory = \
+            os.path.abspath(os.path.join(curr_path, "..", "saved_training_data",
+                                         "{0}_{1}_linked_features".format(network_name, network_id)))
+        rows = DbLogger.read_tuples_from_table(table_name="dataset_link")
+        iterations_read = sorted(list(set([row[2] for row in rows])))
+        feature_names = set([row[3] for row in rows])
+        node_ids = set([row[4] for row in rows])
+        sample_ids = set([row[5] for row in rows])
+        max_sample_id = max([s_id for s_id in sample_ids])
+        min_iteration_id = min([iteration for iteration in iterations_read])
+        data_dict_read = {}
+        for feature_name in feature_names:
+            arr_dict = data_dict[min_iteration_id].get_dict(feature_name)
+            data_dict_read[feature_name] = {}
+            for node_id in arr_dict.keys():
+                shape_list = list(arr_dict[node_id].shape)
+                shape_list.append(len(iterations_read))
+                data_dict_read[feature_name][node_id] = np.zeros(shape=tuple(shape_list))
+                for s_id in range(max_sample_id):
+                    for idx, iteration_id in enumerate(iterations_read):
+                        sample_row = [row for row in rows if
+                                      row[0] == network_name and
+                                      row[1] == network_id and
+                                      row[2] == iteration_id and
+                                      row[3] == feature_name and
+                                      row[4] == node_id and
+                                      row[5] == s_id]
+                        assert len(sample_row) == 1
+                        s_id_for_iteration = sample_row[0][6]
+                        data_dict_read[feature_name][node_id][s_id, ..., idx] = \
+                            data_dict[iteration_id].get_dict(feature_name)[node_id][s_id_for_iteration, ...]
+                        print("X")
+
+            # data_dict_read[feature_name] = np.zeros(shape=(arr.shape[0], arr.shape[1], len(iterations_read)))
+            # print("X")
+
+            # for sampled_id in range(max_sample_id):
+            #     print("X")
+
+        # data_read_dict = {}
+        # for row in rows:
+
+        print("X")
+
+
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
-    DatasetLinkingAlgorithm.run()
+    # DatasetLinkingAlgorithm.run()
+    DatasetLinkingAlgorithm.link_dataset()
 
 
 if __name__ == "__main__":
