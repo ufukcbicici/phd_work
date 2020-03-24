@@ -106,13 +106,16 @@ class DatasetLinkingAlgorithm:
         min_iteration_id = min([iteration for iteration in iterations_read])
         data_dict_read = {}
         for feature_name in feature_names:
+            print("feature_name:{0}".format(feature_name))
             arr_dict = data_dict[min_iteration_id].get_dict(feature_name)
             data_dict_read[feature_name] = {}
             for node_id in arr_dict.keys():
+                print("node_id:{0}".format(node_id))
                 shape_list = list(arr_dict[node_id].shape)
                 shape_list.append(len(iterations_read))
                 data_dict_read[feature_name][node_id] = np.zeros(shape=tuple(shape_list))
                 for s_id in range(max_sample_id):
+                    print("s_id:{0}".format(s_id))
                     for idx, iteration_id in enumerate(iterations_read):
                         sample_row = [row for row in rows if
                                       row[0] == network_name and
@@ -125,8 +128,8 @@ class DatasetLinkingAlgorithm:
                         s_id_for_iteration = sample_row[0][6]
                         data_dict_read[feature_name][node_id][s_id, ..., idx] = \
                             data_dict[iteration_id].get_dict(feature_name)[node_id][s_id_for_iteration, ...]
-                        print("X")
-
+        print("X")
+        pickle.dump(data_dict_read, open(os.path.abspath(os.path.join(target_directory, "data_dict_read.sav")), "wb"))
             # data_dict_read[feature_name] = np.zeros(shape=(arr.shape[0], arr.shape[1], len(iterations_read)))
             # print("X")
 
