@@ -114,7 +114,7 @@ class DatasetLinkingAlgorithm:
                 shape_list = list(arr_dict[node_id].shape)
                 shape_list.append(len(iterations_read))
                 data_dict_read[feature_name][node_id] = np.zeros(shape=tuple(shape_list))
-                for s_id in range(max_sample_id):
+                for s_id in range(max_sample_id + 1):
                     print("s_id:{0}".format(s_id))
                     for idx, iteration_id in enumerate(iterations_read):
                         sample_row = [row for row in rows if
@@ -128,8 +128,20 @@ class DatasetLinkingAlgorithm:
                         s_id_for_iteration = sample_row[0][6]
                         data_dict_read[feature_name][node_id][s_id, ..., idx] = \
                             data_dict[iteration_id].get_dict(feature_name)[node_id][s_id_for_iteration, ...]
-        print("X")
-        pickle.dump(data_dict_read, open(os.path.abspath(os.path.join(target_directory, "data_dict_read.sav")), "wb"))
+        os.mkdir(target_directory)
+        chunk_size = 1000
+        for feature_name in feature_names:
+            for node_id in data_dict_read[feature_name].keys():
+                chunk_id = 0
+                while True:
+                    data_chunk = data_dict_read[feature_name][node_id][chunk_id*chunk_size:(chunk_id+1)*chunk_size]
+                    if np.prod(data_chunk.shape) == 0:
+                        break
+                    pickle.dump(data_chunk,
+                                open(os.path.abspath(os.path.join(target_directory,
+                                                                  "data_dict_read_{0}_node_{1}_chunk_{2}.sav"
+                                                                  .format(feature_name, node_id, chunk_id))), "wb"))
+                    chunk_id += 1
             # data_dict_read[feature_name] = np.zeros(shape=(arr.shape[0], arr.shape[1], len(iterations_read)))
             # print("X")
 
