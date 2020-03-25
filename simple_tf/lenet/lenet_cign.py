@@ -7,14 +7,24 @@ from simple_tf.global_params import GlobalConstants
 
 
 class Lenet_Cign(FastTreeNetwork):
-    def __init__(self, degree_list, dataset):
-        node_build_funcs = [None, None, None]
-        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset)
+    def __init__(self, degree_list, dataset, network_name):
+        node_build_funcs = [Lenet_Cign.root_func, Lenet_Cign.l1_func, Lenet_Cign.leaf_func]
+        super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name)
 
     @staticmethod
     def apply_router_transformation(network, net, node, decision_feature_size):
-        pool_h = tf.nn.max_pool(net, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
-        flat_pool = tf.contrib.layers.flatten(pool_h)
+        # node.evalDict[network.get_variable_name(name="pre_branch_feature", node=node)] = net
+        # # Switch to Global Average Pooling
+        # pool_h = tf.nn.max_pool(net, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
+        # flat_pool = tf.contrib.layers.flatten(pool_h)
+        net_shape = net.get_shape().as_list()
+        # Global Average Pooling
+        flat_pool = tf.nn.avg_pool(net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
+        net_shape = flat_pool.get_shape().as_list()
+        flat_pool = tf.reshape(flat_pool, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
+
+        # pool_h = tf.nn.max_pool(net, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
+        # flat_pool = tf.contrib.layers.flatten(pool_h)
         feature_size = flat_pool.get_shape().as_list()[-1]
         fc_h_weights = tf.Variable(tf.truncated_normal(
             [feature_size, decision_feature_size],
@@ -130,7 +140,7 @@ class Lenet_Cign(FastTreeNetwork):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "Lenet CIGN\n"
+        explanation = "Lenet CIGN - Low Capacity Router\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)

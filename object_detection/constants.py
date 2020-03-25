@@ -9,7 +9,7 @@ class Constants:
     IMG_WIDTHS = [640]
 
     # Model to load
-    MODEL_ID = 57200
+    MODEL_ID = 75000
 
     # Test / Whole Dataset Ratio
     TEST_RATIO = 0.1
@@ -63,7 +63,7 @@ class Constants:
 
     # Parameters for testing
     STRIDE_WIDTH = 10
-    STRIDE_HEIGHT = 25
+    STRIDE_HEIGHT = 40
     TEST_BATCH_SIZE = 5000
     NMS_THRESHOLD = 0.25
     RESULT_REPORTING_PERIOD = 10 # In Epochs

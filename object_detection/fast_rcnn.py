@@ -221,7 +221,8 @@ class FastRcnn:
         roi_proposals = roi_proposals_tensor[:, :, 1:]
         return images, roi_labels, roi_proposals, roi_proposals_tensor_real_coord, ground_truths
 
-    def calculate_accuracy_on_image(self, img_name, img, roi_matrix, type):
+    def calculate_accuracy_on_image(self, img_name, img, roi_matrix,
+                                    upper_left, upper_right, bottom_left, bottom_right, type):
         final_proposals = self.detect_single_image(original_img=img)
         img_width = img.shape[1]
         img_height = img.shape[0]
@@ -277,6 +278,21 @@ class FastRcnn:
                     reshaped_roi_matrix[idx, 2].astype(np.int32),
                     reshaped_roi_matrix[idx, 3].astype(np.int32),
                     reshaped_roi_matrix[idx, 4].astype(np.int32)))
+
+        # Output detection Json File
+        json_dict = {"detections": []}
+        for idx in range(final_proposals.shape[0]):
+            object_info = {"class": int(final_proposals[idx][0]),
+                           "left": final_proposals[idx][2],
+                           "top": final_proposals[idx][3],
+                           "right": final_proposals[idx][4],
+                           "bottom": final_proposals[idx][5]}
+            json_dict["detections"].append(object_info)
+        json_dict["image_width"] = img_width
+        json_dict["image_height"] = img_height
+        json_file = json.dumps(json_dict)
+        with open("detections_{0}.json".format(img_name), 'a') as f:
+            f.write(json_file)
 
     def detect_single_image(self, original_img):
         all_proposals = []

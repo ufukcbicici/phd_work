@@ -58,7 +58,7 @@ def load_fast_rcnn_detector_with_bb_regression():
     global_detector.load_model(iteration=Constants.MODEL_ID)
 
 
-def test_on_all_images(type="test"):
+def test_on_all_images(type="train"):
     dataset = load_dataset()
     load_fast_rcnn_detector_with_bb_regression()
     os.mkdir("groundtruths")
@@ -121,7 +121,7 @@ def sample_call():
 
 def main():
     # sample_call()
-    # test_on_all_images(type="test")
+    test_on_all_images(type="train")
     # print("X")
 
     # create_dataset()
@@ -132,7 +132,7 @@ def main():
     #     roi_sample_count=Constants.ROI_SAMPLE_COUNT_PER_IMAGE,
     #     positive_sample_ratio=Constants.POSITIVE_SAMPLE_RATIO_PER_IMAGE)
 
-    train_fast_rcnn_detector_with_bb_regression()
+    # train_fast_rcnn_detector_with_bb_regression()
     # load_fast_rcnn_detector()
     # test_on_all_images()
     # train_fast_rcnn_detector_with_bb_regression()
