@@ -134,7 +134,8 @@ class DatasetLinkingAlgorithm:
             for node_id in data_dict_read[feature_name].keys():
                 chunk_id = 0
                 while True:
-                    data_chunk = data_dict_read[feature_name][node_id][chunk_id*chunk_size:(chunk_id+1)*chunk_size]
+                    data_chunk = data_dict_read[feature_name][node_id][
+                                 chunk_id * chunk_size:(chunk_id + 1) * chunk_size]
                     if np.prod(data_chunk.shape) == 0:
                         break
                     pickle.dump(data_chunk,
@@ -153,12 +154,62 @@ class DatasetLinkingAlgorithm:
 
         print("X")
 
+    @staticmethod
+    def link_dataset_v2(linking_feature):
+        data_dict = {}
+        # Load all the data
+        for iteration in iterations:
+            network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
+            routing_data = network.load_routing_info(run_id=network_id, iteration=iteration, data_type="test",
+                                                     output_names=output_names)
+            data_dict[iteration] = routing_data
+        rows = DbLogger.read_tuples_from_table(table_name="dataset_link")
+        node_ids = set([row[4] for row in rows])
+        link_data = []
+        for node_id in node_ids:
+            s_rows = DbLogger.read_tuples_from_table(
+                table_name="dataset_link",
+                condition="NodeId = {0} ORDER BY SampleId, Iteration".format(node_id))
+            result_matrix = np.stack(s_rows, axis=0)
+            link_data.append(result_matrix[:, -2:].astype(np.int32))
+        assert all([np.array_equal(link_data[i], link_data[i + 1]) for i in range(len(link_data) - 1)])
+        link_data = link_data[0]
+        whole_data_dict = {}
+        whole_data_dict_vertical = {}
+        for iteration in iterations:
+            for output_name in output_names:
+                for node_id, arr in data_dict[iteration].dictionaryOfRoutingData[output_name].items():
+                    if (node_id, output_name) not in whole_data_dict:
+                        whole_data_dict[(node_id, output_name)] = []
+                    whole_data_dict[(node_id, output_name)].append(arr)
+        for tpl in whole_data_dict.keys():
+            whole_data_dict_vertical[tpl] = np.concatenate(whole_data_dict[tpl], axis=0)
+        print("X")
+
+
+        # Merge all data vertically
+        # features_dict = {}
+        # for iteration in iterations:
+
+        # curr_path = os.path.dirname(os.path.abspath(__file__))
+        # target_directory = \
+        #     os.path.abspath(os.path.join(curr_path, "..", "saved_training_data",
+        #                                  "{0}_{1}_linked_features".format(network_name, network_id)))
+        # rows = DbLogger.read_tuples_from_table(table_name="dataset_link")
+
+        # iterations_read = sorted(list(set([row[2] for row in rows])))
+        # feature_names = set([row[3] for row in rows])
+        # node_ids = set([row[4] for row in rows])
+        # sample_ids = set([row[5] for row in rows])
+        # max_sample_id = max([s_id for s_id in sample_ids])
+        # min_iteration_id = min([iteration for iteration in iterations_read])
+
 
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
     # DatasetLinkingAlgorithm.run()
-    DatasetLinkingAlgorithm.link_dataset()
+    DatasetLinkingAlgorithm.link_dataset_v2("pre_branch_feature")
 
 
 if __name__ == "__main__":

@@ -13,14 +13,15 @@ from simple_tf.fashion_net.fashion_net_baseline import FashionNetBaseline
 from simple_tf.fashion_net.fashion_net_single_late_exit import FashionNetSingleLateExit
 from simple_tf.global_params import GlobalConstants
 from auxillary.constants import DatasetTypes
+from simple_tf.lenet.lenet_baseline import LeNetBaseline
 from simple_tf.lenet.lenet_cign import Lenet_Cign
 from simple_tf.lenet.lenet_cign_early_exit import LenetCignEarlyExit
 
 use_moe = False
 use_sampling = False
 use_random_sampling = False
-use_baseline = False
-use_early_exit = True
+use_baseline = True
+use_early_exit = False
 use_late_exit = False
 
 
@@ -31,6 +32,8 @@ def get_network(dataset, network_name):
     elif use_early_exit:
         network = LenetCignEarlyExit(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                      network_name="LeNetMNIST_CIGN_EarlyExit")
+    elif use_baseline:
+        network = LeNetBaseline(dataset=dataset, network_name="LeNetMNIST_Baseline")
     else:
         raise NotImplementedError()
     return network

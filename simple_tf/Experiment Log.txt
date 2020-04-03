@@ -1902,3 +1902,61 @@ FROM
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
+
+***************************************************************************************************************
+25.03.2020 - HOME
+-Lenet CIGN - Early Exit
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.Epoch >= 90
+	AND
+	Explanation LIKE "%Lenet CIGN - Early Exit%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************
+
+***************************************************************************************************************
+25.03.2020 - DGX dblogger2.db
+-MNIST LeNet Weak Router
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"92276") + LENGTH("92276") + 1, 8) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.Epoch >= 90
+	AND
+	Explanation LIKE "%Lenet CIGN - Low Capacity Router%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************
