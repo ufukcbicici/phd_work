@@ -64,61 +64,6 @@ class JungleGumbelSoftmax(JungleNoStitch):
         #                               temperature_tensor: temperature})
         # p_z = np.mean(results[2], axis=0)
 
-    def build_optimizer(self):
-        # Build main classification loss
-        self.build_main_loss()
-        # Build information gain loss
-        self.build_decision_loss()
-        # Build regularization loss
-        self.build_regularization_loss()
-        # Final Loss
-        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
-        self.evalDict["mainLoss"] = self.mainLoss
-        self.evalDict["regularizationLoss"] = self.regularizationLoss
-        self.evalDict["decisionLoss"] = self.decisionLoss
-        # Build optimizer
-        self.globalCounter = tf.Variable(0, trainable=False)
-        boundaries = [tpl[0] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule]
-        values = [GlobalConstants.INITIAL_LR]
-        values.extend([tpl[1] for tpl in GlobalConstants.LEARNING_RATE_CALCULATOR.schedule])
-        self.learningRate = tf.train.piecewise_constant(self.globalCounter, boundaries, values)
-        self.extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        # pop_var = tf.Variable(name="pop_var", initial_value=tf.constant(0.0, shape=(16, )), trainable=False)
-        # pop_var_assign_op = tf.assign(pop_var, tf.constant(45.0, shape=(16, )))
-        with tf.control_dependencies(self.extra_update_ops):
-            self.optimizer = self.get_solver()
-            # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9)
-            # self.decisionGradsOp = self.optimizer.compute_gradients(self.decisionLoss)
-            # self.decisionGradsOp = [tpl for tpl in self.decisionGradsOp if tpl[0] is not None]
-            # self.classificationGradsOp = self.optimizer.compute_gradients(self.mainLoss)
-            # self.gradAndVarsOp = self.optimizer.compute_gradients(self.finalLoss)
-            # self.trainOp = self.optimizer.apply_gradients(self.gradAndVarsOp, global_step=self.globalCounter)
-            # activations_list = []
-            # probs_list = []
-            # z_probs_list = []
-            # z_samples_list = []
-            # for node in self.topologicalSortedNodes:
-            #     if node.nodeType == NodeType.h_node:
-            #         if UtilityFuncs.get_variable_name(name="activations", node=node) in node.evalDict:
-            #             activation = node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)]
-            #             activations_list.append(activation)
-            #         if UtilityFuncs.get_variable_name(name="branch_probs", node=node) in node.evalDict:
-            #             prob = node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)]
-            #             probs_list.append(prob)
-            #         if UtilityFuncs.get_variable_name(name="z_samples", node=node) in node.evalDict:
-            #             z_samples = node.evalDict[UtilityFuncs.get_variable_name(name="z_samples", node=node)]
-            #             z_samples_list.append(z_samples)
-            #         if UtilityFuncs.get_variable_name(name="z_probs_matrix", node=node) in node.evalDict:
-            #             z_probs_matrix = node.evalDict[UtilityFuncs.get_variable_name(name="z_probs_matrix", node=node)]
-            #             z_probs_list.append(z_probs_matrix)
-            # self.activationGrads = tf.gradients(ys=self.finalLoss, xs=activations_list)
-            # self.activationGradsDecision = tf.gradients(ys=self.decisionLoss, xs=activations_list)
-            # self.activationGradsClassification = tf.gradients(ys=self.mainLoss, xs=activations_list)
-            # self.probGradsDecision = tf.gradients(ys=self.decisionLoss, xs=probs_list)
-            # self.probGradsClassification = tf.gradients(ys=self.mainLoss, xs=probs_list)
-            # self.zProbsGrads = tf.gradients(ys=self.finalLoss, xs=z_probs_list)
-            # self.zSamplesGrads = tf.gradients(ys=self.finalLoss, xs=z_samples_list)
-
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
         node.H_output = branching_feature
@@ -211,73 +156,6 @@ class JungleGumbelSoftmax(JungleNoStitch):
                 else:
                     feed_dict[node.gumbelSoftmaxTemperature] = GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE
         return feed_dict
-
-    def get_run_ops(self):
-        # run_ops = [self.gradAndVarsOp, self.trainOp, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
-        #            self.infoGainDicts,
-        #            self.zSamplesGrads, self.zProbsGrads,
-        #            self.probGradsDecision, self.probGradsClassification,
-        #            self.activationGrads, self.activationGradsDecision, self.activationGradsClassification,
-        #            self.decisionGradsOp, self.classificationGradsOp]
-        run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
-                   self.infoGainDicts]
-        return run_ops
-
-    def update_params(self, sess, dataset, epoch, iteration):
-        use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
-        GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
-        minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
-        if minibatch is None:
-            return None, None, None
-        feed_dict = self.prepare_feed_dict(minibatch=minibatch, iteration=iteration, use_threshold=use_threshold,
-                                           is_train=True, use_masking=True)
-        # Prepare result tensors to collect
-        # grads_vars = sess.run([self.gradAndVarsOp], feed_dict=feed_dict)
-        # for grads_vars in grads_vars:
-        #     if np.any(np.isnan(grads_vars[0])):
-        #         print("Gradient contains nan!")
-        run_ops = self.get_run_ops()
-        if GlobalConstants.USE_VERBOSE:
-            run_ops.append(self.evalDict)
-        # print("Before Update Iteration:{0}".format(iteration))
-        results = sess.run(run_ops, feed_dict=feed_dict)
-
-        # The following is for debug
-        # # print("After Update Iteration:{0}".format(iteration))
-        # self.gradAndVarsDict = results[0]
-        # self.decisionGradsDict = results[-3]
-        # self.classificationGradsDict = results[-2]
-        # prob_grads_decision = results[-8]
-        # prob_grads_classification = results[-7]
-        # activation_grads = results[-6]
-        # activation_grads_decision = results[-5]
-        # activation_grads_classification = results[-4]
-        # zero_count = np.sum(results[-1]["Node1_branch_probs"] == 0.0)
-        # if zero_count > 0:
-        #     print("We have zero!!!")
-        # for grads in activation_grads_decision:
-        #     if np.any(np.isnan(grads)):
-        #         print("Gradient contains nan!")
-        # for grads in activation_grads_classification:
-        #     if np.any(np.isnan(grads)):
-        #         print("Gradient contains nan!")
-        # # for i in range(len(self.decisionGradsDict)):
-        # #     a = self.decisionGradsDict[i][0]
-        # #     b = self.classificationGradsDict[i][0]
-        # #     c = self.gradAndVarsDict[i][0]
-        # #     assert np.allclose(c, a + b)
-        #
-        # for grads_vars in self.gradAndVarsDict:
-        #     if np.any(np.isnan(grads_vars[0])):
-        #         print("Gradient contains nan!")
-        lr = results[1]
-        sample_counts = results[2]
-        is_open_indicators = results[3]
-        # Unit Tests
-        if GlobalConstants.USE_UNIT_TESTS:
-            for test in self.unitTestList:
-                test(results[-1])
-        return lr, sample_counts, is_open_indicators
 
     # Unit test methods
     def test_nan_sample_counts(self, eval_dict):
