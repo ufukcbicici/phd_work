@@ -418,7 +418,7 @@ class Jungle(FastTreeNetwork):
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             if not self.isBaseline:
                 self.get_softmax_decays(feed_dict=feed_dict, iteration=iteration, update=True)
-                feed_dict[self.decisionDropoutKeepProb] = GlobalConstants.DECISION_DROPOUT_KEEP_PROB
+                self.get_decision_dropout_prob(feed_dict=feed_dict, iteration=iteration, update=True)
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=True)
         else:
             feed_dict[self.classificationDropoutKeepProb] = 1.0
@@ -599,8 +599,6 @@ class Jungle(FastTreeNetwork):
         # Measure The Histogram of Branching Probabilities
         self.calculate_branch_probability_histograms(branch_probs=branch_probs_dict)
         # Measure Accuracy
-        overall_count = 0.0
-        overall_correct = 0.0
         posterior_matrix = true_labels_dict[0]
         predicted_labels = np.argmax(posterior_matrix, axis=1)
         accuracy_vector = (predicted_labels == true_labels).astype(np.float32)

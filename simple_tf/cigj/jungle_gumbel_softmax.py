@@ -2,14 +2,14 @@ import tensorflow as tf
 import numpy as np
 
 from auxillary.general_utility_funcs import UtilityFuncs
-from simple_tf.cigj.jungle_no_stitch import JungleNoStitch
+from simple_tf.cigj.jungle import Jungle
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 from simple_tf.cigj.jungle_node import NodeType
 from algorithms.info_gain import InfoGainLoss
 
 
-class JungleGumbelSoftmax(JungleNoStitch):
+class JungleGumbelSoftmax(Jungle):
     def __init__(self, node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                  dataset, network_name):
         self.zSampleCount = tf.placeholder(name="zSampleCount", dtype=tf.int32)

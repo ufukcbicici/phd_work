@@ -12,66 +12,7 @@ from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 
-def get_explanation_string(network):
-    total_param_count = 0
-    for v in tf.trainable_variables():
-        total_param_count += np.prod(v.get_shape().as_list())
-    # Tree
-    explanation = "CIGJ Fashion MNIST Gumbel-Softmax Tests: 128 Sized H Features\n"
-    explanation += "Network Type:{0}\n".format(network.__class__)
-    # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
-    explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
-    explanation += "Jungle Degree Degree:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
-    explanation += "Optimizer:{0}\n".format(GlobalConstants.OPTIMIZER_TYPE)
-    explanation += "********Lr Settings********\n"
-    explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
-    explanation += "********Lr Settings********\n"
-    if not network.isBaseline:
-        explanation += "********Decision Loss Weight Settings********\n"
-        explanation += network.decisionLossCoefficientCalculator.get_explanation()
-        explanation += "********Decision Loss Weight Settings********\n"
-    explanation += "Batch Norm Decay:{0}\n".format(GlobalConstants.BATCH_NORM_DECAY)
-    explanation += "Param Count:{0}\n".format(total_param_count)
-    explanation += "Classification Wd:{0}\n".format(GlobalConstants.WEIGHT_DECAY_COEFFICIENT)
-    explanation += "Decision Wd:{0}\n".format(GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT)
-    explanation += "Info Gain Loss Lambda:{0}\n".format(GlobalConstants.DECISION_LOSS_COEFFICIENT)
-    explanation += "Use Batch Norm Before Decisions:{0}\n".format(GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING)
-    # explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
-    # explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
-    # explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
-    # explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
-    # explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.SOFTMAX_TEST_TEMPERATURE)
 
-    explanation += "********Softmax Decay Settings********\n"
-    for node in network.topologicalSortedNodes:
-        if node.nodeType == NodeType.h_node:
-            explanation += "********Node{0} Softmax Decay********\n".format(node.index)
-            explanation += node.softmaxDecayCalculator.get_explanation()
-            explanation += "********Node{0} Softmax Decay********\n".format(node.index)
-    explanation += "********Softmax Decay Settings********\n"
-
-    explanation += "********Gumbel Softmax Temperature Settings********\n"
-    for node in network.topologicalSortedNodes:
-        if node.nodeType == NodeType.h_node:
-            explanation += "********Node{0} Gumbel Softmax Temperature********\n".format(node.index)
-            explanation += node.gumbelSoftmaxTemperatureCalculator.get_explanation()
-            explanation += "********Node{0} Gumbel Softmax Temperature********\n".format(node.index)
-    explanation += "********Gumbel Softmax Temperature Settings********\n"
-
-    explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
-    explanation += "Classification Dropout Probability:{0}\n".format(GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
-    explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_KEEP_PROB)
-    explanation += "H Feature Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_FEATURES)
-    explanation += "H Pooling Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES)
-    # explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
-    # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-    #     for node in network.topologicalSortedNodes:
-    #         if node.isLeaf:
-    #             continue
-    #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-    #         explanation += node.probThresholdCalculator.get_explanation()
-    #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-    return explanation
 
 
 def cigj_training():

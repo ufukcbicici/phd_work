@@ -360,8 +360,8 @@ class GlobalConstants:
     # Third Conv Layer Output (Single Sample): 40x4x4 -> H Transform(2x2) (40x2x2)x32
     # Fourth FC Layer Output (Single Sample): 128x1 -> H Transform (128)x32
 
-    CIGJ_FASHION_NET_H_FEATURES = [32, 32, 32]
-    CIGJ_FASHION_NET_H_POOL_SIZES = [2, 2, 2]
+    CIGJ_FASHION_NET_H_FEATURES = [32, 32, 32, 32]
+    CIGJ_FASHION_NET_H_POOL_SIZES = [4, 3, 2, None]
 
     CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT = 100
     CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL = 25.0
