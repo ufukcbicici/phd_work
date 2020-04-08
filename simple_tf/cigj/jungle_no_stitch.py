@@ -13,66 +13,72 @@ from algorithms.info_gain import InfoGainLoss
 
 class JungleNoStitch(Jungle):
     def __init__(self, node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                 dataset):
+                 dataset, network_name):
         super().__init__(node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                         dataset)
+                         dataset, network_name)
         # self.unitTestList = [self.test_stitching]
 
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
         node.H_output = branching_feature
-        node_degree = self.degreeList[node.depth + 1]
-        if node_degree > 1:
-            # Step 1: Create Hyperplanes
-            ig_feature_size = node.H_output.get_shape().as_list()[-1]
-            hyperplane_weights = tf.Variable(
-                tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                                    dtype=GlobalConstants.DATA_TYPE),
-                name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
-            hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                            name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
-            if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-                node.H_output = tf.layers.batch_normalization(inputs=node.H_output,
-                                                              momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                                              training=tf.cast(self.isTrain, tf.bool))
-            # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
-            activations = FastTreeNetwork.fc_layer(x=node.H_output, W=hyperplane_weights, b=hyperplane_biases,
-                                                   node=node)
-            node.activationsDict[node.index] = activations
-            decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
-            p_F_given_x = tf.nn.softmax(decayed_activation)
-            p_c_given_x = self.oneHotLabelTensor
-            node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
-                                                      balance_coefficient=self.informationGainBalancingCoefficient)
-            # Step 3:
-            # If training: Sample Z from p(F|x) using Gumbel-Max trick
-            # If testing: Pick Z = argmax_F p(F|x)
-            category_count = tf.constant(node_degree)
-            sampled_indices = self.sample_from_categorical(probs=p_F_given_x, batch_size=self.batchSize,
-                                                           category_count=category_count)
-            arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
-            sampled_one_hot_matrix = tf.one_hot(sampled_indices, category_count)
-            arg_max_one_hot_matrix = tf.one_hot(arg_max_indices, category_count)
-            node.conditionProbabilities = tf.where(self.isTrain > 0, sampled_one_hot_matrix, arg_max_one_hot_matrix)
-            # Reporting
-            node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
-            node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
-            node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
-            node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
-            node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-            node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)] = p_F_given_x
+        if node.depth < len(self.degreeList) - 1:
+            node_degree = self.degreeList[node.depth + 1]
+            if node_degree > 1:
+                # Step 1: Create Hyperplanes
+                ig_feature_size = node.H_output.get_shape().as_list()[-1]
+                hyperplane_weights = UtilityFuncs.create_variable(
+                    name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node),
+                    shape=[ig_feature_size, node_degree],
+                    dtype=GlobalConstants.DATA_TYPE,
+                    initializer=tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                                                    dtype=GlobalConstants.DATA_TYPE))
+                hyperplane_biases = UtilityFuncs.create_variable(
+                    name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node),
+                    shape=[node_degree],
+                    dtype=GlobalConstants.DATA_TYPE,
+                    initializer=tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE))
+                if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
+                    node.H_output = tf.layers.batch_normalization(inputs=node.H_output,
+                                                                  momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                                  training=tf.cast(self.isTrain, tf.bool))
+                # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
+                activations = FastTreeNetwork.fc_layer(x=node.H_output, W=hyperplane_weights, b=hyperplane_biases,
+                                                       node=node)
+                node.activationsDict[node.index] = activations
+                decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
+                p_F_given_x = tf.nn.softmax(decayed_activation)
+                p_c_given_x = self.oneHotLabelTensor
+                node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
+                                                          balance_coefficient=self.informationGainBalancingCoefficient)
+                # Step 3:
+                # If training: Sample Z from p(F|x) using Gumbel-Max trick
+                # If testing: Pick Z = argmax_F p(F|x)
+                category_count = tf.constant(node_degree)
+                sampled_indices = self.sample_from_categorical(probs=p_F_given_x, batch_size=self.batchSize,
+                                                               category_count=category_count)
+                arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
+                sampled_one_hot_matrix = tf.one_hot(sampled_indices, category_count)
+                arg_max_one_hot_matrix = tf.one_hot(arg_max_indices, category_count)
+                node.conditionProbabilities = tf.where(self.isTrain > 0, sampled_one_hot_matrix, arg_max_one_hot_matrix)
+                # Reporting
+                node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
+                node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
+                node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
+                node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
+                node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
+                node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)] = p_F_given_x
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="sampled_indices", node=node)] = sampled_indices
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)] = arg_max_indices
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="sampled_one_hot_matrix", node=node)] = sampled_one_hot_matrix
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
+            else:
+                node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
             node.evalDict[
-                UtilityFuncs.get_variable_name(name="sampled_indices", node=node)] = sampled_indices
-            node.evalDict[
-                UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)] = arg_max_indices
-            node.evalDict[
-                UtilityFuncs.get_variable_name(name="sampled_one_hot_matrix", node=node)] = sampled_one_hot_matrix
-            node.evalDict[
-                UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
-        else:
-            node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
-        node.evalDict[
-            UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
+                UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
         node.F_output = node.F_input
 
     def stitch_samples(self, node):
@@ -179,12 +185,12 @@ class JungleNoStitch(Jungle):
         sample_counts = results[2]
         is_open_indicators = results[3]
         # Unit Tests
-        if GlobalConstants.USE_UNIT_TESTS:
-            for test in self.unitTestList:
-                test(results[-1])
+        # if GlobalConstants.USE_UNIT_TESTS:
+        #     for test in self.unitTestList:
+        #         test(results[-1])
         return lr, sample_counts, is_open_indicators
 
-    def calculate_model_performance(self, calculation_type, sess, dataset, dataset_type, run_id, iteration):
+    def calculate_jungle_performance(self, sess, dataset, run_id, dataset_type, epoch_id, iteration):
         dataset.set_current_data_set_type(dataset_type=dataset_type, batch_size=GlobalConstants.EVAL_BATCH_SIZE)
         leaf_predicted_labels_dict = {}
         leaf_true_labels_dict = {}
@@ -192,6 +198,7 @@ class JungleNoStitch(Jungle):
         info_gain_dict = {}
         branch_probs_dict = {}
         arg_max_indices_dict = {}
+        routing_probabilities_dict = {}
         while True:
             results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
             if results is not None:
@@ -204,9 +211,13 @@ class JungleNoStitch(Jungle):
                         info_gain = results[self.get_variable_name(name="info_gain", node=node)]
                         branch_prob = results[self.get_variable_name(name="branch_probs", node=node)]
                         arg_max_indices = results[UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)]
+                        routing_probabilities = \
+                            results[UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)]
                         UtilityFuncs.concat_to_np_array_dict(dct=branch_probs_dict, key=node.index, array=branch_prob)
                         UtilityFuncs.concat_to_np_array_dict(dct=arg_max_indices_dict, key=node.index,
                                                              array=arg_max_indices)
+                        UtilityFuncs.concat_to_np_array_dict(dct=routing_probabilities_dict, key=node.index,
+                                                             array=routing_probabilities)
                         if node.index not in info_gain_dict:
                             info_gain_dict[node.index] = []
                         info_gain_dict[node.index].append(np.asscalar(info_gain))
@@ -238,7 +249,7 @@ class JungleNoStitch(Jungle):
             kv_rows.append((run_id, iteration, "Dataset:{0} IG:{1}".format(dataset_type, k), avg_info_gain))
         kv_rows.append((run_id, iteration, "Dataset:{0} Total IG".format(dataset_type), total_info_gain))
         # Measure h node label distribution
-        assert len(leaf_true_labels_dict) == 1
+        # assert len(leaf_true_labels_dict) == 1
         JungleNoStitch.measure_h_node_label_distribution(arg_max_dict=arg_max_indices_dict,
                                                          labels_arr=list(leaf_true_labels_dict.values())[0],
                                                          dataset=dataset,
@@ -255,7 +266,7 @@ class JungleNoStitch(Jungle):
         self.label_distribution_analysis(run_id=run_id, iteration=iteration, kv_rows=kv_rows,
                                          leaf_true_labels_dict=leaf_true_labels_dict,
                                          dataset=dataset, dataset_type=dataset_type)
-        # # Measure Accuracy
+        # Measure Accuracy
         overall_count = 0.0
         overall_correct = 0.0
         confusion_matrix_db_rows = []

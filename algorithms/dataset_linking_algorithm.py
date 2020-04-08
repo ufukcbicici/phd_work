@@ -163,6 +163,9 @@ class DatasetLinkingAlgorithm:
             routing_data = network.load_routing_info(run_id=network_id, iteration=iteration, data_type="test",
                                                      output_names=output_names)
             data_dict[iteration] = routing_data
+        sample_count = set([len(d.labelList) for d in data_dict.values()])
+        assert len(sample_count) == 1
+        sample_count = list(sample_count)[0]
         rows = DbLogger.read_tuples_from_table(table_name="dataset_link")
         node_ids = set([row[4] for row in rows])
         link_data = []

@@ -11,7 +11,7 @@ from algorithms.info_gain import InfoGainLoss
 
 class JungleGumbelSoftmax(JungleNoStitch):
     def __init__(self, node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                 dataset):
+                 dataset, network_name):
         self.zSampleCount = tf.placeholder(name="zSampleCount", dtype=tf.int32)
         self.unitTestList = [self.test_nan_sample_counts]
         self.prevEvalDict = {}
@@ -30,7 +30,7 @@ class JungleGumbelSoftmax(JungleNoStitch):
         self.zProbsGrads = None
         self.zSamplesGrads = None
         super().__init__(node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
-                         dataset)
+                         dataset, network_name)
         self.evalDict["oneHotLabelTensor"] = self.oneHotLabelTensor
 
     @staticmethod
@@ -122,67 +122,74 @@ class JungleGumbelSoftmax(JungleNoStitch):
     def apply_decision(self, node, branching_feature):
         assert node.nodeType == NodeType.h_node
         node.H_output = branching_feature
-        node_degree = self.degreeList[node.depth + 1]
-        if node_degree > 1:
-            # Step 1: Create Hyperplanes
-            ig_feature_size = node.H_output.get_shape().as_list()[-1]
-            hyperplane_weights = tf.Variable(
-                tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
-                                    dtype=GlobalConstants.DATA_TYPE),
-                name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node))
-            hyperplane_biases = tf.Variable(tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE),
-                                            name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node))
-            if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
-                node.H_output = tf.layers.batch_normalization(inputs=node.H_output,
-                                                              momentum=GlobalConstants.BATCH_NORM_DECAY,
-                                                              training=tf.cast(self.isTrain, tf.bool))
-            # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
-            activations = FastTreeNetwork.fc_layer(x=node.H_output, W=hyperplane_weights, b=hyperplane_biases,
-                                                   node=node)
-            node.activationsDict[node.index] = activations
-            decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
-            p_F_given_x = tf.nn.softmax(decayed_activation)
-            p_c_given_x = self.oneHotLabelTensor
-            node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
-                                                      balance_coefficient=self.informationGainBalancingCoefficient)
-            # Step 3:
-            # If training: Sample Z from Gumbel-Softmax distribution, based on p(F|x).
-            # If testing: Pick Z = argmax_F p(F|x)
-            # Prevent exactly zero probabilities by adding a constant.
-            equal_mask = tf.cast(tf.equal(p_F_given_x, 0.0), tf.float32)
-            mask_prob = GlobalConstants.INFO_GAIN_LOG_EPSILON * equal_mask
-            p_F_given_x_corrected = p_F_given_x + mask_prob
+        if node.depth < len(self.degreeList) - 1:
+            node_degree = self.degreeList[node.depth + 1]
+            if node_degree > 1:
+                # Step 1: Create Hyperplanes
+                ig_feature_size = node.H_output.get_shape().as_list()[-1]
+                hyperplane_weights = UtilityFuncs.create_variable(
+                    name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node),
+                    shape=[ig_feature_size, node_degree],
+                    dtype=GlobalConstants.DATA_TYPE,
+                    initializer=tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1,
+                                                    seed=GlobalConstants.SEED,
+                                                    dtype=GlobalConstants.DATA_TYPE))
+                hyperplane_biases = UtilityFuncs.create_variable(
+                    name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node),
+                    shape=[node_degree],
+                    dtype=GlobalConstants.DATA_TYPE,
+                    initializer=tf.constant(0.0, shape=[node_degree], dtype=GlobalConstants.DATA_TYPE))
+                if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
+                    node.H_output = tf.layers.batch_normalization(inputs=node.H_output,
+                                                                  momentum=GlobalConstants.BATCH_NORM_DECAY,
+                                                                  training=tf.cast(self.isTrain, tf.bool))
+                # Step 2: Calculate the distribution over the computation units (F nodes in the same layer, p(F|x)
+                activations = FastTreeNetwork.fc_layer(x=node.H_output, W=hyperplane_weights, b=hyperplane_biases,
+                                                       node=node)
+                node.activationsDict[node.index] = activations
+                decayed_activation = node.activationsDict[node.index] / tf.reshape(node.softmaxDecay, (1,))
+                p_F_given_x = tf.nn.softmax(decayed_activation)
+                p_c_given_x = self.oneHotLabelTensor
+                node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_F_given_x, p_c_given_x_2d=p_c_given_x,
+                                                          balance_coefficient=self.informationGainBalancingCoefficient)
+                # Step 3:
+                # If training: Sample Z from Gumbel-Softmax distribution, based on p(F|x).
+                # If testing: Pick Z = argmax_F p(F|x)
+                # Prevent exactly zero probabilities by adding a constant.
+                equal_mask = tf.cast(tf.equal(p_F_given_x, 0.0), tf.float32)
+                mask_prob = GlobalConstants.INFO_GAIN_LOG_EPSILON * equal_mask
+                p_F_given_x_corrected = p_F_given_x + mask_prob
 
-            category_count = tf.constant(node_degree)
-            z_samples = JungleGumbelSoftmax.sample_from_gumbel_softmax(probs=p_F_given_x_corrected,
-                                                                       temperature=node.gumbelSoftmaxTemperature,
-                                                                       z_sample_count=self.zSampleCount,
-                                                                       batch_size=tf.cast(self.batchSize, tf.int32),
-                                                                       child_count=node_degree)
-            z_probs_matrix = tf.reduce_mean(z_samples, axis=1)
-            arg_max_indices = tf.argmax(p_F_given_x_corrected, axis=1, output_type=tf.int32)
-            arg_max_one_hot_matrix = tf.one_hot(arg_max_indices, category_count)
-            node.conditionProbabilities = tf.where(self.isTrain > 0, z_probs_matrix, arg_max_one_hot_matrix)
-            # Reporting
-            node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
-            node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
-            node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
-            node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
-            node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
-            node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)] = p_F_given_x
-            node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs_corrected", node=node)] = p_F_given_x_corrected
+                category_count = tf.constant(node_degree)
+                z_samples = JungleGumbelSoftmax.sample_from_gumbel_softmax(probs=p_F_given_x_corrected,
+                                                                           temperature=node.gumbelSoftmaxTemperature,
+                                                                           z_sample_count=self.zSampleCount,
+                                                                           batch_size=tf.cast(self.batchSize, tf.int32),
+                                                                           child_count=node_degree)
+                z_probs_matrix = tf.reduce_mean(z_samples, axis=1)
+                arg_max_indices = tf.argmax(p_F_given_x_corrected, axis=1, output_type=tf.int32)
+                arg_max_one_hot_matrix = tf.one_hot(arg_max_indices, category_count)
+                node.conditionProbabilities = tf.where(self.isTrain > 0, z_probs_matrix, arg_max_one_hot_matrix)
+                # Reporting
+                node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
+                node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
+                node.evalDict[UtilityFuncs.get_variable_name(name="decayed_activation", node=node)] = decayed_activation
+                node.evalDict[UtilityFuncs.get_variable_name(name="softmax_decay", node=node)] = node.softmaxDecay
+                node.evalDict[UtilityFuncs.get_variable_name(name="info_gain", node=node)] = node.infoGainLoss
+                node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs", node=node)] = p_F_given_x
+                node.evalDict[UtilityFuncs.get_variable_name(name="branch_probs_corrected", node=node)] = p_F_given_x_corrected
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="z_samples", node=node)] = z_samples
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="z_probs_matrix", node=node)] = z_probs_matrix
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)] = arg_max_indices
+                node.evalDict[
+                    UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
+            else:
+                node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
             node.evalDict[
-                UtilityFuncs.get_variable_name(name="z_samples", node=node)] = z_samples
-            node.evalDict[
-                UtilityFuncs.get_variable_name(name="z_probs_matrix", node=node)] = z_probs_matrix
-            node.evalDict[
-                UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)] = arg_max_indices
-            node.evalDict[
-                UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
-        else:
-            node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
-        node.evalDict[
-            UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
+                UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
         node.F_output = node.F_input
 
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
