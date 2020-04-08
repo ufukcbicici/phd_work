@@ -153,12 +153,23 @@ class Jungle(FastTreeNetwork):
         self.decisionLoss = self.decisionLossCoefficient * tf.add_n(decision_losses)
 
     def build_main_loss(self):
-        primary_losses = []
-        for node in self.topologicalSortedNodes:
-            if node.nodeType != NodeType.leaf_node:
-                continue
-            primary_losses.extend(node.lossList)
-        self.mainLoss = tf.add_n(primary_losses)
+        leaf_h_node = sorted([node for node in self.topologicalSortedNodes
+                              if node.nodeType == NodeType.h_node], key=lambda n: n.depth)[-1]
+        softmax_output = leaf_h_node.F_output
+        self.evalDict["softmax_output"] = softmax_output
+        softmax_indices = tf.concat([self.batchIndices, self.labelTensor], axis=1)
+        self.evalDict["softmax_indices"] = softmax_indices
+        selected_softmax_probs = tf.gather_nd(softmax_output, softmax_indices)
+        self.evalDict["selected_softmax_probs"] = selected_softmax_probs
+        zero_mask = 1e-30 * tf.cast(tf.equal(selected_softmax_probs, 0.0), tf.float32)
+        self.evalDict["zero_mask"] = zero_mask
+        stable_softmax_probs = selected_softmax_probs + zero_mask
+        self.evalDict["stable_softmax_probs"] = stable_softmax_probs
+        negative_log_likelihood = -tf.log(stable_softmax_probs)
+        self.evalDict["negative_log_likelihood"] = negative_log_likelihood
+        cross_entropy_loss = tf.reduce_mean(negative_log_likelihood)
+        self.evalDict["cross_entropy_loss"] = cross_entropy_loss
+        self.mainLoss = cross_entropy_loss
 
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
@@ -323,12 +334,15 @@ class Jungle(FastTreeNetwork):
             dtype=GlobalConstants.DATA_TYPE,
             initializer=tf.constant(0.1, shape=[self.labelCount],
                                     dtype=GlobalConstants.DATA_TYPE))
-        final_feature, logits = self.apply_loss(node=node, final_feature=final_feature,
-                                                softmax_weights=fc_softmax_weights,
-                                                softmax_biases=fc_softmax_biases)
+        node.residueOutputTensor = final_feature
+        node.finalFeatures = final_feature
+        node.evalDict[self.get_variable_name(name="final_feature_final", node=node)] = final_feature
+        node.evalDict[self.get_variable_name(name="final_feature_mag", node=node)] = tf.nn.l2_loss(final_feature)
+        logits = FastTreeNetwork.fc_layer(x=final_feature, W=fc_softmax_weights, b=fc_softmax_biases, node=node)
+        node.evalDict[self.get_variable_name(name="logits", node=node)] = logits
         node.evalDict[self.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
         assert len(node.lossList) == 1
-        node.F_output = logits
+        node.F_output = node.evalDict[self.get_variable_name(name="posterior_probs", node=node)]
 
     def get_node_sibling_index(self, node):
         sibling_nodes = [node for node in self.depthToNodesDict[node.depth]

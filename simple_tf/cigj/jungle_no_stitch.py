@@ -84,6 +84,7 @@ class JungleNoStitch(Jungle):
     def stitch_samples(self, node):
         assert node.nodeType == NodeType.h_node
         parents = self.dagObject.parents(node=node)
+        node.labelTensor = self.labelTensor
         # Layer 0 h_node. This receives non-partitioned, complete minibatch from the root node. No stitching needed.
         if len(parents) == 1:
             assert parents[0].nodeType == NodeType.root_node and node.depth == 0
