@@ -12,9 +12,6 @@ from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
 from simple_tf.global_params import GlobalConstants, AccuracyCalcType
 
 
-
-
-
 def cigj_training():
     classification_wd = [0.0]
     decision_wd = [0.0]
@@ -127,6 +124,5 @@ def cigj_training():
                     break
         tf.reset_default_graph()
         run_id += 1
-
 
 # cigj_training()
