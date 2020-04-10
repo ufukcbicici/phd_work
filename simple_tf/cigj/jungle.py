@@ -19,7 +19,7 @@ class Jungle(FastTreeNetwork):
     def __init__(self, node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func,
                  degree_list,
                  dataset, network_name):
-        assert len(node_build_funcs) == len(h_funcs) + 1
+        assert len(node_build_funcs) == len(h_funcs)
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func,
                          summary_func, degree_list, dataset, network_name)
         curr_index = 0
@@ -30,13 +30,12 @@ class Jungle(FastTreeNetwork):
         self.batchIndices = tf.cast(tf.range(self.batchSize), dtype=tf.int32)
         # self.decisionNoiseFactor = tf.placeholder(name="decision_noise_factor", dtype=tf.float32)
         # Create Trellis structure. Add a h node to every non-root and non-leaf layer.
-        degree_list = [degree if depth == len(degree_list) - 1 else degree + 1 for depth, degree in
-                       enumerate(degree_list)]
+        degree_list = [degree + 1 for depth, degree in enumerate(degree_list)]
         assert degree_list[0] == 2
         for depth, num_of_nodes in enumerate(degree_list):
             # root node, F_nodes, leaf nodes and H_node
             for index_in_depth in range(num_of_nodes):
-                if depth < len(degree_list) - 1 and index_in_depth == num_of_nodes - 1:
+                if index_in_depth == num_of_nodes - 1:
                     node_type = NodeType.h_node
                 elif depth == 0 and index_in_depth == 0:
                     assert num_of_nodes == 2
@@ -53,11 +52,6 @@ class Jungle(FastTreeNetwork):
                 self.depthToNodesDict[depth].append(curr_node)
         # Build network as a DAG
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
-        self.build_network()
-        self.build_optimizer()
-        self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
-        self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
-        self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
         # self.print_trellis_structure()
 
     def get_session(self):
@@ -68,6 +62,7 @@ class Jungle(FastTreeNetwork):
         # Each H node will have the F nodes and the root node in the same layer and the H node in the previous layer
         # as the parents.
         # Each F node and leaf node have the H node in the previous layer as the parent.
+        self.dagObject = Dag()
         self.dagObject = Dag()
         for node in self.nodes.values():
             print(node.nodeType)
@@ -85,7 +80,8 @@ class Jungle(FastTreeNetwork):
                 parent_nodes = [candidate_node for candidate_node in self.nodes.values()
                                 if (candidate_node.depth == node.depth
                                     and (candidate_node.nodeType == NodeType.f_node or
-                                         candidate_node.nodeType == NodeType.root_node)) or
+                                         candidate_node.nodeType == NodeType.root_node or
+                                         candidate_node.nodeType == NodeType.leaf_node)) or
                                 (candidate_node.depth == node.depth - 1 and candidate_node.nodeType == NodeType.h_node)]
                 for parent_node in parent_nodes:
                     self.dagObject.add_edge(parent=parent_node, child=node)
@@ -109,12 +105,16 @@ class Jungle(FastTreeNetwork):
                 # assert node.F_output is not None and node.H_output is not None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
                 node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
+        self.build_optimizer()
         # Build the network eval dict
         self.evalDict = {}
         for node in self.topologicalSortedNodes:
             for k, v in node.evalDict.items():
                 assert k not in self.evalDict
                 self.evalDict[k] = v
+        self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
+        self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
+        self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
     def build_optimizer(self):
         # Build main classification loss
@@ -190,7 +190,7 @@ class Jungle(FastTreeNetwork):
                               if node.nodeType == NodeType.h_node], key=lambda n: n.depth)[-1]
         softmax_output = leaf_h_node.F_output
         self.evalDict["softmax_output"] = softmax_output
-        softmax_indices = tf.concat([self.batchIndices, self.labelTensor], axis=1)
+        softmax_indices = tf.stack([self.batchIndices, tf.cast(self.labelTensor, tf.int32)], axis=1)
         self.evalDict["softmax_indices"] = softmax_indices
         selected_softmax_probs = tf.gather_nd(softmax_output, softmax_indices)
         self.evalDict["selected_softmax_probs"] = selected_softmax_probs
@@ -226,7 +226,6 @@ class Jungle(FastTreeNetwork):
         logits = FastTreeNetwork.fc_layer(x=final_feature, W=fc_softmax_weights, b=fc_softmax_biases, node=node)
         node.evalDict[self.get_variable_name(name="logits", node=node)] = logits
         node.evalDict[self.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
-        assert len(node.lossList) == 1
         node.F_output = node.evalDict[self.get_variable_name(name="posterior_probs", node=node)]
 
     def get_node_sibling_index(self, node):
@@ -362,9 +361,9 @@ class Jungle(FastTreeNetwork):
             node.H_input = None
         # Need stitching
         else:
-            # Get all F nodes in the same layer
+            # Get all F nodes or Leaf nodes in the same layer
             parent_f_nodes = [f_node for f_node in self.dagObject.parents(node=node)
-                              if f_node.nodeType == NodeType.f_node]
+                              if f_node.nodeType == NodeType.f_node or f_node.nodeType == NodeType.leaf_node]
             parent_h_nodes = [h_node for h_node in self.dagObject.parents(node=node)
                               if h_node.nodeType == NodeType.h_node]
             assert len(parent_h_nodes) == 1

@@ -61,9 +61,7 @@ def fashion_net_training():
                                     decision_weight_decay_coefficient=tpl[1],
                                     info_gain_balance_coefficient=tpl[2],
                                     classification_keep_probability=1.0 - tpl[3],
-                                    decision_keep_probability=1.0 - tpl[4],
-                                    early_exit_weight=tpl[5],
-                                    late_exit_weight=tpl[6])
+                                    decision_keep_probability=1.0 - tpl[4])
         experiment_id = DbLogger.get_run_id()
         explanation = network.get_explanation_string()
         series_id = 0

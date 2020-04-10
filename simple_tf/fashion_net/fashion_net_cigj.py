@@ -183,15 +183,16 @@ class FashionNetCigj(JungleGumbelSoftmax):
     @staticmethod
     def h_func(node, network):
         network.stitch_samples(node=node)
-        node_degree = network.degreeList[node.depth + 1]
-        if node_degree > 1:
-            h_feature_size = GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[node.depth]
-            pool_size = GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES[node.depth]
-            node.H_output = FashionNetCigj.h_transform(input_net=node.F_input, network=network, node=node,
-                                                       h_feature_size=h_feature_size,
-                                                       pool_size=pool_size)
-        else:
-            node.H_output = tf.constant(0)
+        if node.depth + 1 <= len(network.degreeList) - 1:
+            node_degree = network.degreeList[node.depth + 1]
+            if node_degree > 1:
+                h_feature_size = GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[node.depth]
+                pool_size = GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES[node.depth]
+                node.H_output = FashionNetCigj.h_transform(input_net=node.F_input, network=network, node=node,
+                                                           h_feature_size=h_feature_size,
+                                                           pool_size=pool_size)
+            else:
+                node.H_output = tf.constant(0)
         network.apply_decision(node=node, branching_feature=node.H_output)
 
     def set_training_parameters(self):
@@ -249,11 +250,4 @@ class FashionNetCigj(JungleGumbelSoftmax):
                                       decay=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT,
                                       decay_period=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD,
                                       min_limit=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT)
-                # Gm Temperature
-                temperature_name = self.get_variable_name(name="gm_temperature", node=node)
-                node.gumbelSoftmaxTemperatureCalculator = \
-                    DecayingParameter(name=temperature_name,
-                                      value=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL,
-                                      decay=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT,
-                                      decay_period=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD,
-                                      min_limit=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT)
+
