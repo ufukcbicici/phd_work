@@ -32,9 +32,10 @@ def get_network(dataset, network_name):
 def fashion_net_training():
     classification_wd = [0.0]
     decision_wd = [0.0]
-    info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
-    classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
-                                          GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
+    info_gain_balance_coeffs = [1.0] # [1.0, 2.0, 3.0, 4.0, 5.0]
+    # classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
+    #                                       GlobalConstants.EXPERIMENT_MULTIPLICATION_FACTOR)
+    classification_dropout_probs = [0.0]
     decision_dropout_probs = [0.0]
     cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[classification_wd,
                                                                           decision_wd,

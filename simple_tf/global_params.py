@@ -100,7 +100,7 @@ class GlobalConstants:
 
     USE_FAST_TREE_MODE = True
     EXPERIMENT_MULTIPLICATION_FACTOR = 4
-    OPTIMIZER_TYPE = Optimizer.Momentum
+    OPTIMIZER_TYPE = Optimizer.Adam
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10

@@ -10,7 +10,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle_node import JungleNode
 from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.global_params import GlobalConstants
+from simple_tf.global_params import GlobalConstants, TrainingUpdateResult
 from algorithms.info_gain import InfoGainLoss
 from simple_tf.global_params import Optimizer
 
@@ -94,22 +94,24 @@ class Jungle(FastTreeNetwork):
             print("Building node {0}.".format(node.index))
             # if node.depth > 1:
             #     continue
+            node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = self.labelTensor
             if node.nodeType == NodeType.root_node or node.nodeType == NodeType.f_node or \
                     node.nodeType == NodeType.leaf_node:
                 self.nodeBuildFuncs[node.depth](node=node, network=self)
                 assert node.F_output is not None and node.H_output is None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
-                node.evalDict[UtilityFuncs.get_variable_name(name="labelTensor", node=node)] = self.labelTensor
             elif node.nodeType == NodeType.h_node:
                 self.hFuncs[node.depth](node=node, network=self)
                 # assert node.F_output is not None and node.H_output is not None
                 node.evalDict[UtilityFuncs.get_variable_name(name="F_output", node=node)] = node.F_output
                 node.evalDict[UtilityFuncs.get_variable_name(name="H_output", node=node)] = node.H_output
-        self.build_optimizer()
         # Build the network eval dict
         self.evalDict = {}
+        self.build_optimizer()
         for node in self.topologicalSortedNodes:
             for k, v in node.evalDict.items():
+                if v is None:
+                    continue
                 assert k not in self.evalDict
                 self.evalDict[k] = v
         self.sampleCountTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "sample_count" in k}
@@ -477,7 +479,14 @@ class Jungle(FastTreeNetwork):
         lr = results[1]
         sample_counts = results[2]
         is_open_indicators = results[3]
-        return lr, sample_counts, is_open_indicators
+        if GlobalConstants.USE_VERBOSE:
+            update_results = TrainingUpdateResult(lr=lr, sample_counts=sample_counts,
+                                                  is_open_indicators=is_open_indicators, eval_dict=results[-1])
+        else:
+            # Unit Test for Unified Batch Normalization
+            update_results = TrainingUpdateResult(lr=lr, sample_counts=sample_counts,
+                                                  is_open_indicators=is_open_indicators)
+        return update_results
 
     def label_distribution_analysis(self,
                                     run_id,
@@ -540,14 +549,15 @@ class Jungle(FastTreeNetwork):
         while True:
             results, _ = self.eval_network(sess=sess, dataset=dataset, use_masking=True)
             if results is not None:
-                stable_softmax_probs = results["stable_softmax_probs"]
-                UtilityFuncs.concat_to_np_array_dict(dct=final_posteriors_dict, key=0, array=stable_softmax_probs)
+                final_softmax_output = results["softmax_output"]
+                UtilityFuncs.concat_to_np_array_dict(dct=final_posteriors_dict, key=0, array=final_softmax_output)
                 for node in self.topologicalSortedNodes:
                     true_labels = results[UtilityFuncs.get_variable_name(name="labelTensor", node=node)]
                     UtilityFuncs.concat_to_np_array_dict(dct=true_labels_dict, key=node.index, array=true_labels)
                     if node.nodeType == NodeType.h_node:
-                        node_degree = self.degreeList[node.depth + 1]
-                        if node_degree == 1:
+                        if node.depth + 1 == len(self.degreeList):
+                            continue
+                        if self.degreeList[node.depth + 1] == 1:
                             continue
                         info_gain = results[self.get_variable_name(name="info_gain", node=node)]
                         branch_prob = results[self.get_variable_name(name="branch_probs", node=node)]
@@ -598,7 +608,8 @@ class Jungle(FastTreeNetwork):
         # Measure The Histogram of Branching Probabilities
         self.calculate_branch_probability_histograms(branch_probs=branch_probs_dict)
         # Measure Accuracy
-        posterior_matrix = true_labels_dict[0]
+        assert len(final_posteriors_dict.values()) == 1
+        posterior_matrix = list(final_posteriors_dict.values())[0]
         predicted_labels = np.argmax(posterior_matrix, axis=1)
         accuracy_vector = (predicted_labels == true_labels).astype(np.float32)
         accuracy = np.mean(accuracy_vector)
@@ -606,6 +617,7 @@ class Jungle(FastTreeNetwork):
         cm = confusion_matrix(y_true=true_labels, y_pred=predicted_labels)
         print("*************Overall {0} samples. Overall Accuracy:{1}*************"
               .format(accuracy_vector.shape[0], accuracy))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return accuracy, cm
 
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
@@ -624,8 +636,8 @@ class Jungle(FastTreeNetwork):
                                         run_id=run_id,
                                         iteration=iteration)
             DbLogger.write_into_table(
-                rows=[(run_id, iteration, epoch_id, training_accuracy,
-                       validation_accuracy, 0.0,
+                rows=[(run_id, iteration, epoch_id, np.asscalar(training_accuracy),
+                       np.asscalar(validation_accuracy), 0.0,
                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
 
     # For debugging

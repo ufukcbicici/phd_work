@@ -101,7 +101,8 @@ class FashionNetCigj(JungleGumbelSoftmax):
         explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
         explanation += "Classification Dropout Probability:{0}\n".format(
             GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
-        explanation += "Decision Dropout Probability:{0}\n".format(GlobalConstants.DECISION_DROPOUT_KEEP_PROB)
+        explanation += "Decision Dropout Probability:{0}\n".format(
+            self.decisionDropoutKeepProbCalculator.get_explanation())
         explanation += "H Feature Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_FEATURES)
         explanation += "H Pooling Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES)
         # explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
@@ -200,8 +201,8 @@ class FashionNetCigj(JungleGumbelSoftmax):
         GlobalConstants.TOTAL_EPOCH_COUNT = 100
         GlobalConstants.EPOCH_COUNT = 100
         GlobalConstants.EPOCH_REPORT_PERIOD = 1
-        GlobalConstants.BATCH_SIZE = 125
-        GlobalConstants.EVAL_BATCH_SIZE = 125
+        GlobalConstants.BATCH_SIZE = 60
+        GlobalConstants.EVAL_BATCH_SIZE = 1000
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False
         GlobalConstants.USE_RANDOM_SAMPLING = False
