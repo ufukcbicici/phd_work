@@ -198,10 +198,10 @@ class FashionNetCigj(JungleGumbelSoftmax):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 100
-        GlobalConstants.EPOCH_COUNT = 100
+        GlobalConstants.TOTAL_EPOCH_COUNT = 400
+        GlobalConstants.EPOCH_COUNT = 400
         GlobalConstants.EPOCH_REPORT_PERIOD = 1
-        GlobalConstants.BATCH_SIZE = 60
+        GlobalConstants.BATCH_SIZE = 500
         GlobalConstants.EVAL_BATCH_SIZE = 1000
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False
