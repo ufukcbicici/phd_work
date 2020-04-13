@@ -1,0 +1,26 @@
+SELECT
+RunId,
+Min(Epoch),
+Max(Epoch),
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Dropout Probability:") + LENGTH("Classification Dropout Probability:"), 4) AS ClassificationDropout,
+SUBSTR(Explanation, INSTR(Explanation,"Decision Dropout Probability:") + LENGTH("Decision Dropout Probability:"), 4) AS DecisionDropout
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= START_RUN_ID AND logs_table.RunId < STOP_RUN_ID
+	AND logs_table.Epoch >= START_EPOCH AND logs_table.Epoch < STOP_EPOCH
+	AND
+	Explanation LIKE "%CIGJ Fashion MNIST Gumbel-Softmax Tests%" AND
+	Explanation LIKE "%Batch Size:BATCH_SIZE%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC

@@ -640,6 +640,33 @@ class Jungle(FastTreeNetwork):
                        np.asscalar(validation_accuracy), 0.0,
                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
 
+    def get_explanation_string(self):
+        explanation = ""
+        explanation += "TOTAL_EPOCH_COUNT:{0}\n".format(GlobalConstants.TOTAL_EPOCH_COUNT)
+        explanation += "EPOCH_COUNT:{0}\n".format(GlobalConstants.EPOCH_COUNT)
+        explanation += "EPOCH_REPORT_PERIOD:{0}\n".format(GlobalConstants.EPOCH_REPORT_PERIOD)
+        explanation += "BATCH_SIZE:{0}\n".format(GlobalConstants.BATCH_SIZE)
+        explanation += "EVAL_BATCH_SIZE:{0}\n".format(GlobalConstants.EVAL_BATCH_SIZE)
+        explanation += "USE_MULTI_GPU:{0}\n".format(GlobalConstants.USE_MULTI_GPU)
+        explanation += "USE_SAMPLING_CIGN:{0}\n".format(GlobalConstants.USE_SAMPLING_CIGN)
+        explanation += "USE_RANDOM_SAMPLING:{0}\n".format(GlobalConstants.USE_RANDOM_SAMPLING)
+        explanation += "USE_SCALED_GRADIENTS:{0}\n".format(GlobalConstants.USE_SCALED_GRADIENTS)
+        explanation += "LR SCHEDULE:{0}\n".format(GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation())
+        single_path_cost = 0.0
+        for depth, node_list in self.depthToNodesDict.items():
+            non_h_nodes_cost = np.mean(np.array([node.macCost for node in node_list
+                                                 if node.nodeType != NodeType.h_node]))
+            h_node = [node for node in node_list if node.nodeType == NodeType.h_node]
+            assert len(h_node) == 1
+            h_node_cost = h_node[0].macCost
+            layer_cost = non_h_nodes_cost + h_node_cost
+            explanation += "Layer {0} Mac Cost:{1}\n".format(depth, layer_cost)
+            single_path_cost += layer_cost
+        explanation += "Mac Cost:{0}\n".format(single_path_cost)
+        explanation += "Mac Cost per Nodes:{0}\n".format(self.nodeCosts)
+        explanation += "Optimizer:{0}".format(self.optimizer)
+        return explanation
+
     # For debugging
     def print_trellis_structure(self):
         fig, ax = plt.subplots()

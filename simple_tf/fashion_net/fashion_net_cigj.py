@@ -103,8 +103,29 @@ class FashionNetCigj(JungleGumbelSoftmax):
             GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
         explanation += "Decision Dropout Probability:{0}\n".format(
             self.decisionDropoutKeepProbCalculator.get_explanation())
-        explanation += "H Feature Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_FEATURES)
-        explanation += "H Pooling Sizes:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES)
+        explanation += "CIGJ_FASHION_NET_CONV_FILTER_SIZES:{0}\n"\
+            .format(GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES)
+        explanation += "CIGJ_FASHION_NET_OUTPUT_DIMS:{0}\n"\
+            .format(GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS)
+        explanation += "CIGJ_FASHION_NET_DEGREE_LIST:{0}\n"\
+            .format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
+        explanation += "CIGJ_FASHION_NET_H_FEATURES:{0}\n"\
+            .format(GlobalConstants.CIGJ_FASHION_NET_H_FEATURES)
+        explanation += "CIGJ_FASHION_NET_H_POOL_SIZES:{0}\n"\
+            .format(GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES)
+        explanation += "CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT:{0}\n"\
+            .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT)
+        explanation += "CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL:{0}\n"\
+            .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL)
+        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT:{0}\n"\
+            .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT)
+        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD:{0}\n"\
+            .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD)
+        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT:{0}\n"\
+            .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT)
+        explanation += "CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE:{0}\n" \
+            .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE)
+        explanation += super().get_explanation_string()
         # explanation += "Decision Dropout Probability:{0}\n".format(network.decisionDropoutKeepProbCalculator.value)
         # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
         #     for node in network.topologicalSortedNodes:
@@ -198,20 +219,21 @@ class FashionNetCigj(JungleGumbelSoftmax):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 400
-        GlobalConstants.EPOCH_COUNT = 400
+        GlobalConstants.TOTAL_EPOCH_COUNT = 1600
+        GlobalConstants.EPOCH_COUNT = 1600
         GlobalConstants.EPOCH_REPORT_PERIOD = 1
-        GlobalConstants.BATCH_SIZE = 500
-        GlobalConstants.EVAL_BATCH_SIZE = 1000
+        GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING = 10
+        GlobalConstants.BATCH_SIZE = 2000
+        GlobalConstants.EVAL_BATCH_SIZE = 2000
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False
         GlobalConstants.USE_RANDOM_SAMPLING = False
-        GlobalConstants.INITIAL_LR = 0.01
+        GlobalConstants.INITIAL_LR = 0.1
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(15000, 0.005),
-                                                                               (30000, 0.0025),
-                                                                               (40000, 0.00025)])
+                                                                     schedule=[(15000, 0.01),
+                                                                               (30000, 0.001),
+                                                                               (40000, 0.0001)])
         GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:GPU:0"
         self.networkName = "FashionNet_Lite"
 
@@ -252,3 +274,4 @@ class FashionNetCigj(JungleGumbelSoftmax):
                                       decay_period=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD,
                                       min_limit=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT)
 
+        GlobalConstants.SOFTMAX_TEST_TEMPERATURE = 50.0
