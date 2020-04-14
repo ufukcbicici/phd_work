@@ -219,21 +219,21 @@ class FashionNetCigj(JungleGumbelSoftmax):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 1600
-        GlobalConstants.EPOCH_COUNT = 1600
+        GlobalConstants.TOTAL_EPOCH_COUNT = 400
+        GlobalConstants.EPOCH_COUNT = 400
         GlobalConstants.EPOCH_REPORT_PERIOD = 1
         GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING = 10
-        GlobalConstants.BATCH_SIZE = 2000
-        GlobalConstants.EVAL_BATCH_SIZE = 2000
+        GlobalConstants.BATCH_SIZE = 500
+        GlobalConstants.EVAL_BATCH_SIZE = 5000
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False
         GlobalConstants.USE_RANDOM_SAMPLING = False
-        GlobalConstants.INITIAL_LR = 0.1
+        GlobalConstants.INITIAL_LR = 0.01
         GlobalConstants.LEARNING_RATE_CALCULATOR = DiscreteParameter(name="lr_calculator",
                                                                      value=GlobalConstants.INITIAL_LR,
-                                                                     schedule=[(15000, 0.01),
-                                                                               (30000, 0.001),
-                                                                               (40000, 0.0001)])
+                                                                     schedule=[(15000, 0.005),
+                                                                               (30000, 0.0025),
+                                                                               (40000, 0.00025)])
         GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:GPU:0"
         self.networkName = "FashionNet_Lite"
 

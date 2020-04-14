@@ -114,7 +114,8 @@ class JungleGumbelSoftmax(Jungle):
                 z_probs_matrix = tf.reduce_mean(z_samples, axis=1)
                 arg_max_indices = tf.argmax(p_F_given_x_corrected, axis=1, output_type=tf.int32)
                 arg_max_one_hot_matrix = tf.one_hot(arg_max_indices, category_count)
-                node.conditionProbabilities = tf.where(self.isTrain > 0, z_probs_matrix, arg_max_one_hot_matrix)
+                eval_matrix = tf.where(self.evalMultipath > 0, p_F_given_x_corrected, arg_max_one_hot_matrix)
+                node.conditionProbabilities = tf.where(self.isTrain > 0, z_probs_matrix, eval_matrix)
                 # Reporting
                 node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
                 node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
@@ -131,8 +132,10 @@ class JungleGumbelSoftmax(Jungle):
                     UtilityFuncs.get_variable_name(name="arg_max_indices", node=node)] = arg_max_indices
                 node.evalDict[
                     UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
+                node.evalDict[UtilityFuncs.get_variable_name(name="eval_matrix", node=node)] = eval_matrix
             else:
-                node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
+                node.conditionProbabilities = tf.expand_dims(
+                    tf.ones_like(tensor=self.labelTensor, dtype=tf.float32), axis=1)
             node.evalDict[
                 UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
         node.F_output = node.F_input

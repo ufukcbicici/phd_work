@@ -24,6 +24,7 @@ class Jungle(FastTreeNetwork):
                          summary_func, degree_list, dataset, network_name)
         curr_index = 0
         self.batchSize = tf.placeholder(name="batch_size", dtype=tf.int64)
+        self.evalMultipath = tf.placeholder(name="eval_multipath", dtype=tf.int64)
         self.depthToNodesDict = {}
         self.hFuncs = h_funcs
         self.currentGraph = tf.get_default_graph()
@@ -190,21 +191,30 @@ class Jungle(FastTreeNetwork):
     def build_main_loss(self):
         leaf_h_node = sorted([node for node in self.topologicalSortedNodes
                               if node.nodeType == NodeType.h_node], key=lambda n: n.depth)[-1]
-        softmax_output = leaf_h_node.F_output
-        self.evalDict["softmax_output"] = softmax_output
-        softmax_indices = tf.stack([self.batchIndices, tf.cast(self.labelTensor, tf.int32)], axis=1)
-        self.evalDict["softmax_indices"] = softmax_indices
-        selected_softmax_probs = tf.gather_nd(softmax_output, softmax_indices)
-        self.evalDict["selected_softmax_probs"] = selected_softmax_probs
-        zero_mask = 1e-30 * tf.cast(tf.equal(selected_softmax_probs, 0.0), tf.float32)
-        self.evalDict["zero_mask"] = zero_mask
-        stable_softmax_probs = selected_softmax_probs + zero_mask
-        self.evalDict["stable_softmax_probs"] = stable_softmax_probs
-        negative_log_likelihood = -tf.log(stable_softmax_probs)
-        self.evalDict["negative_log_likelihood"] = negative_log_likelihood
-        cross_entropy_loss = tf.reduce_mean(negative_log_likelihood)
-        self.evalDict["cross_entropy_loss"] = cross_entropy_loss
-        self.mainLoss = cross_entropy_loss
+        if GlobalConstants.CIGJ_USE_LOGIT_OUTPUTS_AT_LEAVES:
+            logits = leaf_h_node.F_output
+            self.evalDict["softmax_output"] = tf.nn.softmax(logits)
+            self.evalDict["cross_entropy_loss_tensor"] = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                labels=self.labelTensor,
+                logits=logits)
+            self.evalDict["cross_entropy_loss"] = tf.reduce_mean(self.evalDict["cross_entropy_loss_tensor"])
+            self.mainLoss = self.evalDict["cross_entropy_loss"]
+        else:
+            softmax_output = leaf_h_node.F_output
+            self.evalDict["softmax_output"] = softmax_output
+            softmax_indices = tf.stack([self.batchIndices, tf.cast(self.labelTensor, tf.int32)], axis=1)
+            self.evalDict["softmax_indices"] = softmax_indices
+            selected_softmax_probs = tf.gather_nd(softmax_output, softmax_indices)
+            self.evalDict["selected_softmax_probs"] = selected_softmax_probs
+            zero_mask = 1e-30 * tf.cast(tf.equal(selected_softmax_probs, 0.0), tf.float32)
+            self.evalDict["zero_mask"] = zero_mask
+            stable_softmax_probs = selected_softmax_probs + zero_mask
+            self.evalDict["stable_softmax_probs"] = stable_softmax_probs
+            negative_log_likelihood = -tf.log(stable_softmax_probs)
+            self.evalDict["negative_log_likelihood"] = negative_log_likelihood
+            cross_entropy_loss = tf.reduce_mean(negative_log_likelihood)
+            self.evalDict["cross_entropy_loss"] = cross_entropy_loss
+            self.mainLoss = cross_entropy_loss
 
     def apply_loss_jungle(self, node, final_feature):
         assert len(final_feature.get_shape().as_list()) == 2
@@ -228,7 +238,10 @@ class Jungle(FastTreeNetwork):
         logits = FastTreeNetwork.fc_layer(x=final_feature, W=fc_softmax_weights, b=fc_softmax_biases, node=node)
         node.evalDict[self.get_variable_name(name="logits", node=node)] = logits
         node.evalDict[self.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
-        node.F_output = node.evalDict[self.get_variable_name(name="posterior_probs", node=node)]
+        if GlobalConstants.CIGJ_USE_LOGIT_OUTPUTS_AT_LEAVES:
+            node.F_output = logits
+        else:
+            node.F_output = node.evalDict[self.get_variable_name(name="posterior_probs", node=node)]
 
     def get_node_sibling_index(self, node):
         sibling_nodes = [node for node in self.depthToNodesDict[node.depth]
@@ -251,7 +264,8 @@ class Jungle(FastTreeNetwork):
                     name=UtilityFuncs.get_variable_name(name="hyperplane_weights", node=node),
                     shape=[ig_feature_size, node_degree],
                     dtype=GlobalConstants.DATA_TYPE,
-                    initializer=tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1, seed=GlobalConstants.SEED,
+                    initializer=tf.truncated_normal([ig_feature_size, node_degree], stddev=0.1,
+                                                    seed=GlobalConstants.SEED,
                                                     dtype=GlobalConstants.DATA_TYPE))
                 hyperplane_biases = UtilityFuncs.create_variable(
                     name=UtilityFuncs.get_variable_name(name="hyperplane_biases", node=node),
@@ -280,7 +294,8 @@ class Jungle(FastTreeNetwork):
                 arg_max_indices = tf.argmax(p_F_given_x, axis=1, output_type=tf.int32)
                 sampled_one_hot_matrix = tf.one_hot(sampled_indices, category_count)
                 arg_max_one_hot_matrix = tf.one_hot(arg_max_indices, category_count)
-                node.conditionProbabilities = tf.where(self.isTrain > 0, sampled_one_hot_matrix, arg_max_one_hot_matrix)
+                eval_matrix = tf.where(self.evalMultipath > 0, p_F_given_x, arg_max_one_hot_matrix)
+                node.conditionProbabilities = tf.where(self.isTrain > 0, sampled_one_hot_matrix, eval_matrix)
                 # Reporting
                 node.evalDict[UtilityFuncs.get_variable_name(name="branching_feature", node=node)] = branching_feature
                 node.evalDict[UtilityFuncs.get_variable_name(name="activations", node=node)] = activations
@@ -296,8 +311,10 @@ class Jungle(FastTreeNetwork):
                     UtilityFuncs.get_variable_name(name="sampled_one_hot_matrix", node=node)] = sampled_one_hot_matrix
                 node.evalDict[
                     UtilityFuncs.get_variable_name(name="arg_max_one_hot_matrix", node=node)] = arg_max_one_hot_matrix
+                node.evalDict[UtilityFuncs.get_variable_name(name="eval_matrix", node=node)] = eval_matrix
             else:
-                node.conditionProbabilities = tf.ones_like(tensor=self.labelTensor, dtype=tf.float32)
+                node.conditionProbabilities = tf.expand_dims(
+                    tf.ones_like(tensor=self.labelTensor, dtype=tf.float32), axis=1)
             node.evalDict[
                 UtilityFuncs.get_variable_name(name="conditionProbabilities", node=node)] = node.conditionProbabilities
         node.F_output = node.F_input
@@ -414,7 +431,8 @@ class Jungle(FastTreeNetwork):
                      self.isTrain: int(is_train),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration,
-                     self.batchSize: GlobalConstants.CURR_BATCH_SIZE}
+                     self.batchSize: GlobalConstants.CURR_BATCH_SIZE,
+                     self.evalMultipath: int(GlobalConstants.CIGJ_USE_MULTIPATH_EVALUATION)}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             if not self.isBaseline:
@@ -597,7 +615,7 @@ class Jungle(FastTreeNetwork):
         # assert len(leaf_true_labels_dict) == 1
         label_tensors_list = list(true_labels_dict.values())
         assert all([np.array_equal(label_tensors_list[i], label_tensors_list[i + 1])
-                    for i in range(len(label_tensors_list)-1)])
+                    for i in range(len(label_tensors_list) - 1)])
         true_labels = label_tensors_list[0]
         Jungle.measure_h_node_label_distribution(arg_max_dict=arg_max_indices_dict, labels_arr=true_labels,
                                                  dataset=dataset, dataset_type=dataset_type, run_id=run_id,
@@ -642,6 +660,8 @@ class Jungle(FastTreeNetwork):
 
     def get_explanation_string(self):
         explanation = ""
+        explanation += "CIGJ_USE_LOGIT_OUTPUTS_AT_LEAVES:{0}\n".format(GlobalConstants.CIGJ_USE_LOGIT_OUTPUTS_AT_LEAVES)
+        explanation += "CIGJ_USE_MULTIPATH_EVALUATION:{0}\n".format(GlobalConstants.CIGJ_USE_MULTIPATH_EVALUATION)
         explanation += "TOTAL_EPOCH_COUNT:{0}\n".format(GlobalConstants.TOTAL_EPOCH_COUNT)
         explanation += "EPOCH_COUNT:{0}\n".format(GlobalConstants.EPOCH_COUNT)
         explanation += "EPOCH_REPORT_PERIOD:{0}\n".format(GlobalConstants.EPOCH_REPORT_PERIOD)

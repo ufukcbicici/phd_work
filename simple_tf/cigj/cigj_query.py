@@ -8,12 +8,12 @@ def query_func():
     # STOP_RUN_ID = 2919
     # 1000
     START_RUN_ID = 2908
-    STOP_RUN_ID = 2926
+    STOP_RUN_ID = 3000
 
     START_EPOCH = 0
-    STOP_EPOCH = 800
+    STOP_EPOCH = 1600
     INTERVAL = 10
-    BATCH_SIZE = 1000
+    BATCH_SIZE = 2000
 
     f = open("epoch_query.txt", "r")
     query_text = f.read()
