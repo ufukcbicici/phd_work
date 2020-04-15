@@ -2,13 +2,14 @@ import tensorflow as tf
 import numpy as np
 from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DecayingParameter, FixedParameter, DiscreteParameter
+from simple_tf.cigj.jungle import Jungle
 from simple_tf.cigj.jungle_gumbel_softmax import JungleGumbelSoftmax
 from simple_tf.cigj.jungle_node import NodeType
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 
 
-class FashionNetCigj(JungleGumbelSoftmax):
+class FashionNetCigj(Jungle):
     def __init__(self, node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func,
                  degree_list, dataset, network_name):
         super().__init__(node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func,

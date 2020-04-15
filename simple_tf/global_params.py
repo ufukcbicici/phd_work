@@ -100,7 +100,7 @@ class GlobalConstants:
 
     USE_FAST_TREE_MODE = True
     EXPERIMENT_MULTIPLICATION_FACTOR = 4
-    OPTIMIZER_TYPE = Optimizer.Momentum
+    OPTIMIZER_TYPE = Optimizer.Adam
     # TREE_DEGREE_LIST = [3, 2]
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
@@ -352,10 +352,10 @@ class GlobalConstants:
 
     # CIGJ - Fashion Net
     CIGJ_USE_LOGIT_OUTPUTS_AT_LEAVES = True
-    CIGJ_USE_MULTIPATH_EVALUATION = True
+    CIGJ_USE_MULTIPATH_EVALUATION = False
     CIGJ_FASHION_NET_CONV_FILTER_SIZES = [5, 5, 1]
-    CIGJ_FASHION_NET_OUTPUT_DIMS = [32, 24, 40, [128, 64]]
-    CIGJ_FASHION_NET_DEGREE_LIST = [1, 2, 3, 4, 1]
+    CIGJ_FASHION_NET_OUTPUT_DIMS = [32, 32, 32, [128, 64]]
+    CIGJ_FASHION_NET_DEGREE_LIST = [1, 3, 3, 3, 3]
 
     # First Conv Layer Output (Single Sample): 32x14x14 -> H Transform(4x4) (32x2x2)x32
     # Second Conv Layer Output (Single Sample): 24x7x7 -> H Transform(3x3) (24x3x3)x32
