@@ -194,12 +194,17 @@ class Jungle(FastTreeNetwork):
         if GlobalConstants.CIGJ_USE_LOGIT_OUTPUTS_AT_LEAVES:
             leaf_f_nodes = [node for node in self.topologicalSortedNodes
                             if node.depth == leaf_h_node.depth and node.nodeType == NodeType.leaf_node]
-            logits_list = [node.F_output for node in leaf_f_nodes]
+            logits_list = [(node.F_output, node.sampleCountTensor) for node in leaf_f_nodes]
             cross_entropy_losses = [
-                tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labelTensor, logits=logits)
-                for logits in logits_list]
-            self.evalDict["cross_entropy_loss_tensor"] = tf.stack(cross_entropy_losses, axis=1)
-            self.evalDict["cross_entropy_loss"] = tf.reduce_mean(self.evalDict["cross_entropy_loss_tensor"])
+                (tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labelTensor, logits=logits),
+                 sample_count_tensor)
+                for (logits, sample_count_tensor) in logits_list]
+            self.evalDict["cross_entropy_loss_tensor"] = cross_entropy_losses
+            sum_ce_list = [(tf.reduce_sum(ce), sample_count_tensor)
+                           for (ce, sample_count_tensor) in cross_entropy_losses]
+            mean_ce_list = [sum_ce / sample_count_tensor for (sum_ce, sample_count_tensor) in sum_ce_list]
+            self.evalDict["mean_ce_list"] = mean_ce_list
+            self.evalDict["cross_entropy_loss"] = tf.add_n(mean_ce_list)
             self.mainLoss = self.evalDict["cross_entropy_loss"]
             self.evalDict["softmax_output"] = tf.nn.softmax(leaf_h_node.F_output)
             # self.evalDict["cross_entropy_loss_tensor"] = tf.nn.sparse_softmax_cross_entropy_with_logits(
