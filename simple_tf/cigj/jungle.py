@@ -64,7 +64,6 @@ class Jungle(FastTreeNetwork):
         # as the parents.
         # Each F node and leaf node have the H node in the previous layer as the parent.
         self.dagObject = Dag()
-        self.dagObject = Dag()
         for node in self.nodes.values():
             print(node.nodeType)
             if node.nodeType == NodeType.root_node:

@@ -355,7 +355,7 @@ class GlobalConstants:
     CIGJ_USE_MULTIPATH_EVALUATION = False
     CIGJ_FASHION_NET_CONV_FILTER_SIZES = [5, 5, 1]
     CIGJ_FASHION_NET_OUTPUT_DIMS = [32, 32, 32, [128, 64]]
-    CIGJ_FASHION_NET_DEGREE_LIST = [1, 3, 3, 3, 3]
+    CIGJ_FASHION_NET_DEGREE_LIST = [1, 1, 1, 1, 2]
 
     # First Conv Layer Output (Single Sample): 32x14x14 -> H Transform(4x4) (32x2x2)x32
     # Second Conv Layer Output (Single Sample): 24x7x7 -> H Transform(3x3) (24x3x3)x32
