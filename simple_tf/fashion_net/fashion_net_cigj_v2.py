@@ -1,66 +1,54 @@
 import tensorflow as tf
 import numpy as np
-from auxillary.general_utility_funcs import UtilityFuncs
-from auxillary.parameters import DecayingParameter, FixedParameter, DiscreteParameter
-from simple_tf.cigj.jungle import Jungle
-from simple_tf.cigj.jungle_gumbel_softmax import JungleGumbelSoftmax
+
+from auxillary.parameters import DiscreteParameter, FixedParameter, DecayingParameter
 from simple_tf.cigj.jungle_node import NodeType
-from simple_tf.cign.fast_tree import FastTreeNetwork
+from simple_tf.cigj_v2.junglev2 import JungleV2
+from simple_tf.fashion_net.fashion_net_cigj import FashionNetCigj
 from simple_tf.global_params import GlobalConstants
 
 
-class FashionNetCigj(Jungle):
-    def __init__(self, node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func,
-                 degree_list, dataset, network_name):
-        super().__init__(node_build_funcs, h_funcs, grad_func, hyperparameter_func, residue_func, summary_func,
-                         degree_list, dataset, network_name)
+class FashionNetCigjV2(JungleV2):
+    # self, node_build_funcs, h_dimensions, dataset, network_name
+    def __init__(self, node_build_funcs, h_dimensions, dataset, network_name, level_params):
+        super().__init__(node_build_funcs, h_dimensions, dataset, network_name)
+        self.levelParams = level_params
+        assert len(node_build_funcs) == len(h_dimensions) + 1 and len(node_build_funcs) == len(self.levelParams)
 
-    @staticmethod
-    def build_conv_layer(input, node, filter_size, num_of_input_channels, num_of_output_channels, name_suffix="",
-                         use_pooling=True):
-        conv_weights = UtilityFuncs.create_variable(
-            name=UtilityFuncs.get_variable_name(name="conv_weight{0}".format(name_suffix), node=node),
-            shape=[filter_size, filter_size, num_of_input_channels, num_of_output_channels],
-            dtype=GlobalConstants.DATA_TYPE,
-            initializer=tf.truncated_normal([filter_size, filter_size, num_of_input_channels, num_of_output_channels],
-                                            stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
-        conv_biases = UtilityFuncs.create_variable(
-            name=UtilityFuncs.get_variable_name(name="conv_bias{0}".format(name_suffix), node=node),
-            shape=[num_of_output_channels],
-            dtype=GlobalConstants.DATA_TYPE,
-            initializer=tf.constant(0.1, shape=[num_of_output_channels], dtype=GlobalConstants.DATA_TYPE))
-        net = FastTreeNetwork.conv_layer(x=input, kernel=conv_weights, strides=[1, 1, 1, 1],
-                                         padding='SAME', bias=conv_biases, node=node)
-        net = tf.nn.relu(net)
-        if use_pooling:
-            net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    # CIGJ_V2_PARAMS = [[("conv", 32, 5, True)],
+    #                   [("conv", 64, 5, True), ("conv", 64, 1, True)],
+    #                   [("fc", 512), ("fc", 256)]]
+
+    def build_lenet_node(self, node, input_x, depth):
+        node_params = self.levelParams[depth]
+        net = input_x
+        for params in node_params:
+            layer_type = params[0]
+            assert layer_type == "conv" or layer_type == "fc"
+            if layer_type == "conv":
+                assert len(net.get_shape().as_list()) == 4
+                input_feature_map_count = net.get_shape().as_list()[-1]
+                output_feature_map_count = params[1]
+                filter_size = params[2]
+                use_pooling = params[3]
+                net = FashionNetCigj.build_conv_layer(input=net, node=node, filter_size=filter_size,
+                                                      num_of_input_channels=input_feature_map_count,
+                                                      num_of_output_channels=output_feature_map_count,
+                                                      use_pooling=use_pooling)
+            else:
+                assert len(net.get_shape().as_list()) == 2
+                input_dim = net.get_shape().as_list()[-1]
+                output_dim = params[1]
+                net = FashionNetCigj.build_fc_layer(input=net, node=node, input_dim=input_dim, output_dim=output_dim,
+                                                    dropout_prob_tensor=self.classificationDropoutKeepProb)
         return net
-
-    @staticmethod
-    def build_fc_layer(input, node, input_dim, output_dim, dropout_prob_tensor, name_suffix=""):
-        fc_weights = UtilityFuncs.create_variable(
-            name=UtilityFuncs.get_variable_name(name="fc_weights{0}".format(name_suffix), node=node),
-            shape=[input_dim, output_dim],
-            dtype=GlobalConstants.DATA_TYPE,
-            initializer=tf.truncated_normal(
-                [input_dim, output_dim],
-                stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
-        fc_biases = UtilityFuncs.create_variable(
-            name=UtilityFuncs.get_variable_name(name="fc_biases{0}".format(name_suffix), node=node),
-            shape=[output_dim],
-            dtype=GlobalConstants.DATA_TYPE,
-            initializer=tf.constant(0.1, shape=[output_dim], dtype=GlobalConstants.DATA_TYPE))
-        x_hat = FastTreeNetwork.fc_layer(x=input, W=fc_weights, b=fc_biases, node=node)
-        hidden_layer = tf.nn.relu(x_hat)
-        dropped_layer = tf.nn.dropout(hidden_layer, dropout_prob_tensor)
-        return dropped_layer
 
     def get_explanation_string(self):
         total_param_count = 0
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "CIGJ Fashion MNIST Gumbel-Softmax Tests: 128 Sized H Features\n"
+        explanation = "CIGJ - Sparse Layers\n"
         explanation += "Network Type:{0}\n".format(self.__class__)
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -139,94 +127,13 @@ class FashionNetCigj(Jungle):
         #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
         return explanation
 
-    @staticmethod
-    def h_transform(input_net, node, network, h_feature_size, pool_size):
-        h_net = input_net
-        # Parametric Average Pooling if the input layer is convolutional
-        assert len(h_net.get_shape().as_list()) == 2 or len(h_net.get_shape().as_list()) == 4
-        if len(h_net.get_shape().as_list()) == 4:
-            h_net = tf.nn.avg_pool(h_net, ksize=[1, pool_size, pool_size, 1], strides=[1, pool_size, pool_size, 1],
-                                   padding='SAME')
-            # h_net = UtilityFuncs.tf_safe_flatten(input_tensor=h_net)
-            h_net = tf.contrib.layers.flatten(h_net)
-
-        feature_size = h_net.get_shape().as_list()[-1]
-        print("h pre input size:{0}".format(feature_size))
-        fc_h_weights = UtilityFuncs.create_variable(
-            name=UtilityFuncs.get_variable_name(name="fc_decision_weights", node=node),
-            shape=[feature_size, h_feature_size],
-            dtype=GlobalConstants.DATA_TYPE,
-            initializer=tf.truncated_normal(
-                [feature_size, h_feature_size],
-                stddev=0.1, seed=GlobalConstants.SEED, dtype=GlobalConstants.DATA_TYPE))
-        fc_h_bias = UtilityFuncs.create_variable(
-            name=UtilityFuncs.get_variable_name(name="fc_decision_bias", node=node),
-            shape=[h_feature_size],
-            dtype=GlobalConstants.DATA_TYPE,
-            initializer=tf.constant(0.1, shape=[h_feature_size], dtype=GlobalConstants.DATA_TYPE))
-        h_net = FastTreeNetwork.fc_layer(x=h_net, W=fc_h_weights, b=fc_h_bias, node=node)
-        h_net = tf.nn.relu(h_net)
-        h_net = tf.nn.dropout(h_net, keep_prob=network.decisionDropoutKeepProb)
-        ig_feature = h_net
-        return ig_feature
-
-    @staticmethod
-    def f_conv_layer_func(node, network):
-        network.mask_input_nodes(node=node)
-        filter_size = GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES[node.depth]
-        num_of_input_channels = 1 if node.depth == 0 else GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth - 1]
-        num_of_output_channels = GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth]
-        node.F_output = FashionNetCigj.build_conv_layer(input=node.F_input,
-                                                        node=node,
-                                                        filter_size=filter_size,
-                                                        num_of_input_channels=num_of_input_channels,
-                                                        num_of_output_channels=num_of_output_channels)
-
-    @staticmethod
-    def f_fc_layer_func(node, network):
-        network.mask_input_nodes(node=node)
-        net = node.F_input
-        if len(net.get_shape().as_list()) == 4:
-            net = tf.contrib.layers.flatten(node.F_input)
-        input_dim = net.get_shape().as_list()[-1]
-        dimensions = [input_dim]
-        dimensions.extend(GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS[node.depth])
-        for layer in range(len(dimensions) - 1):
-            net = FashionNetCigj.build_fc_layer(input=net, node=node,
-                                                input_dim=dimensions[layer],
-                                                output_dim=dimensions[layer + 1],
-                                                dropout_prob_tensor=network.classificationDropoutKeepProb,
-                                                name_suffix="{0}".format(layer))
-        node.F_output = net
-
-    @staticmethod
-    def f_leaf_func(node, network):
-        network.mask_input_nodes(node=node)
-        final_feature = node.F_input
-        network.apply_loss_jungle(node=node, final_feature=final_feature)
-
-    @staticmethod
-    def h_func(node, network):
-        network.stitch_samples(node=node)
-        if node.depth + 1 <= len(network.degreeList) - 1:
-            node_degree = network.degreeList[node.depth + 1]
-            if node_degree > 1:
-                h_feature_size = GlobalConstants.CIGJ_FASHION_NET_H_FEATURES[node.depth]
-                pool_size = GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES[node.depth]
-                node.H_output = FashionNetCigj.h_transform(input_net=node.F_input, network=network, node=node,
-                                                           h_feature_size=h_feature_size,
-                                                           pool_size=pool_size)
-            else:
-                node.H_output = tf.constant(0)
-        network.apply_decision(node=node, branching_feature=node.H_output)
-
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 400
-        GlobalConstants.EPOCH_COUNT = 400
+        GlobalConstants.TOTAL_EPOCH_COUNT = 100
+        GlobalConstants.EPOCH_COUNT = 100
         GlobalConstants.EPOCH_REPORT_PERIOD = 1
         GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING = 10
-        GlobalConstants.BATCH_SIZE = 500
+        GlobalConstants.BATCH_SIZE = 125
         GlobalConstants.EVAL_BATCH_SIZE = 5000
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False
@@ -238,7 +145,7 @@ class FashionNetCigj(Jungle):
                                                                                (30000, 0.0025),
                                                                                (40000, 0.00025)])
         GlobalConstants.GLOBAL_PINNING_DEVICE = "/device:GPU:0"
-        self.networkName = "FashionNet_Lite"
+        self.networkName = "FashionNetCigjV2"
 
     def set_hyperparameters(self, **kwargs):
         # Regularization Parameters

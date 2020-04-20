@@ -9,7 +9,7 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 
 
-class Jungle_V2(FastTreeNetwork):
+class JungleV2(FastTreeNetwork):
     def __init__(self, node_build_funcs, h_dimensions, dataset, network_name):
         super().__init__(node_build_funcs, None, None, None, None, None, dataset, network_name)
         curr_index = 0
@@ -26,20 +26,22 @@ class Jungle_V2(FastTreeNetwork):
         self.dagObject = Dag()
         self.nodes = {}
         curr_index = 0
+        net = None
         for depth, build_func in enumerate(self.nodeBuildFuncs):
             if depth == 0:
                 node_type = NodeType.root_node
+                net = self.dataTensor
             elif depth == len(self.nodeBuildFuncs) - 1:
                 node_type = NodeType.leaf_node
             else:
                 node_type = NodeType.f_node
             curr_node = JungleNode(index=curr_index, depth=depth, node_type=node_type)
             self.nodes[curr_index] = curr_node
-            node_output = build_func()
+            net = build_func(node=curr_node, input_x=net, depth=depth)
             if node_type != NodeType.leaf_node:
-                self.information_gain_output(curr_node, node_output, self.hDimensions[depth])
+                self.information_gain_output(node=curr_node, node_output=net, h_dimension=self.hDimensions[depth])
             else:
-                self.loss_output(node=curr_node, node_output=node_output)
+                self.loss_output(node=curr_node, node_output=net)
             curr_index += 1
 
     def information_gain_output(self, node, node_output, h_dimension):
@@ -95,3 +97,4 @@ class Jungle_V2(FastTreeNetwork):
             initializer=tf.constant(0.0, shape=[self.labelCount], dtype=GlobalConstants.DATA_TYPE))
         self.apply_loss(node=node, final_feature=node_output, softmax_weights=softmax_weights,
                         softmax_biases=softmax_biases)
+

@@ -372,4 +372,9 @@ class GlobalConstants:
     CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT = 0.1
     CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE = 1.0
 
+    # CIGJ_V2 Parameters
+    CIGJ_V2_PARAMS = [[("conv", 32, 5, True)],
+                      [("conv", 64, 5, True), ("conv", 64, 1, True)],
+                      [("fc", 512), ("fc", 256)]]
+
     GLOBAL_PINNING_DEVICE = "/device:GPU:0"
