@@ -42,7 +42,20 @@ class JungleV2(FastTreeNetwork):
                 self.information_gain_output(node=curr_node, node_output=net, h_dimension=self.hDimensions[depth])
             else:
                 self.loss_output(node=curr_node, node_output=net)
+            self.dagObject.add_edge(parent=self.nodes[curr_index-1], child=curr_node)
             curr_index += 1
+        self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
+        # Build main classification loss
+        self.build_main_loss()
+        # Build information gain loss
+        self.build_decision_loss()
+        # Build regularization loss
+        self.build_regularization_loss()
+        # Final Loss
+        self.finalLoss = self.mainLoss + self.regularizationLoss + self.decisionLoss
+        if not GlobalConstants.USE_MULTI_GPU:
+            self.build_optimizer()
+        self.prepare_evaluation_dictionary()
 
     def information_gain_output(self, node, node_output, h_dimension):
         assert len(node_output.get_shape().as_list()) == 2 and len(node_output.get_shape().as_list()) == 4
