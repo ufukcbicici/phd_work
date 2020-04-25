@@ -22,7 +22,7 @@ class FashionNetCigjV2(JungleV2):
     def build_lenet_node(self, node, input_x, depth):
         node_params = self.levelParams[depth]
         net = input_x
-        for params in node_params:
+        for layer_id, params in enumerate(node_params):
             layer_type = params[0]
             assert layer_type == "conv" or layer_type == "fc"
             if layer_type == "conv":
@@ -34,13 +34,15 @@ class FashionNetCigjV2(JungleV2):
                 net = FashionNetCigj.build_conv_layer(input=net, node=node, filter_size=filter_size,
                                                       num_of_input_channels=input_feature_map_count,
                                                       num_of_output_channels=output_feature_map_count,
-                                                      use_pooling=use_pooling)
+                                                      use_pooling=use_pooling, name_suffix="{0}".format(layer_id))
             else:
-                assert len(net.get_shape().as_list()) == 2
+                # assert len(net.get_shape().as_list()) == 2
+                net = tf.contrib.layers.flatten(net)
                 input_dim = net.get_shape().as_list()[-1]
                 output_dim = params[1]
                 net = FashionNetCigj.build_fc_layer(input=net, node=node, input_dim=input_dim, output_dim=output_dim,
-                                                    dropout_prob_tensor=self.classificationDropoutKeepProb)
+                                                    dropout_prob_tensor=self.classificationDropoutKeepProb,
+                                                    name_suffix="{0}".format(layer_id))
         return net
 
     def get_explanation_string(self):

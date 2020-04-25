@@ -18,7 +18,7 @@ def get_network(dataset, network_name):
             node_build_funcs=[FashionNetCigjV2.build_lenet_node,
                               FashionNetCigjV2.build_lenet_node,
                               FashionNetCigjV2.build_lenet_node],
-            h_dimensions=[32, 32],
+            h_dimensions=[2, 4],
             dataset=dataset,
             network_name="FashionNetCigjV2",
             level_params=GlobalConstants.CIGJ_V2_PARAMS)

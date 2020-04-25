@@ -17,7 +17,7 @@ from algorithms import mode_class_visualization, routing_visualizer
 from algorithms.threshold_optimization_algorithms import threshold_optimization_entry
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms import policy_gradients_entry
 from simple_tf.cigj import cigj_full_training_entry, cigj_approx_training_entry
-from simple_tf.fashion_net import fashion_cign_entry, fashion_cigj_entry
+from simple_tf.fashion_net import fashion_cign_entry, fashion_cigj_entry, fashion_net_cigj_v2, fashion_cigjv2_entry
 from simple_tf.lenet import lenet_cign_entry
 from tf_experiments.multi_gpu_experiments import multi_gpu
 
@@ -37,4 +37,5 @@ if __name__ == "__main__":
     # routing_visualizer.main()
     # policy_gradients_entry.main()
     # lenet_cign_entry.lenet_cign_training()
-    fashion_cigj_entry.fashion_net_training()
+    # fashion_cigj_entry.fashion_net_training()
+    fashion_cigjv2_entry.fashion_net_training()

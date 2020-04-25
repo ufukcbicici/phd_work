@@ -11,7 +11,9 @@ from simple_tf.global_params import GlobalConstants
 
 class JungleV2(FastTreeNetwork):
     def __init__(self, node_build_funcs, h_dimensions, dataset, network_name):
-        super().__init__(node_build_funcs, None, None, None, None, None, dataset, network_name)
+        self.degreeList = [1] * len(node_build_funcs)
+        super().__init__(node_build_funcs, None, None, None, None, self.degreeList, dataset, network_name)
+        self.depth = len(self.degreeList)
         curr_index = 0
         self.batchSize = tf.placeholder(name="batch_size", dtype=tf.int64)
         self.evalMultipath = tf.placeholder(name="eval_multipath", dtype=tf.int64)
@@ -37,12 +39,13 @@ class JungleV2(FastTreeNetwork):
                 node_type = NodeType.f_node
             curr_node = JungleNode(index=curr_index, depth=depth, node_type=node_type)
             self.nodes[curr_index] = curr_node
-            net = build_func(node=curr_node, input_x=net, depth=depth)
+            net = build_func(self, node=curr_node, input_x=net, depth=depth)
             if node_type != NodeType.leaf_node:
                 self.information_gain_output(node=curr_node, node_output=net, h_dimension=self.hDimensions[depth])
             else:
                 self.loss_output(node=curr_node, node_output=net)
-            self.dagObject.add_edge(parent=self.nodes[curr_index-1], child=curr_node)
+            if curr_index-1 in self.nodes:
+                self.dagObject.add_edge(parent=self.nodes[curr_index-1], child=curr_node)
             curr_index += 1
         self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
         # Build main classification loss
@@ -58,11 +61,11 @@ class JungleV2(FastTreeNetwork):
         self.prepare_evaluation_dictionary()
 
     def information_gain_output(self, node, node_output, h_dimension):
-        assert len(node_output.get_shape().as_list()) == 2 and len(node_output.get_shape().as_list()) == 4
+        assert len(node_output.get_shape().as_list()) == 2 or len(node_output.get_shape().as_list()) == 4
         if len(node_output.get_shape().as_list()) == 4:
             net_shape = node_output.get_shape().as_list()
             # Global Average Pooling
-            h_net = tf.nn.avg_pool(net_shape, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1],
+            h_net = tf.nn.avg_pool(node_output, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1],
                                    padding='VALID')
             net_shape = h_net.get_shape().as_list()
             h_net = tf.reshape(h_net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
