@@ -47,6 +47,8 @@ class JungleV2(FastTreeNetwork):
             if curr_index-1 in self.nodes:
                 self.dagObject.add_edge(parent=self.nodes[curr_index-1], child=curr_node)
             curr_index += 1
+        self.topologicalSortedNodes = self.dagObject.get_topological_sort()
+        self.isBaseline = False
         self.nodeCosts = {node.index: node.macCost for node in self.topologicalSortedNodes}
         # Build main classification loss
         self.build_main_loss()
@@ -111,6 +113,7 @@ class JungleV2(FastTreeNetwork):
             shape=[self.labelCount],
             dtype=GlobalConstants.DATA_TYPE,
             initializer=tf.constant(0.0, shape=[self.labelCount], dtype=GlobalConstants.DATA_TYPE))
+        node.labelTensor = self.labelTensor
         self.apply_loss(node=node, final_feature=node_output, softmax_weights=softmax_weights,
                         softmax_biases=softmax_biases)
 

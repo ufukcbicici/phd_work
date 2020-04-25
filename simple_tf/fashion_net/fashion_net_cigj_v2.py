@@ -36,8 +36,9 @@ class FashionNetCigjV2(JungleV2):
                                                       num_of_output_channels=output_feature_map_count,
                                                       use_pooling=use_pooling, name_suffix="{0}".format(layer_id))
             else:
-                # assert len(net.get_shape().as_list()) == 2
-                net = tf.contrib.layers.flatten(net)
+                assert len(net.get_shape().as_list()) == 4 or len(net.get_shape().as_list()) == 2
+                if len(net.get_shape().as_list()) == 4:
+                    net = tf.contrib.layers.flatten(net)
                 input_dim = net.get_shape().as_list()[-1]
                 output_dim = params[1]
                 net = FashionNetCigj.build_fc_layer(input=net, node=node, input_dim=input_dim, output_dim=output_dim,
