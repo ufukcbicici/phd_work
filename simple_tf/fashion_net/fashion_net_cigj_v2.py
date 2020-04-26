@@ -170,7 +170,7 @@ class FashionNetCigjV2(JungleV2):
         self.decisionLossCoefficientCalculator = FixedParameter(name="decision_loss_coefficient_calculator",
                                                                 value=1.0)
         for node in self.topologicalSortedNodes:
-            if node.nodeType == NodeType.h_node:
+            if node.nodeType != NodeType.leaf_node:
                 # Softmax Decay
                 decay_name = self.get_variable_name(name="softmax_decay", node=node)
                 node.softmaxDecayCalculator = DecayingParameter(name=decay_name,
