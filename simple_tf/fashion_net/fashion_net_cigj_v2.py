@@ -55,7 +55,8 @@ class FashionNetCigjV2(JungleV2):
         explanation += "Network Type:{0}\n".format(self.__class__)
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
-        explanation += "Jungle Degree Degree:{0}\n".format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
+        explanation += "Level Params:{0}\n".format(self.levelParams)
+        explanation += "H Dimensions:{0}\n".format(self.hDimensions)
         explanation += "Optimizer:{0}\n".format(GlobalConstants.OPTIMIZER_TYPE)
         explanation += "********Lr Settings********\n"
         explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
@@ -97,25 +98,25 @@ class FashionNetCigjV2(JungleV2):
             GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
         explanation += "Decision Dropout Probability:{0}\n".format(
             self.decisionDropoutKeepProbCalculator.get_explanation())
-        explanation += "CIGJ_FASHION_NET_CONV_FILTER_SIZES:{0}\n"\
+        explanation += "CIGJ_FASHION_NET_CONV_FILTER_SIZES:{0}\n" \
             .format(GlobalConstants.CIGJ_FASHION_NET_CONV_FILTER_SIZES)
-        explanation += "CIGJ_FASHION_NET_OUTPUT_DIMS:{0}\n"\
+        explanation += "CIGJ_FASHION_NET_OUTPUT_DIMS:{0}\n" \
             .format(GlobalConstants.CIGJ_FASHION_NET_OUTPUT_DIMS)
-        explanation += "CIGJ_FASHION_NET_DEGREE_LIST:{0}\n"\
+        explanation += "CIGJ_FASHION_NET_DEGREE_LIST:{0}\n" \
             .format(GlobalConstants.CIGJ_FASHION_NET_DEGREE_LIST)
-        explanation += "CIGJ_FASHION_NET_H_FEATURES:{0}\n"\
+        explanation += "CIGJ_FASHION_NET_H_FEATURES:{0}\n" \
             .format(GlobalConstants.CIGJ_FASHION_NET_H_FEATURES)
-        explanation += "CIGJ_FASHION_NET_H_POOL_SIZES:{0}\n"\
+        explanation += "CIGJ_FASHION_NET_H_POOL_SIZES:{0}\n" \
             .format(GlobalConstants.CIGJ_FASHION_NET_H_POOL_SIZES)
-        explanation += "CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT:{0}\n"\
+        explanation += "CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT:{0}\n" \
             .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_SAMPLE_COUNT)
-        explanation += "CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL:{0}\n"\
+        explanation += "CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL:{0}\n" \
             .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEMPERATURE_INITIAL)
-        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT:{0}\n"\
+        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT:{0}\n" \
             .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_COEFFICIENT)
-        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD:{0}\n"\
+        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD:{0}\n" \
             .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD)
-        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT:{0}\n"\
+        explanation += "CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT:{0}\n" \
             .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT)
         explanation += "CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE:{0}\n" \
             .format(GlobalConstants.CIGJ_GUMBEL_SOFTMAX_TEST_TEMPERATURE)
@@ -178,6 +179,7 @@ class FashionNetCigjV2(JungleV2):
                                                                 decay=GlobalConstants.SOFTMAX_DECAY_COEFFICIENT,
                                                                 decay_period=GlobalConstants.SOFTMAX_DECAY_PERIOD,
                                                                 min_limit=GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+                # node.softmaxDecayCalculator = FixedParameter(name=decay_name, value=1.0)
                 # Gm Temperature
                 temperature_name = self.get_variable_name(name="gm_temperature", node=node)
                 node.gumbelSoftmaxTemperatureCalculator = \
@@ -187,4 +189,4 @@ class FashionNetCigjV2(JungleV2):
                                       decay_period=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_PERIOD,
                                       min_limit=GlobalConstants.CIGJ_GUMBEL_SOFTMAX_DECAY_MIN_LIMIT)
 
-        GlobalConstants.SOFTMAX_TEST_TEMPERATURE = 50.0
+        GlobalConstants.SOFTMAX_TEST_TEMPERATURE = 1.0

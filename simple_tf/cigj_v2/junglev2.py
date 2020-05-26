@@ -5,6 +5,7 @@ import time
 from auxillary.constants import DatasetTypes
 from algorithms.info_gain import InfoGainLoss
 from auxillary.dag_utilities import Dag
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cigj.jungle_node import JungleNode, NodeType
 from simple_tf.cign.fast_tree import FastTreeNetwork
@@ -158,6 +159,28 @@ class JungleV2(FastTreeNetwork):
                 self.get_decision_weight(feed_dict=feed_dict, iteration=iteration, update=False)
                 feed_dict[self.decisionDropoutKeepProb] = 1.0
         return feed_dict
+
+    def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
+        # moving_results_1 = sess.run(moving_stat_vars)
+        is_evaluation_epoch_at_report_period = \
+            epoch_id < GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING \
+            and (epoch_id + 1) % GlobalConstants.EPOCH_REPORT_PERIOD == 0
+        is_evaluation_epoch_before_ending = \
+            epoch_id >= GlobalConstants.TOTAL_EPOCH_COUNT - GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING
+        if is_evaluation_epoch_at_report_period or is_evaluation_epoch_before_ending:
+            training_accuracy, training_confusion = \
+                self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.training,
+                                        run_id=run_id,
+                                        iteration=iteration)
+            validation_accuracy, validation_confusion = \
+                self.calculate_accuracy(sess=sess, dataset=dataset, dataset_type=DatasetTypes.test,
+                                        run_id=run_id,
+                                        iteration=iteration)
+            validation_accuracy_corrected = 0.0
+            DbLogger.write_into_table(
+                rows=[(run_id, iteration, epoch_id, training_accuracy,
+                       validation_accuracy, validation_accuracy_corrected,
+                       0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
 
     def train(self, sess, dataset, run_id):
         iteration_counter = 0
