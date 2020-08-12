@@ -292,3 +292,11 @@ class UtilityFuncs:
             except:
                 raise NotImplementedError()
             return var
+
+    # Expand the indices to contain multiplier effect.
+    @staticmethod
+    def expand_index_list(indices, index_multiplier):
+        expanded_indices = []
+        for idx in indices:
+            expanded_indices.extend(list(range(idx, idx + index_multiplier, 1)))
+        return expanded_indices
