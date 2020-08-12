@@ -13,37 +13,39 @@ from simple_tf.fashion_net.fashion_net_baseline import FashionNetBaseline
 from simple_tf.fashion_net.fashion_net_single_late_exit import FashionNetSingleLateExit
 from simple_tf.global_params import GlobalConstants
 from auxillary.constants import DatasetTypes
-from simple_tf.lenet.lenet_baseline import LeNetBaseline
-from simple_tf.lenet.lenet_cign import Lenet_Cign
+from simple_tf.lenet.lenet_cign import LenetCign
 from simple_tf.lenet.lenet_cign_early_exit import LenetCignEarlyExit
+from simple_tf.lenet.lenet_random_sample import LenetCignRandomSample
 
 use_moe = False
 use_sampling = False
 use_random_sampling = False
-use_baseline = True
+use_baseline = False
 use_early_exit = False
 use_late_exit = False
 
 
 def get_network(dataset, network_name):
     if not (use_baseline or use_early_exit or use_late_exit or use_random_sampling):
-        network = Lenet_Cign(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
-                             network_name="LeNetMNIST_CIGN")
+        network = LenetCign(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
+                            network_name="LeNetMNIST_CIGN")
     elif use_early_exit:
         network = LenetCignEarlyExit(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                      network_name="LeNetMNIST_CIGN_EarlyExit")
-    elif use_baseline:
-        network = LeNetBaseline(dataset=dataset, network_name="LeNetMNIST_Baseline")
+    elif use_random_sampling:
+        network = LenetCignRandomSample(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
+                                        network_name="LeNetMNIST_CIGN_RandomSample")
     else:
         raise NotImplementedError()
     return network
 
 
 def lenet_cign_training():
-    network_name = "LeNetMNIST_CIGN_EarlyExit"
+    network_name = "LeNetMNIST_CIGN_AllPaths"
     dataset = MnistDataSet(validation_sample_count=0, load_validation_from=None)
     dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
-    classification_wd = [i * 0.00005 for i in range(0, 21)] * 15
+    classification_wd = [0.00075] * 2
+    classification_wd.extend([i * 0.00005 for i in range(16, 21)] * 10)
     # classification_wd = [0.0] * 7
     classification_wd = sorted(classification_wd)
     decision_wd = [0.0009]
@@ -72,7 +74,9 @@ def lenet_cign_training():
                                     decision_weight_decay_coefficient=tpl[1],
                                     info_gain_balance_coefficient=tpl[2],
                                     classification_keep_probability=1.0,
-                                    decision_keep_probability=1.0)
+                                    decision_keep_probability=1.0,
+                                    early_exit_weight=1.0,
+                                    late_exit_weight=1.0)
         experiment_id = DbLogger.get_run_id()
         explanation = network.get_explanation_string()
         series_id = 0

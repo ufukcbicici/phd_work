@@ -91,3 +91,117 @@ class RoutingDataset:
         if output_name not in self.dictionaryOfRoutingData:
             return None
         return self.dictionaryOfRoutingData[output_name]
+
+
+# RoutingDataset
+class RoutingDatasetMultiIteration(RoutingDataset):
+    def __init__(self, iterations, data_dict, sample_link_map):
+        # self.iterations = iterations
+        # self.minIteration = np.min(iterations)
+        # self.dataDict = data_dict
+        # self.sampleLinkMap = sample_link_map
+        # Merged Label List
+        super().__init__([], {})
+        # 000000 = {tuple} <
+        #
+        # class 'tuple'>: (0, 43680, 0, 3)
+        #
+        # 000001 = {tuple} <
+        #
+        # class 'tuple'>: (0, 44160, 7087, 3)
+        #
+        # 000002 = {tuple} <
+        #
+        # class 'tuple'>: (0, 44640, 1645, 3)
+        #
+        # 000003 = {tuple} <
+        #
+        # class 'tuple'>: (0, 45120, 5743, 3)
+        #
+        # 000004 = {tuple} <
+        #
+        # class 'tuple'>: (0, 45600, 3109, 3)
+        #
+        # 000005 = {tuple} <
+        #
+        # class 'tuple'>: (0, 46080, 8697, 3)
+        #
+        # 000006 = {tuple} <
+        #
+        # class 'tuple'>: (0, 46560, 8593, 3)
+        #
+        # 000007 = {tuple} <
+        #
+        # class 'tuple'>: (0, 47040, 6166, 3)
+        #
+        # 00000
+        # 8 = {tuple} <
+        #
+        # class 'tuple'>: (0, 47520, 6858, 3)
+        #
+        # 00000
+        # 9 = {tuple} <
+        #
+        # class 'tuple'>: (0, 48000, 9256, 3)
+        #
+        # 000010 = {tuple} <
+        #
+        # class 'tuple'>: (1, 43680, 1, 3)
+        #
+        # 000011 = {tuple} <
+        #
+        # class 'tuple'>: (1, 44160, 9661, 3)
+        #
+        # 000012 = {tuple} <
+        #
+        # class 'tuple'>: (1, 44640, 9558, 3)
+        #
+        # 000013 = {tuple} <
+        #
+        # class 'tuple'>: (1, 45120, 7724, 3)
+        #
+        # 000014 = {tuple} <
+        #
+        # class 'tuple'>: (1, 45600, 2563, 3)
+        #
+        # 000015 = {tuple} <
+        #
+        # class 'tuple'>: (1, 46080, 1660, 3)
+        #
+        # 000016 = {tuple} <
+        #
+        # class 'tuple'>: (1, 46560, 3385, 3)
+        #
+        # 000017 = {tuple} <
+        #
+        # class 'tuple'>: (1, 47040, 9452, 3)
+        #
+        # 00001
+        # 8 = {tuple} <
+        #
+        # class 'tuple'>: (1, 47520, 2974, 3)
+        #
+        # 00001
+        # 9 = {tuple} <
+        #
+        # class 'tuple'>: (1, 48000, 6420, 3)
+        #
+        # 000020 = {tuple} <
+        #
+        # class 'tuple'>: (2, 43680, 2, 3)
+        for tpl in sample_link_map:
+            sample_id = tpl[0]
+            iteration = tpl[1]
+            sample_id_in_iteration = tpl[2]
+            self.labelList.append(data_dict[iteration].labelList[sample_id_in_iteration])
+            for k in data_dict[iteration].keys():
+                if k not in self.dictionaryOfRoutingData:
+                    self.dictionaryOfRoutingData[k] = []
+                self.dictionaryOfRoutingData[k].append(data_dict[iteration][k][sample_id_in_iteration])
+
+
+
+
+        # self.primaryRoutingDataset = data_dict[self.minIteration]
+        # super().__init__(self.primaryRoutingDataset.labelList, self.primaryRoutingDataset.dictionaryOfRoutingData)
+

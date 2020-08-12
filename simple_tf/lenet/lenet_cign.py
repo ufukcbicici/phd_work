@@ -6,14 +6,14 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.global_params import GlobalConstants
 
 
-class Lenet_Cign(FastTreeNetwork):
+class LenetCign(FastTreeNetwork):
     def __init__(self, degree_list, dataset, network_name):
-        node_build_funcs = [Lenet_Cign.root_func, Lenet_Cign.l1_func, Lenet_Cign.leaf_func]
+        node_build_funcs = [LenetCign.root_func, LenetCign.l1_func, LenetCign.leaf_func]
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name)
 
     @staticmethod
     def apply_router_transformation(network, net, node, decision_feature_size):
-        # node.evalDict[network.get_variable_name(name="pre_branch_feature", node=node)] = net
+        node.evalDict[network.get_variable_name(name="pre_branch_feature", node=node)] = net
         # # Switch to Global Average Pooling
         # pool_h = tf.nn.max_pool(net, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
         # flat_pool = tf.contrib.layers.flatten(pool_h)
@@ -68,8 +68,8 @@ class Lenet_Cign(FastTreeNetwork):
         pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
         node.fOpsList.extend([conv, relu, pool])
         # ***************** H: Connected to F *****************
-        Lenet_Cign.apply_router_transformation(network=network, net=relu, node=node,
-                                               decision_feature_size=GlobalConstants.LENET_H_FEATURE_SIZE_1)
+        LenetCign.apply_router_transformation(network=network, net=relu, node=node,
+                                              decision_feature_size=GlobalConstants.LENET_H_FEATURE_SIZE_1)
         # ***************** H: Connected to F *****************
 
     @staticmethod
@@ -94,8 +94,8 @@ class Lenet_Cign(FastTreeNetwork):
         node.fOpsList.extend([conv, relu, pool])
         # H
         # ***************** H: Connected to F *****************
-        Lenet_Cign.apply_router_transformation(network=network, net=relu, node=node,
-                                               decision_feature_size=GlobalConstants.LENET_H_FEATURE_SIZE_2)
+        LenetCign.apply_router_transformation(network=network, net=relu, node=node,
+                                              decision_feature_size=GlobalConstants.LENET_H_FEATURE_SIZE_2)
         # ***************** H: Connected to F *****************
 
     @staticmethod
@@ -140,7 +140,7 @@ class Lenet_Cign(FastTreeNetwork):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "Lenet CIGN - Low Capacity Router\n"
+        explanation = "Lenet CIGN - To All Paths\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -276,9 +276,10 @@ class Lenet_Cign(FastTreeNetwork):
             node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
             initial_value = 1.0 / float(node_degree)
             threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
-            node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                                                             decay_period=12000,
-                                                             min_limit=0.4)
+            # node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
+            #                                                  decay_period=12000,
+            #                                                  min_limit=0.4)
+            node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
             # Softmax Decay
             decay_name = self.get_variable_name(name="softmax_decay", node=node)
             node.softmaxDecayCalculator = DecayingParameter(name=decay_name,

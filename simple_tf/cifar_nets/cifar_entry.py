@@ -16,9 +16,9 @@ from simple_tf.cifar_nets.cifar100_resnet_baseline import Cifar100_Baseline
 from simple_tf.cign.cign_multi_gpu_early_exit import CignMultiGpuEarlyExit
 from simple_tf.global_params import GlobalConstants
 
-use_multi_gpu = True
+use_multi_gpu = False
 use_multi_gpu_single_late_exit = False
-use_multi_gpu_early_exit = False
+use_multi_gpu_early_exit = True
 use_sampling = False
 use_random_sampling = False
 use_baseline = False

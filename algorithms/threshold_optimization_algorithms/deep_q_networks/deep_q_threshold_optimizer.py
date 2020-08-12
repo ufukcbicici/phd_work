@@ -260,14 +260,14 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         # Now we are ready to calculate the optimal trajectories and calculate the optimal accuracy and computation load
         # for every state.
         states_matrix = UtilityFuncs.get_cartesian_product(
-                [[sample_id for sample_id in range(state_count)], [0]])
+            [[sample_id for sample_id in range(state_count)], [0]])
         states_matrix = np.array(states_matrix)
         for t in range(self.get_max_trajectory_length()):
             Q_table = Q_tables[t][states_matrix[:, 0], states_matrix[:, 1], :]
             actions_t = np.argmax(Q_table, axis=1)
             states_matrix[:, 1] = actions_t
             print("Bellman Decision Distribution Level:{0}:{1}".format(t, Counter(states_matrix[:, 1])))
-         # The last layer actions determine the routing decisions.
+        # The last layer actions determine the routing decisions.
         routing_decisions = self.actionSpaces[-1][states_matrix[:, 1], :]
         truth_vector = self.calculate_results_from_routing_decisions(states_matrix[:, 0], routing_decisions, data_type)
         self.calculate_results_by_sampling(q_tables=Q_tables, state_ids=states_matrix[:, 0], data_type=data_type,
@@ -278,15 +278,13 @@ class DeepQThresholdOptimizer(QLearningThresholdOptimizer):
         batch_size = 100
         batch_id = 0
         while True:
-            batch_states = state_ids[batch_id*batch_size:(batch_id + 1)*batch_size]
+            batch_states = state_ids[batch_id * batch_size:(batch_id + 1) * batch_size]
             if len(batch_states) == 0:
                 break
             batch_states = np.repeat(batch_states, repeats=sample_count, axis=0)
             # for t in range(self.get_max_trajectory_length()):
             #     print("X")
             batch_id += 1
-
-
 
     def calculate_results_from_routing_decisions(self, state_ids, routing_decisions, data_type):
         dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP

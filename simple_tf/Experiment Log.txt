@@ -1845,6 +1845,43 @@ ORDER BY AvgValidationAccuracy DESC
 ***************************************************************************************************************
 
 
+
+***************************************************************************************************************
+25.02.2020 - TRUBA dblogger_cign.db
+-Resnet-50 CIGN - Policy Gradients
+
+Query:
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Wd:") + LENGTH("Classification Wd") + 1, 7) AS Wd
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 1190
+	AND
+	Explanation LIKE "%Decay Step:35000%"
+	AND
+	Explanation LIKE "%Batch Size:500%"
+	AND
+	Explanation LIKE "%Tree Degree:[2, 2]%"
+	AND
+	Explanation LIKE "%Resnet-50 Multi Gpu CIGN Policy Gradients%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************
+
+
 ***************************************************************************************************************
 24.03.2020 - Lab dblogger3.db
 -MNIST LeNet Weak Router
@@ -1956,6 +1993,41 @@ FROM
 	WHERE logs_table.Epoch >= 90
 	AND
 	Explanation LIKE "%Lenet CIGN - Low Capacity Router%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+***************************************************************************************************************
+
+
+
+***************************************************************************************************************
+25.03.2020 - Home
+-Fashion MNIST CIGN - Journal Results
+
+Query:
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Classification Dropout Probability:") + LENGTH("Classification Dropout Probability:"), 4) AS ClassificationDropout,
+SUBSTR(Explanation, INSTR(Explanation,"Decision Dropout Probability:") + LENGTH("Decision Dropout Probability:"), 4) AS DecisionDropout
+FROM
+(
+	SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+	LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+	WHERE logs_table.RunId >= 0 AND logs_table.Epoch >= 90
+	AND
+	Explanation LIKE "%Fashion Net - Single Late Exit%" AND
+	Explanation LIKE "%Batch Size:125%" AND
+	Explanation LIKE "%LATE_EXIT_CONV_LAYERS:[128, 128, 128]%" AND
+	Explanation LIKE "%LATE_EXIT_FC_LAYERS:[512, 256]%" AND
+	Explanation LIKE "%USE_SCALED_GRADIENTS:False%"
 )
 GROUP BY Explanation
 ORDER BY AvgValidationAccuracy DESC

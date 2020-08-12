@@ -19,6 +19,7 @@ from simple_tf.global_params import GlobalConstants
 
 # run_id = 1613
 # # network_name = "Cifar100_CIGN_Sampling"
+# network_name = "Lenet_CIGN"
 network_name = "FashionNet_Lite"
 # iteration = 48000
 # routing_data_dict = {}
@@ -56,7 +57,7 @@ def bayesian_process_runner(param_tpl):
     use_weighted = param_tpl[3]
     accuracy_computation_balance = param_tpl[4]
     network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="")
+    routing_data = network.load_routing_info(run_id=run_id, iteration=iteration, data_type="test")
     multipath_calculator = MultipathCalculatorV2(network=network, routing_data=routing_data)
     bayesian_optimizer = BayesianThresholdOptimizer(
         run_id=run_id, network=network, iteration=iteration, routing_data=routing_data,
@@ -65,6 +66,9 @@ def bayesian_process_runner(param_tpl):
         use_weighted_scoring=use_weighted, initial_sample_count=10,
         test_ratio=0.5, max_iter=50, verbose=True)
     bayesian_optimizer.run()
+    del network
+    del routing_data
+    del bayesian_optimizer
 
 
 def main():
@@ -97,8 +101,9 @@ def main():
     # weighted_score_list = [False]
     # balance_list = [1.0]
 
-    run_ids = [451]
-    iterations = [43680] # [43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000]
+    run_ids = [452]
+    # iterations = [48000]
+    iterations = [46080, 48000]
     xi_list = [0.01, 0.02, 0.05, 0.1, 0.001, 0.005, 0.0001, 0.0] * 10
     weighted_score_list = [False]
     balance_list = [1.0, 0.99, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6]
@@ -106,7 +111,7 @@ def main():
                                                                           xi_list, weighted_score_list, balance_list])
     # bayesian_process_runner(cartesian_product)
 
-    pool = Pool(processes=1)
+    pool = Pool(processes=6)
     pool.map(bayesian_process_runner, cartesian_product)
 
     # ThresholdAccuracyMeasurement.calculate_accuracy(run_id=67, iteration=119100, max_overload=10.0, max_limit=1)

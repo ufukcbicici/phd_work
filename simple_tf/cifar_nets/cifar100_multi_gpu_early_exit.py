@@ -20,7 +20,7 @@ first_conv_filter_size = GlobalConstants.RESNET_HYPERPARAMS.first_conv_filter_si
 
 class Cifar100_MultiGpuCignEarlyExit(CignMultiGpuEarlyExit):
     # Late Exit
-    LATE_EXIT_NUM_OF_CONV_LAYERS = 4
+    LATE_EXIT_NUM_OF_CONV_LAYERS = 16
     LATE_EXIT_CONV_LAYER_FEATURE_COUNT = 64
 
     def __init__(self, degree_list, dataset, network_name):

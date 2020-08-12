@@ -93,8 +93,8 @@ class CignEarlyExitTree(FastTreeNetwork):
                 if is_evaluation_epoch_before_ending:
                     # self.save_model(sess=sess, run_id=run_id, iteration=iteration)
                     t0 = time.time()
-                    self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
-                                           dataset=dataset, dataset_type=DatasetTypes.training)
+                    # self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
+                    #                        dataset=dataset, dataset_type=DatasetTypes.training)
                     t1 = time.time()
                     self.save_routing_info(sess=sess, run_id=run_id, iteration=iteration,
                                            dataset=dataset, dataset_type=DatasetTypes.test)

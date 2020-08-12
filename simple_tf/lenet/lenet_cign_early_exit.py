@@ -7,7 +7,7 @@ from simple_tf.cign.cign_early_exit import CignEarlyExitTree
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from simple_tf.global_params import GlobalConstants
 from simple_tf.cign.fast_tree import FastTreeNetwork
-from simple_tf.lenet.lenet_cign import Lenet_Cign
+from simple_tf.lenet.lenet_cign import LenetCign
 
 
 class LenetCignEarlyExit(CignEarlyExitTree):
@@ -21,7 +21,7 @@ class LenetCignEarlyExit(CignEarlyExitTree):
     LATE_EXIT_FC_LAYERS = [64, 32, 16]
 
     def __init__(self, degree_list, dataset, network_name):
-        node_build_funcs = [Lenet_Cign.root_func, Lenet_Cign.l1_func, LenetCignEarlyExit.leaf_func]
+        node_build_funcs = [LenetCign.root_func, LenetCign.l1_func, LenetCignEarlyExit.leaf_func]
         super().__init__(node_build_funcs, None, None, None, None, degree_list, dataset, network_name)
 
     @staticmethod
@@ -60,7 +60,7 @@ class LenetCignEarlyExit(CignEarlyExitTree):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "Lenet CIGN - Early Exit\n"
+        explanation = "Lenet CIGN - Early Exit - Save Outputs\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -175,6 +175,8 @@ class LenetCignEarlyExit(CignEarlyExitTree):
         GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB = kwargs["classification_keep_probability"]
         GlobalConstants.DECISION_WEIGHT_DECAY_COEFFICIENT = kwargs["decision_weight_decay_coefficient"]
         GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT = kwargs["info_gain_balance_coefficient"]
+        GlobalConstants.EARLY_EXIT_WEIGHT = kwargs["early_exit_weight"]
+        GlobalConstants.LATE_EXIT_WEIGHT = kwargs["late_exit_weight"]
         self.decisionDropoutKeepProbCalculator = FixedParameter(name="decision_dropout_prob",
                                                                 value=kwargs["decision_keep_probability"])
         # Noise Coefficient
