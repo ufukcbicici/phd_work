@@ -298,5 +298,7 @@ class UtilityFuncs:
     def expand_index_list(indices, index_multiplier):
         expanded_indices = []
         for idx in indices:
-            expanded_indices.extend(list(range(idx, idx + index_multiplier, 1)))
-        return expanded_indices
+            edx = idx * index_multiplier
+            expanded_indices.extend(list(range(edx, edx + index_multiplier, 1)))
+        assert len(set(expanded_indices)) == len(expanded_indices)
+        return np.array(expanded_indices)

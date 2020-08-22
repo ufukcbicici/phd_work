@@ -2,6 +2,9 @@ import numpy as np
 import os
 import pickle
 from scipy.spatial import distance_matrix
+
+from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers import RoutingDataset, \
+    MultiIterationRoutingDataset
 from auxillary.db_logger import DbLogger
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
@@ -183,6 +186,10 @@ class DatasetLinkingAlgorithm:
             dict_of_data_dicts[feature_name] = {}
             for node_id in routing_data_dict[db_iterations[0]].dictionaryOfRoutingData[feature_name].keys():
                 dict_of_data_dicts[feature_name][node_id] = []
+        dict_of_data_dicts["nodeCosts"] = {}
+        for node_id in routing_data_dict[db_iterations[0]].dictionaryOfRoutingData["nodeCosts"].keys():
+            dict_of_data_dicts["nodeCosts"][node_id] = routing_data_dict[db_iterations[0]].dictionaryOfRoutingData[
+                "nodeCosts"][node_id]
 
         merged_labels = []
         # Add features and labels from different iterations into single feature matrices.
@@ -210,65 +217,52 @@ class DatasetLinkingAlgorithm:
             assert len(set(sample_label_list)) == 1
             merged_labels.extend(sample_label_list)
             print("Processed Sample:{0}".format(sample_id_list[0]))
-        print("X")
+        merged_labels = np.array(merged_labels)
+        for feature_name in feature_names_:
+            for node_id in dict_of_data_dicts[feature_name].keys():
+                if feature_name == "nodeCosts":
+                    continue
+                print("Proccessing feature:{0} node:{1}".format(feature_name, node_id))
+                dict_of_data_dicts[feature_name][node_id] = np.stack(dict_of_data_dicts[feature_name][node_id], axis=0)
+        routing_dataset = RoutingDataset(dict_of_data_dicts=dict_of_data_dicts, label_list=merged_labels,
+                                         index_multiplier=len(db_iterations))
+        return routing_dataset
 
-        # data_dict = {}
+    @staticmethod
+    def link_dataset_v3(network_name_, run_id_, degree_list_, test_iterations_):
+        # Get iterations
+        db_iteration_tuples = DbLogger.read_query(
+            query="SELECT Iteration, COUNT(1) AS CNT FROM dataset_link "
+                  "WHERE NetworkName=\"{0}\" AND NetworkId={1} GROUP BY Iteration".format(network_name_, run_id_))
+        db_iterations = sorted([tpl[0] for tpl in db_iteration_tuples])
+        assert len(set([tpl[1] for tpl in db_iteration_tuples])) == 1
+        # Get iteration mappings
+        db_mappings = DbLogger.read_query(
+            query="SELECT SampleId, Iteration, SampleIdForIteration, COUNT(1) AS CNT FROM dataset_link "
+                  "WHERE NetworkName=\"{0}\" AND NetworkId={1} "
+                  "GROUP BY SampleId, Iteration, SampleIdForIteration "
+                  "ORDER BY SampleId, Iteration".format(network_name_, run_id_))
+        assert len(set([tpl[-1] for tpl in db_mappings])) == 1
+        # Load all routing datasets
+        routing_data_dict = {}
         # # Load all the data
-        # for iteration in iterations:
-        #     network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-        #     routing_data = network.load_routing_info(run_id=network_id, iteration=iteration, data_type="test",
-        #                                              output_names=output_names)
-        #     data_dict[iteration] = routing_data
-        # sample_count = set([len(d.labelList) for d in data_dict.values()])
-        # assert len(sample_count) == 1
-        # sample_count = list(sample_count)[0]
-        # rows = DbLogger.read_tuples_from_table(table_name="dataset_link")
-        # node_ids = set([row[4] for row in rows])
-        # link_data = []
-        # for node_id in node_ids:
-        #     s_rows = DbLogger.read_tuples_from_table(
-        #         table_name="dataset_link",
-        #         condition="NodeId = {0} ORDER BY SampleId, Iteration".format(node_id))
-        #     result_matrix = np.stack(s_rows, axis=0)
-        #     link_data.append(result_matrix[:, -2:].astype(np.int32))
-        # assert all([np.array_equal(link_data[i], link_data[i + 1]) for i in range(len(link_data) - 1)])
-        # link_data = link_data[0]
-        # whole_data_dict = {}
-        # whole_data_dict_vertical = {}
-        # for iteration in iterations:
-        #     for output_name in output_names:
-        #         for node_id, arr in data_dict[iteration].dictionaryOfRoutingData[output_name].items():
-        #             if (node_id, output_name) not in whole_data_dict:
-        #                 whole_data_dict[(node_id, output_name)] = []
-        #             whole_data_dict[(node_id, output_name)].append(arr)
-        # for tpl in whole_data_dict.keys():
-        #     whole_data_dict_vertical[tpl] = np.concatenate(whole_data_dict[tpl], axis=0)
-        # print("X")
-
-        # Merge all data vertically
-        # features_dict = {}
-        # for iteration in iterations:
-
-        # curr_path = os.path.dirname(os.path.abspath(__file__))
-        # target_directory = \
-        #     os.path.abspath(os.path.join(curr_path, "..", "saved_training_data",
-        #                                  "{0}_{1}_linked_features".format(network_name, network_id)))
-        # rows = DbLogger.read_tuples_from_table(table_name="dataset_link")
-
-        # iterations_read = sorted(list(set([row[2] for row in rows])))
-        # feature_names = set([row[3] for row in rows])
-        # node_ids = set([row[4] for row in rows])
-        # sample_ids = set([row[5] for row in rows])
-        # max_sample_id = max([s_id for s_id in sample_ids])
-        # min_iteration_id = min([iteration for iteration in iterations_read])
+        for iteration in db_iterations:
+            network = FastTreeNetwork.get_mock_tree(degree_list=degree_list_, network_name=network_name_)
+            routing_data = network.load_routing_info(run_id=run_id_, iteration=iteration, data_type="test",
+                                                     output_names=output_names)
+            routing_data_dict[iteration] = routing_data
+        multipath_routing_dataset = MultiIterationRoutingDataset(
+            dict_of_routing_datasets=routing_data_dict, sample_linkage_info=db_mappings,
+            test_iterations=test_iterations_)
+        return multipath_routing_dataset
 
 
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
     # DatasetLinkingAlgorithm.run()
-    DatasetLinkingAlgorithm.link_dataset_v2(network_name_="FashionNet_Lite", run_id_=453, degree_list_=[2, 2],
-                                            feature_names_=used_output_names)
+    DatasetLinkingAlgorithm.link_dataset_v3(network_name_="FashionNet_Lite", run_id_=453, degree_list_=[2, 2],
+                                            test_iterations_=[48000])
 
 
 if __name__ == "__main__":
