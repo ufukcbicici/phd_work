@@ -3,12 +3,13 @@ import tensorflow as tf
 
 
 class MultiIterationDQN:
-    def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names):
+    def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func):
         self.routingDataset = routing_dataset
         self.network = network
         self.networkName = network_name
         self.runId = run_id
         self.usedFeatureNames = used_feature_names
+        self.qLearningFunc = q_learning_func
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
         self.innerNodes = sorted(self.innerNodes, key=lambda node: node.index)
@@ -16,37 +17,62 @@ class MultiIterationDQN:
         self.leafIndices = {node.index: idx for idx, node in enumerate(self.leafNodes)}
         # Data dictionaries
         self.maxLikelihoodPaths = {}
+        self.stateFeatures = {}
         # Init data structures
-        self.get_max_likelihood_paths_of_iterations()
+        self.get_max_likelihood_paths()
+        self.prepare_state_features()
         # The following is for testing, can comment out later.
-        self.test_likelihood_consistency()
+        # self.test_likelihood_consistency()
         print("X")
 
-    def get_max_likelihood_paths_of_iterations(self):
+    def get_max_likelihood_paths(self):
         for iteration in self.routingDataset.iterations:
-            self.maxLikelihoodPaths[iteration] = self.get_max_likelihood_paths(
-                branch_probs=self.routingDataset.dictOfDatasets[iteration].get_dict("branch_probs"))
+            branch_probs = self.routingDataset.dictOfDatasets[iteration].get_dict("branch_probs")
+            sample_sizes = list(set([arr.shape[0] for arr in branch_probs.values()]))
+            assert len(sample_sizes) == 1
+            sample_size = sample_sizes[0]
+            max_likelihood_paths = []
+            for idx in range(sample_size):
+                curr_node = self.network.topologicalSortedNodes[0]
+                route = []
+                while True:
+                    route.append(curr_node.index)
+                    if curr_node.isLeaf:
+                        break
+                    routing_distribution = branch_probs[curr_node.index][idx]
+                    arg_max_child_index = np.argmax(routing_distribution)
+                    child_nodes = self.network.dagObject.children(node=curr_node)
+                    child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
+                    curr_node = child_nodes[arg_max_child_index]
+                max_likelihood_paths.append(np.array(route))
+            max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
+            self.maxLikelihoodPaths[iteration] = max_likelihood_paths
 
-    def get_max_likelihood_paths(self, branch_probs):
-        sample_sizes = list(set([arr.shape[0] for arr in branch_probs.values()]))
-        assert len(sample_sizes) == 1
-        sample_size = sample_sizes[0]
-        max_likelihood_paths = []
-        for idx in range(sample_size):
-            curr_node = self.network.topologicalSortedNodes[0]
-            route = []
-            while True:
-                route.append(curr_node.index)
-                if curr_node.isLeaf:
-                    break
-                routing_distribution = branch_probs[curr_node.index][idx]
-                arg_max_child_index = np.argmax(routing_distribution)
-                child_nodes = self.network.dagObject.children(node=curr_node)
-                child_nodes = sorted(child_nodes, key=lambda c_node: c_node.index)
-                curr_node = child_nodes[arg_max_child_index]
-            max_likelihood_paths.append(np.array(route))
-        max_likelihood_paths = np.stack(max_likelihood_paths, axis=0)
-        return max_likelihood_paths
+    def prepare_state_features(self):
+        # if self.policyNetworkFunc == "mlp":
+        #     super().prepare_state_features(data=data)
+        # elif self.policyNetworkFunc == "cnn":
+        root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
+        assert len(root_node) == 1
+        for iteration in self.routingDataset.iterations:
+            features_dict = {}
+            for node in self.innerNodes:
+                # array_list = [data.get_dict(feature_name)[node.index] for feature_name in self.networkFeatureNames]
+                array_list = []
+                for feature_name in self.usedFeatureNames:
+                    feature_arr = self.routingDataset.dictOfDatasets[iteration].get_dict(feature_name)[node.index]
+                    if self.qLearningFunc == "mlp":
+                        if len(feature_arr.shape) > 2:
+                            shape_as_list = list(feature_arr.shape)
+                            mean_axes = tuple([i for i in range(1, len(shape_as_list) - 1, 1)])
+                            feature_arr = np.mean(feature_arr, axis=mean_axes)
+                            assert len(feature_arr.shape) == 2
+                    elif self.qLearningFunc == "cnn":
+                        assert len(feature_arr.shape) == 4
+                    array_list.append(feature_arr)
+                feature_vectors = np.concatenate(array_list, axis=-1)
+                features_dict[node.index] = feature_vectors
+            self.stateFeatures[iteration] = features_dict
 
     # Test methods
     def test_likelihood_consistency(self):
