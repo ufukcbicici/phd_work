@@ -216,7 +216,7 @@ class Jungle(FastTreeNetwork):
             self.evalDict["softmax_output"] = softmax_output
             softmax_indices = tf.stack([self.batchIndices, tf.cast(self.labelTensor, tf.int32)], axis=1)
             self.evalDict["softmax_indices"] = softmax_indices
-            selected_softmax_probs = tf.gather_nd(softmax_output, softmax_indices)
+            selected_softmax_probs = tf.c(softmax_output, softmax_indices)
             self.evalDict["selected_softmax_probs"] = selected_softmax_probs
             zero_mask = 1e-30 * tf.cast(tf.equal(selected_softmax_probs, 0.0), tf.float32)
             self.evalDict["zero_mask"] = zero_mask

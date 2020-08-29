@@ -15,15 +15,26 @@ class MultiIterationDQN:
         self.innerNodes = sorted(self.innerNodes, key=lambda node: node.index)
         self.leafNodes = sorted(self.leafNodes, key=lambda node: node.index)
         self.leafIndices = {node.index: idx for idx, node in enumerate(self.leafNodes)}
-        # Data dictionaries
+        # Data containers
         self.maxLikelihoodPaths = {}
         self.stateFeatures = {}
+        self.posteriorTensors = {}
+        self.actionSpaces = []
+        self.networkActivationCosts = []
+        self.networkActivationCostsDict = {}
+        self.baseEvaluationCost = 0.0
         # Init data structures
         self.get_max_likelihood_paths()
         self.prepare_state_features()
+        self.prepare_posterior_tensors()
+        self.build_action_spaces()
+        self.get_evaluation_costs()
         # The following is for testing, can comment out later.
         # self.test_likelihood_consistency()
         print("X")
+
+    def get_max_trajectory_length(self) -> int:
+        return int(self.network.depth - 1)
 
     def get_max_likelihood_paths(self):
         for iteration in self.routingDataset.iterations:
@@ -73,6 +84,54 @@ class MultiIterationDQN:
                 feature_vectors = np.concatenate(array_list, axis=-1)
                 features_dict[node.index] = feature_vectors
             self.stateFeatures[iteration] = features_dict
+
+    def prepare_posterior_tensors(self):
+        for iteration in self.routingDataset.iterations:
+            self.posteriorTensors[iteration] = \
+                np.stack([self.routingDataset.dictOfDatasets[iteration].
+                         get_dict("posterior_probs")[node.index] for node in self.leafNodes], axis=2)
+
+    def build_action_spaces(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+        self.actionSpaces = []
+        for t in range(max_trajectory_length):
+            next_level_node_count = len(self.network.orderedNodesPerLevel[t + 1])
+            action_count = (2 ** next_level_node_count) - 1
+            action_space = []
+            for action_id in range(action_count):
+                action_code = action_id + 1
+                l = [int(x) for x in list('{0:0b}'.format(action_code))]
+                k = [0] * (next_level_node_count - len(l))
+                k.extend(l)
+                binary_node_selection = np.array(k)
+                action_space.append(binary_node_selection)
+            action_space = np.stack(action_space, axis=0)
+            self.actionSpaces.append(action_space)
+
+    def get_evaluation_costs(self):
+        path_costs = []
+        for node in self.leafNodes:
+            leaf_ancestors = self.network.dagObject.ancestors(node=node)
+            leaf_ancestors.append(node)
+            path_costs.append(sum([self.routingDataset.nodeCosts[ancestor.index] for ancestor in leaf_ancestors]))
+        self.baseEvaluationCost = np.mean(np.array(path_costs))
+        self.networkActivationCosts = []
+        self.networkActivationCostsDict = {}
+        for action_id in range(self.actionSpaces[-1].shape[0]):
+            node_selection = self.actionSpaces[-1][action_id]
+            processed_nodes_set = set()
+            for node_idx, curr_node in enumerate(self.leafNodes):
+                if node_selection[node_idx] == 0:
+                    continue
+                leaf_ancestors = self.network.dagObject.ancestors(node=curr_node)
+                leaf_ancestors.append(curr_node)
+                for ancestor in leaf_ancestors:
+                    processed_nodes_set.add(ancestor.index)
+            total_cost = sum([self.routingDataset.nodeCosts[n_idx] for n_idx in processed_nodes_set])
+            self.networkActivationCosts.append(total_cost)
+            self.networkActivationCostsDict[tuple(self.actionSpaces[-1][action_id])] = \
+                (total_cost / self.baseEvaluationCost) - 1.0
+        self.networkActivationCosts = (np.array(self.networkActivationCosts) * (1.0 / self.baseEvaluationCost)) - 1.0
 
     # Test methods
     def test_likelihood_consistency(self):

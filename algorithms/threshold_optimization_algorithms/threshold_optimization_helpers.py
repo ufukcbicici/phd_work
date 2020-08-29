@@ -126,6 +126,18 @@ class MultiIterationRoutingDataset(RoutingDataset):
     def __init__(self, dict_of_routing_datasets, sample_linkage_info, test_iterations):
         self.iterations = sorted(list(dict_of_routing_datasets.keys()))
         self.dictOfDatasets = dict_of_routing_datasets
+        # Node costs
+        assert len(set([len(d.dictionaryOfRoutingData["nodeCosts"]) for d in self.dictOfDatasets.values()])) == 1
+        for idx in range(len(self.iterations) - 1):
+            iteration_t = self.iterations[idx]
+            iteration_t_plus_1 = self.iterations[idx + 1]
+            assert set(self.dictOfDatasets[iteration_t].dictionaryOfRoutingData["nodeCosts"].keys()) == \
+                   set(self.dictOfDatasets[iteration_t_plus_1].dictionaryOfRoutingData["nodeCosts"].keys())
+            assert all([self.dictOfDatasets[iteration_t].dictionaryOfRoutingData["nodeCosts"][k] ==
+                    self.dictOfDatasets[iteration_t_plus_1].dictionaryOfRoutingData["nodeCosts"][k]
+                    for k in self.dictOfDatasets[iteration_t].dictionaryOfRoutingData["nodeCosts"].keys()])
+        self.nodeCosts = self.dictOfDatasets[self.iterations[0]].dictionaryOfRoutingData["nodeCosts"]
+        # Linkage Information
         self.linkageInfo = {}
         for tpl in sample_linkage_info:
             # SampleId, Iteration, SampleIdForIteration, COUNT(1)
