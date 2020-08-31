@@ -365,6 +365,28 @@ class MultiIterationDQN:
                 self.l2Loss += self.l2LambdaTf * tf.nn.l2_loss(tv)
             # self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
 
+    def get_max_likelihood_accuracy(self, iterations, sample_indices):
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        predicted_labels_list = []
+        true_labels_list = []
+        for iteration in iterations:
+            indices_for_iteration = np.array(map(lambda idx: self.routingDataset.linkageInfo[(idx, iteration)],
+                                                 sample_indices))
+            posteriors_for_iteration = self.posteriorTensors[iteration][indices_for_iteration]
+            ml_indices_for_iteration = self.maxLikelihoodPaths[iteration][indices_for_iteration]
+            true_labels_for_iteration = self.routingDataset[iteration].labelList[indices_for_iteration]
+            ml_leaf_indices_for_iteration = ml_indices_for_iteration[:, -1] - min_leaf_id
+            selected_posteriors = posteriors_for_iteration[:, :, ml_leaf_indices_for_iteration]
+            predicted_labels = np.argmax(selected_posteriors, axis=1)
+            predicted_labels_list.append(predicted_labels)
+            true_labels_list.append(true_labels_for_iteration)
+        all_predicted_labels = np.concatenate(predicted_labels_list)
+        all_true_labels = np.concatenate(true_labels_list)
+        assert all_predicted_labels.shape == all_true_labels.shape
+        correct_count = np.sum((all_predicted_labels == all_true_labels).astype(np.float32))
+        accuracy = correct_count / all_true_labels.shape[0]
+        return accuracy
+
     # Test methods
     def test_likelihood_consistency(self):
         for idx in range(self.routingDataset.labelList.shape[0]):
@@ -375,3 +397,54 @@ class MultiIterationDQN:
             path_array = np.stack(path_array, axis=0)
             print("X")
 
+    def train(self, level, **kwargs):
+        if level != self.get_max_trajectory_length() - 1:
+            raise NotImplementedError()
+        self.session.run(tf.global_variables_initializer())
+        self.evaluate_ml_routing_accuracies()
+        sample_count = kwargs["sample_count"]
+        episode_count = kwargs["episode_count"]
+        discount_factor = kwargs["discount_factor"]
+        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        learning_rate = kwargs["learning_rate"]
+        epsilon = 1.0
+        # Fill the experience replay table: Solve the cold start problem.
+        self.fill_experience_replay_table(level=level, batch_count=5, sample_count=sample_count, epsilon=epsilon)
+        losses = []
+        for episode_id in range(episode_count):
+            print("episode_id:{0}".format(episode_id))
+            self.fill_experience_replay_table(level=level, batch_count=1, sample_count=sample_count, epsilon=epsilon)
+            # Sample batch of experiences from the table
+            experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count, replace=False)
+            experiences_sampled = self.experienceReplayTable[experience_ids]
+            sampled_state_ids = experiences_sampled[:, 0:2].astype(np.int32)
+            sampled_actions = experiences_sampled[:, 2].astype(np.int32)
+            sampled_rewards = experiences_sampled[:, 3]
+            # Add Gradient Descent Step
+            sampled_state_features = self.get_state_features(state_matrix=sampled_state_ids, level=level,
+                                                             data_type="validation")
+            # results = self.session.run(
+            #     [self.qFuncs[level],
+            #      self.selectionIndices[level],
+            #      self.selectedQValues[level],
+            #      self.lossVectors[level],
+            #      self.lossValues[level],
+            #      self.totalLosses[level],
+            #      self.l2Loss], feed_dict={self.stateCount: experiences_sampled.shape[0],
+            #                               self.stateInputs[level]: sampled_state_features,
+            #                               self.actionSelections[level]: sampled_actions,
+            #                               self.rewardVectors[level]: sampled_rewards,
+            #                               self.l2LambdaTf: 0.0})
+            results = self.session.run([self.totalLosses[level], self.optimizers[level]],
+                                       feed_dict={self.stateCount: experiences_sampled.shape[0],
+                                                  self.stateInputs[level]: sampled_state_features,
+                                                  self.actionSelections[level]: sampled_actions,
+                                                  self.rewardVectors[level]: sampled_rewards,
+                                                  self.l2LambdaTf: 0.0005})
+            epsilon *= epsilon_discount_factor
+            total_loss = results[0]
+            losses.append(total_loss)
+            if len(losses) % 100 == 0:
+                self.measure_performance(level=level, losses=losses, data_type="validation")
+                self.measure_performance(level=level, losses=losses, data_type="test")
+                losses = []
