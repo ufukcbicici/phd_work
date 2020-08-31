@@ -50,7 +50,8 @@ def train_deep_q_learning():
                                                            test_iterations_=[48000])
     routing_data.apply_validation_test_split(test_ratio=0.1)
     dqn = MultiIterationDQN(routing_dataset=routing_data, network=network, network_name=network_name,
-                            run_id=453, used_feature_names=used_output_names, q_learning_func = "cnn")
+                            run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
+                            lambda_mac_cost=0.0)
     print("X")
     # q_learning_threshold_optimizer = DeepQThresholdOptimizer(
     #     validation_data=validation_data,

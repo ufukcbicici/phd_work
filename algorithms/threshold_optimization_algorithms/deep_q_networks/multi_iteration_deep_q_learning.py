@@ -9,7 +9,7 @@ class MultiIterationDQN:
     INCLUDE_IG_IN_REWARD_CALCULATIONS = True
 
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
-                 lambda_mac_cost):
+                 lambda_mac_cost, max_experience_count=100000):
         self.routingDataset = routing_dataset
         self.network = network
         self.networkName = network_name
@@ -32,6 +32,27 @@ class MultiIterationDQN:
         self.baseEvaluationCost = 0.0
         self.reachabilityMatrices = []
         self.rewardTensors = {}
+        # Neural network components
+        self.experienceReplayTable = None
+        self.maxExpCount = max_experience_count
+        self.stateInputs = []
+        self.qFuncs = []
+        self.selectedQValues = []
+        self.stateCount = tf.placeholder(dtype=tf.int32, name="stateCount")
+        self.stateRange = tf.range(0, self.stateCount, 1)
+        self.actionSelections = []
+        self.selectionIndices = []
+        self.rewardVectors = []
+        self.lossVectors = []
+        self.lossValues = []
+        self.optimizers = []
+        self.totalLosses = []
+        self.globalStep = tf.Variable(0, name='global_step', trainable=False)
+        self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
+        self.l2Loss = None
+        for level in range(self.get_max_trajectory_length()):
+            self.build_q_function(level=level)
+        self.session = tf.Session()
         # Init data structures
         self.get_max_likelihood_paths()
         self.prepare_state_features()
@@ -181,7 +202,7 @@ class MultiIterationDQN:
 
     def get_posterior_tensors(self):
         for iteration in self.routingDataset.iterations:
-            np.stack([self.routingDataset[iteration].get_dict("posterior_probs")[node.index]
+            np.stack([self.routingDataset.dictOfDatasets[iteration].get_dict("posterior_probs")[node.index]
                       for node in self.leafNodes], axis=2)
 
     def calculate_reward_tensors(self):
@@ -241,6 +262,49 @@ class MultiIterationDQN:
                     rewards_arr += (prediction_correctness_tensor == 0).astype(np.float32) * invalid_prediction_penalty
                     rewards_arr -= self.lambdaMacCost * computation_overload_tensor
                 self.rewardTensors[iteration].append(rewards_arr)
+
+    def build_q_function(self, level):
+        if level != self.get_max_trajectory_length() - 1:
+            self.stateInputs.append(None)
+            self.qFuncs.append(None)
+            self.actionSelections.append(None)
+            self.selectedQValues.append(None)
+            self.selectionIndices.append(None)
+            self.rewardVectors.append(None)
+            self.lossVectors.append(None)
+            self.lossValues.append(None)
+            self.totalLosses.append(None)
+            self.optimizers.append(None)
+        # else:
+        #     if self.qLearningFunc == "cnn":
+        #         nodes_at_level = self.network.orderedNodesPerLevel[level]
+        #         entry_shape = list(self.validationFeaturesDict[nodes_at_level[0].index].shape)
+        #         entry_shape[0] = None
+        #         entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
+        #         tf_state_input = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="inputs_{0}".format(level))
+        #         self.stateInputs.append(tf_state_input)
+        #         self.build_cnn_q_network(level=level)
+        #     # Get selected q values; build the regression loss
+        #     tf_selected_action_input = tf.placeholder(dtype=tf.int32, shape=[None],
+        #                                               name="action_inputs_{0}".format(level))
+        #     self.actionSelections.append(tf_selected_action_input)
+        #     selection_matrix = tf.stack([self.stateRange, tf_selected_action_input], axis=1)
+        #     self.selectionIndices.append(selection_matrix)
+        #     selected_q_values = tf.gather_nd(self.qFuncs[level], selection_matrix)
+        #     self.selectedQValues.append(selected_q_values)
+        #     reward_vector = tf.placeholder(dtype=tf.float32, shape=[None],
+        #                                    name="reward_vector_{0}".format(level))
+        #     self.rewardVectors.append(reward_vector)
+        #     # Loss functions
+        #     mse_vector = tf.square(selected_q_values - reward_vector)
+        #     self.lossVectors.append(mse_vector)
+        #     mse_loss = tf.reduce_mean(mse_vector)
+        #     self.lossValues.append(mse_loss)
+        #     self.get_l2_loss()
+        #     total_loss = mse_loss + self.l2Loss
+        #     self.totalLosses.append(total_loss)
+        #     optimizer = tf.train.AdamOptimizer().minimize(total_loss, global_step=self.globalStep)
+        #     self.optimizers.append(optimizer)
 
     # Test methods
     def test_likelihood_consistency(self):
