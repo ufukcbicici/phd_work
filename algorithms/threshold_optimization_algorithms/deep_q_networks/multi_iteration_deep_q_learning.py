@@ -3,13 +3,20 @@ import tensorflow as tf
 
 
 class MultiIterationDQN:
-    def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func):
+    invalid_action_penalty = -1.0
+    valid_prediction_reward = 1.0
+    invalid_prediction_penalty = 0.0
+    INCLUDE_IG_IN_REWARD_CALCULATIONS = True
+
+    def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
+                 lambda_mac_cost):
         self.routingDataset = routing_dataset
         self.network = network
         self.networkName = network_name
         self.runId = run_id
         self.usedFeatureNames = used_feature_names
         self.qLearningFunc = q_learning_func
+        self.lambdaMacCost = lambda_mac_cost
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
         self.innerNodes = sorted(self.innerNodes, key=lambda node: node.index)
@@ -24,6 +31,7 @@ class MultiIterationDQN:
         self.networkActivationCostsDict = {}
         self.baseEvaluationCost = 0.0
         self.reachabilityMatrices = []
+        self.rewardTensors = {}
         # Init data structures
         self.get_max_likelihood_paths()
         self.prepare_state_features()
@@ -31,6 +39,8 @@ class MultiIterationDQN:
         self.build_action_spaces()
         self.get_evaluation_costs()
         self.get_reachability_matrices()
+        self.get_posterior_tensors()
+        self.calculate_reward_tensors()
         # The following is for testing, can comment out later.
         # self.test_likelihood_consistency()
         print("X")
@@ -168,6 +178,69 @@ class MultiIterationDQN:
                             is_valid_selection = is_valid_selection and any(selection_arr)
                         reachability_matrix_t[action_t_minus_one_id, actions_t_id] = is_valid_selection
             self.reachabilityMatrices.append(reachability_matrix_t)
+
+    def get_posterior_tensors(self):
+        for iteration in self.routingDataset.iterations:
+            np.stack([self.routingDataset[iteration].get_dict("posterior_probs")[node.index]
+                      for node in self.leafNodes], axis=2)
+
+    def calculate_reward_tensors(self):
+        invalid_action_penalty = MultiIterationDQN.invalid_action_penalty
+        valid_prediction_reward = MultiIterationDQN.valid_prediction_reward
+        invalid_prediction_penalty = MultiIterationDQN.invalid_prediction_penalty
+
+        for iteration in self.routingDataset.iterations:
+            self.rewardTensors[iteration] = []
+            label_list = self.routingDataset.dictOfDatasets[iteration].labelList
+            sample_count = label_list.shape[0]
+            posteriors_tensor = self.posteriorTensors[iteration]
+            for t in range(self.get_max_trajectory_length()):
+                action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+                action_count_t = self.actionSpaces[t].shape[0]
+                reward_shape = (sample_count, action_count_t_minus_one, action_count_t)
+                rewards_arr = np.zeros(shape=reward_shape, dtype=np.float32)
+                validity_of_actions_tensor = np.repeat(np.expand_dims(self.reachabilityMatrices[t], axis=0),
+                                                       repeats=sample_count, axis=0)
+                rewards_arr += (validity_of_actions_tensor == 0.0).astype(np.float32) * invalid_action_penalty
+                if t == self.get_max_trajectory_length() - 1:
+                    true_labels = label_list
+                    # Prediction Rewards:
+                    # Calculate the prediction results for every state and for every routing decision
+                    prediction_correctness_vec_list = []
+                    calculation_cost_vec_list = []
+                    min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[t + 1]])
+                    ig_indices = self.maxLikelihoodPaths[iteration][:, -1] - min_leaf_id
+                    for action_id in range(self.actionSpaces[t].shape[0]):
+                        routing_decision = self.actionSpaces[t][action_id, :]
+                        routing_matrix = np.repeat(routing_decision[np.newaxis, :], axis=0,
+                                                   repeats=true_labels.shape[0])
+                        if MultiIterationDQN.INCLUDE_IG_IN_REWARD_CALCULATIONS:
+                            # Set Information Gain routed leaf nodes to 1. They are always evaluated.
+                            routing_matrix[np.arange(true_labels.shape[0]), ig_indices] = 1
+                        weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
+                        routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
+                        assert routing_matrix.shape[1] == posteriors_tensor.shape[2]
+                        weighted_posteriors = posteriors_tensor * routing_matrix_weighted[:, np.newaxis, :]
+                        final_posteriors = np.sum(weighted_posteriors, axis=2)
+                        predicted_labels = np.argmax(final_posteriors, axis=1)
+                        validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+                        prediction_correctness_vec_list.append(validity_of_predictions_vec)
+                        # Get the calculation costs
+                        computation_overload_vector = np.apply_along_axis(
+                            lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
+                            arr=routing_matrix)
+                        calculation_cost_vec_list.append(computation_overload_vector)
+                    prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
+                    prediction_correctness_tensor = np.repeat(
+                        np.expand_dims(prediction_correctness_matrix, axis=1), axis=1, repeats=action_count_t_minus_one)
+                    computation_overload_matrix = np.stack(calculation_cost_vec_list, axis=1)
+                    computation_overload_tensor = np.repeat(
+                        np.expand_dims(computation_overload_matrix, axis=1), axis=1, repeats=action_count_t_minus_one)
+                    # Add to the rewards tensor
+                    rewards_arr += (prediction_correctness_tensor == 1).astype(np.float32) * valid_prediction_reward
+                    rewards_arr += (prediction_correctness_tensor == 0).astype(np.float32) * invalid_prediction_penalty
+                    rewards_arr -= self.lambdaMacCost * computation_overload_tensor
+                self.rewardTensors[iteration].append(rewards_arr)
 
     # Test methods
     def test_likelihood_consistency(self):
