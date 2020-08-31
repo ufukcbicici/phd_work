@@ -294,27 +294,27 @@ class MultiIterationDQN:
                                                 name="state_inputs_{0}".format(level))
                 self.stateInputs.append(tf_state_input)
                 self.build_cnn_q_network(level=level)
-        # Get selected q values; build the regression loss
-        tf_selected_action_input = tf.placeholder(dtype=tf.int32, shape=[None],
-                                                  name="action_inputs_{0}".format(level))
-        self.actionSelections.append(tf_selected_action_input)
-        selection_matrix = tf.stack([self.stateRange, tf_selected_action_input], axis=1)
-        self.selectionIndices.append(selection_matrix)
-        selected_q_values = tf.gather_nd(self.qFuncs[level], selection_matrix)
-        self.selectedQValues.append(selected_q_values)
-        reward_vector = tf.placeholder(dtype=tf.float32, shape=[None],
-                                       name="reward_vector_{0}".format(level))
-        self.rewardVectors.append(reward_vector)
-        # Loss functions
-        mse_vector = tf.square(selected_q_values - reward_vector)
-        self.lossVectors.append(mse_vector)
-        mse_loss = tf.reduce_mean(mse_vector)
-        self.lossValues.append(mse_loss)
-        self.get_l2_loss()
-        total_loss = mse_loss + self.l2Loss
-        self.totalLosses.append(total_loss)
-        optimizer = tf.train.AdamOptimizer().minimize(total_loss, global_step=self.globalStep)
-        self.optimizers.append(optimizer)
+            # Get selected q values; build the regression loss
+            tf_selected_action_input = tf.placeholder(dtype=tf.int32, shape=[None],
+                                                      name="action_inputs_{0}".format(level))
+            self.actionSelections.append(tf_selected_action_input)
+            selection_matrix = tf.stack([self.stateRange, tf_selected_action_input], axis=1)
+            self.selectionIndices.append(selection_matrix)
+            selected_q_values = tf.gather_nd(self.qFuncs[level], selection_matrix)
+            self.selectedQValues.append(selected_q_values)
+            reward_vector = tf.placeholder(dtype=tf.float32, shape=[None],
+                                           name="reward_vector_{0}".format(level))
+            self.rewardVectors.append(reward_vector)
+            # Loss functions
+            mse_vector = tf.square(selected_q_values - reward_vector)
+            self.lossVectors.append(mse_vector)
+            mse_loss = tf.reduce_mean(mse_vector)
+            self.lossValues.append(mse_loss)
+            self.get_l2_loss()
+            total_loss = mse_loss + self.l2Loss
+            self.totalLosses.append(total_loss)
+            optimizer = tf.train.AdamOptimizer().minimize(total_loss, global_step=self.globalStep)
+            self.optimizers.append(optimizer)
 
     def build_cnn_q_network(self, level):
         hidden_layers = MultiIterationDQN.HIDDEN_LAYERS[level]
