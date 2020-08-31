@@ -8,6 +8,12 @@ class MultiIterationDQN:
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = True
 
+    CONV_FEATURES = [[32], [64]]
+    HIDDEN_LAYERS = [[128, 64], [128, 64]]
+    FILTER_SIZES = [[1], [1]]
+    STRIDES = [[1], [1]]
+    MAX_POOL = [[None], [None]]
+
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
                  lambda_mac_cost, max_experience_count=100000):
         self.routingDataset = routing_dataset
@@ -32,6 +38,15 @@ class MultiIterationDQN:
         self.baseEvaluationCost = 0.0
         self.reachabilityMatrices = []
         self.rewardTensors = {}
+        # Init data structures
+        self.get_max_likelihood_paths()
+        self.prepare_state_features()
+        self.prepare_posterior_tensors()
+        self.build_action_spaces()
+        self.get_evaluation_costs()
+        self.get_reachability_matrices()
+        self.get_posterior_tensors()
+        self.calculate_reward_tensors()
         # Neural network components
         self.experienceReplayTable = None
         self.maxExpCount = max_experience_count
@@ -53,15 +68,6 @@ class MultiIterationDQN:
         for level in range(self.get_max_trajectory_length()):
             self.build_q_function(level=level)
         self.session = tf.Session()
-        # Init data structures
-        self.get_max_likelihood_paths()
-        self.prepare_state_features()
-        self.prepare_posterior_tensors()
-        self.build_action_spaces()
-        self.get_evaluation_costs()
-        self.get_reachability_matrices()
-        self.get_posterior_tensors()
-        self.calculate_reward_tensors()
         # The following is for testing, can comment out later.
         # self.test_likelihood_consistency()
         print("X")
@@ -275,15 +281,19 @@ class MultiIterationDQN:
             self.lossValues.append(None)
             self.totalLosses.append(None)
             self.optimizers.append(None)
-        # else:
-        #     if self.qLearningFunc == "cnn":
-        #         nodes_at_level = self.network.orderedNodesPerLevel[level]
-        #         entry_shape = list(self.validationFeaturesDict[nodes_at_level[0].index].shape)
-        #         entry_shape[0] = None
-        #         entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
-        #         tf_state_input = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="inputs_{0}".format(level))
-        #         self.stateInputs.append(tf_state_input)
-        #         self.build_cnn_q_network(level=level)
+        else:
+            if self.qLearningFunc == "cnn":
+                nodes_at_level = self.network.orderedNodesPerLevel[level]
+                shapes_list = [self.stateFeatures[iteration][node.index].shape
+                               for iteration in self.routingDataset.iterations for node in nodes_at_level]
+                assert len(set(shapes_list)) == 1
+                entry_shape = list(shapes_list[0])
+                entry_shape[0] = None
+                entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
+                tf_state_input = tf.placeholder(dtype=tf.float32, shape=entry_shape,
+                                                name="state_inputs_{0}".format(level))
+                self.stateInputs.append(tf_state_input)
+                self.build_cnn_q_network(level=level)
         #     # Get selected q values; build the regression loss
         #     tf_selected_action_input = tf.placeholder(dtype=tf.int32, shape=[None],
         #                                               name="action_inputs_{0}".format(level))
@@ -305,6 +315,46 @@ class MultiIterationDQN:
         #     self.totalLosses.append(total_loss)
         #     optimizer = tf.train.AdamOptimizer().minimize(total_loss, global_step=self.globalStep)
         #     self.optimizers.append(optimizer)
+
+    def build_cnn_q_network(self, level):
+        hidden_layers = MultiIterationDQN.HIDDEN_LAYERS[level]
+        hidden_layers.append(self.actionSpaces[level].shape[0])
+        conv_features = MultiIterationDQN.CONV_FEATURES[level]
+        filter_sizes = MultiIterationDQN.FILTER_SIZES[level]
+        strides = MultiIterationDQN.STRIDES[level]
+        pools = MultiIterationDQN.MAX_POOL[level]
+
+        with tf.variable_scope("dqn_level_{0}".format(level)):
+            net = self.stateInputs[level]
+            conv_layer_id = 0
+            for conv_feature, filter_size, stride, max_pool in zip(conv_features, filter_sizes, strides, pools):
+                in_filters = net.get_shape().as_list()[-1]
+                out_filters = conv_feature
+                kernel = [filter_size, filter_size, in_filters, out_filters]
+                strides = [1, stride, stride, 1]
+                W = tf.get_variable("conv_layer_kernel_{0}_t{1}".format(conv_layer_id, level), kernel,
+                                    trainable=True)
+                b = tf.get_variable("conv_layer_bias_{0}_t{1}".format(conv_layer_id, level), [kernel[-1]],
+                                    trainable=True)
+                net = tf.nn.conv2d(net, W, strides, padding='SAME')
+                net = tf.nn.bias_add(net, b)
+                net = tf.nn.relu(net)
+                if max_pool is not None:
+                    net = tf.nn.max_pool(net, ksize=[1, max_pool, max_pool, 1], strides=[1, max_pool, max_pool, 1],
+                                         padding='SAME')
+                conv_layer_id += 1
+            # net = tf.contrib.layers.flatten(net)
+            net_shape = net.get_shape().as_list()
+            net = tf.nn.avg_pool(net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
+            net_shape = net.get_shape().as_list()
+            net = tf.reshape(net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
+            for layer_id, layer_dim in enumerate(hidden_layers):
+                if layer_id < len(hidden_layers) - 1:
+                    net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+                else:
+                    net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
+            q_values = net
+            self.qFuncs.append(q_values)
 
     # Test methods
     def test_likelihood_consistency(self):
