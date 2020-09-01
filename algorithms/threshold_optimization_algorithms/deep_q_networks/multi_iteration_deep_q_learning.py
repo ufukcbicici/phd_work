@@ -409,6 +409,9 @@ class MultiIterationDQN:
         if level != self.get_max_trajectory_length() - 1:
             raise NotImplementedError()
         self.session.run(tf.global_variables_initializer())
+        print("Whole Data ML Accuracy{0}".format(
+            self.get_max_likelihood_accuracy(iterations=self.routingDataset.iterations,
+                                             sample_indices=np.arange(self.routingDataset.labelList.shape[0]))))
         print("Training Set ML Accuracy:{0}".format(
             self.get_max_likelihood_accuracy(iterations=self.routingDataset.iterations,
                                              sample_indices=self.routingDataset.trainingIndices)))
