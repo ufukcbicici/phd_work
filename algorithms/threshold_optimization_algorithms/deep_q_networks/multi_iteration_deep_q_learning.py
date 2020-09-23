@@ -45,7 +45,6 @@ class MultiIterationDQN:
         self.build_action_spaces()
         self.get_evaluation_costs()
         self.get_reachability_matrices()
-        self.get_posterior_tensors()
         self.calculate_reward_tensors()
         # Neural network components
         self.experienceReplayTable = None
@@ -205,11 +204,6 @@ class MultiIterationDQN:
                             is_valid_selection = is_valid_selection and any(selection_arr)
                         reachability_matrix_t[action_t_minus_one_id, actions_t_id] = is_valid_selection
             self.reachabilityMatrices.append(reachability_matrix_t)
-
-    def get_posterior_tensors(self):
-        for iteration in self.routingDataset.iterations:
-            np.stack([self.routingDataset.dictOfDatasets[iteration].get_dict("posterior_probs")[node.index]
-                      for node in self.leafNodes], axis=2)
 
     def calculate_reward_tensors(self):
         invalid_action_penalty = MultiIterationDQN.invalid_action_penalty
@@ -405,10 +399,166 @@ class MultiIterationDQN:
             path_array = np.stack(path_array, axis=0)
             print("X")
 
+    def get_state_feature(self, sample_id, iteration, action_id_t_minus_1, level):
+        nodes_in_level = self.network.orderedNodesPerLevel[level]
+        sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
+        route_decision = np.array([1]) if level == 0 else self.actionSpaces[level - 1][action_id_t_minus_1]
+        feature = [route_decision[idx] * self.stateFeatures[iteration][node.index][sample_id_in_iteration]
+                   for idx, node in enumerate(nodes_in_level)]
+        feature = np.concatenate(feature, axis=-1)
+        return feature
+
+    def get_reward(self, sample_id, iteration, action_id_t_minus_1, action_id_t, level):
+        sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
+        reward_t = self.rewardTensors[iteration][level][sample_id_in_iteration, action_id_t_minus_1, action_id_t]
+        return reward_t
+
+    # def get_state_features(self, sample_ids, iterations, t_minus_one_action_ids, level):
+    #     nodes_in_level = self.network.orderedNodesPerLevel[level]
+    #
+    #
+    #
+    #
+    #     features_list = map(state_build_func)
+
+    # for row_id in range(state_matrix.shape[0]):
+    #     iteration = state_matrix[row_id, 0]
+    #     sample_id = state_matrix[row_id, 1]
+    #     t_minus_one_action_id = state_matrix[row_id, 2]
+    #     sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
+    #     route_decision = np.array([1]) if level == 0 else self.actionSpaces[level - 1][t_minus_one_action_id]
+    #     feature = [route_decision[idx] * self.stateFeatures[iteration][node.index][sample_id_in_iteration]
+    #                for idx, node in enumerate(nodes_in_level)]
+    #     features_list.append(np.concatenate(feature, axis=-1))
+    # features = np.stack(features_list, axis=0)
+    # return features
+
+    # print("X")
+    # # # assert data_type in {"validation", "test"}
+    # # # route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
+    # # #     self.actionSpaces[level - 1][state_matrix[:, 1]]
+    # # list_of_feature_tensors = [self.validationFeaturesDict[node.index] if data_type == "validation" else
+    # #                            self.testFeaturesDict[node.index] for node in
+    # #                            self.network.orderedNodesPerLevel[level]]
+    # # list_of_sampled_tensors = [feature_tensor[state_matrix[:, 0], :] for feature_tensor in list_of_feature_tensors]
+    # # list_of_coeffs = []
+    # # for idx in range(len(list_of_sampled_tensors)):
+    # #     route_coeffs = route_decisions[:, idx]
+    # #     for _ in range(len(list_of_sampled_tensors[idx].shape) - 1):
+    # #         route_coeffs = np.expand_dims(route_coeffs, axis=-1)
+    # #     list_of_coeffs.append(route_coeffs)
+    # # list_of_sparse_tensors = [feature_tensor * coeff_arr
+    # #                           for feature_tensor, coeff_arr in zip(list_of_sampled_tensors, list_of_coeffs)]
+    # # # This is for debugging
+    # # # manuel_route_matrix = np.stack([np.array([int(np.sum(tensor) != 0) for tensor in _l])
+    # # #                                 for _l in list_of_sparse_tensors], axis=1)
+    # # # assert np.array_equal(route_decisions, manuel_route_matrix)
+    # # state_features = np.concatenate(list_of_sparse_tensors, axis=-1)
+    # # return state_features
+
+    def add_to_the_experience_table(self, experience_matrix):
+        if self.experienceReplayTable is None:
+            self.experienceReplayTable = np.copy(experience_matrix)
+        else:
+            self.experienceReplayTable = np.concatenate([self.experienceReplayTable, experience_matrix], axis=0)
+            if self.experienceReplayTable.shape[0] > self.maxExpCount:
+                num_rows_to_delete = self.experienceReplayTable.shape[0] - self.maxExpCount
+                self.experienceReplayTable = self.experienceReplayTable[num_rows_to_delete:]
+                assert self.experienceReplayTable.shape[0] == self.maxExpCount
+
+    def fill_experience_replay_table(self, level, sample_count, epsilon):
+        state_count = self.routingDataset.trainingIndices.shape[0]
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
+        action_count_t = self.actionSpaces[level].shape[0]
+        sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
+        iterations = np.random.choice(self.routingDataset.iterations, sample_count, replace=True)
+        actions_t_minus_1 = np.random.choice(action_count_t_minus_one, sample_count)
+        # Build the current state: s_t
+        state_matrix_t = np.stack([sample_ids, iterations, actions_t_minus_1], axis=1)
+        # Get the state features for state_matrix_t
+        state_features_t = [
+            self.get_state_feature(sample_id=s_id, iteration=it, action_id_t_minus_1=a_t_1, level=level) for
+            s_id, it, a_t_1 in
+            zip(sample_ids, iterations, actions_t_minus_1)]
+        state_features_t = np.stack(state_features_t, axis=0)
+        # Get the Q Table for states: s_t
+        Q_table = self.session.run([self.qFuncs[level]],
+                                   feed_dict={
+                                       self.stateInputs[level]: state_features_t})[0]
+        # Sample a_t epsilon greedy for every state.
+        # If 1, choose uniformly over all actions. If 0, choose the best action.
+        epsilon_greedy_sampling_choices = np.random.choice(a=[0, 1], size=state_matrix_t.shape[0],
+                                                           p=[1.0 - epsilon, epsilon])
+        random_selection = np.random.choice(action_count_t, size=state_matrix_t.shape[0])
+        greedy_selection = np.argmax(Q_table, axis=1)
+        actions_t = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
+        rewards_t = np.array([
+            self.get_reward(sample_id=s_id, iteration=it, action_id_t_minus_1=a_t_1, action_id_t=a_t, level=level)
+            for s_id, it, a_t_1, a_t in zip(sample_ids, iterations, actions_t_minus_1, actions_t)])
+
+        # for idx in range(sample_count):
+        #     # Build the current state: s_t
+        #     state_t = (iterations[idx], sample_ids[idx], t_minus_one_action_ids[idx])
+        #     # Get the Q_table
+        #
+        #
+        #     # Get the action a_t
+        #     # Sample epsilon greedy for every state.
+        #     # If 1, choose uniformly over all actions. If 0, choose the best action.
+        #     action_t =
+
+        # for batch_id in range(batch_count):
+        #     sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
+        #     iterations = np.random.choice(self.routingDataset.iterations, sample_count, replace=True)
+        #     t_minus_one_action_ids = np.random.choice(action_count_t_minus_one, sample_count)
+        #     state_matrix = np.stack([iterations, sample_ids, t_minus_one_action_ids], axis=1)
+        #     rewards_matrix = []
+        #     for idx in range(state_matrix.shape[0]):
+        #         iteration = state_matrix[idx, 0]
+        #         sample_id = state_matrix[idx, 1]
+        #         t_minus_one_action_id = state_matrix[idx, 2]
+        #         sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
+        #         rewards_matrix.append(self.rewardTensors[iteration][level]
+        #                               [sample_id_in_iteration, t_minus_one_action_id, :])
+        #     rewards_matrix = np.stack(rewards_matrix, axis=0)
+        #     state_features = self.get_state_features(state_matrix=state_matrix, level=level)
+        #     print("X")
+
+        # rewards_tensor = self.validationRewards[level]
+        # for batch_id in range(batch_count):
+        #     state_ids = np.random.choice(state_count, sample_count, replace=False)
+        #     action_ids = np.random.choice(action_count_t_minus_one, sample_count)
+        #     state_matrix = np.stack([state_ids, action_ids], axis=1)
+        #     rewards_matrix = rewards_tensor[state_matrix[:, 0], state_matrix[:, 1], :]
+        #     state_features = self.get_state_features(state_matrix=state_matrix, level=level, data_type="validation")
+        #     Q_table = self.session.run([self.qFuncs[level]],
+        #                                feed_dict={
+        #                                    self.stateInputs[level]: state_features})[0]
+        #     # Sample epsilon greedy for every state.
+        #     # If 1, choose uniformly over all actions. If 0, choose the best action.
+        #     epsilon_greedy_sampling_choices = np.random.choice(a=[0, 1], size=state_matrix.shape[0],
+        #                                                        p=[1.0 - epsilon, epsilon])
+        #     random_selection = np.random.choice(action_count_t, size=state_matrix.shape[0])
+        #     greedy_selection = np.argmax(Q_table, axis=1)
+        #     selected_actions = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
+        #     rewards = rewards_matrix[np.arange(state_matrix.shape[0]), selected_actions]
+        #     # Store into the experience replay table
+        #     experience_matrix = np.concatenate([state_matrix,
+        #                                         np.expand_dims(selected_actions, axis=1),
+        #                                         np.expand_dims(rewards, axis=1)], axis=1)
+        #     self.add_to_the_experience_table(experience_matrix=experience_matrix)
+
     def train(self, level, **kwargs):
+        sample_count = kwargs["sample_count"]
+        episode_count = kwargs["episode_count"]
+        discount_factor = kwargs["discount_factor"]
+        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        learning_rate = kwargs["learning_rate"]
+        epsilon = 1.0
         if level != self.get_max_trajectory_length() - 1:
             raise NotImplementedError()
         self.session.run(tf.global_variables_initializer())
+        # If we use only information gain for routing (ML: Maximum likelihood routing)
         print("Whole Data ML Accuracy{0}".format(
             self.get_max_likelihood_accuracy(iterations=self.routingDataset.iterations,
                                              sample_indices=np.arange(self.routingDataset.labelList.shape[0]))))
@@ -418,17 +568,8 @@ class MultiIterationDQN:
         print("Test Set ML Accuracy:{0}".format(
             self.get_max_likelihood_accuracy(iterations=self.routingDataset.testIterations,
                                              sample_indices=self.routingDataset.testIndices)))
-        print("X")
-
-        # self.evaluate_ml_routing_accuracies()
-        # sample_count = kwargs["sample_count"]
-        # episode_count = kwargs["episode_count"]
-        # discount_factor = kwargs["discount_factor"]
-        # epsilon_discount_factor = kwargs["epsilon_discount_factor"]
-        # learning_rate = kwargs["learning_rate"]
-        # epsilon = 1.0
-        # # Fill the experience replay table: Solve the cold start problem.
-        # self.fill_experience_replay_table(level=level, batch_count=5, sample_count=sample_count, epsilon=epsilon)
+        # Fill the experience replay table: Solve the cold start problem.
+        self.fill_experience_replay_table(level=level, batch_count=5, sample_count=sample_count, epsilon=epsilon)
         # losses = []
         # for episode_id in range(episode_count):
         #     print("episode_id:{0}".format(episode_id))
