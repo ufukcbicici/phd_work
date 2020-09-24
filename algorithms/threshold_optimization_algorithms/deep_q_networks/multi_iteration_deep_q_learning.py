@@ -389,16 +389,6 @@ class MultiIterationDQN:
         accuracy = correct_count / all_true_labels.shape[0]
         return accuracy
 
-    # Test methods
-    def test_likelihood_consistency(self):
-        for idx in range(self.routingDataset.labelList.shape[0]):
-            path_array = []
-            for iteration in self.routingDataset.iterations:
-                iteration_id = self.routingDataset.linkageInfo[(idx, iteration)]
-                path_array.append(self.maxLikelihoodPaths[iteration][iteration_id])
-            path_array = np.stack(path_array, axis=0)
-            print("X")
-
     def get_state_feature(self, sample_id, iteration, action_id_t_minus_1, level):
         nodes_in_level = self.network.orderedNodesPerLevel[level]
         sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
@@ -481,6 +471,8 @@ class MultiIterationDQN:
             s_id, it, a_t_1 in
             zip(sample_ids, iterations, actions_t_minus_1)]
         state_features_t = np.stack(state_features_t, axis=0)
+        # Check if the state features are correctly built
+        self.test_state_features(state_features_t=state_features_t, actions_t_minus_1=actions_t_minus_1, level=level)
         # Get the Q Table for states: s_t
         Q_table = self.session.run([self.qFuncs[level]],
                                    feed_dict={
@@ -495,58 +487,13 @@ class MultiIterationDQN:
         rewards_t = np.array([
             self.get_reward(sample_id=s_id, iteration=it, action_id_t_minus_1=a_t_1, action_id_t=a_t, level=level)
             for s_id, it, a_t_1, a_t in zip(sample_ids, iterations, actions_t_minus_1, actions_t)])
-
-        # for idx in range(sample_count):
-        #     # Build the current state: s_t
-        #     state_t = (iterations[idx], sample_ids[idx], t_minus_one_action_ids[idx])
-        #     # Get the Q_table
-        #
-        #
-        #     # Get the action a_t
-        #     # Sample epsilon greedy for every state.
-        #     # If 1, choose uniformly over all actions. If 0, choose the best action.
-        #     action_t =
-
-        # for batch_id in range(batch_count):
-        #     sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
-        #     iterations = np.random.choice(self.routingDataset.iterations, sample_count, replace=True)
-        #     t_minus_one_action_ids = np.random.choice(action_count_t_minus_one, sample_count)
-        #     state_matrix = np.stack([iterations, sample_ids, t_minus_one_action_ids], axis=1)
-        #     rewards_matrix = []
-        #     for idx in range(state_matrix.shape[0]):
-        #         iteration = state_matrix[idx, 0]
-        #         sample_id = state_matrix[idx, 1]
-        #         t_minus_one_action_id = state_matrix[idx, 2]
-        #         sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
-        #         rewards_matrix.append(self.rewardTensors[iteration][level]
-        #                               [sample_id_in_iteration, t_minus_one_action_id, :])
-        #     rewards_matrix = np.stack(rewards_matrix, axis=0)
-        #     state_features = self.get_state_features(state_matrix=state_matrix, level=level)
-        #     print("X")
-
-        # rewards_tensor = self.validationRewards[level]
-        # for batch_id in range(batch_count):
-        #     state_ids = np.random.choice(state_count, sample_count, replace=False)
-        #     action_ids = np.random.choice(action_count_t_minus_one, sample_count)
-        #     state_matrix = np.stack([state_ids, action_ids], axis=1)
-        #     rewards_matrix = rewards_tensor[state_matrix[:, 0], state_matrix[:, 1], :]
-        #     state_features = self.get_state_features(state_matrix=state_matrix, level=level, data_type="validation")
-        #     Q_table = self.session.run([self.qFuncs[level]],
-        #                                feed_dict={
-        #                                    self.stateInputs[level]: state_features})[0]
-        #     # Sample epsilon greedy for every state.
-        #     # If 1, choose uniformly over all actions. If 0, choose the best action.
-        #     epsilon_greedy_sampling_choices = np.random.choice(a=[0, 1], size=state_matrix.shape[0],
-        #                                                        p=[1.0 - epsilon, epsilon])
-        #     random_selection = np.random.choice(action_count_t, size=state_matrix.shape[0])
-        #     greedy_selection = np.argmax(Q_table, axis=1)
-        #     selected_actions = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
-        #     rewards = rewards_matrix[np.arange(state_matrix.shape[0]), selected_actions]
-        #     # Store into the experience replay table
-        #     experience_matrix = np.concatenate([state_matrix,
-        #                                         np.expand_dims(selected_actions, axis=1),
-        #                                         np.expand_dims(rewards, axis=1)], axis=1)
-        #     self.add_to_the_experience_table(experience_matrix=experience_matrix)
+        # Store into the experience replay table. Note that normally, we store (s_t,a_t,r_t,s_{t+1}) into the
+        # experience replay table. But in our case, the state transition distribution p(s_{t+1}|s_t,a_t) is
+        # deterministic. We can only store s_t,a_t and we can calculate s_{t+1} from this pair later.
+        experience_matrix = np.concatenate([state_matrix_t,
+                                            np.expand_dims(actions_t, axis=1),
+                                            np.expand_dims(rewards_t, axis=1)], axis=1)
+        self.add_to_the_experience_table(experience_matrix=experience_matrix)
 
     def train(self, level, **kwargs):
         sample_count = kwargs["sample_count"]
@@ -569,7 +516,8 @@ class MultiIterationDQN:
             self.get_max_likelihood_accuracy(iterations=self.routingDataset.testIterations,
                                              sample_indices=self.routingDataset.testIndices)))
         # Fill the experience replay table: Solve the cold start problem.
-        self.fill_experience_replay_table(level=level, batch_count=5, sample_count=sample_count, epsilon=epsilon)
+        self.fill_experience_replay_table(level=level, sample_count=5*sample_count, epsilon=epsilon)
+
         # losses = []
         # for episode_id in range(episode_count):
         #     print("episode_id:{0}".format(episode_id))
@@ -608,3 +556,20 @@ class MultiIterationDQN:
         #         self.measure_performance(level=level, losses=losses, data_type="validation")
         #         self.measure_performance(level=level, losses=losses, data_type="test")
         #         losses = []
+
+    # Test methods
+    def test_likelihood_consistency(self):
+        for idx in range(self.routingDataset.labelList.shape[0]):
+            path_array = []
+            for iteration in self.routingDataset.iterations:
+                iteration_id = self.routingDataset.linkageInfo[(idx, iteration)]
+                path_array.append(self.maxLikelihoodPaths[iteration][iteration_id])
+            path_array = np.stack(path_array, axis=0)
+            print("X")
+
+    def test_state_features(self, state_features_t, actions_t_minus_1, level):
+        s_t = np.mean(state_features_t, (1, 2))
+        s_t = np.stack([np.mean(s_t[:, 0:s_t.shape[1]//2], axis=1),
+                        np.mean(s_t[:, s_t.shape[1]//2:s_t.shape[1]], axis=1)], axis=1)
+        r_t = np.stack([self.actionSpaces[level - 1][idx] for idx in actions_t_minus_1], axis=0)
+        assert np.array_equal(s_t != 0, r_t)
