@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 
+from auxillary.general_utility_funcs import UtilityFuncs
+
 
 class MultiIterationDQN:
     invalid_action_penalty = -1.0
@@ -389,62 +391,34 @@ class MultiIterationDQN:
         accuracy = correct_count / all_true_labels.shape[0]
         return accuracy
 
-    def get_state_feature(self, sample_id, iteration, action_id_t_minus_1, level):
+    def get_state_features(self, samples, iterations, action_ids_t_minus_1, level):
         nodes_in_level = self.network.orderedNodesPerLevel[level]
-        sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
-        route_decision = np.array([1]) if level == 0 else self.actionSpaces[level - 1][action_id_t_minus_1]
-        feature = [route_decision[idx] * self.stateFeatures[iteration][node.index][sample_id_in_iteration]
-                   for idx, node in enumerate(nodes_in_level)]
-        feature = np.concatenate(feature, axis=-1)
-        return feature
+        features = []
+        for s_id, it, a_t_1 in zip(samples, iterations, action_ids_t_minus_1):
+            sample_id_in_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+            route_decision = np.array([1]) if level == 0 else self.actionSpaces[level - 1][a_t_1]
+            feature = [route_decision[idx] * self.stateFeatures[it][node.index][sample_id_in_iteration]
+                       for idx, node in enumerate(nodes_in_level)]
+            feature = np.concatenate(feature, axis=-1)
+            features.append(feature)
+        features = np.stack(features, axis=0)
+        return features
 
-    def get_reward(self, sample_id, iteration, action_id_t_minus_1, action_id_t, level):
-        sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
-        reward_t = self.rewardTensors[iteration][level][sample_id_in_iteration, action_id_t_minus_1, action_id_t]
-        return reward_t
-
-    # def get_state_features(self, sample_ids, iterations, t_minus_one_action_ids, level):
-    #     nodes_in_level = self.network.orderedNodesPerLevel[level]
-    #
-    #
-    #
-    #
-    #     features_list = map(state_build_func)
-
-    # for row_id in range(state_matrix.shape[0]):
-    #     iteration = state_matrix[row_id, 0]
-    #     sample_id = state_matrix[row_id, 1]
-    #     t_minus_one_action_id = state_matrix[row_id, 2]
-    #     sample_id_in_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
-    #     route_decision = np.array([1]) if level == 0 else self.actionSpaces[level - 1][t_minus_one_action_id]
-    #     feature = [route_decision[idx] * self.stateFeatures[iteration][node.index][sample_id_in_iteration]
-    #                for idx, node in enumerate(nodes_in_level)]
-    #     features_list.append(np.concatenate(feature, axis=-1))
-    # features = np.stack(features_list, axis=0)
-    # return features
-
-    # print("X")
-    # # # assert data_type in {"validation", "test"}
-    # # # route_decisions = np.zeros(shape=(state_matrix.shape[0],)) if level == 0 else \
-    # # #     self.actionSpaces[level - 1][state_matrix[:, 1]]
-    # # list_of_feature_tensors = [self.validationFeaturesDict[node.index] if data_type == "validation" else
-    # #                            self.testFeaturesDict[node.index] for node in
-    # #                            self.network.orderedNodesPerLevel[level]]
-    # # list_of_sampled_tensors = [feature_tensor[state_matrix[:, 0], :] for feature_tensor in list_of_feature_tensors]
-    # # list_of_coeffs = []
-    # # for idx in range(len(list_of_sampled_tensors)):
-    # #     route_coeffs = route_decisions[:, idx]
-    # #     for _ in range(len(list_of_sampled_tensors[idx].shape) - 1):
-    # #         route_coeffs = np.expand_dims(route_coeffs, axis=-1)
-    # #     list_of_coeffs.append(route_coeffs)
-    # # list_of_sparse_tensors = [feature_tensor * coeff_arr
-    # #                           for feature_tensor, coeff_arr in zip(list_of_sampled_tensors, list_of_coeffs)]
-    # # # This is for debugging
-    # # # manuel_route_matrix = np.stack([np.array([int(np.sum(tensor) != 0) for tensor in _l])
-    # # #                                 for _l in list_of_sparse_tensors], axis=1)
-    # # # assert np.array_equal(route_decisions, manuel_route_matrix)
-    # # state_features = np.concatenate(list_of_sparse_tensors, axis=-1)
-    # # return state_features
+    def get_rewards(self, samples, iterations, action_ids_t_minus_1, action_ids_t, level):
+        rewards = []
+        if action_ids_t is not None:
+            for s_id, it, a_t_1, a_t in zip(samples, iterations, action_ids_t_minus_1, action_ids_t):
+                sample_id_in_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+                reward_t = self.rewardTensors[it][level][sample_id_in_iteration, a_t_1, a_t]
+                rewards.append(reward_t)
+            rewards = np.array(rewards)
+        else:
+            for s_id, it, a_t_1 in zip(samples, iterations, action_ids_t_minus_1):
+                sample_id_in_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+                reward_array = self.rewardTensors[it][level][sample_id_in_iteration, a_t_1]
+                rewards.append(reward_array)
+            rewards = np.array(rewards)
+        return rewards
 
     def add_to_the_experience_table(self, experience_matrix):
         if self.experienceReplayTable is None:
@@ -466,11 +440,8 @@ class MultiIterationDQN:
         # Build the current state: s_t
         state_matrix_t = np.stack([sample_ids, iterations, actions_t_minus_1], axis=1)
         # Get the state features for state_matrix_t
-        state_features_t = [
-            self.get_state_feature(sample_id=s_id, iteration=it, action_id_t_minus_1=a_t_1, level=level) for
-            s_id, it, a_t_1 in
-            zip(sample_ids, iterations, actions_t_minus_1)]
-        state_features_t = np.stack(state_features_t, axis=0)
+        state_features_t = self.get_state_features(samples=sample_ids, iterations=iterations,
+                                                   action_ids_t_minus_1=actions_t_minus_1, level=level)
         # Check if the state features are correctly built
         self.test_state_features(state_features_t=state_features_t, actions_t_minus_1=actions_t_minus_1, level=level)
         # Get the Q Table for states: s_t
@@ -484,9 +455,8 @@ class MultiIterationDQN:
         random_selection = np.random.choice(action_count_t, size=state_matrix_t.shape[0])
         greedy_selection = np.argmax(Q_table, axis=1)
         actions_t = np.where(epsilon_greedy_sampling_choices, random_selection, greedy_selection)
-        rewards_t = np.array([
-            self.get_reward(sample_id=s_id, iteration=it, action_id_t_minus_1=a_t_1, action_id_t=a_t, level=level)
-            for s_id, it, a_t_1, a_t in zip(sample_ids, iterations, actions_t_minus_1, actions_t)])
+        rewards_t = self.get_rewards(samples=sample_ids, iterations=iterations, action_ids_t_minus_1=actions_t_minus_1,
+                                     action_ids_t=actions_t, level=level)
         # Store into the experience replay table. Note that normally, we store (s_t,a_t,r_t,s_{t+1}) into the
         # experience replay table. But in our case, the state transition distribution p(s_{t+1}|s_t,a_t) is
         # deterministic. We can only store s_t,a_t and we can calculate s_{t+1} from this pair later.
@@ -516,46 +486,211 @@ class MultiIterationDQN:
             self.get_max_likelihood_accuracy(iterations=self.routingDataset.testIterations,
                                              sample_indices=self.routingDataset.testIndices)))
         # Fill the experience replay table: Solve the cold start problem.
-        self.fill_experience_replay_table(level=level, sample_count=5*sample_count, epsilon=epsilon)
+        self.fill_experience_replay_table(level=level, sample_count=10 * sample_count, epsilon=epsilon)
+        losses = []
+        for episode_id in range(episode_count):
+            self.fill_experience_replay_table(level=level, sample_count=sample_count, epsilon=epsilon)
+            # Sample batch of experiences from the table
+            experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count, replace=False)
+            experiences_sampled = self.experienceReplayTable[experience_ids]
+            sampled_state_tuples = experiences_sampled[:, 0:3].astype(np.int32)
+            sampled_actions = experiences_sampled[:, 3].astype(np.int32)
+            sampled_rewards = experiences_sampled[:, 4]
+            # Add Gradient Descent Step
+            # Get the state features for state_matrix_t
+            state_features_t = self.get_state_features(samples=sampled_state_tuples[:, 0],
+                                                       iterations=sampled_state_tuples[:, 1],
+                                                       action_ids_t_minus_1=sampled_state_tuples[:, 2], level=level)
+            # results = self.session.run(
+            #     [self.qFuncs[level],
+            #      self.selectionIndices[level],
+            #      self.selectedQValues[level],
+            #      self.lossVectors[level],
+            #      self.lossValues[level],
+            #      self.totalLosses[level],
+            #      self.l2Loss], feed_dict={self.stateCount: experiences_sampled.shape[0],
+            #                               self.stateInputs[level]: state_features_t,
+            #                               self.actionSelections[level]: sampled_actions,
+            #                               self.rewardVectors[level]: sampled_rewards,
+            #                               self.l2LambdaTf: 0.0})
+            results = self.session.run([self.totalLosses[level], self.optimizers[level]],
+                                       feed_dict={self.stateCount: experiences_sampled.shape[0],
+                                                  self.stateInputs[level]: state_features_t,
+                                                  self.actionSelections[level]: sampled_actions,
+                                                  self.rewardVectors[level]: sampled_rewards,
+                                                  self.l2LambdaTf: 0.0})
+            # Adjust epsilon
+            epsilon *= epsilon_discount_factor
+            total_loss = results[0]
+            losses.append(total_loss)
+            if len(losses) % 100 == 0:
+                self.measure_performance(level=level, losses=losses, data_type="validation")
+                self.measure_performance(level=level, losses=losses, data_type="test")
+                losses = []
 
-        # losses = []
-        # for episode_id in range(episode_count):
-        #     print("episode_id:{0}".format(episode_id))
-        #     self.fill_experience_replay_table(level=level, batch_count=1, sample_count=sample_count, epsilon=epsilon)
-        #     # Sample batch of experiences from the table
-        #     experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count, replace=False)
-        #     experiences_sampled = self.experienceReplayTable[experience_ids]
-        #     sampled_state_ids = experiences_sampled[:, 0:2].astype(np.int32)
-        #     sampled_actions = experiences_sampled[:, 2].astype(np.int32)
-        #     sampled_rewards = experiences_sampled[:, 3]
-        #     # Add Gradient Descent Step
-        #     sampled_state_features = self.get_state_features(state_matrix=sampled_state_ids, level=level,
-        #                                                      data_type="validation")
-        #     # results = self.session.run(
-        #     #     [self.qFuncs[level],
-        #     #      self.selectionIndices[level],
-        #     #      self.selectedQValues[level],
-        #     #      self.lossVectors[level],
-        #     #      self.lossValues[level],
-        #     #      self.totalLosses[level],
-        #     #      self.l2Loss], feed_dict={self.stateCount: experiences_sampled.shape[0],
-        #     #                               self.stateInputs[level]: sampled_state_features,
-        #     #                               self.actionSelections[level]: sampled_actions,
-        #     #                               self.rewardVectors[level]: sampled_rewards,
-        #     #                               self.l2LambdaTf: 0.0})
-        #     results = self.session.run([self.totalLosses[level], self.optimizers[level]],
-        #                                feed_dict={self.stateCount: experiences_sampled.shape[0],
-        #                                           self.stateInputs[level]: sampled_state_features,
-        #                                           self.actionSelections[level]: sampled_actions,
-        #                                           self.rewardVectors[level]: sampled_rewards,
-        #                                           self.l2LambdaTf: 0.0005})
-        #     epsilon *= epsilon_discount_factor
-        #     total_loss = results[0]
-        #     losses.append(total_loss)
-        #     if len(losses) % 100 == 0:
-        #         self.measure_performance(level=level, losses=losses, data_type="validation")
-        #         self.measure_performance(level=level, losses=losses, data_type="test")
-        #         losses = []
+    def get_all_possible_state_features(self, sample_indices, iterations, level):
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
+        # Enumerate all possible states
+        all_state_tuples = UtilityFuncs.get_cartesian_product(
+            [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+        complete_state_matrix = np.array(all_state_tuples)
+        complete_state_features = self.get_state_features(
+            samples=complete_state_matrix[:, 0], iterations=complete_state_matrix[:, 1],
+            action_ids_t_minus_1=complete_state_matrix[:, 2], level=level)
+        return complete_state_features, complete_state_matrix
+
+    def create_q_table(self, sample_indices, iterations, level):
+        # Enumerate all possible states
+        complete_state_features, complete_state_matrix = self.get_all_possible_state_features(
+            sample_indices=sample_indices,
+            iterations=iterations, level=level)
+        assert complete_state_features.shape[0] == complete_state_matrix.shape[0]
+        # Get q-values for every state
+        q_vals = self.session.run([self.qFuncs[level]], feed_dict={self.stateInputs[level]: complete_state_features})[0]
+        assert q_vals.shape[0] == complete_state_matrix.shape[0]
+        q_table = {}
+        for state_tuple, q_val in zip(complete_state_matrix, q_vals):
+            q_table[tuple(state_tuple)] = q_val
+        return q_table
+
+    def execute_bellman_equation(self, sample_indices, iterations, discount_rate):
+        last_level = self.get_max_trajectory_length() - 1
+        # sample_ids_for_iterations = np.array([self.routingDataset.linkageInfo[(s_id, it)]
+        #                                       for s_id, it in zip(sample_indices, iterations)])
+        # Execute the Bellman Equation
+        # Step 1: Get the Q*(s,a) for the last level.
+        # TODO: Later, implement this in a vectorized way.
+        Q_table_T = self.create_q_table(sample_indices=sample_indices, iterations=iterations, level=last_level)
+        Q_tables = {last_level: Q_table_T}
+        for t in range(last_level - 1, -1, -1):
+            action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+            action_count_t = self.actionSpaces[t].shape[0]
+            for s_id, it, a_t_minus_1 in zip(sample_indices, iterations, range(action_count_t_minus_one)):
+                sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+                for a_t in range(action_count_t):
+                    # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
+                    # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
+                    # s_{t}: (sample_id, iteration, a_{t-1})
+                    r_t_plus_1 = self.rewardTensors[it][t][sample_id_for_iteration, a_t_minus_1, a_t]
+                    # \sum_{s_{t+1}} p(s_{t+1}|s_{t},a_{t}) max_{a_{t+1}} Q*(s_{t+1},a_{t+1})
+                    # Since in our case p(s_{t+1}|s_{t},a_{t}) is deterministic,
+                    # it is a lookup into the Q*(s_{t+1},a_{t+1}) table.
+                    # Again:
+                    # s_{t}: (sample_id, iteration, a_{t-1}). Then we have:
+                    # s_{t+1}: (sample_id, iteration, a_t)
+                    # Get the Q* values, belonging to s_{t+1}.
+                    q_values = Q_tables[t+1][(s_id, it, a_t)]
+                    q_t = r_t_plus_1 + discount_rate*np.max(q_values)
+
+
+
+
+
+
+        # # Enumerate all possible states
+        # complete_state_features, complete_state_matrix = self.get_all_possible_state_features(
+        #     sample_indices=sample_indices,
+        #     iterations=iterations, level=last_level)
+        # Q_table_T = self.session.run([self.qFuncs[last_level]], feed_dict={self.stateInputs[last_level]:
+        #                                                                        complete_state_features})[0]
+        # Q_tables = []
+        # Q_t_plus_one = np.copy(Q_table_T)
+        # assert np.prod(Q_t_plus_one.shape) == len(sample_indices) * len(iterations) * action_count_t_minus_one * \
+        #        action_count_t
+        # Q_tables.append(Q_t_plus_one)
+
+        # for t in range(last_level - 1, -1, -1):
+        #     action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+        #     action_count_t = self.actionSpaces[t].shape[0]
+        #     all_state_tuples = UtilityFuncs.get_cartesian_product(
+        #         [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+        #     complete_state_features, complete_state_matrix = self.get_all_possible_state_features(
+        #         sample_indices=sample_indices,
+        #         iterations=iterations, level=t)
+        #     expected_rewards = self.get_rewards(samples=complete_state_matrix[:, 0],
+        #                                         iterations=complete_state_matrix[:, 1],
+        #                                         action_ids_t_minus_1=complete_state_matrix[:, 2],
+        #                                         action_ids_t=None, level=t)
+        #     Q_t = []
+        #     for a_t in range(action_count_t):
+        #         # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
+        #         # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
+        #         r_t_plus_1 = expected_rewards[:, a_t]
+        #         # \sum_{s_{t+1}} p(s_{t+1}|s_{t},a_{t}) max_{a_{t+1}} Q*(s_{t+1},a_{t+1})
+        #         # Since in our case p(s_{t+1}|s_{t},a_{t}) is deterministic,
+        #         # it is a lookup into the Q*(s_{t+1},a_{t+1}) table.
+        #         Q_tables[-1]
+
+
+
+
+
+
+        print("X")
+
+        # dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
+        # last_level = self.get_max_trajectory_length() - 1
+        # state_count = dataset.routingDataset.labelList.shape[0]
+        # action_count_t_minus_one = 1 if last_level == 0 else self.actionSpaces[last_level - 1].shape[0]
+        # action_count_t = self.actionSpaces[last_level].shape[0]
+        # rewards = self.validationRewards if data_type == "validation" else self.testRewards
+        # # Execute the Bellman Equation
+        # # Step 1: Get the Q*(s,a) for the last level.
+        # state_ids = np.array([sample_id for sample_id in range(state_count)])
+        # complete_state_matrix = UtilityFuncs.get_cartesian_product(
+        #     [state_ids, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+        # complete_state_matrix = np.array(complete_state_matrix)
+        # complete_state_features = self.get_state_features(state_matrix=complete_state_matrix, level=last_level,
+        #                                                   data_type=data_type)
+        # Q_table_T = self.session.run([self.qFuncs[last_level]],
+        #                              feed_dict={self.stateInputs[last_level]: complete_state_features})[0]
+        # Q_tables = []
+        # Q_t_plus_one = np.copy(Q_table_T)
+        # assert np.prod(Q_t_plus_one.shape) == state_count * action_count_t_minus_one * action_count_t
+        # Q_t_plus_one = np.reshape(Q_t_plus_one, newshape=(state_count, action_count_t_minus_one, action_count_t))
+        # Q_tables.append(Q_t_plus_one)
+        # for t in range(last_level - 1, -1, -1):
+        #     action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+        #     action_count_t = self.actionSpaces[t].shape[0]
+        #     states_matrix = UtilityFuncs.get_cartesian_product(
+        #         [[sample_id for sample_id in range(state_count)],
+        #          [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+        #     states_matrix = np.array(states_matrix)
+        #     expected_rewards = rewards[t][states_matrix[:, 0], states_matrix[:, 1], :]
+        #     Q_t = []
+        #     for a in range(action_count_t):
+        #         # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
+        #         # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
+        #         reward_vector = expected_rewards[:, a]
+        #         # \sum_{s_{t+1}} p(s_{t+1}|s_{t},a_{t}) max_{a_{t+1}} Q*(s_{t+1},a_{t+1})
+        #         # Since in our case p(s_{t+1}|s_{t},a_{t}) is deterministic,
+        #         # it is a lookup into the Q*(s_{t+1},a_{t+1}) table.
+        #         Q_t_plus_one_given_a = Q_t_plus_one[state_ids, a * np.ones_like(state_ids), :]
+        #         assert reward_vector.shape[0] == Q_t_plus_one_given_a.shape[0] * action_count_t_minus_one
+        #         Q_t_plus_one_given_a = np.repeat(Q_t_plus_one_given_a, axis=0, repeats=action_count_t_minus_one)
+        #         q_values = np.max(Q_t_plus_one_given_a, axis=1)
+        #         assert reward_vector.shape[0] == q_values.shape[0]
+        #         Q_t.append(reward_vector + q_values)
+        #     Q_t = np.stack(Q_t, axis=1)
+        #     Q_t_plus_one = np.reshape(Q_t, newshape=(state_count, action_count_t_minus_one, action_count_t))
+        #     Q_tables.append(Q_t_plus_one)
+        # Q_tables.reverse()
+        # # Now we are ready to calculate the optimal trajectories and calculate the optimal accuracy and computation load
+        # # for every state.
+        # states_matrix = UtilityFuncs.get_cartesian_product(
+        #     [[sample_id for sample_id in range(state_count)], [0]])
+        # states_matrix = np.array(states_matrix)
+        # for t in range(self.get_max_trajectory_length()):
+        #     Q_table = Q_tables[t][states_matrix[:, 0], states_matrix[:, 1], :]
+        #     actions_t = np.argmax(Q_table, axis=1)
+        #     states_matrix[:, 1] = actions_t
+        #     print("Bellman Decision Distribution Level:{0}:{1}".format(t, Counter(states_matrix[:, 1])))
+        # # The last layer actions determine the routing decisions.
+        # routing_decisions = self.actionSpaces[-1][states_matrix[:, 1], :]
+        # truth_vector = self.calculate_results_from_routing_decisions(states_matrix[:, 0], routing_decisions, data_type)
+        # self.calculate_results_by_sampling(q_tables=Q_tables, state_ids=states_matrix[:, 0], data_type=data_type,
+        #                                    sample_count=1000)
+        # return routing_decisions, truth_vector
 
     # Test methods
     def test_likelihood_consistency(self):
@@ -569,7 +704,7 @@ class MultiIterationDQN:
 
     def test_state_features(self, state_features_t, actions_t_minus_1, level):
         s_t = np.mean(state_features_t, (1, 2))
-        s_t = np.stack([np.mean(s_t[:, 0:s_t.shape[1]//2], axis=1),
-                        np.mean(s_t[:, s_t.shape[1]//2:s_t.shape[1]], axis=1)], axis=1)
+        s_t = np.stack([np.mean(s_t[:, 0:s_t.shape[1] // 2], axis=1),
+                        np.mean(s_t[:, s_t.shape[1] // 2:s_t.shape[1]], axis=1)], axis=1)
         r_t = np.stack([self.actionSpaces[level - 1][idx] for idx in actions_t_minus_1], axis=0)
         assert np.array_equal(s_t != 0, r_t)
