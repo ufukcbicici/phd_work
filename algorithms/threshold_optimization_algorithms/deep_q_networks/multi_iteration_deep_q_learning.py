@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-
+from sklearn.metrics import mean_squared_error
 from auxillary.general_utility_funcs import UtilityFuncs
 
 
@@ -523,9 +523,9 @@ class MultiIterationDQN:
             epsilon *= epsilon_discount_factor
             total_loss = results[0]
             losses.append(total_loss)
-            if len(losses) % 100 == 0:
-                self.measure_performance(level=level, losses=losses, data_type="validation")
-                self.measure_performance(level=level, losses=losses, data_type="test")
+            if len(losses) % 10 == 0:
+                # self.measure_performance(level=level, losses=losses, data_type="validation")
+                # self.measure_performance(level=level, losses=losses, data_type="test")
                 losses = []
 
     def get_all_possible_state_features(self, sample_indices, iterations, level):
@@ -553,6 +553,70 @@ class MultiIterationDQN:
             q_table[tuple(state_tuple)] = q_val
         return q_table
 
+    # Performance Measurements
+    def calculate_results_from_routing_decisions(self, sample_ids, iterations, Q_tables):
+        # Get the routing decisions of each sample, by using the calculated Q-Tables for every time step,
+        # Selecting the optimal policy.
+        # last_level = self.get_max_trajectory_length() - 1
+        routing_decisions = []
+        for s_id, it in zip(sample_ids, iterations):
+            a_t_minus_1 = 0
+            for t in range(self.get_max_trajectory_length()):
+                all_actions_t = Q_tables[t][(s_id, it, a_t_minus_1)]
+                a_t_minus_1 = np.argmax(all_actions_t)
+            routing_decision = self.actionSpaces[-1][a_t_minus_1]
+            routing_decisions.append(routing_decision)
+        routing_decisions = np.array(routing_decisions)
+        # Calculate the accuracy and the computation load arising from the routing decisions.
+        assert sample_ids.shape[0] == iterations.shape[0] and iterations.shape[0] == routing_decisions.shape[0]
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        truth_array = []
+        computation_cost_array = []
+        for s_id, it, routing in zip(sample_ids, iterations, routing_decisions):
+            sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+            posteriors = self.posteriorTensors[it][sample_id_for_iteration, :]
+            r_vector = np.copy(routing)
+            if MultiIterationDQN.INCLUDE_IG_IN_REWARD_CALCULATIONS:
+                # Set Information Gain routed leaf nodes to 1. They are always evaluated.
+                ig_idx = self.maxLikelihoodPaths[it][sample_id_for_iteration, -1] - min_leaf_id
+                r_vector[ig_idx] = 1
+            routing_weight = np.reciprocal(np.sum(r_vector).astype(np.float32))
+            weighted_r_vector = routing_weight * r_vector
+            weighted_posteriors = posteriors * weighted_r_vector[np.newaxis, :]
+            final_posterior = np.sum(weighted_posteriors, axis=1)
+            y_hat = np.argmax(final_posterior, axis=1)
+            y = self.routingDataset.dictOfDatasets[it].labelList[sample_id_for_iteration]
+            truth_array.append(y_hat == y)
+            computation_cost_array.append(self.networkActivationCostsDict[tuple(r_vector)])
+        accuracy = np.mean(np.array(truth_array).astype(np.float32))
+        computation_cost = np.mean(np.array(computation_cost_array))
+        return accuracy, computation_cost
+
+    # Calculate the Q-Table vs Rewards table divergence and related scores for the last tree layer.
+    def measure_performance(self, sample_indices, iterations, Q_table_T):
+        last_level = self.get_max_trajectory_length() - 1
+        action_count_t_minus_one = self.actionSpaces[last_level - 1].shape[0]
+        # Calculate the mean policy value
+        np_table = np.stack([v for v in Q_table_T.values()], axis=0)
+        mean_policy_value = np.mean(np.max(np_table, axis=1))
+        # print("mean_policy_value:{0}".format(mean_policy_value))
+        # Calculate the MSE.
+        y = []
+        y_hat = []
+        all_state_tuples = UtilityFuncs.get_cartesian_product(
+            [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+        for s_id, it, a_t_minus_1 in all_state_tuples:
+            sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+            rewards_arr = self.rewardTensors[it][last_level][sample_id_for_iteration, a_t_minus_1, :]
+            q_values_arr = Q_table_T[(s_id, it, a_t_minus_1)]
+            assert rewards_arr.shape == q_values_arr.shape
+            y.append(rewards_arr)
+            y_hat.append(q_values_arr)
+        y = np.concatenate(y)
+        y_hat = np.concatenate(y_hat)
+        mse_score = mean_squared_error(y_true=y, y_pred=y_hat)
+        return mean_policy_value, mse_score
+
     def execute_bellman_equation(self, sample_indices, iterations, discount_rate):
         last_level = self.get_max_trajectory_length() - 1
         # sample_ids_for_iterations = np.array([self.routingDataset.linkageInfo[(s_id, it)]
@@ -562,15 +626,16 @@ class MultiIterationDQN:
         # TODO: Later, implement this in a vectorized way.
         Q_table_T = self.create_q_table(sample_indices=sample_indices, iterations=iterations, level=last_level)
         Q_tables = {last_level: Q_table_T}
+        # Calculate the mean policy value and the MSE for the provided samples
+        mean_policy_value, mse_score = self.measure_performance(sample_indices=sample_indices, iterations=iterations,
+                                                                Q_table_T=Q_table_T)
         for t in range(last_level - 1, -1, -1):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
             q_table_t = {t: {}}
-
-            # all_state_tuples = UtilityFuncs.get_cartesian_product(
-            #     [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
-            # complete_state_matrix = np.array(all_state_tuples)
-            for s_id, it, a_t_minus_1 in zip(sample_indices, iterations, range(action_count_t_minus_one)):
+            all_state_tuples = UtilityFuncs.get_cartesian_product(
+                [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+            for s_id, it, a_t_minus_1 in all_state_tuples:
                 sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
                 q_table_t[t][(s_id, it, a_t_minus_1)] = np.array([np.nan] * action_count_t)
                 for a_t in range(action_count_t):
@@ -585,125 +650,15 @@ class MultiIterationDQN:
                     # s_{t}: (sample_id, iteration, a_{t-1}). Then we have:
                     # s_{t+1}: (sample_id, iteration, a_t)
                     # Get the Q* values, belonging to s_{t+1}.
-                    q_values = Q_tables[t+1][(s_id, it, a_t)]
-                    q_t = r_t_plus_1 + discount_rate*np.max(q_values)
+                    q_values = Q_tables[t + 1][(s_id, it, a_t)]
+                    q_t = r_t_plus_1 + discount_rate * np.max(q_values)
                     # Save the result into Q* table for the current time step; for the state tuple:
                     # s_{t}: (sample_id, iteration, a_{t-1})
                     q_table_t[t][(s_id, it, a_t_minus_1)][a_t] = q_t
             # Confirm that no nan entries left
             for v in q_table_t[t].values():
                 assert np.sum(np.isnan(v)) == 0
-
-
-
-
-
-
-
-        # # Enumerate all possible states
-        # complete_state_features, complete_state_matrix = self.get_all_possible_state_features(
-        #     sample_indices=sample_indices,
-        #     iterations=iterations, level=last_level)
-        # Q_table_T = self.session.run([self.qFuncs[last_level]], feed_dict={self.stateInputs[last_level]:
-        #                                                                        complete_state_features})[0]
-        # Q_tables = []
-        # Q_t_plus_one = np.copy(Q_table_T)
-        # assert np.prod(Q_t_plus_one.shape) == len(sample_indices) * len(iterations) * action_count_t_minus_one * \
-        #        action_count_t
-        # Q_tables.append(Q_t_plus_one)
-
-        # for t in range(last_level - 1, -1, -1):
-        #     action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
-        #     action_count_t = self.actionSpaces[t].shape[0]
-        #     all_state_tuples = UtilityFuncs.get_cartesian_product(
-        #         [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
-        #     complete_state_features, complete_state_matrix = self.get_all_possible_state_features(
-        #         sample_indices=sample_indices,
-        #         iterations=iterations, level=t)
-        #     expected_rewards = self.get_rewards(samples=complete_state_matrix[:, 0],
-        #                                         iterations=complete_state_matrix[:, 1],
-        #                                         action_ids_t_minus_1=complete_state_matrix[:, 2],
-        #                                         action_ids_t=None, level=t)
-        #     Q_t = []
-        #     for a_t in range(action_count_t):
-        #         # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
-        #         # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
-        #         r_t_plus_1 = expected_rewards[:, a_t]
-        #         # \sum_{s_{t+1}} p(s_{t+1}|s_{t},a_{t}) max_{a_{t+1}} Q*(s_{t+1},a_{t+1})
-        #         # Since in our case p(s_{t+1}|s_{t},a_{t}) is deterministic,
-        #         # it is a lookup into the Q*(s_{t+1},a_{t+1}) table.
-        #         Q_tables[-1]
-
-
-
-
-
-
         print("X")
-
-        # dataset = self.validationDataForMDP if data_type == "validation" else self.testDataForMDP
-        # last_level = self.get_max_trajectory_length() - 1
-        # state_count = dataset.routingDataset.labelList.shape[0]
-        # action_count_t_minus_one = 1 if last_level == 0 else self.actionSpaces[last_level - 1].shape[0]
-        # action_count_t = self.actionSpaces[last_level].shape[0]
-        # rewards = self.validationRewards if data_type == "validation" else self.testRewards
-        # # Execute the Bellman Equation
-        # # Step 1: Get the Q*(s,a) for the last level.
-        # state_ids = np.array([sample_id for sample_id in range(state_count)])
-        # complete_state_matrix = UtilityFuncs.get_cartesian_product(
-        #     [state_ids, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
-        # complete_state_matrix = np.array(complete_state_matrix)
-        # complete_state_features = self.get_state_features(state_matrix=complete_state_matrix, level=last_level,
-        #                                                   data_type=data_type)
-        # Q_table_T = self.session.run([self.qFuncs[last_level]],
-        #                              feed_dict={self.stateInputs[last_level]: complete_state_features})[0]
-        # Q_tables = []
-        # Q_t_plus_one = np.copy(Q_table_T)
-        # assert np.prod(Q_t_plus_one.shape) == state_count * action_count_t_minus_one * action_count_t
-        # Q_t_plus_one = np.reshape(Q_t_plus_one, newshape=(state_count, action_count_t_minus_one, action_count_t))
-        # Q_tables.append(Q_t_plus_one)
-        # for t in range(last_level - 1, -1, -1):
-        #     action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
-        #     action_count_t = self.actionSpaces[t].shape[0]
-        #     states_matrix = UtilityFuncs.get_cartesian_product(
-        #         [[sample_id for sample_id in range(state_count)],
-        #          [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
-        #     states_matrix = np.array(states_matrix)
-        #     expected_rewards = rewards[t][states_matrix[:, 0], states_matrix[:, 1], :]
-        #     Q_t = []
-        #     for a in range(action_count_t):
-        #         # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
-        #         # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
-        #         reward_vector = expected_rewards[:, a]
-        #         # \sum_{s_{t+1}} p(s_{t+1}|s_{t},a_{t}) max_{a_{t+1}} Q*(s_{t+1},a_{t+1})
-        #         # Since in our case p(s_{t+1}|s_{t},a_{t}) is deterministic,
-        #         # it is a lookup into the Q*(s_{t+1},a_{t+1}) table.
-        #         Q_t_plus_one_given_a = Q_t_plus_one[state_ids, a * np.ones_like(state_ids), :]
-        #         assert reward_vector.shape[0] == Q_t_plus_one_given_a.shape[0] * action_count_t_minus_one
-        #         Q_t_plus_one_given_a = np.repeat(Q_t_plus_one_given_a, axis=0, repeats=action_count_t_minus_one)
-        #         q_values = np.max(Q_t_plus_one_given_a, axis=1)
-        #         assert reward_vector.shape[0] == q_values.shape[0]
-        #         Q_t.append(reward_vector + q_values)
-        #     Q_t = np.stack(Q_t, axis=1)
-        #     Q_t_plus_one = np.reshape(Q_t, newshape=(state_count, action_count_t_minus_one, action_count_t))
-        #     Q_tables.append(Q_t_plus_one)
-        # Q_tables.reverse()
-        # # Now we are ready to calculate the optimal trajectories and calculate the optimal accuracy and computation load
-        # # for every state.
-        # states_matrix = UtilityFuncs.get_cartesian_product(
-        #     [[sample_id for sample_id in range(state_count)], [0]])
-        # states_matrix = np.array(states_matrix)
-        # for t in range(self.get_max_trajectory_length()):
-        #     Q_table = Q_tables[t][states_matrix[:, 0], states_matrix[:, 1], :]
-        #     actions_t = np.argmax(Q_table, axis=1)
-        #     states_matrix[:, 1] = actions_t
-        #     print("Bellman Decision Distribution Level:{0}:{1}".format(t, Counter(states_matrix[:, 1])))
-        # # The last layer actions determine the routing decisions.
-        # routing_decisions = self.actionSpaces[-1][states_matrix[:, 1], :]
-        # truth_vector = self.calculate_results_from_routing_decisions(states_matrix[:, 0], routing_decisions, data_type)
-        # self.calculate_results_by_sampling(q_tables=Q_tables, state_ids=states_matrix[:, 0], data_type=data_type,
-        #                                    sample_count=1000)
-        # return routing_decisions, truth_vector
 
     # Test methods
     def test_likelihood_consistency(self):
