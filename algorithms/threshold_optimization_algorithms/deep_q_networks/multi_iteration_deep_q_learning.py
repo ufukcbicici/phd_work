@@ -570,7 +570,6 @@ class MultiIterationDQN:
             # all_state_tuples = UtilityFuncs.get_cartesian_product(
             #     [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
             # complete_state_matrix = np.array(all_state_tuples)
-
             for s_id, it, a_t_minus_1 in zip(sample_indices, iterations, range(action_count_t_minus_one)):
                 sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
                 q_table_t[t][(s_id, it, a_t_minus_1)] = np.array([np.nan] * action_count_t)
@@ -591,7 +590,9 @@ class MultiIterationDQN:
                     # Save the result into Q* table for the current time step; for the state tuple:
                     # s_{t}: (sample_id, iteration, a_{t-1})
                     q_table_t[t][(s_id, it, a_t_minus_1)][a_t] = q_t
-
+            # Confirm that no nan entries left
+            for v in q_table_t[t].values():
+                assert np.sum(np.isnan(v)) == 0
 
 
 
