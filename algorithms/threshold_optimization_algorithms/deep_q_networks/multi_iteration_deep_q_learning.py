@@ -394,7 +394,9 @@ class MultiIterationDQN:
     def get_state_features(self, samples, iterations, action_ids_t_minus_1, level):
         nodes_in_level = self.network.orderedNodesPerLevel[level]
         features = []
-        for s_id, it, a_t_1 in zip(samples, iterations, action_ids_t_minus_1):
+        state_tuples = UtilityFuncs.get_cartesian_product(
+            list_of_lists=[samples, iterations, list(range(action_ids_t_minus_1))])
+        for s_id, it, a_t_1 in state_tuples:
             sample_id_in_iteration = self.routingDataset.linkageInfo[(s_id, it)]
             route_decision = np.array([1]) if level == 0 else self.actionSpaces[level - 1][a_t_1]
             feature = [route_decision[idx] * self.stateFeatures[it][node.index][sample_id_in_iteration]
@@ -488,6 +490,13 @@ class MultiIterationDQN:
         # Fill the experience replay table: Solve the cold start problem.
         self.fill_experience_replay_table(level=level, sample_count=10 * sample_count, epsilon=epsilon)
         losses = []
+        # Test the accuracy evaluations
+        self.execute_bellman_equation(sample_indices=self.routingDataset.trainingIndices,
+                                      iterations=self.routingDataset.iterations,
+                                      discount_rate=discount_factor)
+        self.execute_bellman_equation(sample_indices=self.routingDataset.testIndices,
+                                      iterations=self.routingDataset.testIterations,
+                                      discount_rate=discount_factor)
         for episode_id in range(episode_count):
             self.fill_experience_replay_table(level=level, sample_count=sample_count, epsilon=epsilon)
             # Sample batch of experiences from the table
@@ -524,8 +533,13 @@ class MultiIterationDQN:
             total_loss = results[0]
             losses.append(total_loss)
             if len(losses) % 10 == 0:
-                # self.measure_performance(level=level, losses=losses, data_type="validation")
-                # self.measure_performance(level=level, losses=losses, data_type="test")
+                print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
+                self.execute_bellman_equation(sample_indices=self.routingDataset.trainingIndices,
+                                              iterations=self.routingDataset.iterations,
+                                              discount_rate=discount_factor)
+                self.execute_bellman_equation(sample_indices=self.routingDataset.testIndices,
+                                              iterations=self.routingDataset.testIterations,
+                                              discount_rate=discount_factor)
                 losses = []
 
     def get_all_possible_state_features(self, sample_indices, iterations, level):
@@ -658,7 +672,13 @@ class MultiIterationDQN:
             # Confirm that no nan entries left
             for v in q_table_t[t].values():
                 assert np.sum(np.isnan(v)) == 0
-        print("X")
+        accuracy, computation_cost = self.calculate_results_from_routing_decisions(sample_ids=sample_indices,
+                                                                                   iterations=iterations,
+                                                                                   Q_tables=Q_tables)
+        print("Mean Policy Value:{0}".format(accuracy))
+        print("MSE:{0}".format(mse_score))
+        print("Accuracy:{0}".format(accuracy))
+        print("Computation Cost:{0}".format(computation_cost))
 
     # Test methods
     def test_likelihood_consistency(self):
