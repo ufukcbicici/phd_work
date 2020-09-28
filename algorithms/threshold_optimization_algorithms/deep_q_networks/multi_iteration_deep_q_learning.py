@@ -565,8 +565,15 @@ class MultiIterationDQN:
         for t in range(last_level - 1, -1, -1):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
+            q_table_t = {t: {}}
+
+            # all_state_tuples = UtilityFuncs.get_cartesian_product(
+            #     [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+            # complete_state_matrix = np.array(all_state_tuples)
+
             for s_id, it, a_t_minus_1 in zip(sample_indices, iterations, range(action_count_t_minus_one)):
                 sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+                q_table_t[t][(s_id, it, a_t_minus_1)] = np.array([np.nan] * action_count_t)
                 for a_t in range(action_count_t):
                     # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
                     # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
@@ -581,6 +588,11 @@ class MultiIterationDQN:
                     # Get the Q* values, belonging to s_{t+1}.
                     q_values = Q_tables[t+1][(s_id, it, a_t)]
                     q_t = r_t_plus_1 + discount_rate*np.max(q_values)
+                    # Save the result into Q* table for the current time step; for the state tuple:
+                    # s_{t}: (sample_id, iteration, a_{t-1})
+                    q_table_t[t][(s_id, it, a_t_minus_1)][a_t] = q_t
+
+
 
 
 
