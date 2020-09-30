@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 from sklearn.metrics import mean_squared_error
+
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 
 
@@ -466,6 +468,32 @@ class MultiIterationDQN:
                                             np.expand_dims(rewards_t, axis=1)], axis=1)
         self.add_to_the_experience_table(experience_matrix=experience_matrix)
 
+    def get_explanation_string(self, **kwargs):
+        # sample_count = kwargs["sample_count"]
+        # episode_count = kwargs["episode_count"]
+        # discount_factor = kwargs["discount_factor"]
+        # epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        # learning_rate = kwargs["learning_rate"]
+
+        explanation_string = ""
+        for k, v in kwargs:
+            explanation_string += "{0}:{1}\n".format(k, v)
+        return
+
+    def evaluate(self, episode_id, discount_factor):
+        print("***********Training Set***********")
+        training_mean_policy_value, training_mse_score, training_accuracy, training_computation_cost = \
+            self.execute_bellman_equation(
+                sample_indices=self.routingDataset.trainingIndices,
+                iterations=self.routingDataset.iterations,
+                discount_rate=discount_factor)
+        print("***********Test Set***********")
+        test_mean_policy_value, test_mse_score, test_accuracy, test_computation_cost = \
+            self.execute_bellman_equation(
+                sample_indices=self.routingDataset.testIndices,
+                iterations=self.routingDataset.testIterations,
+                discount_rate=discount_factor)
+
     def train(self, level, **kwargs):
         sample_count = kwargs["sample_count"]
         episode_count = kwargs["episode_count"]
@@ -477,27 +505,40 @@ class MultiIterationDQN:
             raise NotImplementedError()
         self.session.run(tf.global_variables_initializer())
         # If we use only information gain for routing (ML: Maximum likelihood routing)
-        print("Whole Data ML Accuracy{0}".format(
-            self.get_max_likelihood_accuracy(iterations=self.routingDataset.iterations,
-                                             sample_indices=np.arange(self.routingDataset.labelList.shape[0]))))
-        print("Training Set ML Accuracy:{0}".format(
-            self.get_max_likelihood_accuracy(iterations=self.routingDataset.iterations,
-                                             sample_indices=self.routingDataset.trainingIndices)))
-        print("Test Set ML Accuracy:{0}".format(
-            self.get_max_likelihood_accuracy(iterations=self.routingDataset.testIterations,
-                                             sample_indices=self.routingDataset.testIndices)))
+        whole_data_ml_accuracy = self.get_max_likelihood_accuracy(iterations=self.routingDataset.iterations,
+                                                                  sample_indices=np.arange(
+                                                                      self.routingDataset.labelList.shape[0]))
+        training_ml_accuracy = self.get_max_likelihood_accuracy(iterations=self.routingDataset.iterations,
+                                                                sample_indices=self.routingDataset.trainingIndices)
+        test_ml_accuracy = self.get_max_likelihood_accuracy(iterations=self.routingDataset.testIterations,
+                                                            sample_indices=self.routingDataset.testIndices)
+        # Fill the explanation string for the experiment
+        kwargs["whole_data_ml_accuracy"] = whole_data_ml_accuracy
+        kwargs["training_ml_accuracy"] = training_ml_accuracy
+        kwargs["test_ml_accuracy"] = test_ml_accuracy
+        kwargs["invalid_action_penalty"] = MultiIterationDQN.invalid_action_penalty
+        kwargs["valid_prediction_reward"] = MultiIterationDQN.valid_prediction_reward
+        kwargs["invalid_prediction_penalty"] = MultiIterationDQN.invalid_prediction_penalty
+        kwargs["INCLUDE_IG_IN_REWARD_CALCULATIONS"] = MultiIterationDQN.INCLUDE_IG_IN_REWARD_CALCULATIONS
+        kwargs["CONV_FEATURES"] = MultiIterationDQN.CONV_FEATURES
+        kwargs["HIDDEN_LAYERS"] = MultiIterationDQN.HIDDEN_LAYERS
+        kwargs["FILTER_SIZES"] = MultiIterationDQN.FILTER_SIZES
+        kwargs["STRIDES"] = MultiIterationDQN.STRIDES
+        kwargs["MAX_POOL"] = MultiIterationDQN.MAX_POOL
+        experiment_id = DbLogger.get_run_id()
+        explanation_string = "DQN Experiment. RunID:{0}".format(experiment_id)
+        for k, v in kwargs:
+            explanation_string += "{0}:{1}\n".format(k, v)
+        print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
+        print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
+        print("Test Set ML Accuracy:{0}".format(test_ml_accuracy))
+        DbLogger.write_into_table(rows=[(experiment_id, explanation_string)], table=DbLogger.runMetaData, col_count=2)
+
         # Fill the experience replay table: Solve the cold start problem.
         self.fill_experience_replay_table(level=level, sample_count=10 * sample_count, epsilon=epsilon)
         losses = []
         # Test the accuracy evaluations
-        print("***********Training Set***********")
-        self.execute_bellman_equation(sample_indices=self.routingDataset.trainingIndices,
-                                      iterations=self.routingDataset.iterations,
-                                      discount_rate=discount_factor)
-        print("***********Test Set***********")
-        self.execute_bellman_equation(sample_indices=self.routingDataset.testIndices,
-                                      iterations=self.routingDataset.testIterations,
-                                      discount_rate=discount_factor)
+        self.evaluate(episode_id=-1, discount_factor=discount_factor)
         for episode_id in range(episode_count):
             # print("Episode:{0}".format(episode_id))
             self.fill_experience_replay_table(level=level, sample_count=sample_count, epsilon=epsilon)
@@ -536,16 +577,9 @@ class MultiIterationDQN:
             losses.append(total_loss)
             if len(losses) % 10 == 0:
                 print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
-            if (episode_id + 1) % 1000 == 0:
-                print("***********Training Set***********")
-                self.execute_bellman_equation(sample_indices=self.routingDataset.trainingIndices,
-                                              iterations=self.routingDataset.iterations,
-                                              discount_rate=discount_factor)
-                print("***********Test Set***********")
-                self.execute_bellman_equation(sample_indices=self.routingDataset.testIndices,
-                                              iterations=self.routingDataset.testIterations,
-                                              discount_rate=discount_factor)
                 losses = []
+            if (episode_id + 1) % 200 == 0:
+                self.evaluate(episode_id=episode_id, discount_factor=discount_factor)
 
     def get_all_possible_state_features(self, sample_indices, iterations, level, batch_size=10000):
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
@@ -686,6 +720,7 @@ class MultiIterationDQN:
         print("MSE:{0}".format(mse_score))
         print("Accuracy:{0}".format(accuracy))
         print("Computation Cost:{0}".format(computation_cost))
+        return mean_policy_value, mse_score, accuracy, computation_cost
 
     # Test methods
     def test_likelihood_consistency(self):
