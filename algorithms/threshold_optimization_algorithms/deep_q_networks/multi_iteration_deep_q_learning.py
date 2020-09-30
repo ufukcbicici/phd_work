@@ -495,8 +495,10 @@ class MultiIterationDQN:
                 discount_rate=discount_factor)
         DbLogger.write_into_table(
             rows=[(run_id, episode_id,
-                   training_mean_policy_value, training_mse_score, training_accuracy, training_computation_cost,
-                   test_mean_policy_value, test_mse_score, test_accuracy, test_computation_cost)],
+                   np.asscalar(training_mean_policy_value), np.asscalar(training_mse_score),
+                   np.asscalar(training_accuracy), np.asscalar(training_computation_cost),
+                   np.asscalar(test_mean_policy_value), np.asscalar(test_mse_score),
+                   np.asscalar(test_accuracy), np.asscalar(test_computation_cost))],
             table="deep_q_learning_logs", col_count=10)
 
     def train(self, level, **kwargs):
@@ -531,8 +533,8 @@ class MultiIterationDQN:
         kwargs["STRIDES"] = MultiIterationDQN.STRIDES
         kwargs["MAX_POOL"] = MultiIterationDQN.MAX_POOL
         experiment_id = DbLogger.get_run_id()
-        explanation_string = "DQN Experiment. RunID:{0}".format(experiment_id)
-        for k, v in kwargs:
+        explanation_string = "DQN Experiment. RunID:{0}\n".format(experiment_id)
+        for k, v in kwargs.items():
             explanation_string += "{0}:{1}\n".format(k, v)
         print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
         print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
