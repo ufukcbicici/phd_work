@@ -499,7 +499,7 @@ class MultiIterationDQN:
                                       iterations=self.routingDataset.testIterations,
                                       discount_rate=discount_factor)
         for episode_id in range(episode_count):
-            print("Episode:{0}".format(episode_id))
+            # print("Episode:{0}".format(episode_id))
             self.fill_experience_replay_table(level=level, sample_count=sample_count, epsilon=epsilon)
             # Sample batch of experiences from the table
             experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count, replace=False)
@@ -536,7 +536,7 @@ class MultiIterationDQN:
             losses.append(total_loss)
             if len(losses) % 10 == 0:
                 print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
-            elif len(losses) % 1000 == 0:
+            if (episode_id + 1) % 1000 == 0:
                 print("***********Training Set***********")
                 self.execute_bellman_equation(sample_indices=self.routingDataset.trainingIndices,
                                               iterations=self.routingDataset.iterations,
