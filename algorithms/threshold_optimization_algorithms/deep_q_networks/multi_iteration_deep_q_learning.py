@@ -393,10 +393,9 @@ class MultiIterationDQN:
 
     def get_state_features(self, samples, iterations, action_ids_t_minus_1, level):
         nodes_in_level = self.network.orderedNodesPerLevel[level]
+        assert len({len(samples), len(iterations), len(action_ids_t_minus_1)}) == 1
         features = []
-        state_tuples = UtilityFuncs.get_cartesian_product(
-            list_of_lists=[samples, iterations, list(range(action_ids_t_minus_1))])
-        for s_id, it, a_t_1 in state_tuples:
+        for s_id, it, a_t_1 in zip(samples, iterations, action_ids_t_minus_1):
             sample_id_in_iteration = self.routingDataset.linkageInfo[(s_id, it)]
             route_decision = np.array([1]) if level == 0 else self.actionSpaces[level - 1][a_t_1]
             feature = [route_decision[idx] * self.stateFeatures[it][node.index][sample_id_in_iteration]
@@ -491,13 +490,16 @@ class MultiIterationDQN:
         self.fill_experience_replay_table(level=level, sample_count=10 * sample_count, epsilon=epsilon)
         losses = []
         # Test the accuracy evaluations
+        print("***********Training Set***********")
         self.execute_bellman_equation(sample_indices=self.routingDataset.trainingIndices,
                                       iterations=self.routingDataset.iterations,
                                       discount_rate=discount_factor)
+        print("***********Test Set***********")
         self.execute_bellman_equation(sample_indices=self.routingDataset.testIndices,
                                       iterations=self.routingDataset.testIterations,
                                       discount_rate=discount_factor)
         for episode_id in range(episode_count):
+            print("Episode:{0}".format(episode_id))
             self.fill_experience_replay_table(level=level, sample_count=sample_count, epsilon=epsilon)
             # Sample batch of experiences from the table
             experience_ids = np.random.choice(self.experienceReplayTable.shape[0], sample_count, replace=False)
@@ -534,37 +536,47 @@ class MultiIterationDQN:
             losses.append(total_loss)
             if len(losses) % 10 == 0:
                 print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
+            elif len(losses) % 1000 == 0:
+                print("***********Training Set***********")
                 self.execute_bellman_equation(sample_indices=self.routingDataset.trainingIndices,
                                               iterations=self.routingDataset.iterations,
                                               discount_rate=discount_factor)
+                print("***********Test Set***********")
                 self.execute_bellman_equation(sample_indices=self.routingDataset.testIndices,
                                               iterations=self.routingDataset.testIterations,
                                               discount_rate=discount_factor)
                 losses = []
 
-    def get_all_possible_state_features(self, sample_indices, iterations, level):
+    def get_all_possible_state_features(self, sample_indices, iterations, level, batch_size=10000):
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
         # Enumerate all possible states
         all_state_tuples = UtilityFuncs.get_cartesian_product(
             [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
         complete_state_matrix = np.array(all_state_tuples)
-        complete_state_features = self.get_state_features(
-            samples=complete_state_matrix[:, 0], iterations=complete_state_matrix[:, 1],
-            action_ids_t_minus_1=complete_state_matrix[:, 2], level=level)
-        return complete_state_features, complete_state_matrix
+        for idx in range(0, complete_state_matrix.shape[0], batch_size):
+            s0 = idx
+            s1 = min(idx + batch_size, complete_state_matrix.shape[0])
+            state_matrix_part = complete_state_matrix[s0:s1, :]
+            state_features = self.get_state_features(samples=state_matrix_part[:, 0],
+                                                     iterations=state_matrix_part[:, 1],
+                                                     action_ids_t_minus_1=state_matrix_part[:, 2], level=level)
+            yield state_features, state_matrix_part
+            # complete_state_features = self.get_state_features(
+            #     samples=complete_state_matrix[:, 0], iterations=complete_state_matrix[:, 1],
+            #     action_ids_t_minus_1=complete_state_matrix[:, 2], level=level)
+            # return complete_state_features, complete_state_matrix
 
     def create_q_table(self, sample_indices, iterations, level):
-        # Enumerate all possible states
-        complete_state_features, complete_state_matrix = self.get_all_possible_state_features(
-            sample_indices=sample_indices,
-            iterations=iterations, level=level)
-        assert complete_state_features.shape[0] == complete_state_matrix.shape[0]
-        # Get q-values for every state
-        q_vals = self.session.run([self.qFuncs[level]], feed_dict={self.stateInputs[level]: complete_state_features})[0]
-        assert q_vals.shape[0] == complete_state_matrix.shape[0]
         q_table = {}
-        for state_tuple, q_val in zip(complete_state_matrix, q_vals):
-            q_table[tuple(state_tuple)] = q_val
+        for state_features, state_matrix_part in self.get_all_possible_state_features(sample_indices=sample_indices,
+                                                                                      iterations=iterations,
+                                                                                      level=level):
+            assert state_features.shape[0] == state_matrix_part.shape[0]
+            q_vals = \
+                self.session.run([self.qFuncs[level]], feed_dict={self.stateInputs[level]: state_features})[0]
+            for state_tuple, q_val in zip(state_matrix_part, q_vals):
+                assert tuple(state_tuple) not in q_table
+                q_table[tuple(state_tuple)] = q_val
         return q_table
 
     # Performance Measurements
@@ -572,24 +584,19 @@ class MultiIterationDQN:
         # Get the routing decisions of each sample, by using the calculated Q-Tables for every time step,
         # Selecting the optimal policy.
         # last_level = self.get_max_trajectory_length() - 1
-        routing_decisions = []
-        for s_id, it in zip(sample_ids, iterations):
+        state_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=[sample_ids, iterations])
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        truth_array = []
+        computation_cost_array = []
+        for s_id, it in state_tuples:
+            sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
             a_t_minus_1 = 0
             for t in range(self.get_max_trajectory_length()):
                 all_actions_t = Q_tables[t][(s_id, it, a_t_minus_1)]
                 a_t_minus_1 = np.argmax(all_actions_t)
             routing_decision = self.actionSpaces[-1][a_t_minus_1]
-            routing_decisions.append(routing_decision)
-        routing_decisions = np.array(routing_decisions)
-        # Calculate the accuracy and the computation load arising from the routing decisions.
-        assert sample_ids.shape[0] == iterations.shape[0] and iterations.shape[0] == routing_decisions.shape[0]
-        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
-        truth_array = []
-        computation_cost_array = []
-        for s_id, it, routing in zip(sample_ids, iterations, routing_decisions):
-            sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
             posteriors = self.posteriorTensors[it][sample_id_for_iteration, :]
-            r_vector = np.copy(routing)
+            r_vector = np.copy(routing_decision)
             if MultiIterationDQN.INCLUDE_IG_IN_REWARD_CALCULATIONS:
                 # Set Information Gain routed leaf nodes to 1. They are always evaluated.
                 ig_idx = self.maxLikelihoodPaths[it][sample_id_for_iteration, -1] - min_leaf_id
@@ -598,7 +605,7 @@ class MultiIterationDQN:
             weighted_r_vector = routing_weight * r_vector
             weighted_posteriors = posteriors * weighted_r_vector[np.newaxis, :]
             final_posterior = np.sum(weighted_posteriors, axis=1)
-            y_hat = np.argmax(final_posterior, axis=1)
+            y_hat = np.argmax(final_posterior)
             y = self.routingDataset.dictOfDatasets[it].labelList[sample_id_for_iteration]
             truth_array.append(y_hat == y)
             computation_cost_array.append(self.networkActivationCostsDict[tuple(r_vector)])
@@ -646,12 +653,12 @@ class MultiIterationDQN:
         for t in range(last_level - 1, -1, -1):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
-            q_table_t = {t: {}}
+            Q_tables[t] = {}
             all_state_tuples = UtilityFuncs.get_cartesian_product(
                 [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
             for s_id, it, a_t_minus_1 in all_state_tuples:
                 sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
-                q_table_t[t][(s_id, it, a_t_minus_1)] = np.array([np.nan] * action_count_t)
+                Q_tables[t][(s_id, it, a_t_minus_1)] = np.array([np.nan] * action_count_t)
                 for a_t in range(action_count_t):
                     # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
                     # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
@@ -668,9 +675,9 @@ class MultiIterationDQN:
                     q_t = r_t_plus_1 + discount_rate * np.max(q_values)
                     # Save the result into Q* table for the current time step; for the state tuple:
                     # s_{t}: (sample_id, iteration, a_{t-1})
-                    q_table_t[t][(s_id, it, a_t_minus_1)][a_t] = q_t
+                    Q_tables[t][(s_id, it, a_t_minus_1)][a_t] = q_t
             # Confirm that no nan entries left
-            for v in q_table_t[t].values():
+            for v in Q_tables[t].values():
                 assert np.sum(np.isnan(v)) == 0
         accuracy, computation_cost = self.calculate_results_from_routing_decisions(sample_ids=sample_indices,
                                                                                    iterations=iterations,
