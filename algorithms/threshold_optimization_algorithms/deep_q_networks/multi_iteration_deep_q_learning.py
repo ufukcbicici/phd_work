@@ -480,7 +480,7 @@ class MultiIterationDQN:
             explanation_string += "{0}:{1}\n".format(k, v)
         return
 
-    def evaluate(self, episode_id, discount_factor):
+    def evaluate(self, run_id, episode_id, discount_factor):
         print("***********Training Set***********")
         training_mean_policy_value, training_mse_score, training_accuracy, training_computation_cost = \
             self.execute_bellman_equation(
@@ -493,6 +493,11 @@ class MultiIterationDQN:
                 sample_indices=self.routingDataset.testIndices,
                 iterations=self.routingDataset.testIterations,
                 discount_rate=discount_factor)
+        DbLogger.write_into_table(
+            rows=[(run_id, episode_id,
+                   training_mean_policy_value, training_mse_score, training_accuracy, training_computation_cost,
+                   test_mean_policy_value, test_mse_score, test_accuracy, test_computation_cost)],
+            table="deep_q_learning_logs", col_count=10)
 
     def train(self, level, **kwargs):
         sample_count = kwargs["sample_count"]
@@ -538,7 +543,7 @@ class MultiIterationDQN:
         self.fill_experience_replay_table(level=level, sample_count=10 * sample_count, epsilon=epsilon)
         losses = []
         # Test the accuracy evaluations
-        self.evaluate(episode_id=-1, discount_factor=discount_factor)
+        self.evaluate(run_id=experiment_id, episode_id=-1, discount_factor=discount_factor)
         for episode_id in range(episode_count):
             # print("Episode:{0}".format(episode_id))
             self.fill_experience_replay_table(level=level, sample_count=sample_count, epsilon=epsilon)
@@ -579,7 +584,7 @@ class MultiIterationDQN:
                 print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
                 losses = []
             if (episode_id + 1) % 200 == 0:
-                self.evaluate(episode_id=episode_id, discount_factor=discount_factor)
+                self.evaluate(run_id=experiment_id, episode_id=episode_id, discount_factor=discount_factor)
 
     def get_all_possible_state_features(self, sample_indices, iterations, level, batch_size=10000):
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
