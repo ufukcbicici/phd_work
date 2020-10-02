@@ -12,11 +12,11 @@ class MultiIterationDQN:
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = True
 
-    CONV_FEATURES = [[32], [64]]
-    HIDDEN_LAYERS = [[128, 64], [128, 64]]
-    FILTER_SIZES = [[1], [1]]
-    STRIDES = [[1], [1]]
-    MAX_POOL = [[None], [None]]
+    CONV_FEATURES = [64]
+    FILTER_SIZES = [1]
+    STRIDES = [1]
+    HIDDEN_LAYERS = [128, 64]
+    MAX_POOL = [None]
 
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
                  lambda_mac_cost, max_experience_count=100000):
@@ -53,23 +53,22 @@ class MultiIterationDQN:
         # Neural network components
         self.experienceReplayTable = None
         self.maxExpCount = max_experience_count
-        self.stateInputs = []
-        self.qFuncs = []
-        self.selectedQValues = []
+        self.stateInput = None
+        self.qFunction = None
+        self.selectedQs = None
         self.stateCount = tf.placeholder(dtype=tf.int32, name="stateCount")
         self.stateRange = tf.range(0, self.stateCount, 1)
-        self.actionSelections = []
-        self.selectionIndices = []
-        self.rewardVectors = []
-        self.lossVectors = []
-        self.lossValues = []
-        self.optimizers = []
-        self.totalLosses = []
+        self.actionSelection = None
+        self.selectionMatrix = None
+        self.rewardVector = None
+        self.lossVector = None
+        self.lossValue = None
+        self.optimizer = None
+        self.totalLoss = None
         self.globalStep = tf.Variable(0, name='global_step', trainable=False)
         self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
         self.l2Loss = None
-        for level in range(self.get_max_trajectory_length()):
-            self.build_q_function(level=level)
+        self.build_q_function()
         self.session = tf.Session()
         # The following is for testing, can comment out later.
         # self.test_likelihood_consistency()
@@ -267,73 +266,48 @@ class MultiIterationDQN:
                     rewards_arr -= self.lambdaMacCost * computation_overload_tensor
                 self.rewardTensors[iteration].append(rewards_arr)
 
-    def build_q_function(self, level):
-        if level != self.get_max_trajectory_length() - 1:
-            self.stateInputs.append(None)
-            self.qFuncs.append(None)
-            self.actionSelections.append(None)
-            self.selectedQValues.append(None)
-            self.selectionIndices.append(None)
-            self.rewardVectors.append(None)
-            self.lossVectors.append(None)
-            self.lossValues.append(None)
-            self.totalLosses.append(None)
-            self.optimizers.append(None)
-        else:
-            if self.qLearningFunc == "cnn":
-                nodes_at_level = self.network.orderedNodesPerLevel[level]
-                shapes_list = [self.stateFeatures[iteration][node.index].shape
-                               for iteration in self.routingDataset.iterations for node in nodes_at_level]
-                assert len(set(shapes_list)) == 1
-                entry_shape = list(shapes_list[0])
-                entry_shape[0] = None
-                entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
-                tf_state_input = tf.placeholder(dtype=tf.float32, shape=entry_shape,
-                                                name="state_inputs_{0}".format(level))
-                self.stateInputs.append(tf_state_input)
-                self.build_cnn_q_network(level=level)
-            # Get selected q values; build the regression loss
-            tf_selected_action_input = tf.placeholder(dtype=tf.int32, shape=[None],
-                                                      name="action_inputs_{0}".format(level))
-            self.actionSelections.append(tf_selected_action_input)
-            selection_matrix = tf.stack([self.stateRange, tf_selected_action_input], axis=1)
-            self.selectionIndices.append(selection_matrix)
-            selected_q_values = tf.gather_nd(self.qFuncs[level], selection_matrix)
-            self.selectedQValues.append(selected_q_values)
-            reward_vector = tf.placeholder(dtype=tf.float32, shape=[None],
-                                           name="reward_vector_{0}".format(level))
-            self.rewardVectors.append(reward_vector)
-            # Loss functions
-            mse_vector = tf.square(selected_q_values - reward_vector)
-            self.lossVectors.append(mse_vector)
-            mse_loss = tf.reduce_mean(mse_vector)
-            self.lossValues.append(mse_loss)
-            self.get_l2_loss()
-            total_loss = mse_loss + self.l2Loss
-            self.totalLosses.append(total_loss)
-            optimizer = tf.train.AdamOptimizer().minimize(total_loss, global_step=self.globalStep)
-            self.optimizers.append(optimizer)
+    def build_q_function(self):
+        level = self.get_max_trajectory_length() - 1
+        if self.qLearningFunc == "cnn":
+            nodes_at_level = self.network.orderedNodesPerLevel[level]
+            shapes_list = [self.stateFeatures[iteration][node.index].shape
+                           for iteration in self.routingDataset.iterations for node in nodes_at_level]
+            assert len(set(shapes_list)) == 1
+            entry_shape = list(shapes_list[0])
+            entry_shape[0] = None
+            entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
+            self.stateInput = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="state_inputs")
+            self.build_cnn_q_network()
+        # Get selected q values; build the regression loss
+        self.actionSelection = tf.placeholder(dtype=tf.int32, shape=[None], name="action_inputs")
+        self.selectionMatrix = tf.stack([self.stateRange, self.actionSelection], axis=1)
+        self.selectedQs = tf.gather_nd(self.qFunction, self.selectionMatrix)
+        self.rewardVector = tf.placeholder(dtype=tf.float32, shape=[None], name="reward_vector")
+        # Loss functions
+        self.lossVector = tf.square(self.selectedQs - self.rewardVector)
+        self.lossValue = tf.reduce_mean(self.lossVector)
+        self.get_l2_loss()
+        self.totalLoss = self.lossValue + self.l2Loss
+        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalLoss, global_step=self.globalStep)
 
-    def build_cnn_q_network(self, level):
-        hidden_layers = MultiIterationDQN.HIDDEN_LAYERS[level]
-        hidden_layers.append(self.actionSpaces[level].shape[0])
-        conv_features = MultiIterationDQN.CONV_FEATURES[level]
-        filter_sizes = MultiIterationDQN.FILTER_SIZES[level]
-        strides = MultiIterationDQN.STRIDES[level]
-        pools = MultiIterationDQN.MAX_POOL[level]
+    def build_cnn_q_network(self):
+        hidden_layers = MultiIterationDQN.HIDDEN_LAYERS
+        hidden_layers.append(self.actionSpaces[-1].shape[0])
+        conv_features = MultiIterationDQN.CONV_FEATURES
+        filter_sizes = MultiIterationDQN.FILTER_SIZES
+        strides = MultiIterationDQN.STRIDES
+        pools = MultiIterationDQN.MAX_POOL
 
-        with tf.variable_scope("dqn_level_{0}".format(level)):
-            net = self.stateInputs[level]
+        with tf.variable_scope("dqn"):
+            net = self.stateInput
             conv_layer_id = 0
             for conv_feature, filter_size, stride, max_pool in zip(conv_features, filter_sizes, strides, pools):
                 in_filters = net.get_shape().as_list()[-1]
                 out_filters = conv_feature
                 kernel = [filter_size, filter_size, in_filters, out_filters]
                 strides = [1, stride, stride, 1]
-                W = tf.get_variable("conv_layer_kernel_{0}_t{1}".format(conv_layer_id, level), kernel,
-                                    trainable=True)
-                b = tf.get_variable("conv_layer_bias_{0}_t{1}".format(conv_layer_id, level), [kernel[-1]],
-                                    trainable=True)
+                W = tf.get_variable("conv_layer_kernel_{0}".format(conv_layer_id), kernel, trainable=True)
+                b = tf.get_variable("conv_layer_bias_{0}".format(conv_layer_id), [kernel[-1]], trainable=True)
                 net = tf.nn.conv2d(net, W, strides, padding='SAME')
                 net = tf.nn.bias_add(net, b)
                 net = tf.nn.relu(net)
@@ -351,8 +325,7 @@ class MultiIterationDQN:
                     net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
                 else:
                     net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
-            q_values = net
-            self.qFuncs.append(q_values)
+            self.qFunction = net
 
     def get_l2_loss(self):
         # L2 Loss
@@ -420,7 +393,7 @@ class MultiIterationDQN:
                 sample_id_in_iteration = self.routingDataset.linkageInfo[(s_id, it)]
                 reward_array = self.rewardTensors[it][level][sample_id_in_iteration, a_t_1]
                 rewards.append(reward_array)
-            rewards = np.array(rewards)
+            rewards = np.stack(rewards, axis=0)
         return rewards
 
     def add_to_the_experience_table(self, experience_matrix):
@@ -448,9 +421,7 @@ class MultiIterationDQN:
         # Check if the state features are correctly built
         self.test_state_features(state_features_t=state_features_t, actions_t_minus_1=actions_t_minus_1, level=level)
         # Get the Q Table for states: s_t
-        Q_table = self.session.run([self.qFuncs[level]],
-                                   feed_dict={
-                                       self.stateInputs[level]: state_features_t})[0]
+        Q_table = self.session.run([self.qFunction], feed_dict={ self.stateInput: state_features_t})[0]
         # Sample a_t epsilon greedy for every state.
         # If 1, choose uniformly over all actions. If 0, choose the best action.
         epsilon_greedy_sampling_choices = np.random.choice(a=[0, 1], size=state_matrix_t.shape[0],
@@ -560,23 +531,12 @@ class MultiIterationDQN:
             state_features_t = self.get_state_features(samples=sampled_state_tuples[:, 0],
                                                        iterations=sampled_state_tuples[:, 1],
                                                        action_ids_t_minus_1=sampled_state_tuples[:, 2], level=level)
-            # results = self.session.run(
-            #     [self.qFuncs[level],
-            #      self.selectionIndices[level],
-            #      self.selectedQValues[level],
-            #      self.lossVectors[level],
-            #      self.lossValues[level],
-            #      self.totalLosses[level],
-            #      self.l2Loss], feed_dict={self.stateCount: experiences_sampled.shape[0],
-            #                               self.stateInputs[level]: state_features_t,
-            #                               self.actionSelections[level]: sampled_actions,
-            #                               self.rewardVectors[level]: sampled_rewards,
-            #                               self.l2LambdaTf: 0.0})
-            results = self.session.run([self.totalLosses[level], self.optimizers[level]],
+
+            results = self.session.run([self.totalLoss, self.optimizer],
                                        feed_dict={self.stateCount: experiences_sampled.shape[0],
-                                                  self.stateInputs[level]: state_features_t,
-                                                  self.actionSelections[level]: sampled_actions,
-                                                  self.rewardVectors[level]: sampled_rewards,
+                                                  self.stateInput: state_features_t,
+                                                  self.actionSelection: sampled_actions,
+                                                  self.rewardVector: sampled_rewards,
                                                   self.l2LambdaTf: 0.0})
             # Adjust epsilon
             epsilon *= epsilon_discount_factor
@@ -607,14 +567,15 @@ class MultiIterationDQN:
             #     action_ids_t_minus_1=complete_state_matrix[:, 2], level=level)
             # return complete_state_features, complete_state_matrix
 
-    def create_q_table(self, sample_indices, iterations, level):
+    def create_q_table(self, sample_indices, iterations):
         q_table = {}
+        last_level = self.get_max_trajectory_length() - 1
         for state_features, state_matrix_part in self.get_all_possible_state_features(sample_indices=sample_indices,
                                                                                       iterations=iterations,
-                                                                                      level=level):
+                                                                                      level=last_level):
             assert state_features.shape[0] == state_matrix_part.shape[0]
             q_vals = \
-                self.session.run([self.qFuncs[level]], feed_dict={self.stateInputs[level]: state_features})[0]
+                self.session.run([self.qFunction], feed_dict={self.stateInput: state_features})[0]
             for state_tuple, q_val in zip(state_matrix_part, q_vals):
                 assert tuple(state_tuple) not in q_table
                 q_table[tuple(state_tuple)] = q_val
@@ -686,7 +647,7 @@ class MultiIterationDQN:
         # Execute the Bellman Equation
         # Step 1: Get the Q*(s,a) for the last level.
         # TODO: Later, implement this in a vectorized way.
-        Q_table_T = self.create_q_table(sample_indices=sample_indices, iterations=iterations, level=last_level)
+        Q_table_T = self.create_q_table(sample_indices=sample_indices, iterations=iterations)
         Q_tables = {last_level: Q_table_T}
         # Calculate the mean policy value and the MSE for the provided samples
         mean_policy_value, mse_score = self.measure_performance(sample_indices=sample_indices, iterations=iterations,
