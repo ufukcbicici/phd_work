@@ -11,10 +11,10 @@ from auxillary.general_utility_funcs import UtilityFuncs
 class MultiIterationDQNRegression(MultiIterationDQN):
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
                  lambda_mac_cost):
-        super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
-                         lambda_mac_cost)
         self.rewardMatrix = None
         self.lossMatrix = None
+        super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
+                         lambda_mac_cost)
 
     def build_q_function(self):
         level = self.get_max_trajectory_length() - 1
