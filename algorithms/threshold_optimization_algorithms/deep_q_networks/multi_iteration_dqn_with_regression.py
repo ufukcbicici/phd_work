@@ -31,7 +31,7 @@ class MultiIterationDQNRegression(MultiIterationDQN):
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
         self.rewardMatrix = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[-1].shape[0]],
                                            name="reward_matrix")
-        self.lossMatrix = self.qFunction - self.rewardMatrix
+        self.lossMatrix = tf.square(self.qFunction - self.rewardMatrix)
         self.lossValue = tf.reduce_mean(self.lossMatrix)
         self.get_l2_loss()
         self.totalLoss = self.lossValue + self.l2Loss
