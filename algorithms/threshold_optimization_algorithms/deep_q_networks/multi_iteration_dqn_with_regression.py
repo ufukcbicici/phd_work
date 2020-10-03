@@ -29,7 +29,7 @@ class MultiIterationDQNRegression(MultiIterationDQN):
             self.stateInput = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="state_inputs")
             self.build_cnn_q_network()
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
-        self.rewardMatrix = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[-1].shape[1]],
+        self.rewardMatrix = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[-1].shape[0]],
                                            name="reward_matrix")
         self.lossMatrix = self.qFunction - self.rewardMatrix
         self.lossValue = tf.reduce_mean(self.lossMatrix)
