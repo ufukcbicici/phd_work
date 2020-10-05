@@ -4,11 +4,13 @@ from sklearn.metrics import mean_squared_error
 
 from algorithms.threshold_optimization_algorithms.deep_q_networks.multi_iteration_deep_q_learning import \
     MultiIterationDQN
+from algorithms.threshold_optimization_algorithms.deep_q_networks.multi_iteration_dqn_with_regression import \
+    MultiIterationDQNRegression
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 
 
-class MultiIterationDQNRegression(MultiIterationDQN):
+class MultiIterationDQNRegressionValidActions(MultiIterationDQNRegression):
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
                  lambda_mac_cost):
         self.rewardMatrix = None
@@ -19,19 +21,6 @@ class MultiIterationDQNRegression(MultiIterationDQN):
         self.lrValues = [0.1, 0.01, 0.001, 0.0001]
         self.learningRate = tf.train.piecewise_constant(self.globalStep, self.lrBoundaries, self.lrValues)
         self.build_loss()
-
-    def build_q_function(self):
-        level = self.get_max_trajectory_length() - 1
-        if self.qLearningFunc == "cnn":
-            nodes_at_level = self.network.orderedNodesPerLevel[level]
-            shapes_list = [self.stateFeatures[iteration][node.index].shape
-                           for iteration in self.routingDataset.iterations for node in nodes_at_level]
-            assert len(set(shapes_list)) == 1
-            entry_shape = list(shapes_list[0])
-            entry_shape[0] = None
-            entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
-            self.stateInput = tf.placeholder(dtype=tf.float32, shape=entry_shape, name="state_inputs")
-            self.build_cnn_q_network()
 
     def build_loss(self):
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
@@ -83,6 +72,4 @@ class MultiIterationDQNRegression(MultiIterationDQN):
                 print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
                 losses = []
             if (episode_id + 1) % 200 == 0:
-                if (episode_id + 1) == 10000:
-                    print("X")
                 self.evaluate(run_id=run_id, episode_id=episode_id, discount_factor=discount_factor)

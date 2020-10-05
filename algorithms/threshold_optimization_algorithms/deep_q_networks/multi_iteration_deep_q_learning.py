@@ -421,7 +421,7 @@ class MultiIterationDQN:
         # Check if the state features are correctly built
         self.test_state_features(state_features_t=state_features_t, actions_t_minus_1=actions_t_minus_1, level=level)
         # Get the Q Table for states: s_t
-        Q_table = self.session.run([self.qFunction], feed_dict={ self.stateInput: state_features_t})[0]
+        Q_table = self.session.run([self.qFunction], feed_dict={self.stateInput: state_features_t})[0]
         # Sample a_t epsilon greedy for every state.
         # If 1, choose uniformly over all actions. If 0, choose the best action.
         epsilon_greedy_sampling_choices = np.random.choice(a=[0, 1], size=state_matrix_t.shape[0],
@@ -453,13 +453,15 @@ class MultiIterationDQN:
 
     def evaluate(self, run_id, episode_id, discount_factor):
         print("***********Training Set***********")
-        training_mean_policy_value, training_mse_score, training_accuracy, training_computation_cost = \
+        training_mean_policy_value, training_mse_score, training_accuracy, \
+        training_computation_cost, training_optimal_accuracy, training_optimal_calculation_cost = \
             self.execute_bellman_equation(
                 sample_indices=self.routingDataset.trainingIndices,
                 iterations=self.routingDataset.iterations,
                 discount_rate=discount_factor)
         print("***********Test Set***********")
-        test_mean_policy_value, test_mse_score, test_accuracy, test_computation_cost = \
+        test_mean_policy_value, test_mse_score, test_accuracy, \
+        test_computation_cost, test_optimal_accuracy, test_optimal_calculation_cost = \
             self.execute_bellman_equation(
                 sample_indices=self.routingDataset.testIndices,
                 iterations=self.routingDataset.testIterations,
@@ -472,16 +474,7 @@ class MultiIterationDQN:
                    np.asscalar(test_accuracy), np.asscalar(test_computation_cost))],
             table="deep_q_learning_logs", col_count=10)
 
-    def train(self, level, **kwargs):
-        sample_count = kwargs["sample_count"]
-        episode_count = kwargs["episode_count"]
-        discount_factor = kwargs["discount_factor"]
-        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
-        learning_rate = kwargs["learning_rate"]
-        epsilon = 1.0
-        if level != self.get_max_trajectory_length() - 1:
-            raise NotImplementedError()
-        self.session.run(tf.global_variables_initializer())
+    def log_meta_data(self, kwargs):
         # If we use only information gain for routing (ML: Maximum likelihood routing)
         whole_data_ml_accuracy = self.get_max_likelihood_accuracy(iterations=self.routingDataset.iterations,
                                                                   sample_indices=np.arange(
@@ -503,20 +496,33 @@ class MultiIterationDQN:
         kwargs["FILTER_SIZES"] = MultiIterationDQN.FILTER_SIZES
         kwargs["STRIDES"] = MultiIterationDQN.STRIDES
         kwargs["MAX_POOL"] = MultiIterationDQN.MAX_POOL
-        experiment_id = DbLogger.get_run_id()
-        explanation_string = "DQN Experiment. RunID:{0}\n".format(experiment_id)
+        kwargs["lambdaMacCost"] = self.lambdaMacCost
+        run_id = DbLogger.get_run_id()
+        explanation_string = "DQN Experiment. RunID:{0}\n".format(run_id)
         for k, v in kwargs.items():
             explanation_string += "{0}:{1}\n".format(k, v)
         print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
         print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
         print("Test Set ML Accuracy:{0}".format(test_ml_accuracy))
-        DbLogger.write_into_table(rows=[(experiment_id, explanation_string)], table=DbLogger.runMetaData, col_count=2)
+        DbLogger.write_into_table(rows=[(run_id, explanation_string)], table=DbLogger.runMetaData, col_count=2)
+        return run_id
 
+    def train(self, level, **kwargs):
+        sample_count = kwargs["sample_count"]
+        episode_count = kwargs["episode_count"]
+        discount_factor = kwargs["discount_factor"]
+        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        learning_rate = kwargs["learning_rate"]
+        epsilon = 1.0
+        if level != self.get_max_trajectory_length() - 1:
+            raise NotImplementedError()
+        self.session.run(tf.global_variables_initializer())
+        run_id = self.log_meta_data(kwargs=kwargs)
         # Fill the experience replay table: Solve the cold start problem.
         self.fill_experience_replay_table(level=level, sample_count=10 * sample_count, epsilon=epsilon)
         losses = []
         # Test the accuracy evaluations
-        self.evaluate(run_id=experiment_id, episode_id=-1, discount_factor=discount_factor)
+        self.evaluate(run_id=run_id, episode_id=-1, discount_factor=discount_factor)
         for episode_id in range(episode_count):
             # print("Episode:{0}".format(episode_id))
             self.fill_experience_replay_table(level=level, sample_count=sample_count, epsilon=epsilon)
@@ -546,7 +552,7 @@ class MultiIterationDQN:
                 print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
                 losses = []
             if (episode_id + 1) % 200 == 0:
-                self.evaluate(run_id=experiment_id, episode_id=episode_id, discount_factor=discount_factor)
+                self.evaluate(run_id=run_id, episode_id=episode_id, discount_factor=discount_factor)
 
     def get_all_possible_state_features(self, sample_indices, iterations, level, batch_size=10000):
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
@@ -581,39 +587,74 @@ class MultiIterationDQN:
                 q_table[tuple(state_tuple)] = q_val
         return q_table
 
+    def get_classification_result_from_routing_decision(self, sample_id, iteration, routing_decision):
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        sample_id_for_iteration = self.routingDataset.linkageInfo[(sample_id, iteration)]
+        posteriors = self.posteriorTensors[iteration][sample_id_for_iteration, :]
+        r_vector = np.copy(routing_decision)
+        if MultiIterationDQN.INCLUDE_IG_IN_REWARD_CALCULATIONS:
+            # Set Information Gain routed leaf nodes to 1. They are always evaluated.
+            ig_idx = self.maxLikelihoodPaths[iteration][sample_id_for_iteration, -1] - min_leaf_id
+            r_vector[ig_idx] = 1
+        routing_weight = np.reciprocal(np.sum(r_vector).astype(np.float32))
+        weighted_r_vector = routing_weight * r_vector
+        weighted_posteriors = posteriors * weighted_r_vector[np.newaxis, :]
+        final_posterior = np.sum(weighted_posteriors, axis=1)
+        y_hat = np.argmax(final_posterior)
+        y = self.routingDataset.dictOfDatasets[iteration].labelList[sample_id_for_iteration]
+        computation_cost = self.networkActivationCostsDict[tuple(r_vector)]
+        return y, y_hat, computation_cost
+
+        # truth_array.append(y_hat == y)
+        # computation_cost_array.append(self.networkActivationCostsDict[tuple(r_vector)])
+
+        # routing_weight = np.reciprocal(np.sum(r_vector).astype(np.float32))
+        # weighted_r_vector = routing_weight * r_vector
+        # weighted_posteriors = posteriors * weighted_r_vector[np.newaxis, :]
+        # final_posterior = np.sum(weighted_posteriors, axis=1)
+        # y_hat = np.argmax(final_posterior)
+        # y = self.routingDataset.dictOfDatasets[it].labelList[sample_id_for_iteration]
+        # truth_array.append(y_hat == y)
+        # computation_cost_array.append(self.networkActivationCostsDict[tuple(r_vector)])
+
     # Performance Measurements
-    def calculate_results_from_routing_decisions(self, sample_ids, iterations, Q_tables):
+    def calculate_results_from_routing_decisions(self, sample_ids, iterations, Q_tables, R_tables):
         # Get the routing decisions of each sample, by using the calculated Q-Tables for every time step,
         # Selecting the optimal policy.
         # last_level = self.get_max_trajectory_length() - 1
         state_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=[sample_ids, iterations])
         min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
-        truth_array = []
-        computation_cost_array = []
+        # truth_array = []
+        # computation_cost_array = []
+        q_results = {"truth": [], "predicted": [], "computation_costs": []}
+        r_results = {"truth": [], "predicted": [], "computation_costs": []}
         for s_id, it in state_tuples:
-            sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+            # sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
             a_t_minus_1 = 0
+            a_t_minus_1_optimal = 0
             for t in range(self.get_max_trajectory_length()):
                 all_actions_t = Q_tables[t][(s_id, it, a_t_minus_1)]
                 a_t_minus_1 = np.argmax(all_actions_t)
-            routing_decision = self.actionSpaces[-1][a_t_minus_1]
-            posteriors = self.posteriorTensors[it][sample_id_for_iteration, :]
-            r_vector = np.copy(routing_decision)
-            if MultiIterationDQN.INCLUDE_IG_IN_REWARD_CALCULATIONS:
-                # Set Information Gain routed leaf nodes to 1. They are always evaluated.
-                ig_idx = self.maxLikelihoodPaths[it][sample_id_for_iteration, -1] - min_leaf_id
-                r_vector[ig_idx] = 1
-            routing_weight = np.reciprocal(np.sum(r_vector).astype(np.float32))
-            weighted_r_vector = routing_weight * r_vector
-            weighted_posteriors = posteriors * weighted_r_vector[np.newaxis, :]
-            final_posterior = np.sum(weighted_posteriors, axis=1)
-            y_hat = np.argmax(final_posterior)
-            y = self.routingDataset.dictOfDatasets[it].labelList[sample_id_for_iteration]
-            truth_array.append(y_hat == y)
-            computation_cost_array.append(self.networkActivationCostsDict[tuple(r_vector)])
-        accuracy = np.mean(np.array(truth_array).astype(np.float32))
-        computation_cost = np.mean(np.array(computation_cost_array))
-        return accuracy, computation_cost
+                all_actions_t_optimal = R_tables[t][(s_id, it, a_t_minus_1_optimal)]
+                a_t_minus_1_optimal = np.argmax(all_actions_t_optimal)
+            routing_decision_q = self.actionSpaces[-1][a_t_minus_1]
+            y_q, y_q_hat, computation_cost_q = self.get_classification_result_from_routing_decision(
+                sample_id=s_id, iteration=it, routing_decision=routing_decision_q)
+            q_results["truth"].append(y_q)
+            q_results["predicted"].append(y_q_hat)
+            q_results["computation_costs"].append(computation_cost_q)
+            routing_decision_r = self.actionSpaces[-1][a_t_minus_1_optimal]
+            y_r, y_r_hat, computation_cost_r = self.get_classification_result_from_routing_decision(
+                sample_id=s_id, iteration=it, routing_decision=routing_decision_r)
+            r_results["truth"].append(y_r)
+            r_results["predicted"].append(y_r_hat)
+            r_results["computation_costs"].append(computation_cost_r)
+        accuracy = np.mean((np.array(q_results["truth"]) == np.array(q_results["predicted"])).astype(np.float32))
+        computation_cost = np.mean(np.array(q_results["computation_costs"]))
+        optimal_accuracy = np.mean((np.array(r_results["truth"]) == np.array(r_results["predicted"]))
+                                   .astype(np.float32))
+        optimal_computation_cost = np.mean(np.array(r_results["computation_costs"]))
+        return accuracy, computation_cost, optimal_accuracy, optimal_computation_cost
 
     # Calculate the Q-Table vs Rewards table divergence and related scores for the last tree layer.
     def measure_performance(self, sample_indices, iterations, Q_table_T):
@@ -640,6 +681,22 @@ class MultiIterationDQN:
         mse_score = mean_squared_error(y_true=y, y_pred=y_hat)
         return mean_policy_value, mse_score
 
+    def create_r_table(self, sample_indices, iterations):
+        last_level = self.get_max_trajectory_length() - 1
+        action_count_t_minus_one = self.actionSpaces[last_level - 1].shape[0]
+        # Enumerate all possible states
+        all_state_tuples = UtilityFuncs.get_cartesian_product(
+            [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+        R_table_T = {}
+        for state_tuple in all_state_tuples:
+            s_id = state_tuple[0]
+            it = state_tuple[1]
+            a_t_minus_1 = state_tuple[2]
+            sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
+            R_table_T[tuple([s_id, it, a_t_minus_1])] = \
+                self.rewardTensors[it][last_level][sample_id_for_iteration, a_t_minus_1]
+        return R_table_T
+
     def execute_bellman_equation(self, sample_indices, iterations, discount_rate):
         last_level = self.get_max_trajectory_length() - 1
         # sample_ids_for_iterations = np.array([self.routingDataset.linkageInfo[(s_id, it)]
@@ -649,6 +706,8 @@ class MultiIterationDQN:
         # TODO: Later, implement this in a vectorized way.
         Q_table_T = self.create_q_table(sample_indices=sample_indices, iterations=iterations)
         Q_tables = {last_level: Q_table_T}
+        R_table_T = self.create_r_table(sample_indices=sample_indices, iterations=iterations)
+        R_tables = {last_level: R_table_T}
         # Calculate the mean policy value and the MSE for the provided samples
         mean_policy_value, mse_score = self.measure_performance(sample_indices=sample_indices, iterations=iterations,
                                                                 Q_table_T=Q_table_T)
@@ -656,11 +715,13 @@ class MultiIterationDQN:
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
             Q_tables[t] = {}
+            R_tables[t] = {}
             all_state_tuples = UtilityFuncs.get_cartesian_product(
                 [sample_indices, iterations, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
             for s_id, it, a_t_minus_1 in all_state_tuples:
                 sample_id_for_iteration = self.routingDataset.linkageInfo[(s_id, it)]
                 Q_tables[t][(s_id, it, a_t_minus_1)] = np.array([np.nan] * action_count_t)
+                R_tables[t][(s_id, it, a_t_minus_1)] = np.array([np.nan] * action_count_t)
                 for a_t in range(action_count_t):
                     # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
                     # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
@@ -675,20 +736,30 @@ class MultiIterationDQN:
                     # Get the Q* values, belonging to s_{t+1}.
                     q_values = Q_tables[t + 1][(s_id, it, a_t)]
                     q_t = r_t_plus_1 + discount_rate * np.max(q_values)
+                    r_values = R_tables[t + 1][(s_id, it, a_t)]
+                    r_t = r_t_plus_1 + discount_rate * np.max(r_values)
                     # Save the result into Q* table for the current time step; for the state tuple:
                     # s_{t}: (sample_id, iteration, a_{t-1})
                     Q_tables[t][(s_id, it, a_t_minus_1)][a_t] = q_t
+                    R_tables[t][(s_id, it, a_t_minus_1)][a_t] = r_t
             # Confirm that no nan entries left
             for v in Q_tables[t].values():
                 assert np.sum(np.isnan(v)) == 0
-        accuracy, computation_cost = self.calculate_results_from_routing_decisions(sample_ids=sample_indices,
-                                                                                   iterations=iterations,
-                                                                                   Q_tables=Q_tables)
+            for v in R_tables[t].values():
+                assert np.sum(np.isnan(v)) == 0
+        accuracy, computation_cost, optimal_accuracy, optimal_calculation_cost = \
+            self.calculate_results_from_routing_decisions(
+                sample_ids=sample_indices,
+                iterations=iterations,
+                Q_tables=Q_tables,
+                R_tables=R_tables)
         print("Mean Policy Value:{0}".format(accuracy))
         print("MSE:{0}".format(mse_score))
         print("Accuracy:{0}".format(accuracy))
         print("Computation Cost:{0}".format(computation_cost))
-        return mean_policy_value, mse_score, accuracy, computation_cost
+        print("Optimal Accuracy:{0}".format(optimal_accuracy))
+        print("Optimal Computation Cost:{0}".format(optimal_calculation_cost))
+        return mean_policy_value, mse_score, accuracy, computation_cost, optimal_accuracy, optimal_calculation_cost
 
     # Test methods
     def test_likelihood_consistency(self):

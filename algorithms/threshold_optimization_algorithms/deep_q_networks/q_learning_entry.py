@@ -51,10 +51,11 @@ def train_deep_q_learning():
                                                            degree_list_=[2, 2],
                                                            test_iterations_=[43680, 44160, 44640, 45120, 45600,
                                                                              46080, 46560, 47040, 47520, 48000])
+    routing_data.create_routing_dataset()
     routing_data.apply_validation_test_split(test_ratio=0.1)
     dqn = MultiIterationDQNRegression(routing_dataset=routing_data, network=network, network_name=network_name,
                                       run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
-                                      lambda_mac_cost=0.1)
+                                      lambda_mac_cost=0.2)
     dqn.train(level=1, sample_count=512, episode_count=25000, discount_factor=1.0, epsilon_discount_factor=0.99975,
               learning_rate=0.001)
     print("X")

@@ -151,6 +151,47 @@ class MultiIterationRoutingDataset(RoutingDataset):
         super().__init__(self.dictOfDatasets[self.iterations[0]].labelList,
                          self.dictOfDatasets[self.iterations[0]].dictionaryOfRoutingData)
 
+    def create_routing_dataset(self):
+        # self.labelList = label_list
+        # self.dictionaryOfRoutingData = dict_of_data_dicts
+        # self.indexMultiplier = index_multiplier
+        # # Assert the integrity of augmented samples
+        # for idx in range(0, self.labelList.shape[0], self.indexMultiplier):
+        #     sub_list = self.labelList[idx:idx + self.indexMultiplier].tolist()
+        #     assert len(set(sub_list)) == 1
+
+        label_list = []
+        dict_of_data_dicts = {}
+        dict_of_data_dicts_merged = {}
+        for iteration in self.iterations:
+            routing_data = self.dictOfDatasets[iteration]
+            for feature_name, feature_dict in routing_data.dictionaryOfRoutingData.items():
+                if "Costs" not in feature_name:
+                    if feature_name not in dict_of_data_dicts:
+                        dict_of_data_dicts[feature_name] = {}
+                    for node_id, feature_array in feature_dict.items():
+                        if node_id not in dict_of_data_dicts[feature_name]:
+                            dict_of_data_dicts[feature_name][node_id] = []
+                        dict_of_data_dicts[feature_name][node_id].append(np.copy(feature_array))
+                else:
+                    dict_of_data_dicts_merged[feature_name] = feature_dict
+            label_list.append(routing_data.labelList)
+        for feature_name in dict_of_data_dicts.keys():
+            if "Costs" in feature_name:
+                continue
+            assert isinstance(dict_of_data_dicts[feature_name], dict)
+            dict_of_data_dicts_merged[feature_name] = {}
+            for node_id in dict_of_data_dicts[feature_name].keys():
+                assert isinstance(dict_of_data_dicts[feature_name][node_id], list)
+                dict_of_data_dicts_merged[feature_name][node_id] = \
+                    np.concatenate(dict_of_data_dicts[feature_name][node_id], axis=0)
+        label_list = np.concatenate(label_list, axis=0)
+        print("X")
+
+
+
+
+
     def split_dataset_with_indices(self, training_indices, test_indices):
         pass
 
