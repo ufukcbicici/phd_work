@@ -145,13 +145,14 @@ class MultiIterationRoutingDataset(RoutingDataset):
             iteration = tpl[1]
             sample_id_for_iteration = tpl[2]
             self.linkageInfo[(sample_id, iteration)] = sample_id_for_iteration
+        self.trainingIterations = self.iterations
         self.testIterations = test_iterations
         self.trainingIndices = None
         self.testIndices = None
         super().__init__(self.dictOfDatasets[self.iterations[0]].labelList,
                          self.dictOfDatasets[self.iterations[0]].dictionaryOfRoutingData)
 
-    def create_routing_dataset(self):
+    def switch_to_single_iteration_mode(self):
         # self.labelList = label_list
         # self.dictionaryOfRoutingData = dict_of_data_dicts
         # self.indexMultiplier = index_multiplier
@@ -160,9 +161,12 @@ class MultiIterationRoutingDataset(RoutingDataset):
         #     sub_list = self.labelList[idx:idx + self.indexMultiplier].tolist()
         #     assert len(set(sub_list)) == 1
 
+        self.labelList = []
+        self.dictionaryOfRoutingData = {}
+        self.indexMultiplier = 1
+
         label_list = []
         dict_of_data_dicts = {}
-        dict_of_data_dicts_merged = {}
         for iteration in self.iterations:
             routing_data = self.dictOfDatasets[iteration]
             for feature_name, feature_dict in routing_data.dictionaryOfRoutingData.items():
@@ -174,18 +178,37 @@ class MultiIterationRoutingDataset(RoutingDataset):
                             dict_of_data_dicts[feature_name][node_id] = []
                         dict_of_data_dicts[feature_name][node_id].append(np.copy(feature_array))
                 else:
-                    dict_of_data_dicts_merged[feature_name] = feature_dict
+                    self.dictionaryOfRoutingData[feature_name] = feature_dict
             label_list.append(routing_data.labelList)
+        size_set = set()
         for feature_name in dict_of_data_dicts.keys():
             if "Costs" in feature_name:
                 continue
             assert isinstance(dict_of_data_dicts[feature_name], dict)
-            dict_of_data_dicts_merged[feature_name] = {}
+            self.dictionaryOfRoutingData[feature_name] = {}
             for node_id in dict_of_data_dicts[feature_name].keys():
                 assert isinstance(dict_of_data_dicts[feature_name][node_id], list)
-                dict_of_data_dicts_merged[feature_name][node_id] = \
+                for arr in dict_of_data_dicts[feature_name][node_id]:
+                    size_set.add(arr.shape[0])
+                self.dictionaryOfRoutingData[feature_name][node_id] = \
                     np.concatenate(dict_of_data_dicts[feature_name][node_id], axis=0)
-        label_list = np.concatenate(label_list, axis=0)
+        for arr in label_list:
+            size_set.add(arr.shape[0])
+        self.labelList = np.concatenate(label_list, axis=0)
+        # Update the training and test indices
+        assert len(size_set) == 1
+        data_batch_size = list(size_set)[0]
+        its_dict = {"training": self.trainingIterations, "test": self.testIterations}
+        indices_dict = {"training": self.trainingIndices, "test": self.testIndices}
+        new_indices_dict = {"training": [], "test": []}
+        for data_type in ["training", "test"]:
+            tpls = UtilityFuncs.get_cartesian_product(list_of_lists=[indices_dict[data_type], its_dict[data_type]])
+            for s_id, it in tpls:
+                sample_id_in_iteration = self.linkageInfo[(s_id, it)]
+                new_index = (self.iterations.index(it) * data_batch_size) + sample_id_in_iteration
+                new_indices_dict[data_type].append(new_index)
+        self.trainingIndices = np.array(new_indices_dict["training"])
+        self.testIndices = np.array(new_indices_dict["test"])
         print("X")
 
 
