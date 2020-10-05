@@ -153,18 +153,9 @@ class MultiIterationRoutingDataset(RoutingDataset):
                          self.dictOfDatasets[self.iterations[0]].dictionaryOfRoutingData)
 
     def switch_to_single_iteration_mode(self):
-        # self.labelList = label_list
-        # self.dictionaryOfRoutingData = dict_of_data_dicts
-        # self.indexMultiplier = index_multiplier
-        # # Assert the integrity of augmented samples
-        # for idx in range(0, self.labelList.shape[0], self.indexMultiplier):
-        #     sub_list = self.labelList[idx:idx + self.indexMultiplier].tolist()
-        #     assert len(set(sub_list)) == 1
-
         self.labelList = []
         self.dictionaryOfRoutingData = {}
         self.indexMultiplier = 1
-
         label_list = []
         dict_of_data_dicts = {}
         for iteration in self.iterations:
@@ -209,6 +200,9 @@ class MultiIterationRoutingDataset(RoutingDataset):
                 new_indices_dict[data_type].append(new_index)
         self.trainingIndices = np.array(new_indices_dict["training"])
         self.testIndices = np.array(new_indices_dict["test"])
+        # Intersection of training and tests must be empty.
+        assert len(set(self.trainingIndices).intersection(set(self.testIndices))) == 0
+        self.dictOfDatasets = None
         print("X")
 
 
