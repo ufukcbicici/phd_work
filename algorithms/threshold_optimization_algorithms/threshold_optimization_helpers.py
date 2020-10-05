@@ -202,6 +202,7 @@ class MultiIterationRoutingDataset(RoutingDataset):
         self.testIndices = np.array(new_indices_dict["test"])
         # Intersection of training and tests must be empty.
         assert len(set(self.trainingIndices).intersection(set(self.testIndices))) == 0
+        # Clear memory
         self.dictOfDatasets = None
         print("X")
 
