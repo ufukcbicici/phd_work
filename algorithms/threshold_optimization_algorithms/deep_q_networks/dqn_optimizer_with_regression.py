@@ -331,7 +331,7 @@ class DqnWithRegression:
     def get_max_likelihood_accuracy(self, sample_indices):
         min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
         posteriors = self.posteriorTensors[sample_indices]
-        ml_indices = self.maxLikelihoodPaths[sample_indices] - min_leaf_id
+        ml_indices = self.maxLikelihoodPaths[sample_indices][:, -1] - min_leaf_id
         true_labels = self.routingDataset.labelList[sample_indices]
         selected_posteriors = posteriors[np.arange(posteriors.shape[0]), :, ml_indices]
         predicted_labels = np.argmax(selected_posteriors, axis=1)
@@ -344,8 +344,7 @@ class DqnWithRegression:
         with tf.variable_scope("dqn_{0}".format(level)):
             if self.qLearningFunc == "cnn":
                 nodes_at_level = self.network.orderedNodesPerLevel[level]
-                shapes_list = [self.stateFeatures[iteration][node.index].shape
-                               for iteration in self.routingDataset.iterations for node in nodes_at_level]
+                shapes_list = [self.stateFeatures[node.index].shape for node in nodes_at_level]
                 assert len(set(shapes_list)) == 1
                 entry_shape = list(shapes_list[0])
                 entry_shape[0] = None
