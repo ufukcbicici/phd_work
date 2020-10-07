@@ -51,24 +51,28 @@ class DqnWithRegression:
         self.get_reachability_matrices()
         self.calculate_reward_tensors()
         # # Neural network components
-        self.stateInputs = [] * self.get_max_trajectory_length()
-        self.qFuncs = [] * self.get_max_trajectory_length()
-        self.selectedQValues = [] * self.get_max_trajectory_length()
+        self.stateInputs = [None] * self.get_max_trajectory_length()
+        self.qFuncs = [None] * self.get_max_trajectory_length()
+        self.selectedQValues = [None] * self.get_max_trajectory_length()
         self.stateCount = tf.placeholder(dtype=tf.int32, name="stateCount")
         self.stateRange = tf.range(0, self.stateCount, 1)
-        self.actionSelections = [] * self.get_max_trajectory_length()
-        self.selectionIndices = [] * self.get_max_trajectory_length()
-        self.rewardMatrices = [] * self.get_max_trajectory_length()
-        self.lossMatrices = [] * self.get_max_trajectory_length()
-        self.regressionLossValues = [] * self.get_max_trajectory_length()
-        self.optimizers = [] * self.get_max_trajectory_length()
-        self.totalLosses = [] * self.get_max_trajectory_length()
+        self.actionSelections = [None] * self.get_max_trajectory_length()
+        self.selectionIndices = [None] * self.get_max_trajectory_length()
+        self.rewardMatrices = [None] * self.get_max_trajectory_length()
+        self.lossMatrices = [None] * self.get_max_trajectory_length()
+        self.regressionLossValues = [None] * self.get_max_trajectory_length()
+        self.optimizers = [None] * self.get_max_trajectory_length()
+        self.totalLosses = [None] * self.get_max_trajectory_length()
         self.globalSteps = [tf.Variable(0, name='global_step_{0}'.format(idx), trainable=False)
                             for idx in range(self.get_max_trajectory_length())]
         self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
-        self.l2Losses = [] * self.get_max_trajectory_length()
+        self.l2Losses = [None] * self.get_max_trajectory_length()
         for level in range(self.get_max_trajectory_length()):
             self.build_q_function(level=level)
+        self.lrBoundaries = [5000, 10000, 20000]
+        self.lrValues = [0.1, 0.01, 0.001, 0.0001]
+        # self.learningRate = tf.train.piecewise_constant(self.globalStep, self.lrBoundaries, self.lrValues)
+        self.session = tf.Session()
         # # The following is for testing, can comment out later.
         # # self.test_likelihood_consistency()
         # print("X")
@@ -324,6 +328,17 @@ class DqnWithRegression:
         # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).\
         #     minimize(self.totalLoss, global_step=self.globalStep)
 
+    def get_max_likelihood_accuracy(self, sample_indices):
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        posteriors = self.posteriorTensors[sample_indices]
+        ml_indices = self.maxLikelihoodPaths[sample_indices] - min_leaf_id
+        true_labels = self.routingDataset.labelList[sample_indices]
+        selected_posteriors = posteriors[np.arange(posteriors.shape[0]), :, ml_indices]
+        predicted_labels = np.argmax(selected_posteriors, axis=1)
+        correct_count = np.sum((predicted_labels == true_labels).astype(np.float32))
+        accuracy = correct_count / true_labels.shape[0]
+        return accuracy
+
     # OK
     def build_q_function(self, level):
         with tf.variable_scope("dqn_{0}".format(level)):
@@ -339,3 +354,75 @@ class DqnWithRegression:
                                                          name="state_inputs_{0}".format(level))
                 self.build_cnn_q_network(level=level)
                 self.build_loss(level=level)
+
+    def log_meta_data(self, kwargs):
+        # If we use only information gain for routing (ML: Maximum likelihood routing)
+        whole_data_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=np.arange(
+                                                                      self.routingDataset.labelList.shape[0]))
+        training_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.trainingIndices)
+        test_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.testIndices)
+        # Fill the explanation string for the experiment
+        kwargs["whole_data_ml_accuracy"] = whole_data_ml_accuracy
+        kwargs["training_ml_accuracy"] = training_ml_accuracy
+        kwargs["test_ml_accuracy"] = test_ml_accuracy
+        kwargs["invalid_action_penalty"] = DqnWithRegression.invalid_action_penalty
+        kwargs["valid_prediction_reward"] = DqnWithRegression.valid_prediction_reward
+        kwargs["invalid_prediction_penalty"] = DqnWithRegression.invalid_prediction_penalty
+        kwargs["INCLUDE_IG_IN_REWARD_CALCULATIONS"] = DqnWithRegression.INCLUDE_IG_IN_REWARD_CALCULATIONS
+        kwargs["CONV_FEATURES"] = DqnWithRegression.CONV_FEATURES
+        kwargs["HIDDEN_LAYERS"] = DqnWithRegression.HIDDEN_LAYERS
+        kwargs["FILTER_SIZES"] = DqnWithRegression.FILTER_SIZES
+        kwargs["STRIDES"] = DqnWithRegression.STRIDES
+        kwargs["MAX_POOL"] = DqnWithRegression.MAX_POOL
+        kwargs["lambdaMacCost"] = self.lambdaMacCost
+        run_id = DbLogger.get_run_id()
+        explanation_string = "DQN Experiment. RunID:{0}\n".format(run_id)
+        for k, v in kwargs.items():
+            explanation_string += "{0}:{1}\n".format(k, v)
+        print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
+        print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
+        print("Test Set ML Accuracy:{0}".format(test_ml_accuracy))
+        DbLogger.write_into_table(rows=[(run_id, explanation_string)], table=DbLogger.runMetaData, col_count=2)
+        return run_id
+
+    def train(self, level, **kwargs):
+        sample_count = kwargs["sample_count"]
+        episode_count = kwargs["episode_count"]
+        discount_factor = kwargs["discount_factor"]
+        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
+        learning_rate = kwargs["learning_rate"]
+        epsilon = 1.0
+        if level != self.get_max_trajectory_length() - 1:
+            raise NotImplementedError()
+        self.session.run(tf.global_variables_initializer())
+        # If we use only information gain for routing (ML: Maximum likelihood routing)
+        kwargs["lrValues"] = self.lrValues
+        kwargs["lrBoundaries"] = self.lrBoundaries
+        run_id = self.log_meta_data(kwargs=kwargs)
+        losses = []
+        # Test the accuracy evaluations
+        # self.evaluate(run_id=run_id, episode_id=-1, discount_factor=discount_factor)
+        # for episode_id in range(episode_count):
+        #     print("Episode:{0}".format(episode_id))
+        #     sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
+        #     iterations = np.random.choice(self.routingDataset.iterations, sample_count, replace=True)
+        #     actions_t_minus_1 = np.random.choice(self.actionSpaces[level - 1].shape[0], sample_count, replace=True)
+        #     rewards_matrix = self.get_rewards(samples=sample_ids, iterations=iterations,
+        #                                       action_ids_t_minus_1=actions_t_minus_1, action_ids_t=None, level=level)
+        #     state_features = self.get_state_features(samples=sample_ids,
+        #                                              iterations=iterations,
+        #                                              action_ids_t_minus_1=actions_t_minus_1, level=level)
+        #     results = self.session.run([self.totalLoss, self.lossMatrix, self.lossValue, self.optimizer],
+        #                                feed_dict={self.stateCount: sample_count,
+        #                                           self.stateInput: state_features,
+        #                                           self.rewardMatrix: rewards_matrix,
+        #                                           self.l2LambdaTf: 0.0})
+        #     total_loss = results[0]
+        #     losses.append(total_loss)
+        #     if len(losses) % 10 == 0:
+        #         print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
+        #         losses = []
+        #     if (episode_id + 1) % 200 == 0:
+        #         if (episode_id + 1) == 10000:
+        #             print("X")
+        #         self.evaluate(run_id=run_id, episode_id=episode_id, discount_factor=discount_factor)
