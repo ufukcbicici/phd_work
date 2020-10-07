@@ -12,11 +12,11 @@ class DqnWithRegression:
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = True
 
-    CONV_FEATURES = [64]
-    FILTER_SIZES = [1]
-    STRIDES = [1]
-    HIDDEN_LAYERS = [128, 64]
-    MAX_POOL = [None]
+    CONV_FEATURES = [[32], [64]]
+    HIDDEN_LAYERS = [[128, 64], [128, 64]]
+    FILTER_SIZES = [[1], [1]]
+    STRIDES = [[1], [1]]
+    MAX_POOL = [[None], [None]]
 
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
                  lambda_mac_cost, max_experience_count=100000):
@@ -40,7 +40,7 @@ class DqnWithRegression:
         self.networkActivationCosts = None
         self.networkActivationCostsDict = None
         self.baseEvaluationCost = 0.0
-        self.reachabilityMatrices = None
+        self.reachabilityMatrices = []
         self.rewardTensors = None
         # Init data structures
         self.get_max_likelihood_paths()
@@ -51,25 +51,24 @@ class DqnWithRegression:
         self.get_reachability_matrices()
         self.calculate_reward_tensors()
         # # Neural network components
-        # self.experienceReplayTable = None
-        # self.maxExpCount = max_experience_count
-        # self.stateInput = None
-        # self.qFunction = None
-        # self.selectedQs = None
-        # self.stateCount = tf.placeholder(dtype=tf.int32, name="stateCount")
-        # self.stateRange = tf.range(0, self.stateCount, 1)
-        # self.actionSelection = None
-        # self.selectionMatrix = None
-        # self.rewardVector = None
-        # self.lossVector = None
-        # self.lossValue = None
-        # self.optimizer = None
-        # self.totalLoss = None
-        # self.globalStep = tf.Variable(0, name='global_step', trainable=False)
-        # self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
-        # self.l2Loss = None
-        # self.build_q_function()
-        # self.session = tf.Session()
+        self.stateInputs = [] * self.get_max_trajectory_length()
+        self.qFuncs = [] * self.get_max_trajectory_length()
+        self.selectedQValues = [] * self.get_max_trajectory_length()
+        self.stateCount = tf.placeholder(dtype=tf.int32, name="stateCount")
+        self.stateRange = tf.range(0, self.stateCount, 1)
+        self.actionSelections = [] * self.get_max_trajectory_length()
+        self.selectionIndices = [] * self.get_max_trajectory_length()
+        self.rewardMatrices = [] * self.get_max_trajectory_length()
+        self.lossMatrices = [] * self.get_max_trajectory_length()
+        self.regressionLossValues = [] * self.get_max_trajectory_length()
+        self.optimizers = [] * self.get_max_trajectory_length()
+        self.totalLosses = [] * self.get_max_trajectory_length()
+        self.globalSteps = [tf.Variable(0, name='global_step_{0}'.format(idx), trainable=False)
+                            for idx in range(self.get_max_trajectory_length())]
+        self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
+        self.l2Losses = [] * self.get_max_trajectory_length()
+        for level in range(self.get_max_trajectory_length()):
+            self.build_q_function(level=level)
         # # The following is for testing, can comment out later.
         # # self.test_likelihood_consistency()
         # print("X")
@@ -267,3 +266,76 @@ class DqnWithRegression:
                     np.float32) * invalid_prediction_penalty
                 rewards_arr -= self.lambdaMacCost * computation_overload_tensor
             self.rewardTensors.append(rewards_arr)
+
+    def build_cnn_q_network(self, level):
+        hidden_layers = DqnWithRegression.HIDDEN_LAYERS[level]
+        hidden_layers.append(self.actionSpaces[level].shape[0])
+        conv_features = DqnWithRegression.CONV_FEATURES[level]
+        filter_sizes = DqnWithRegression.FILTER_SIZES[level]
+        strides = DqnWithRegression.STRIDES[level]
+        pools = DqnWithRegression.MAX_POOL[level]
+        net = self.stateInputs[level]
+        conv_layer_id = 0
+        for conv_feature, filter_size, stride, max_pool in zip(conv_features, filter_sizes, strides, pools):
+            in_filters = net.get_shape().as_list()[-1]
+            out_filters = conv_feature
+            kernel = [filter_size, filter_size, in_filters, out_filters]
+            strides = [1, stride, stride, 1]
+            W = tf.get_variable("conv_layer_kernel_{0}".format(conv_layer_id), kernel, trainable=True)
+            b = tf.get_variable("conv_layer_bias_{0}".format(conv_layer_id), [kernel[-1]], trainable=True)
+            net = tf.nn.conv2d(net, W, strides, padding='SAME')
+            net = tf.nn.bias_add(net, b)
+            net = tf.nn.relu(net)
+            if max_pool is not None:
+                net = tf.nn.max_pool(net, ksize=[1, max_pool, max_pool, 1], strides=[1, max_pool, max_pool, 1],
+                                     padding='SAME')
+            conv_layer_id += 1
+        # net = tf.contrib.layers.flatten(net)
+        net_shape = net.get_shape().as_list()
+        net = tf.nn.avg_pool(net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
+        net_shape = net.get_shape().as_list()
+        net = tf.reshape(net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
+        for layer_id, layer_dim in enumerate(hidden_layers):
+            if layer_id < len(hidden_layers) - 1:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+            else:
+                net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
+        self.qFuncs[level] = net
+
+    def get_l2_loss(self, level):
+        # L2 Loss
+        tvars = tf.trainable_variables(scope="dqn_{0}".format(level))
+        self.l2Losses[level] = tf.constant(0.0)
+        for tv in tvars:
+            if 'kernel' in tv.name:
+                self.l2Losses[level] += self.l2LambdaTf * tf.nn.l2_loss(tv)
+            # self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
+
+    def build_loss(self, level):
+        # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
+        self.rewardMatrices[level] = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[level].shape[0]],
+                                                    name="reward_matrix_{0}".format(level))
+        self.lossMatrices[level] = tf.square(self.qFuncs[level] - self.rewardMatrices[level])
+        self.regressionLossValues[level] = tf.reduce_mean(self.lossMatrices[level])
+        self.get_l2_loss(level=level)
+        self.totalLosses[level] = self.regressionLossValues[level] + self.l2Losses[level]
+        self.optimizers[level] = tf.train.AdamOptimizer().minimize(self.totalLosses[level],
+                                                                   global_step=self.globalSteps[level])
+        # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).\
+        #     minimize(self.totalLoss, global_step=self.globalStep)
+
+    # OK
+    def build_q_function(self, level):
+        with tf.variable_scope("dqn_{0}".format(level)):
+            if self.qLearningFunc == "cnn":
+                nodes_at_level = self.network.orderedNodesPerLevel[level]
+                shapes_list = [self.stateFeatures[iteration][node.index].shape
+                               for iteration in self.routingDataset.iterations for node in nodes_at_level]
+                assert len(set(shapes_list)) == 1
+                entry_shape = list(shapes_list[0])
+                entry_shape[0] = None
+                entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
+                self.stateInputs[level] = tf.placeholder(dtype=tf.float32, shape=entry_shape,
+                                                         name="state_inputs_{0}".format(level))
+                self.build_cnn_q_network(level=level)
+                self.build_loss(level=level)
