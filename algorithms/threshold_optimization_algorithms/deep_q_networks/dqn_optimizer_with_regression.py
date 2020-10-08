@@ -434,7 +434,7 @@ class DqnWithRegression:
             action_count_t = self.actionSpaces[t].shape[0]
             QTables_manual[t] = np.zeros_like(self.optimalQTables[t])
             all_state_tuples = UtilityFuncs.get_cartesian_product(
-                [total_sample_count, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+                [range(total_sample_count), [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
             for s_id, a_t_minus_1 in all_state_tuples:
                 for a_t in range(action_count_t):
                     # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
