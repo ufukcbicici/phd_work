@@ -414,10 +414,12 @@ class DqnWithRegression:
     def calculate_optimal_q_tables(self, discount_rate):
         # List of optimal Q_tables for every time step
         self.optimalQTables = [None] * self.get_max_trajectory_length()
+        last_level = self.get_max_trajectory_length()
+        total_sample_count = self.rewardTensors[0].shape[0]
         # optimal_Q_tables[self.get_max_trajectory_length()-1] = self.rewardTensors[-1]
-        for t in range(self.get_max_trajectory_length()-1, -1, -1):
+        for t in range(last_level - 1, -1, -1):
             # Get the rewards for that time step
-            if t == self.get_max_trajectory_length()-1:
+            if t == last_level-1:
                 self.optimalQTables[t] = self.rewardTensors[t]
             else:
                 rewards_t = self.rewardTensors[t]
@@ -425,6 +427,27 @@ class DqnWithRegression:
                 q_star = np.max(q_next, axis=-1)
                 q_t = rewards_t + discount_rate * q_star[:, np.newaxis, :]
                 self.optimalQTables[t] = q_t
+        # The rest is for testing purposes. Can comment it out.
+        QTables_manual = {}
+        for t in range(last_level - 1, -1, -1):
+            action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+            action_count_t = self.actionSpaces[t].shape[0]
+            QTables_manual[t] = np.zeros_like(self.optimalQTables[t])
+            all_state_tuples = UtilityFuncs.get_cartesian_product(
+                [total_sample_count, [a_t_minus_one for a_t_minus_one in range(action_count_t_minus_one)]])
+            for s_id, a_t_minus_1 in all_state_tuples:
+                for a_t in range(action_count_t):
+                    # E[r_{t+1}] = \sum_{r_{t+1}}r_{t+1}p(r_{t+1}|s_{t},a_{t})
+                    # Since in our case p(r_{t+1}|s_{t},a_{t}) is deterministic, it is a lookup into the rewards table.
+                    # s_{t}: (sample_id, iteration, a_{t-1})
+                    r_t = self.rewardTensors[t][s_id, a_t_minus_1, a_t]
+                    q_t = r_t
+                    if t < last_level - 1:
+                        q_t_plus_1 = QTables_manual[t + 1][s_id, a_t]
+                        q_t += np.max(q_t_plus_1)
+                    QTables_manual[t][s_id, a_t_minus_1, a_t] = q_t
+        for t in range(last_level - 1, -1, -1):
+            assert np.allclose(self.optimalQTables[t], QTables_manual[t])
 
     # Calculate the estimated Q-Table vs actual Q-table divergence and related scores for the given layer.
     def measure_performance(self, level, Q_table, sample_indices, action_ids_t_minus_1):
@@ -434,10 +457,6 @@ class DqnWithRegression:
         # Calculate the MSE between the Q_{t}^{predicted}(s,a) and Q_{t}^{actual}(s,a).
         y = []
         y_hat = []
-
-
-
-
 
     def execute_bellman_equation(self, level, sample_indices, action_ids_t_minus_1, discount_rate):
         last_level = self.get_max_trajectory_length() - 1
