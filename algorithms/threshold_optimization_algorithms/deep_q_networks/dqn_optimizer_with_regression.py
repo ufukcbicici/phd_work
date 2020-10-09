@@ -436,7 +436,7 @@ class DqnWithRegression:
                     q_tables[t] = self.rewardTensors[t]
                 else:
                     rewards_t = self.rewardTensors[t]
-                    q_next = self.optimalQTables[t + 1]
+                    q_next = q_tables[t + 1]
                     q_star = np.max(q_next, axis=-1)
                     q_t = rewards_t + discount_rate * q_star[:, np.newaxis, :]
                     q_tables[t] = q_t
