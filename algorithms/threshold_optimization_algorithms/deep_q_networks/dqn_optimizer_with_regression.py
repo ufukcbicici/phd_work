@@ -573,10 +573,11 @@ class DqnWithRegression:
         losses = []
         # Calculate the ultimate, optimal Q Tables.
         self.optimalQTables = self.calculate_q_tables_with_dqn(discount_rate=discount_factor)
-        optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=discount_factor)
-        assert len(self.optimalQTables) == len(optimal_q_tables_test)
-        for t in range(len(self.optimalQTables)):
-            assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
+        # These are for testing purposes
+        # optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=discount_factor)
+        # assert len(self.optimalQTables) == len(optimal_q_tables_test)
+        # for t in range(len(self.optimalQTables)):
+        #     assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
         print("X")
 
         # self.calculate_optimal_q_tables(discount_rate=discount_factor)
