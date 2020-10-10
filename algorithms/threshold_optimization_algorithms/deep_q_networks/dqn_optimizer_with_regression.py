@@ -556,6 +556,31 @@ class DqnWithRegression:
         # print("Optimal Computation Cost:{0}".format(optimal_calculation_cost))
         # return mean_policy_value, mse_score, accuracy, computation_cost, optimal_accuracy, optimal_calculation_cost
 
+    def evaluate(self, run_id, episode_id, discount_factor):
+        print("***********Training Set***********")
+
+        # training_mean_policy_value, training_mse_score, training_accuracy, \
+        # training_computation_cost, training_optimal_accuracy, training_optimal_calculation_cost = \
+        #     self.execute_bellman_equation(
+        #         sample_indices=self.routingDataset.trainingIndices,
+        #         iterations=self.routingDataset.iterations,
+        #         discount_rate=discount_factor)
+        # print("***********Test Set***********")
+        # test_mean_policy_value, test_mse_score, test_accuracy, \
+        # test_computation_cost, test_optimal_accuracy, test_optimal_calculation_cost = \
+        #     self.execute_bellman_equation(
+        #         sample_indices=self.routingDataset.testIndices,
+        #         iterations=self.routingDataset.testIterations,
+        #         discount_rate=discount_factor)
+        # DbLogger.write_into_table(
+        #     rows=[(run_id, episode_id,
+        #            np.asscalar(training_mean_policy_value), np.asscalar(training_mse_score),
+        #            np.asscalar(training_accuracy), np.asscalar(training_computation_cost),
+        #            np.asscalar(test_mean_policy_value), np.asscalar(test_mse_score),
+        #            np.asscalar(test_accuracy), np.asscalar(test_computation_cost))],
+        #     table="deep_q_learning_logs", col_count=10)
+
+
     def train(self, level, **kwargs):
         sample_count = kwargs["sample_count"]
         episode_count = kwargs["episode_count"]
@@ -578,11 +603,7 @@ class DqnWithRegression:
         # assert len(self.optimalQTables) == len(optimal_q_tables_test)
         # for t in range(len(self.optimalQTables)):
         #     assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
-        print("X")
-
-        # self.calculate_optimal_q_tables(discount_rate=discount_factor)
-        # Test the accuracy evaluations
-        # self.evaluate(run_id=run_id, episode_id=-1, discount_factor=discount_factor)
+        self.evaluate(run_id=run_id, episode_id=-1, discount_factor=discount_factor)
         # for episode_id in range(episode_count):
         #     print("Episode:{0}".format(episode_id))
         #     sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
