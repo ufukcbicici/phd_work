@@ -385,6 +385,14 @@ class DqnWithRegression:
         DbLogger.write_into_table(rows=[(run_id, explanation_string)], table=DbLogger.runMetaData, col_count=2)
         return run_id
 
+    def get_state_tuples(self, sample_indices, level):
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
+        state_id_tuples = UtilityFuncs.get_cartesian_product(
+            list_of_lists=[sample_indices,
+                           list(range(action_count_t_minus_one))])
+        state_id_tuples = np.array(state_id_tuples)
+        return state_id_tuples
+
     def get_state_features(self, sample_indices, action_ids_t_minus_1, level):
         nodes_in_level = self.network.orderedNodesPerLevel[level]
         assert len({len(sample_indices), len(action_ids_t_minus_1)}) == 1
@@ -422,10 +430,7 @@ class DqnWithRegression:
         for t in range(last_level - 1, -1, -1):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             if t >= dqn_lowest_level:
-                state_id_tuples = UtilityFuncs.get_cartesian_product(
-                    list_of_lists=[list(range(total_sample_count)),
-                                   list(range(action_count_t_minus_one))])
-                state_id_tuples = np.array(state_id_tuples)
+                state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=t)
                 q_table_predicted = self.create_q_table(level=t, sample_indices=state_id_tuples[:, 0],
                                                         action_ids_t_minus_1=state_id_tuples[:, 1])
                 # Reshape for further processing
@@ -455,10 +460,7 @@ class DqnWithRegression:
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             action_count_t = self.actionSpaces[t].shape[0]
             if t >= dqn_lowest_level:
-                state_id_tuples = UtilityFuncs.get_cartesian_product(
-                    list_of_lists=[list(range(total_sample_count)),
-                                   list(range(action_count_t_minus_one))])
-                state_id_tuples = np.array(state_id_tuples)
+                state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=t)
                 q_table_predicted = self.create_q_table(level=t, sample_indices=state_id_tuples[:, 0],
                                                         action_ids_t_minus_1=state_id_tuples[:, 1])
                 # Reshape for further processing
@@ -481,39 +483,27 @@ class DqnWithRegression:
                         q_t = r_t
                         if t < last_level - 1:
                             q_t_plus_1 = q_tables[t + 1][s_id, a_t]
-                            q_t += np.max(q_t_plus_1)
+                            q_t += discount_rate * np.max(q_t_plus_1)
                         q_tables[t][s_id, a_t_minus_1, a_t] = q_t
         return q_tables
 
     # Calculate the estimated Q-Table vs actual Q-table divergence and related scores for the given layer.
-    def measure_performance(self, level, Q_table, sample_indices, action_ids_t_minus_1):
-        assert len({len(sample_indices), len(action_ids_t_minus_1)}) == 1
+    def measure_performance(self, level, Q_tables_whole, sample_indices):
+        state_id_tuples = self.get_state_tuples(sample_indices=sample_indices, level=level)
+        Q_table_predicted = Q_tables_whole[level][state_id_tuples[:, 0], state_id_tuples[:, 1]]
+        Q_table_truth = self.optimalQTables[level][state_id_tuples[:, 0], state_id_tuples[:, 1]]
         # Calculate the mean policy value
-        mean_policy_value = np.mean(np.max(Q_table, axis=1))
+        mean_policy_value = np.mean(np.max(Q_table_predicted, axis=1))
         # Calculate the MSE between the Q_{t}^{predicted}(s,a) and Q_{t}^{actual}(s,a).
-        Q_table_truth = self.optimalQTables[level][sample_indices, action_ids_t_minus_1]
-        assert Q_table.shape == Q_table_truth.shape
-        y = np.reshape(newshape=(np.prod(Q_table_truth), ))
-        y_hat = np.reshape(newshape=(np.prod(Q_table), ))
+        assert Q_table_predicted.shape == Q_table_truth.shape
+        y_hat = np.reshape(Q_table_predicted, newshape=(np.prod(Q_table_predicted.shape),))
+        y = np.reshape(Q_table_truth, newshape=(np.prod(Q_table_truth.shape),))
         mse_score = mean_squared_error(y_true=y, y_pred=y_hat)
         return mean_policy_value, mse_score
 
     def execute_bellman_equation(self, sample_indices):
         last_level = self.get_max_trajectory_length() - 1
         # Q_tables = self.calculate_q_tables_with_dqn(discount_rate=)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         # sample_ids_for_iterations = np.array([self.routingDataset.linkageInfo[(s_id, it)]
         #                                       for s_id, it in zip(sample_indices, iterations)])
@@ -585,6 +575,23 @@ class DqnWithRegression:
         # Get the q-tables for all samples
         q_tables = self.calculate_q_tables_with_dqn(discount_rate=discount_factor, dqn_lowest_level=level)
         print("***********Training Set***********")
+        training_mean_policy_value, training_mse_score = \
+            self.measure_performance(level=level, Q_tables_whole=q_tables,
+                                     sample_indices=self.routingDataset.trainingIndices)
+        training_mean_policy_value_optimal, training_mse_score_optimal = \
+            self.measure_performance(level=level,
+                                     Q_tables_whole=self.optimalQTables,
+                                     sample_indices=self.routingDataset.trainingIndices)
+        print("***********Test Set***********")
+        test_mean_policy_value, test_mse_score = \
+            self.measure_performance(level=level,
+                                     Q_tables_whole=q_tables,
+                                     sample_indices=self.routingDataset.testIndices)
+        test_mean_policy_value_optimal, test_mse_score_optimal = \
+            self.measure_performance(level=level,
+                                     Q_tables_whole=self.optimalQTables,
+                                     sample_indices=self.routingDataset.testIndices)
+        print("X")
 
         # training_mean_policy_value, training_mse_score, training_accuracy, \
         # training_computation_cost, training_optimal_accuracy, training_optimal_calculation_cost = \
@@ -607,7 +614,6 @@ class DqnWithRegression:
         #            np.asscalar(test_accuracy), np.asscalar(test_computation_cost))],
         #     table="deep_q_learning_logs", col_count=10)
 
-
     def train(self, level, **kwargs):
         sample_count = kwargs["sample_count"]
         episode_count = kwargs["episode_count"]
@@ -626,10 +632,10 @@ class DqnWithRegression:
         # Calculate the ultimate, optimal Q Tables.
         self.optimalQTables = self.calculate_q_tables_with_dqn(discount_rate=discount_factor)
         # These are for testing purposes
-        # optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=discount_factor)
-        # assert len(self.optimalQTables) == len(optimal_q_tables_test)
-        # for t in range(len(self.optimalQTables)):
-        #     assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
+        optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=discount_factor)
+        assert len(self.optimalQTables) == len(optimal_q_tables_test)
+        for t in range(len(self.optimalQTables)):
+            assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
         self.evaluate(run_id=run_id, episode_id=-1, level=level, discount_factor=discount_factor)
         # for episode_id in range(episode_count):
         #     print("Episode:{0}".format(episode_id))
