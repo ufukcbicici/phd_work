@@ -388,10 +388,14 @@ class DqnWithRegression:
     def get_state_features(self, sample_indices, action_ids_t_minus_1, level):
         nodes_in_level = self.network.orderedNodesPerLevel[level]
         assert len({len(sample_indices), len(action_ids_t_minus_1)}) == 1
-        routing_decisions = np.array([1] * len(sample_indices)) if level == 0 else \
+        routing_decisions = np.array([1] * len(sample_indices))[:, np.newaxis] if level == 0 else \
             self.actionSpaces[level - 1][action_ids_t_minus_1]
-        weighted_feature_arrays = [routing_decisions[:, idx] * self.stateFeatures[node.index][sample_indices]
-                                   for idx, node in enumerate(nodes_in_level)]
+        weighted_feature_arrays = []
+        for idx, node in enumerate(nodes_in_level):
+            route_coeffs = routing_decisions[:, idx]
+            for _ in range(len(self.stateFeatures[node.index].shape) - 1):
+                route_coeffs = np.expand_dims(route_coeffs, axis=-1)
+            weighted_feature_arrays.append(route_coeffs * self.stateFeatures[node.index][sample_indices])
         features = np.concatenate(weighted_feature_arrays, axis=-1)
         return features
 
@@ -400,7 +404,7 @@ class DqnWithRegression:
         assert len({len(sample_indices), len(action_ids_t_minus_1)}) == 1
         for offset in range(0, sample_indices.shape[0], batch_size):
             start_idx = offset
-            end_idx = min(start_idx + offset, sample_indices.shape[0])
+            end_idx = min(start_idx + batch_size, sample_indices.shape[0])
             sample_indices_batch = sample_indices[start_idx: end_idx]
             action_ids_t_minus_1_batch = action_ids_t_minus_1[start_idx: end_idx]
             state_features = self.get_state_features(sample_indices=sample_indices_batch,
@@ -421,6 +425,7 @@ class DqnWithRegression:
                 state_id_tuples = UtilityFuncs.get_cartesian_product(
                     list_of_lists=[list(range(total_sample_count)),
                                    list(range(action_count_t_minus_one))])
+                state_id_tuples = np.array(state_id_tuples)
                 q_table_predicted = self.create_q_table(level=t, sample_indices=state_id_tuples[:, 0],
                                                         action_ids_t_minus_1=state_id_tuples[:, 1])
                 # Reshape for further processing
@@ -453,6 +458,7 @@ class DqnWithRegression:
                 state_id_tuples = UtilityFuncs.get_cartesian_product(
                     list_of_lists=[list(range(total_sample_count)),
                                    list(range(action_count_t_minus_one))])
+                state_id_tuples = np.array(state_id_tuples)
                 q_table_predicted = self.create_q_table(level=t, sample_indices=state_id_tuples[:, 0],
                                                         action_ids_t_minus_1=state_id_tuples[:, 1])
                 # Reshape for further processing
@@ -488,14 +494,29 @@ class DqnWithRegression:
         y = []
         y_hat = []
 
-    def execute_bellman_equation(self, level, sample_indices, action_ids_t_minus_1, discount_rate):
+    def execute_bellman_equation(self, sample_indices):
         last_level = self.get_max_trajectory_length() - 1
+        # Q_tables = self.calculate_q_tables_with_dqn(discount_rate=)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         # sample_ids_for_iterations = np.array([self.routingDataset.linkageInfo[(s_id, it)]
         #                                       for s_id, it in zip(sample_indices, iterations)])
         # Execute the Bellman Equation
         # Step 1: Get the Q*(s,a) for the last level.
-        Q_table_T = self.create_q_table(level=level, sample_indices=sample_indices,
-                                        action_ids_t_minus_1=action_ids_t_minus_1)
+        # Q_table_T = self.create_q_table(level=level, sample_indices=sample_indices,
+        #                                 action_ids_t_minus_1=action_ids_t_minus_1)
         # Calculate the mean policy value and the MSE for the provided samples
         # mean_policy_value, mse_score = self.measure_performance(sample_indices=sample_indices, iterations=iterations,
         #                                                         Q_table_T=Q_table_T)
@@ -556,7 +577,9 @@ class DqnWithRegression:
         # print("Optimal Computation Cost:{0}".format(optimal_calculation_cost))
         # return mean_policy_value, mse_score, accuracy, computation_cost, optimal_accuracy, optimal_calculation_cost
 
-    def evaluate(self, run_id, episode_id, discount_factor):
+    def evaluate(self, run_id, episode_id, level, discount_factor):
+        # Get the q-tables for all samples
+        q_tables = self.calculate_q_tables_with_dqn(discount_rate=discount_factor, dqn_lowest_level=level)
         print("***********Training Set***********")
 
         # training_mean_policy_value, training_mse_score, training_accuracy, \
@@ -603,7 +626,7 @@ class DqnWithRegression:
         # assert len(self.optimalQTables) == len(optimal_q_tables_test)
         # for t in range(len(self.optimalQTables)):
         #     assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
-        self.evaluate(run_id=run_id, episode_id=-1, discount_factor=discount_factor)
+        self.evaluate(run_id=run_id, episode_id=-1, level=level, discount_factor=discount_factor)
         # for episode_id in range(episode_count):
         #     print("Episode:{0}".format(episode_id))
         #     sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
