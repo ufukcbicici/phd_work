@@ -491,8 +491,12 @@ class DqnWithRegression:
         # Calculate the mean policy value
         mean_policy_value = np.mean(np.max(Q_table, axis=1))
         # Calculate the MSE between the Q_{t}^{predicted}(s,a) and Q_{t}^{actual}(s,a).
-        y = []
-        y_hat = []
+        Q_table_truth = self.optimalQTables[level][sample_indices, action_ids_t_minus_1]
+        assert Q_table.shape == Q_table_truth.shape
+        y = np.reshape(newshape=(np.prod(Q_table_truth), ))
+        y_hat = np.reshape(newshape=(np.prod(Q_table), ))
+        mse_score = mean_squared_error(y_true=y, y_pred=y_hat)
+        return mean_policy_value, mse_score
 
     def execute_bellman_equation(self, sample_indices):
         last_level = self.get_max_trajectory_length() - 1
