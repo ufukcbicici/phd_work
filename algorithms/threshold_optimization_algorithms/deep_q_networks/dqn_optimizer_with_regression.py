@@ -7,10 +7,10 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class DqnWithRegression:
-    invalid_action_penalty = -1.0
-    valid_prediction_reward = 1.0
+    invalid_action_penalty = -100.0
+    valid_prediction_reward = 100.0
     invalid_prediction_penalty = 0.0
-    INCLUDE_IG_IN_REWARD_CALCULATIONS = True
+    INCLUDE_IG_IN_REWARD_CALCULATIONS = False
 
     CONV_FEATURES = [[32], [64]]
     HIDDEN_LAYERS = [[128, 64], [128, 64]]
@@ -511,7 +511,7 @@ class DqnWithRegression:
             a_t_minus_1 = a_t
         routing_matrix = self.actionSpaces[-1][a_t]
         min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
-        posteriors = self.posteriorTensors[-1][sample_indices, :]
+        posteriors = self.posteriorTensors[sample_indices, :]
         if DqnWithRegression.INCLUDE_IG_IN_REWARD_CALCULATIONS:
             # Set Information Gain routed leaf nodes to 1. They are always evaluated.
             ig_idx = self.maxLikelihoodPaths[sample_indices][:, -1] - min_leaf_id
@@ -528,7 +528,17 @@ class DqnWithRegression:
             lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
             arr=routing_matrix)
         computation_cost = np.mean(computation_overload_vector)
-        return accuracy, computation_cost
+        return truth_vector, computation_overload_vector, accuracy, computation_cost
+
+    def result_analysis(self, level, q_tables, q_hat_tables, indices):
+        true_labels = self.routingDataset.labelList[indices]
+        truth_vector, comp_vector, _, _ = self.execute_bellman_equation(Q_tables=q_tables, sample_indices=indices)
+        truth_vector_hat, comp_vector_hat, _, _ = self.execute_bellman_equation(Q_tables=q_hat_tables,
+                                                                                sample_indices=indices)
+        q = [q_table[indices] for q_table in q_tables]
+        q_hat = [q_table[indices] for q_table in q_hat_tables]
+        print("X")
+
 
     def evaluate(self, run_id, episode_id, level, discount_factor):
         # Get the q-tables for all samples
@@ -541,12 +551,14 @@ class DqnWithRegression:
             self.measure_performance(level=level,
                                      Q_tables_whole=self.optimalQTables,
                                      sample_indices=self.routingDataset.trainingIndices)
-        training_accuracy, training_computation_cost = \
+        _, _, training_accuracy, training_computation_cost = \
             self.execute_bellman_equation(Q_tables=q_tables,
                                           sample_indices=self.routingDataset.trainingIndices)
-        training_accuracy_optimal, training_computation_cost_optimal = \
+        _, _, training_accuracy_optimal, training_computation_cost_optimal = \
             self.execute_bellman_equation(Q_tables=self.optimalQTables,
                                           sample_indices=self.routingDataset.trainingIndices)
+        self.result_analysis(level=level, q_tables=self.optimalQTables, q_hat_tables=q_tables,
+                             indices=self.routingDataset.trainingIndices)
         print("***********Test Set***********")
         test_mean_policy_value, test_mse_score = \
             self.measure_performance(level=level,
@@ -556,12 +568,20 @@ class DqnWithRegression:
             self.measure_performance(level=level,
                                      Q_tables_whole=self.optimalQTables,
                                      sample_indices=self.routingDataset.testIndices)
-        test_accuracy, test_computation_cost = \
+        _, _, test_accuracy, test_computation_cost = \
             self.execute_bellman_equation(Q_tables=q_tables,
                                           sample_indices=self.routingDataset.testIndices)
-        test_accuracy_optimal, test_computation_cost_optimal = \
+        _, _, test_accuracy_optimal, test_computation_cost_optimal = \
             self.execute_bellman_equation(Q_tables=self.optimalQTables,
                                           sample_indices=self.routingDataset.testIndices)
+        print("training_mean_policy_value_optimal:{0} training_mse_score_optimal:{1}"
+              .format(training_mean_policy_value_optimal, training_mse_score_optimal))
+        print("training_accuracy_optimal:{0} training_computation_cost_optimal:{1}"
+              .format(training_accuracy_optimal, training_computation_cost_optimal))
+        print("test_mean_policy_value_optimal:{0} test_mse_score_optimal:{1}"
+              .format(test_mean_policy_value_optimal, test_mse_score_optimal))
+        print("test_accuracy_optimal:{0} test_computation_cost_optimal:{1}"
+              .format(test_accuracy_optimal, test_computation_cost_optimal))
         DbLogger.write_into_table(
             rows=[(run_id, episode_id,
                    np.asscalar(training_mean_policy_value), np.asscalar(training_mse_score),
@@ -593,27 +613,26 @@ class DqnWithRegression:
         for t in range(len(self.optimalQTables)):
             assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
         self.evaluate(run_id=run_id, episode_id=-1, level=level, discount_factor=discount_factor)
-        # for episode_id in range(episode_count):
-        #     print("Episode:{0}".format(episode_id))
-        #     sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
-        #     iterations = np.random.choice(self.routingDataset.iterations, sample_count, replace=True)
-        #     actions_t_minus_1 = np.random.choice(self.actionSpaces[level - 1].shape[0], sample_count, replace=True)
-        #     rewards_matrix = self.get_rewards(samples=sample_ids, iterations=iterations,
-        #                                       action_ids_t_minus_1=actions_t_minus_1, action_ids_t=None, level=level)
-        #     state_features = self.get_state_features(samples=sample_ids,
-        #                                              iterations=iterations,
-        #                                              action_ids_t_minus_1=actions_t_minus_1, level=level)
-        #     results = self.session.run([self.totalLoss, self.lossMatrix, self.lossValue, self.optimizer],
-        #                                feed_dict={self.stateCount: sample_count,
-        #                                           self.stateInput: state_features,
-        #                                           self.rewardMatrix: rewards_matrix,
-        #                                           self.l2LambdaTf: 0.0})
-        #     total_loss = results[0]
-        #     losses.append(total_loss)
-        #     if len(losses) % 10 == 0:
-        #         print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
-        #         losses = []
-        #     if (episode_id + 1) % 200 == 0:
-        #         if (episode_id + 1) == 10000:
-        #             print("X")
-        #         self.evaluate(run_id=run_id, episode_id=episode_id, discount_factor=discount_factor)
+        for episode_id in range(episode_count):
+            print("Episode:{0}".format(episode_id))
+            sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
+            actions_t_minus_1 = np.random.choice(self.actionSpaces[level - 1].shape[0], sample_count, replace=True)
+            optimal_q_values = self.optimalQTables[level][sample_ids, actions_t_minus_1]
+            state_features = self.get_state_features(sample_indices=sample_ids,
+                                                     action_ids_t_minus_1=actions_t_minus_1,
+                                                     level=level)
+            results = self.session.run([self.totalLosses[level], self.lossMatrices[level],
+                                        self.regressionLossValues[level], self.optimizers[level]],
+                                       feed_dict={self.stateCount: sample_count,
+                                                  self.stateInputs[level]: state_features,
+                                                  self.rewardMatrices[level]: optimal_q_values,
+                                                  self.l2LambdaTf: 0.0})
+            total_loss = results[0]
+            losses.append(total_loss)
+            if len(losses) % 10 == 0:
+                print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
+                losses = []
+            if (episode_id + 1) % 200 == 0:
+                if (episode_id + 1) == 10000:
+                    print("X")
+                self.evaluate(run_id=run_id, episode_id=episode_id, level=level, discount_factor=discount_factor)

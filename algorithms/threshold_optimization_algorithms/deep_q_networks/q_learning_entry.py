@@ -56,7 +56,7 @@ def train_deep_q_learning():
     routing_data.switch_to_single_iteration_mode()
     dqn = DqnWithRegression(routing_dataset=routing_data, network=network, network_name=network_name,
                             run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
-                            lambda_mac_cost=0.2)
+                            lambda_mac_cost=0.0)
     # dqn = MultiIterationDQNRegression(routing_dataset=routing_data, network=network, network_name=network_name,
     #                                   run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
     #                                   lambda_mac_cost=0.2)
