@@ -43,7 +43,7 @@ def train_deep_q_learning():
     network_id = 453
     network_name = "FashionNet_Lite"
     iteration = 47520
-
+    np.random.seed(67)
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
     used_output_names = ["pre_branch_feature"]

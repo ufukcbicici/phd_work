@@ -7,8 +7,8 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class DqnWithRegression:
-    invalid_action_penalty = -100.0
-    valid_prediction_reward = 100.0
+    invalid_action_penalty = -1.0
+    valid_prediction_reward = 1.0
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = False
 
@@ -74,6 +74,7 @@ class DqnWithRegression:
         self.lrValues = [0.1, 0.01, 0.001, 0.0001]
         # self.learningRate = tf.train.piecewise_constant(self.globalStep, self.lrBoundaries, self.lrValues)
         self.session = tf.Session()
+        self.processedPairs = {}
         # # The following is for testing, can comment out later.
         # # self.test_likelihood_consistency()
         # print("X")
@@ -537,6 +538,7 @@ class DqnWithRegression:
                                                                                 sample_indices=indices)
         q = [q_table[indices] for q_table in q_tables]
         q_hat = [q_table[indices] for q_table in q_hat_tables]
+        non_compatible_indices = np.nonzero(truth_vector != truth_vector_hat)[0]
         print("X")
 
 
@@ -618,6 +620,10 @@ class DqnWithRegression:
             sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
             actions_t_minus_1 = np.random.choice(self.actionSpaces[level - 1].shape[0], sample_count, replace=True)
             optimal_q_values = self.optimalQTables[level][sample_ids, actions_t_minus_1]
+            for s_id, a_t_minus_1 in zip(sample_ids, actions_t_minus_1):
+                if (s_id, a_t_minus_1) not in self.processedPairs:
+                    self.processedPairs[(s_id, a_t_minus_1)] = 0
+                self.processedPairs[(s_id, a_t_minus_1)] += 1
             state_features = self.get_state_features(sample_indices=sample_ids,
                                                      action_ids_t_minus_1=actions_t_minus_1,
                                                      level=level)
