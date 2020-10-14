@@ -275,7 +275,7 @@ class DqnWithRegression:
 
     def build_cnn_q_network(self, level):
         hidden_layers = DqnWithRegression.HIDDEN_LAYERS[level]
-        hidden_layers.append(self.actionSpaces[level].shape[0])
+        # hidden_layers.append(self.actionSpaces[level].shape[0])
         conv_features = DqnWithRegression.CONV_FEATURES[level]
         filter_sizes = DqnWithRegression.FILTER_SIZES[level]
         strides = DqnWithRegression.STRIDES[level]
@@ -302,11 +302,13 @@ class DqnWithRegression:
         net_shape = net.get_shape().as_list()
         net = tf.reshape(net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
         for layer_id, layer_dim in enumerate(hidden_layers):
-            if layer_id < len(hidden_layers) - 1:
-                net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
-            else:
-                net = tf.layers.dense(inputs=net, units=layer_dim, activation=None)
-        self.qFuncs[level] = net
+            net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
+        self.qFuncs[level] = self.get_q_net_output(net=net, level=level)
+
+    def get_q_net_output(self, net, level):
+        output_dim = self.actionSpaces[level].shape[0]
+        q_net = tf.layers.dense(inputs=net, units=output_dim, activation=None)
+        return q_net
 
     def get_l2_loss(self, level):
         # L2 Loss
@@ -540,7 +542,6 @@ class DqnWithRegression:
         q_hat = [q_table[indices] for q_table in q_hat_tables]
         non_compatible_indices = np.nonzero(truth_vector != truth_vector_hat)[0]
         print("X")
-
 
     def evaluate(self, run_id, episode_id, level, discount_factor):
         # Get the q-tables for all samples
