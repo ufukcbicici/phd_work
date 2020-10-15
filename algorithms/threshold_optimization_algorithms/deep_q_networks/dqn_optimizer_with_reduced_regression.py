@@ -8,7 +8,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class DqnWithReducedRegression(DqnWithRegression):
-    invalid_action_penalty = -np.inf
+    invalid_action_penalty = -1.0e10
     valid_prediction_reward = 1.0
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = False
@@ -20,25 +20,33 @@ class DqnWithReducedRegression(DqnWithRegression):
     MAX_POOL = [[None], [None]]
 
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
-                 lambda_mac_cost, max_experience_count=100000):
-        super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
-                         lambda_mac_cost, max_experience_count)
+                 lambda_mac_cost, valid_prediction_reward, invalid_prediction_penalty, feature_type,
+                 max_experience_count=100000):
         self.selectionIndices = tf.placeholder(dtype=tf.int32, name="selectionIndices", shape=[None, 2])
-        self.selectedRewards = [None] * self.get_max_trajectory_length()
-        self.lossVectors = [None] * self.get_max_trajectory_length()
+        self.selectedRewards = [None] * int(network.depth - 1)
+        self.lossVectors = [None] * int(network.depth - 1)
+        super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
+                         lambda_mac_cost,
+                         DqnWithReducedRegression.invalid_action_penalty,
+                         valid_prediction_reward,
+                         invalid_prediction_penalty,
+                         feature_type,
+                         max_experience_count)
 
     def build_loss(self, level):
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
         self.rewardMatrices[level] = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[level].shape[0]],
                                                     name="reward_matrix_{0}".format(level))
-        self.selectedRewards[level] = tf.gather_nd(self.rewardMatrices[level], self.selectionIndices)
-        self.selectedQValues[level] = tf.gather_nd(self.qFuncs[level], self.selectionIndices)
-        self.lossVectors[level] = tf.square(self.selectedQValues[level] - self.selectedRewards[level])
-        self.regressionLossValues[level] = tf.reduce_mean(self.lossVectors[level])
-        self.get_l2_loss(level=level)
-        self.totalLosses[level] = self.regressionLossValues[level] + self.l2Losses[level]
-        self.optimizers[level] = tf.train.AdamOptimizer().minimize(self.totalLosses[level],
-                                                                   global_step=self.globalSteps[level])
+        self.updateOps = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(self.updateOps):
+            self.selectedRewards[level] = tf.gather_nd(self.rewardMatrices[level], self.selectionIndices)
+            self.selectedQValues[level] = tf.gather_nd(self.qFuncs[level], self.selectionIndices)
+            self.lossVectors[level] = tf.square(self.selectedQValues[level] - self.selectedRewards[level])
+            self.regressionLossValues[level] = tf.reduce_mean(self.lossVectors[level])
+            self.get_l2_loss(level=level)
+            self.totalLosses[level] = self.regressionLossValues[level] + self.l2Losses[level]
+            self.optimizers[level] = tf.train.AdamOptimizer().minimize(self.totalLosses[level],
+                                                                       global_step=self.globalSteps[level])
         # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).\
         #     minimize(self.totalLoss, global_step=self.globalStep)
 
@@ -64,7 +72,7 @@ class DqnWithReducedRegression(DqnWithRegression):
                 # Set non accesible indices to -np.inf
                 idx_array = self.get_selection_indices(level=t, actions_t_minus_1=state_id_tuples[:, 1],
                                                        non_zeros=False)
-                q_table_predicted[idx_array[:, 0], idx_array[:, 1]] = -np.inf
+                q_table_predicted[idx_array[:, 0], idx_array[:, 1]] = DqnWithReducedRegression.invalid_action_penalty
                 # Reshape for further processing
                 assert q_table_predicted.shape[0] == total_sample_count * action_count_t_minus_one \
                        and len(q_table_predicted.shape) == 2
@@ -94,8 +102,10 @@ class DqnWithReducedRegression(DqnWithRegression):
         # Calculate the MSE between the Q_{t}^{predicted}(s,a) and Q_{t}^{actual}(s,a).
         assert Q_table_predicted.shape == Q_table_truth.shape
         # Account for -np.inf entries
-        y = Q_table_truth[np.logical_not(np.isinf(Q_table_predicted))]
-        y_hat = Q_table_predicted[np.logical_not(np.isinf(Q_table_predicted))]
+        reachability_matrix = self.reachabilityMatrices[level][state_id_tuples[:, 1]]
+        assert Q_table_predicted.shape == reachability_matrix.shape
+        y = Q_table_truth[reachability_matrix == 1]
+        y_hat = Q_table_predicted[reachability_matrix == 1]
         mse_score = mean_squared_error(y_true=y, y_pred=y_hat)
         return mean_policy_value, mse_score
 
@@ -135,16 +145,17 @@ class DqnWithReducedRegression(DqnWithRegression):
             state_features = self.get_state_features(sample_indices=sample_ids,
                                                      action_ids_t_minus_1=actions_t_minus_1,
                                                      level=level)
-            results = self.session.run([self.selectedRewards[level],
+            results = self.session.run([self.totalLosses[level],
+                                        self.selectedRewards[level],
                                         self.selectedQValues[level],
                                         self.lossVectors[level],
                                         self.regressionLossValues[level],
-                                        self.totalLosses[level],
                                         self.optimizers[level]],
                                        feed_dict={self.stateCount: sample_count,
                                                   self.stateInputs[level]: state_features,
                                                   self.rewardMatrices[level]: optimal_q_values,
-                                                  self.selectionIndices[level]: idx_array,
+                                                  self.selectionIndices: idx_array,
+                                                  self.isTrain: True,
                                                   self.l2LambdaTf: 0.0})
             total_loss = results[0]
             losses.append(total_loss)

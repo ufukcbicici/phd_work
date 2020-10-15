@@ -7,9 +7,9 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class DqnWithRegression:
-    invalid_action_penalty = -1.0
-    valid_prediction_reward = 1.0
-    invalid_prediction_penalty = 0.0
+    # invalid_action_penalty = -1.0
+    # valid_prediction_reward = 1.0
+    # invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = False
 
     CONV_FEATURES = [[32], [64]]
@@ -19,7 +19,16 @@ class DqnWithRegression:
     MAX_POOL = [[None], [None]]
 
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
-                 lambda_mac_cost, max_experience_count=100000):
+                 lambda_mac_cost,
+                 invalid_action_penalty,
+                 valid_prediction_reward,
+                 invalid_prediction_penalty,
+                 feature_type,
+                 max_experience_count=100000):
+        self.invalidActionPenalty = invalid_action_penalty
+        self.validPredictionReward = valid_prediction_reward
+        self.invalidPredictionPenalty = invalid_prediction_penalty
+        self.featureType = feature_type
         self.routingDataset = routing_dataset
         self.network = network
         self.networkName = network_name
@@ -52,13 +61,13 @@ class DqnWithRegression:
         self.get_reachability_matrices()
         self.calculate_reward_tensors()
         # # Neural network components
+        self.updateOps = None
         self.stateInputs = [None] * self.get_max_trajectory_length()
         self.qFuncs = [None] * self.get_max_trajectory_length()
         self.selectedQValues = [None] * self.get_max_trajectory_length()
         self.stateCount = tf.placeholder(dtype=tf.int32, name="stateCount")
         self.stateRange = tf.range(0, self.stateCount, 1)
         self.actionSelections = [None] * self.get_max_trajectory_length()
-        self.selectionIndices = [None] * self.get_max_trajectory_length()
         self.rewardMatrices = [None] * self.get_max_trajectory_length()
         self.lossMatrices = [None] * self.get_max_trajectory_length()
         self.regressionLossValues = [None] * self.get_max_trajectory_length()
@@ -67,6 +76,7 @@ class DqnWithRegression:
         self.globalSteps = [tf.Variable(0, name='global_step_{0}'.format(idx), trainable=False)
                             for idx in range(self.get_max_trajectory_length())]
         self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
+        self.isTrain = tf.placeholder(dtype=tf.bool, name="isTrain")
         self.l2Losses = [None] * self.get_max_trajectory_length()
         for level in range(self.get_max_trajectory_length()):
             self.build_q_function(level=level)
@@ -215,9 +225,9 @@ class DqnWithRegression:
 
     # OK
     def calculate_reward_tensors(self):
-        invalid_action_penalty = DqnWithRegression.invalid_action_penalty
-        valid_prediction_reward = DqnWithRegression.valid_prediction_reward
-        invalid_prediction_penalty = DqnWithRegression.invalid_prediction_penalty
+        invalid_action_penalty = self.invalidActionPenalty
+        valid_prediction_reward = self.validPredictionReward
+        invalid_prediction_penalty = self.invalidPredictionPenalty
         self.rewardTensors = []
         label_list = self.routingDataset.labelList
         sample_count = label_list.shape[0]
@@ -281,6 +291,9 @@ class DqnWithRegression:
         strides = DqnWithRegression.STRIDES[level]
         pools = DqnWithRegression.MAX_POOL[level]
         net = self.stateInputs[level]
+        net = tf.layers.batch_normalization(inputs=net,
+                                            momentum=0.9,
+                                            training=self.isTrain)
         conv_layer_id = 0
         for conv_feature, filter_size, stride, max_pool in zip(conv_features, filter_sizes, strides, pools):
             in_filters = net.get_shape().as_list()[-1]
@@ -323,12 +336,14 @@ class DqnWithRegression:
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
         self.rewardMatrices[level] = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[level].shape[0]],
                                                     name="reward_matrix_{0}".format(level))
-        self.lossMatrices[level] = tf.square(self.qFuncs[level] - self.rewardMatrices[level])
-        self.regressionLossValues[level] = tf.reduce_mean(self.lossMatrices[level])
-        self.get_l2_loss(level=level)
-        self.totalLosses[level] = self.regressionLossValues[level] + self.l2Losses[level]
-        self.optimizers[level] = tf.train.AdamOptimizer().minimize(self.totalLosses[level],
-                                                                   global_step=self.globalSteps[level])
+        self.updateOps = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(self.updateOps):
+            self.lossMatrices[level] = tf.square(self.qFuncs[level] - self.rewardMatrices[level])
+            self.regressionLossValues[level] = tf.reduce_mean(self.lossMatrices[level])
+            self.get_l2_loss(level=level)
+            self.totalLosses[level] = self.regressionLossValues[level] + self.l2Losses[level]
+            self.optimizers[level] = tf.train.AdamOptimizer().minimize(self.totalLosses[level],
+                                                                       global_step=self.globalSteps[level])
         # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).\
         #     minimize(self.totalLoss, global_step=self.globalStep)
 
@@ -347,14 +362,22 @@ class DqnWithRegression:
     def build_q_function(self, level):
         with tf.variable_scope("dqn_{0}".format(level)):
             if self.qLearningFunc == "cnn":
-                nodes_at_level = self.network.orderedNodesPerLevel[level]
-                shapes_list = [self.stateFeatures[node.index].shape for node in nodes_at_level]
-                assert len(set(shapes_list)) == 1
-                entry_shape = list(shapes_list[0])
-                entry_shape[0] = None
-                entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
-                self.stateInputs[level] = tf.placeholder(dtype=tf.float32, shape=entry_shape,
-                                                         name="state_inputs_{0}".format(level))
+                if self.featureType == "concatenate":
+                    nodes_at_level = self.network.orderedNodesPerLevel[level]
+                    shapes_list = [self.stateFeatures[node.index].shape for node in nodes_at_level]
+                    assert len(set(shapes_list)) == 1
+                    entry_shape = list(shapes_list[0])
+                    entry_shape[0] = None
+                    entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
+                    self.stateInputs[level] = tf.placeholder(dtype=tf.float32, shape=entry_shape,
+                                                             name="state_inputs_{0}".format(level))
+                elif self.featureType == "sum":
+                    nodes_at_level = self.network.orderedNodesPerLevel[level]
+                    self.stateInputs[level] = tf.placeholder(dtype=tf.float32,
+                                                             shape=self.stateFeatures[nodes_at_level[0]].shape,
+                                                             name="state_inputs_{0}".format(level))
+                else:
+                    raise NotImplementedError()
                 self.build_cnn_q_network(level=level)
                 self.build_loss(level=level)
 
@@ -368,9 +391,10 @@ class DqnWithRegression:
         kwargs["whole_data_ml_accuracy"] = whole_data_ml_accuracy
         kwargs["training_ml_accuracy"] = training_ml_accuracy
         kwargs["test_ml_accuracy"] = test_ml_accuracy
-        kwargs["invalid_action_penalty"] = DqnWithRegression.invalid_action_penalty
-        kwargs["valid_prediction_reward"] = DqnWithRegression.valid_prediction_reward
-        kwargs["invalid_prediction_penalty"] = DqnWithRegression.invalid_prediction_penalty
+        kwargs["featureType"] = self.featureType
+        kwargs["invalid_action_penalty"] = self.invalidActionPenalty
+        kwargs["valid_prediction_reward"] = self.validPredictionReward
+        kwargs["invalid_prediction_penalty"] = self.invalidPredictionPenalty
         kwargs["INCLUDE_IG_IN_REWARD_CALCULATIONS"] = DqnWithRegression.INCLUDE_IG_IN_REWARD_CALCULATIONS
         kwargs["CONV_FEATURES"] = DqnWithRegression.CONV_FEATURES
         kwargs["HIDDEN_LAYERS"] = DqnWithRegression.HIDDEN_LAYERS
@@ -407,7 +431,13 @@ class DqnWithRegression:
             for _ in range(len(self.stateFeatures[node.index].shape) - 1):
                 route_coeffs = np.expand_dims(route_coeffs, axis=-1)
             weighted_feature_arrays.append(route_coeffs * self.stateFeatures[node.index][sample_indices])
-        features = np.concatenate(weighted_feature_arrays, axis=-1)
+        if self.featureType == "concatenate":
+            features = np.concatenate(weighted_feature_arrays, axis=-1)
+        elif self.featureType == "sum":
+            stacked_features = np.stack(weighted_feature_arrays, axis=-1)
+            features = np.sum(stacked_features, axis=-1)
+        else:
+            raise NotImplementedError()
         return features
 
     def create_q_table(self, level, sample_indices, action_ids_t_minus_1, batch_size=5000):
@@ -421,7 +451,8 @@ class DqnWithRegression:
             state_features = self.get_state_features(sample_indices=sample_indices_batch,
                                                      action_ids_t_minus_1=action_ids_t_minus_1_batch,
                                                      level=level)
-            q_vals = self.session.run([self.qFuncs[level]], feed_dict={self.stateInputs[level]: state_features})[0]
+            q_vals = self.session.run([self.qFuncs[level]], feed_dict={self.stateInputs[level]: state_features,
+                                                                       self.isTrain: False})[0]
             q_values.append(q_vals)
         q_values = np.concatenate(q_values, axis=0)
         return q_values
@@ -633,6 +664,7 @@ class DqnWithRegression:
                                        feed_dict={self.stateCount: sample_count,
                                                   self.stateInputs[level]: state_features,
                                                   self.rewardMatrices[level]: optimal_q_values,
+                                                  self.isTrain: True,
                                                   self.l2LambdaTf: 0.0})
             total_loss = results[0]
             losses.append(total_loss)

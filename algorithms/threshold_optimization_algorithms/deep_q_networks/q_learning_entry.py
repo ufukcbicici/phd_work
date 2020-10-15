@@ -5,6 +5,8 @@ import time
 from algorithms.dataset_linking_algorithm import DatasetLinkingAlgorithm
 from algorithms.threshold_optimization_algorithms.deep_q_networks.deep_q_threshold_optimizer import \
     DeepQThresholdOptimizer
+from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_reduced_regression import \
+    DqnWithReducedRegression
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_regression import DqnWithRegression
 from algorithms.threshold_optimization_algorithms.deep_q_networks.multi_iteration_deep_q_learning import \
     MultiIterationDQN
@@ -54,9 +56,18 @@ def train_deep_q_learning():
                                                                              46080, 46560, 47040, 47520, 48000])
     routing_data.apply_validation_test_split(test_ratio=0.1)
     routing_data.switch_to_single_iteration_mode()
-    dqn = DqnWithRegression(routing_dataset=routing_data, network=network, network_name=network_name,
-                            run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
-                            lambda_mac_cost=0.0)
+    dqn = DqnWithReducedRegression(routing_dataset=routing_data, network=network, network_name=network_name,
+                                   run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
+                                   lambda_mac_cost=0.0,
+                                   valid_prediction_reward=1.0,
+                                   invalid_prediction_penalty=0.0, feature_type="sum")
+    # dqn = DqnWithRegression(routing_dataset=routing_data, network=network, network_name=network_name,
+    #                         run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
+    #                         lambda_mac_cost=0.0,
+    #                         valid_prediction_reward=1.0,
+    #                         invalid_prediction_penalty=0.0,
+    #                         invalid_action_penalty=-1.0,
+    #                         feature_type="sum")
     # dqn = MultiIterationDQNRegression(routing_dataset=routing_data, network=network, network_name=network_name,
     #                                   run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
     #                                   lambda_mac_cost=0.2)
