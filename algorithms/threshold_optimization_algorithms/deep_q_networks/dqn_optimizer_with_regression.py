@@ -362,19 +362,20 @@ class DqnWithRegression:
     def build_q_function(self, level):
         with tf.variable_scope("dqn_{0}".format(level)):
             if self.qLearningFunc == "cnn":
+                nodes_at_level = self.network.orderedNodesPerLevel[level]
+                shapes_list = [self.stateFeatures[node.index].shape for node in nodes_at_level]
+                assert len(set(shapes_list)) == 1
+                entry_shape = list(shapes_list[0])
                 if self.featureType == "concatenate":
-                    nodes_at_level = self.network.orderedNodesPerLevel[level]
-                    shapes_list = [self.stateFeatures[node.index].shape for node in nodes_at_level]
-                    assert len(set(shapes_list)) == 1
-                    entry_shape = list(shapes_list[0])
                     entry_shape[0] = None
                     entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
-                    self.stateInputs[level] = tf.placeholder(dtype=tf.float32, shape=entry_shape,
+                    self.stateInputs[level] = tf.placeholder(dtype=tf.float32,
+                                                             shape=entry_shape,
                                                              name="state_inputs_{0}".format(level))
                 elif self.featureType == "sum":
-                    nodes_at_level = self.network.orderedNodesPerLevel[level]
+                    entry_shape[0] = None
                     self.stateInputs[level] = tf.placeholder(dtype=tf.float32,
-                                                             shape=self.stateFeatures[nodes_at_level[0]].shape,
+                                                             shape=entry_shape,
                                                              name="state_inputs_{0}".format(level))
                 else:
                     raise NotImplementedError()
