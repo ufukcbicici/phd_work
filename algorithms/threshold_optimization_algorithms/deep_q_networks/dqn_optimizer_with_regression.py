@@ -61,7 +61,6 @@ class DqnWithRegression:
         self.get_reachability_matrices()
         self.calculate_reward_tensors()
         # # Neural network components
-        self.updateOps = [None] * self.get_max_trajectory_length()
         self.stateInputs = [None] * self.get_max_trajectory_length()
         self.qFuncs = [None] * self.get_max_trajectory_length()
         self.selectedQValues = [None] * self.get_max_trajectory_length()
@@ -332,19 +331,12 @@ class DqnWithRegression:
                 self.l2Losses[level] += self.l2LambdaTf * tf.nn.l2_loss(tv)
             # self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
 
-    def get_current_level_update_ops(self, level):
-        update_ops = set(tf.get_collection(tf.GraphKeys.UPDATE_OPS))
-        past_update_ops = []
-        for t in range(level):
-            past_update_ops.extend(self.updateOps[t])
-        return list(update_ops.difference(set(past_update_ops)))
-
     def build_loss(self, level):
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
         self.rewardMatrices[level] = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[level].shape[0]],
                                                     name="reward_matrix_{0}".format(level))
-        self.updateOps[level] = self.get_current_level_update_ops(level=level)
-        with tf.control_dependencies(self.updateOps[level]):
+        update_ops = tf.get_collection(key=tf.GraphKeys.UPDATE_OPS, scope="dqn_{0}".format(level))
+        with tf.control_dependencies(update_ops):
             self.lossMatrices[level] = tf.square(self.qFuncs[level] - self.rewardMatrices[level])
             self.regressionLossValues[level] = tf.reduce_mean(self.lossMatrices[level])
             self.get_l2_loss(level=level)

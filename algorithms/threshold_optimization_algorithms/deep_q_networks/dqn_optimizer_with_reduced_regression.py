@@ -37,8 +37,8 @@ class DqnWithReducedRegression(DqnWithRegression):
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
         self.rewardMatrices[level] = tf.placeholder(dtype=tf.float32, shape=[None, self.actionSpaces[level].shape[0]],
                                                     name="reward_matrix_{0}".format(level))
-        self.updateOps[level] = self.get_current_level_update_ops(level=level)
-        with tf.control_dependencies(self.updateOps[level]):
+        update_ops = tf.get_collection(key=tf.GraphKeys.UPDATE_OPS, scope="dqn_{0}".format(level))
+        with tf.control_dependencies(update_ops):
             self.selectedRewards[level] = tf.gather_nd(self.rewardMatrices[level], self.selectionIndices)
             self.selectedQValues[level] = tf.gather_nd(self.qFuncs[level], self.selectionIndices)
             self.lossVectors[level] = tf.square(self.selectedQValues[level] - self.selectedRewards[level])
