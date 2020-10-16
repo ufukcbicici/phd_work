@@ -18,13 +18,14 @@ class DqnWithRegression:
     STRIDES = [[1], [1]]
     MAX_POOL = [[None], [None]]
 
-    def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
+    def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
                  lambda_mac_cost,
                  invalid_action_penalty,
                  valid_prediction_reward,
                  invalid_prediction_penalty,
                  feature_type,
                  max_experience_count=100000):
+        self.dqnFunc = dqn_func
         self.invalidActionPenalty = invalid_action_penalty
         self.validPredictionReward = valid_prediction_reward
         self.invalidPredictionPenalty = invalid_prediction_penalty
@@ -34,7 +35,6 @@ class DqnWithRegression:
         self.networkName = network_name
         self.runId = run_id
         self.usedFeatureNames = used_feature_names
-        self.qLearningFunc = q_learning_func
         self.lambdaMacCost = lambda_mac_cost
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
@@ -116,24 +116,12 @@ class DqnWithRegression:
 
     # OK
     def prepare_state_features(self):
-        # if self.policyNetworkFunc == "mlp":
-        #     super().prepare_state_features(data=data)
-        # elif self.policyNetworkFunc == "cnn":
-        root_node = [node for node in self.network.topologicalSortedNodes if node.isRoot]
-        assert len(root_node) == 1
         for node in self.innerNodes:
             # array_list = [data.get_dict(feature_name)[node.index] for feature_name in self.networkFeatureNames]
             array_list = []
             for feature_name in self.usedFeatureNames:
                 feature_arr = self.routingDataset.get_dict(feature_name)[node.index]
-                if self.qLearningFunc == "mlp":
-                    if len(feature_arr.shape) > 2:
-                        shape_as_list = list(feature_arr.shape)
-                        mean_axes = tuple([i for i in range(1, len(shape_as_list) - 1, 1)])
-                        feature_arr = np.mean(feature_arr, axis=mean_axes)
-                        assert len(feature_arr.shape) == 2
-                elif self.qLearningFunc == "cnn":
-                    assert len(feature_arr.shape) == 4
+                assert len(feature_arr.shape) == 4
                 array_list.append(feature_arr)
             feature_vectors = np.concatenate(array_list, axis=-1)
             self.stateFeatures[node.index] = feature_vectors
@@ -282,41 +270,6 @@ class DqnWithRegression:
                 rewards_arr -= self.lambdaMacCost * computation_overload_tensor
             self.rewardTensors.append(rewards_arr)
 
-    def build_cnn_q_network(self, level):
-        hidden_layers = DqnWithRegression.HIDDEN_LAYERS[level]
-        # hidden_layers.append(self.actionSpaces[level].shape[0])
-        conv_features = DqnWithRegression.CONV_FEATURES[level]
-        filter_sizes = DqnWithRegression.FILTER_SIZES[level]
-        strides = DqnWithRegression.STRIDES[level]
-        pools = DqnWithRegression.MAX_POOL[level]
-        net = self.stateInputs[level]
-        net = tf.layers.batch_normalization(inputs=net,
-                                            momentum=0.9,
-                                            training=self.isTrain)
-        conv_layer_id = 0
-        for conv_feature, filter_size, stride, max_pool in zip(conv_features, filter_sizes, strides, pools):
-            in_filters = net.get_shape().as_list()[-1]
-            out_filters = conv_feature
-            kernel = [filter_size, filter_size, in_filters, out_filters]
-            strides = [1, stride, stride, 1]
-            W = tf.get_variable("conv_layer_kernel_{0}".format(conv_layer_id), kernel, trainable=True)
-            b = tf.get_variable("conv_layer_bias_{0}".format(conv_layer_id), [kernel[-1]], trainable=True)
-            net = tf.nn.conv2d(net, W, strides, padding='SAME')
-            net = tf.nn.bias_add(net, b)
-            net = tf.nn.relu(net)
-            if max_pool is not None:
-                net = tf.nn.max_pool(net, ksize=[1, max_pool, max_pool, 1], strides=[1, max_pool, max_pool, 1],
-                                     padding='SAME')
-            conv_layer_id += 1
-        # net = tf.contrib.layers.flatten(net)
-        net_shape = net.get_shape().as_list()
-        net = tf.nn.avg_pool(net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
-        net_shape = net.get_shape().as_list()
-        net = tf.reshape(net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
-        for layer_id, layer_dim in enumerate(hidden_layers):
-            net = tf.layers.dense(inputs=net, units=layer_dim, activation=tf.nn.relu)
-        self.qFuncs[level] = self.get_q_net_output(net=net, level=level)
-
     def get_q_net_output(self, net, level):
         output_dim = self.actionSpaces[level].shape[0]
         q_net = tf.layers.dense(inputs=net, units=output_dim, activation=None)
@@ -360,26 +313,25 @@ class DqnWithRegression:
     # OK
     def build_q_function(self, level):
         with tf.variable_scope("dqn_{0}".format(level)):
-            if self.qLearningFunc == "cnn":
-                nodes_at_level = self.network.orderedNodesPerLevel[level]
-                shapes_list = [self.stateFeatures[node.index].shape for node in nodes_at_level]
-                assert len(set(shapes_list)) == 1
-                entry_shape = list(shapes_list[0])
-                if self.featureType == "concatenate":
-                    entry_shape[0] = None
-                    entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
-                    self.stateInputs[level] = tf.placeholder(dtype=tf.float32,
-                                                             shape=entry_shape,
-                                                             name="state_inputs_{0}".format(level))
-                elif self.featureType == "sum":
-                    entry_shape[0] = None
-                    self.stateInputs[level] = tf.placeholder(dtype=tf.float32,
-                                                             shape=entry_shape,
-                                                             name="state_inputs_{0}".format(level))
-                else:
-                    raise NotImplementedError()
-                self.build_cnn_q_network(level=level)
-                self.build_loss(level=level)
+            nodes_at_level = self.network.orderedNodesPerLevel[level]
+            shapes_list = [self.stateFeatures[node.index].shape for node in nodes_at_level]
+            assert len(set(shapes_list)) == 1
+            entry_shape = list(shapes_list[0])
+            if self.featureType == "concatenate":
+                entry_shape[0] = None
+                entry_shape[-1] = len(nodes_at_level) * entry_shape[-1]
+                self.stateInputs[level] = tf.placeholder(dtype=tf.float32,
+                                                         shape=entry_shape,
+                                                         name="state_inputs_{0}".format(level))
+            elif self.featureType == "sum":
+                entry_shape[0] = None
+                self.stateInputs[level] = tf.placeholder(dtype=tf.float32,
+                                                         shape=entry_shape,
+                                                         name="state_inputs_{0}".format(level))
+            else:
+                raise NotImplementedError()
+            self.dqnFunc(net_input=self.stateInputs[level], is_train=self.isTrain, level=level, class_obj=self)
+            self.build_loss(level=level)
 
     def log_meta_data(self, kwargs):
         # If we use only information gain for routing (ML: Maximum likelihood routing)

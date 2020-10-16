@@ -13,19 +13,20 @@ class DqnWithReducedRegression(DqnWithRegression):
     invalid_prediction_penalty = 0.0
     INCLUDE_IG_IN_REWARD_CALCULATIONS = False
 
+    # LeNet DQN Parameters
     CONV_FEATURES = [[32], [64]]
     HIDDEN_LAYERS = [[128, 64], [128, 64]]
     FILTER_SIZES = [[1], [1]]
     STRIDES = [[1], [1]]
     MAX_POOL = [[None], [None]]
 
-    def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
+    def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
                  lambda_mac_cost, valid_prediction_reward, invalid_prediction_penalty, feature_type,
                  max_experience_count=100000):
         self.selectionIndices = tf.placeholder(dtype=tf.int32, name="selectionIndices", shape=[None, 2])
         self.selectedRewards = [None] * int(network.depth - 1)
         self.lossVectors = [None] * int(network.depth - 1)
-        super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, q_learning_func,
+        super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
                          lambda_mac_cost,
                          DqnWithReducedRegression.invalid_action_penalty,
                          valid_prediction_reward,
