@@ -2,6 +2,9 @@ import numpy as np
 import tensorflow as tf
 from sklearn.metrics import mean_squared_error
 
+from simple_tf.cign.fast_tree import FastTreeNetwork
+from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
+from simple_tf.uncategorized.node import Node
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 
@@ -77,6 +80,8 @@ class DqnWithRegression:
         self.l2LambdaTf = tf.placeholder(dtype=tf.float32, name="l2LambdaTf")
         self.isTrain = tf.placeholder(dtype=tf.bool, name="isTrain")
         self.l2Losses = [None] * self.get_max_trajectory_length()
+        self.nodes = [Node(index=0, depth=0, is_root=True, is_leaf=True)
+                      for _ in range(self.get_max_trajectory_length())]
         for level in range(self.get_max_trajectory_length()):
             self.build_q_function(level=level)
         self.lrBoundaries = [5000, 10000, 20000]
@@ -272,8 +277,13 @@ class DqnWithRegression:
             self.rewardTensors.append(rewards_arr)
 
     def get_q_net_output(self, net, level):
+        curr_dim = net.get_shape().as_list[-1]
         output_dim = self.actionSpaces[level].shape[0]
-        q_net = tf.layers.dense(inputs=net, units=output_dim, activation=None)
+        W, b = FashionCignLite.get_affine_layer_params(
+            layer_shape=[curr_dim, output_dim],
+            W_name="fc_q_output_W_level{0}".format(level),
+            b_name="fc_layer_b_level{0}".format(level))
+        q_net = FastTreeNetwork.fc_layer(x=net, W=W, b=b, node=self.nodes[level])
         return q_net
 
     def get_l2_loss(self, level):
