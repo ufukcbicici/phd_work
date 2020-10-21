@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from sklearn.metrics import mean_squared_error
-
+import os
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_regression import DqnWithRegression
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -14,11 +14,14 @@ class DqnWithReducedRegression(DqnWithRegression):
     INCLUDE_IG_IN_REWARD_CALCULATIONS = False
 
     # LeNet DQN Parameters
-    CONV_FEATURES = [[32], [64]]
-    HIDDEN_LAYERS = [[128, 64], [128, 64]]
-    FILTER_SIZES = [[1], [1]]
-    STRIDES = [[1], [1]]
+    CONV_FEATURES = [[32], [32]]
+    HIDDEN_LAYERS = [[64, 32], [64, 32]]
+    FILTER_SIZES = [[3], [3]]
+    STRIDES = [[1], [2]]
     MAX_POOL = [[None], [None]]
+
+    # Squeeze and Excitation Parameters
+    SE_REDUCTION_RATIO = [2, 2]
 
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
                  lambda_mac_cost, valid_prediction_reward, invalid_prediction_penalty, feature_type,
@@ -110,13 +113,45 @@ class DqnWithReducedRegression(DqnWithRegression):
         mse_score = mean_squared_error(y_true=y, y_pred=y_hat)
         return mean_policy_value, mse_score
 
+    def log_meta_data(self, kwargs):
+        # If we use only information gain for routing (ML: Maximum likelihood routing)
+        whole_data_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=np.arange(
+            self.routingDataset.labelList.shape[0]))
+        training_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.trainingIndices)
+        test_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.testIndices)
+        # Fill the explanation string for the experiment
+        kwargs["whole_data_ml_accuracy"] = whole_data_ml_accuracy
+        kwargs["training_ml_accuracy"] = training_ml_accuracy
+        kwargs["test_ml_accuracy"] = test_ml_accuracy
+        kwargs["featureType"] = self.featureType
+        kwargs["invalid_action_penalty"] = self.invalidActionPenalty
+        kwargs["valid_prediction_reward"] = self.validPredictionReward
+        kwargs["invalid_prediction_penalty"] = self.invalidPredictionPenalty
+        kwargs["INCLUDE_IG_IN_REWARD_CALCULATIONS"] = self.INCLUDE_IG_IN_REWARD_CALCULATIONS
+        kwargs["CONV_FEATURES"] = self.CONV_FEATURES
+        kwargs["HIDDEN_LAYERS"] = self.HIDDEN_LAYERS
+        kwargs["FILTER_SIZES"] = self.FILTER_SIZES
+        kwargs["STRIDES"] = self.STRIDES
+        kwargs["MAX_POOL"] = self.MAX_POOL
+        kwargs["lambdaMacCost"] = self.lambdaMacCost
+        kwargs["dqnFunc"] = self.dqnFunc
+        kwargs["SE_REDUCTION_RATIO"] = self.SE_REDUCTION_RATIO
+        run_id = DbLogger.get_run_id()
+        explanation_string = "DQN Experiment. RunID:{0}\n".format(run_id)
+        for k, v in kwargs.items():
+            explanation_string += "{0}:{1}\n".format(k, v)
+        print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
+        print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
+        print("Test Set ML Accuracy:{0}".format(test_ml_accuracy))
+        DbLogger.write_into_table(rows=[(run_id, explanation_string)], table=DbLogger.runMetaData, col_count=2)
+        return run_id
+
     def train(self, level, **kwargs):
+        self.saver = tf.train.Saver()
         sample_count = kwargs["sample_count"]
         episode_count = kwargs["episode_count"]
         discount_factor = kwargs["discount_factor"]
-        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
-        learning_rate = kwargs["learning_rate"]
-        epsilon = 1.0
+        l2_lambda = kwargs["l2_lambda"]
         if level != self.get_max_trajectory_length() - 1:
             raise NotImplementedError()
         self.session.run(tf.global_variables_initializer())
@@ -157,13 +192,14 @@ class DqnWithReducedRegression(DqnWithRegression):
                                                   self.rewardMatrices[level]: optimal_q_values,
                                                   self.selectionIndices: idx_array,
                                                   self.isTrain: True,
-                                                  self.l2LambdaTf: 0.0})
+                                                  self.l2LambdaTf: l2_lambda})
             total_loss = results[0]
             losses.append(total_loss)
             if len(losses) % 10 == 0:
                 print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
                 losses = []
-            if (episode_id + 1) % 200 == 0:
-                if (episode_id + 1) == 10000:
-                    print("X")
+            if (episode_id + 1) % 2000 == 0:
                 self.evaluate(run_id=run_id, episode_id=episode_id, level=level, discount_factor=discount_factor)
+        model_path = os.path.join("..", "dqn_models", "dqn_run_id_{0}".format(run_id))
+        os.mkdir(model_path)
+        self.saver.save(self.session, os.path.join(model_path, "dqn_run_id_{0}.ckpt".format(run_id)))

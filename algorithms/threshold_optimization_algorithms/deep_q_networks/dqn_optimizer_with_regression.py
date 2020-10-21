@@ -84,6 +84,7 @@ class DqnWithRegression:
         # self.learningRate = tf.train.piecewise_constant(self.globalStep, self.lrBoundaries, self.lrValues)
         self.session = tf.Session()
         self.processedPairs = {}
+        self.saver = None
         # # The following is for testing, can comment out later.
         # # self.test_likelihood_consistency()
         # print("X")
@@ -347,13 +348,14 @@ class DqnWithRegression:
         kwargs["invalid_action_penalty"] = self.invalidActionPenalty
         kwargs["valid_prediction_reward"] = self.validPredictionReward
         kwargs["invalid_prediction_penalty"] = self.invalidPredictionPenalty
-        kwargs["INCLUDE_IG_IN_REWARD_CALCULATIONS"] = DqnWithRegression.INCLUDE_IG_IN_REWARD_CALCULATIONS
-        kwargs["CONV_FEATURES"] = DqnWithRegression.CONV_FEATURES
-        kwargs["HIDDEN_LAYERS"] = DqnWithRegression.HIDDEN_LAYERS
-        kwargs["FILTER_SIZES"] = DqnWithRegression.FILTER_SIZES
-        kwargs["STRIDES"] = DqnWithRegression.STRIDES
-        kwargs["MAX_POOL"] = DqnWithRegression.MAX_POOL
+        kwargs["INCLUDE_IG_IN_REWARD_CALCULATIONS"] = self.INCLUDE_IG_IN_REWARD_CALCULATIONS
+        kwargs["CONV_FEATURES"] = self.CONV_FEATURES
+        kwargs["HIDDEN_LAYERS"] = self.HIDDEN_LAYERS
+        kwargs["FILTER_SIZES"] = self.FILTER_SIZES
+        kwargs["STRIDES"] = self.STRIDES
+        kwargs["MAX_POOL"] = self.MAX_POOL
         kwargs["lambdaMacCost"] = self.lambdaMacCost
+        kwargs["dqnFunc"] = self.dqnFunc
         run_id = DbLogger.get_run_id()
         explanation_string = "DQN Experiment. RunID:{0}\n".format(run_id)
         for k, v in kwargs.items():
@@ -577,6 +579,7 @@ class DqnWithRegression:
             table="deep_q_learning_logs", col_count=10)
 
     def train(self, level, **kwargs):
+        self.saver = tf.train.Saver()
         sample_count = kwargs["sample_count"]
         episode_count = kwargs["episode_count"]
         discount_factor = kwargs["discount_factor"]
