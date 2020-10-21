@@ -41,7 +41,7 @@ class DeepQNetworks:
     def get_dense_layers(net_input, node, is_train, hidden_layers, name="fc_layer"):
         net = net_input
         for layer_id, layer_dim in enumerate(hidden_layers):
-            curr_dim = net.get_shape().as_list[-1]
+            curr_dim = net.get_shape().as_list()[-1]
             W, b = FashionCignLite.get_affine_layer_params(
                 layer_shape=[curr_dim, layer_dim],
                 W_name="{0}_W_{1}".format(name, layer_id),

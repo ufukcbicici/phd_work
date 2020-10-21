@@ -277,7 +277,7 @@ class DqnWithRegression:
             self.rewardTensors.append(rewards_arr)
 
     def get_q_net_output(self, net, level):
-        curr_dim = net.get_shape().as_list[-1]
+        curr_dim = net.get_shape().as_list()[-1]
         output_dim = self.actionSpaces[level].shape[0]
         W, b = FashionCignLite.get_affine_layer_params(
             layer_shape=[curr_dim, output_dim],
@@ -366,6 +366,7 @@ class DqnWithRegression:
         kwargs["MAX_POOL"] = self.MAX_POOL
         kwargs["lambdaMacCost"] = self.lambdaMacCost
         kwargs["dqnFunc"] = self.dqnFunc
+        kwargs["operationCosts"] = [node.opMacCostsDict for node in self.nodes]
         run_id = DbLogger.get_run_id()
         explanation_string = "DQN Experiment. RunID:{0}\n".format(run_id)
         for k, v in kwargs.items():

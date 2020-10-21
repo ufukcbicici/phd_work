@@ -84,6 +84,7 @@ def train_deep_q_learning():
         dqn.train(level=1, sample_count=128, episode_count=50000, discount_factor=1.0, l2_lambda=l2_lambda, seed=seed)
         print("X")
         tf.reset_default_graph()
+        break
 
 
 def main():

@@ -136,6 +136,7 @@ class DqnWithReducedRegression(DqnWithRegression):
         kwargs["lambdaMacCost"] = self.lambdaMacCost
         kwargs["dqnFunc"] = self.dqnFunc
         kwargs["SE_REDUCTION_RATIO"] = self.SE_REDUCTION_RATIO
+        kwargs["operationCosts"] = [node.opMacCostsDict for node in self.nodes]
         run_id = DbLogger.get_run_id()
         explanation_string = "DQN Experiment. RunID:{0}\n".format(run_id)
         for k, v in kwargs.items():
