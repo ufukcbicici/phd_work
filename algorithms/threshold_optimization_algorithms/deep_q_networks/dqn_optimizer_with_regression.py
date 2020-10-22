@@ -290,9 +290,9 @@ class DqnWithRegression:
         # L2 Loss
         tvars = tf.trainable_variables(scope="dqn_{0}".format(level))
         self.l2Losses[level] = tf.constant(0.0)
-        for tv in tvars:
-            if 'kernel' in tv.name:
-                self.l2Losses[level] += self.l2LambdaTf * tf.nn.l2_loss(tv)
+        valid_vars = [tv for tv in tvars if 'kernel' in tv.name or "_W_" in tv.name]
+        for var in valid_vars:
+            self.l2Losses[level] += self.l2LambdaTf * tf.nn.l2_loss(var)
             # self.paramL2Norms[tv.name] = tf.nn.l2_loss(tv)
 
     def build_loss(self, level):
@@ -404,6 +404,15 @@ class DqnWithRegression:
         else:
             raise NotImplementedError()
         return features
+
+    def get_selection_indices(self, level, actions_t_minus_1, non_zeros=True):
+        reachability_matrix = self.reachabilityMatrices[level][actions_t_minus_1]
+        if non_zeros:
+            indices = np.nonzero(reachability_matrix == 1)
+        else:
+            indices = np.nonzero(reachability_matrix == 0)
+        idx_array = np.stack([indices[0], indices[1]], axis=1)
+        return idx_array
 
     def create_q_table(self, level, sample_indices, action_ids_t_minus_1, batch_size=5000):
         q_values = []
