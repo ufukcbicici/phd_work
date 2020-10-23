@@ -54,38 +54,23 @@ class DqnWithReducedRegression(DqnWithRegression):
         # self.optimizer = tf.train.MomentumOptimizer(self.learningRate, 0.9).\
         #     minimize(self.totalLoss, global_step=self.globalStep)
 
-    def calculate_q_tables_with_dqn(self, discount_rate, dqn_lowest_level=np.inf):
-        q_tables = [None] * self.get_max_trajectory_length()
-        last_level = self.get_max_trajectory_length()
+    def calculate_q_table_with_dqn(self, level):
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
         total_sample_count = self.rewardTensors[0].shape[0]
-        for t in range(last_level - 1, -1, -1):
-            action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
-            if t >= dqn_lowest_level:
-                state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=t)
-                q_table_predicted = self.create_q_table(level=t, sample_indices=state_id_tuples[:, 0],
-                                                        action_ids_t_minus_1=state_id_tuples[:, 1])
-                # Set non accesible indices to -np.inf
-                idx_array = self.get_selection_indices(level=t, actions_t_minus_1=state_id_tuples[:, 1],
-                                                       non_zeros=False)
-                q_table_predicted[idx_array[:, 0], idx_array[:, 1]] = DqnWithReducedRegression.invalid_action_penalty
-                # Reshape for further processing
-                assert q_table_predicted.shape[0] == total_sample_count * action_count_t_minus_one \
-                       and len(q_table_predicted.shape) == 2
-                q_table_predicted = np.reshape(q_table_predicted,
-                                               newshape=(total_sample_count, action_count_t_minus_one,
-                                                         q_table_predicted.shape[1]))
-                q_tables[t] = q_table_predicted
-            else:
-                # Get the rewards for that time step
-                if t == last_level - 1:
-                    q_tables[t] = self.rewardTensors[t]
-                else:
-                    rewards_t = self.rewardTensors[t]
-                    q_next = q_tables[t + 1]
-                    q_star = np.max(q_next, axis=-1)
-                    q_t = rewards_t + discount_rate * q_star[:, np.newaxis, :]
-                    q_tables[t] = q_t
-        return q_tables
+        state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=level)
+        q_table_predicted = self.calculate_q_values(level=level, sample_indices=state_id_tuples[:, 0],
+                                                    action_ids_t_minus_1=state_id_tuples[:, 1])
+        # Set non accesible indices to -np.inf
+        idx_array = self.get_selection_indices(level=t, actions_t_minus_1=state_id_tuples[:, 1],
+                                               non_zeros=False)
+        q_table_predicted[idx_array[:, 0], idx_array[:, 1]] = DqnWithReducedRegression.invalid_action_penalty
+        # Reshape for further processing
+        assert q_table_predicted.shape[0] == total_sample_count * action_count_t_minus_one and \
+               len(q_table_predicted.shape) == 2
+        q_table_predicted = np.reshape(q_table_predicted,
+                                       newshape=(total_sample_count, action_count_t_minus_one,
+                                                 q_table_predicted.shape[1]))
+        return q_table_predicted
 
     # Calculate the estimated Q-Table vs actual Q-table divergence and related scores for the given layer.
     def measure_performance(self, level, Q_tables_whole, sample_indices):
@@ -139,26 +124,19 @@ class DqnWithReducedRegression(DqnWithRegression):
         return run_id
 
     def train(self, level, **kwargs):
-        self.saver = tf.train.Saver()
+        self.setup_before_training(level=level, **kwargs)
         sample_count = kwargs["sample_count"]
-        episode_count = kwargs["episode_count"]
-        discount_factor = kwargs["discount_factor"]
         l2_lambda = kwargs["l2_lambda"]
-        if level != self.get_max_trajectory_length() - 1:
-            raise NotImplementedError()
-        self.session.run(tf.global_variables_initializer())
-        # If we use only information gain for routing (ML: Maximum likelihood routing)
-        kwargs["lrValues"] = self.lrValues
-        kwargs["lrBoundaries"] = self.lrBoundaries
-        run_id = self.log_meta_data(kwargs=kwargs)
+        run_id = kwargs["run_id"]
+        discount_factor = kwargs["discount_factor"]
+        episode_count = kwargs["episode_count"]
+        self.saver = tf.train.Saver()
         losses = []
-        # Calculate the ultimate, optimal Q Tables.
-        self.optimalQTables = self.calculate_q_tables_with_dqn(discount_rate=discount_factor)
         # These are for testing purposes
-        # optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=discount_factor)
-        # assert len(self.optimalQTables) == len(optimal_q_tables_test)
-        # for t in range(len(self.optimalQTables)):
-        #     assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
+        optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=discount_factor)
+        assert len(self.optimalQTables) == len(optimal_q_tables_test)
+        for t in range(len(self.optimalQTables)):
+            assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
         self.evaluate(run_id=run_id, episode_id=-1, level=level, discount_factor=discount_factor)
         for episode_id in range(episode_count):
             print("Episode:{0}".format(episode_id))

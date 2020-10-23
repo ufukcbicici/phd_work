@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import tensorflow as tf
 from sklearn.metrics import mean_squared_error
 
@@ -414,7 +415,7 @@ class DqnWithRegression:
         idx_array = np.stack([indices[0], indices[1]], axis=1)
         return idx_array
 
-    def create_q_table(self, level, sample_indices, action_ids_t_minus_1, batch_size=5000):
+    def calculate_q_values(self, level, sample_indices, action_ids_t_minus_1, batch_size=5000):
         q_values = []
         assert len({len(sample_indices), len(action_ids_t_minus_1)}) == 1
         for offset in range(0, sample_indices.shape[0], batch_size):
@@ -431,34 +432,71 @@ class DqnWithRegression:
         q_values = np.concatenate(q_values, axis=0)
         return q_values
 
-    def calculate_q_tables_with_dqn(self, discount_rate, dqn_lowest_level=np.inf):
-        q_tables = [None] * self.get_max_trajectory_length()
-        last_level = self.get_max_trajectory_length()
+    def calculate_q_table_with_dqn(self, level):
+        action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
         total_sample_count = self.rewardTensors[0].shape[0]
+        state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=level)
+        q_table_predicted = self.calculate_q_values(level=level, sample_indices=state_id_tuples[:, 0],
+                                                    action_ids_t_minus_1=state_id_tuples[:, 1])
+        # Reshape for further processing
+        assert q_table_predicted.shape[0] == total_sample_count * action_count_t_minus_one and \
+               len(q_table_predicted.shape) == 2
+        q_table_predicted = np.reshape(q_table_predicted,
+                                       newshape=(total_sample_count, action_count_t_minus_one,
+                                                 q_table_predicted.shape[1]))
+        return q_table_predicted
+
+    def calculate_optimal_q_tables(self, discount_rate):
+        self.optimalQTables = [None] * self.get_max_trajectory_length()
+        last_level = self.get_max_trajectory_length()
         for t in range(last_level - 1, -1, -1):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
-            if t >= dqn_lowest_level:
-                state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=t)
-                q_table_predicted = self.create_q_table(level=t, sample_indices=state_id_tuples[:, 0],
-                                                        action_ids_t_minus_1=state_id_tuples[:, 1])
-                # Reshape for further processing
-                assert q_table_predicted.shape[0] == total_sample_count * action_count_t_minus_one \
-                       and len(q_table_predicted.shape) == 2
-                q_table_predicted = np.reshape(q_table_predicted,
-                                               newshape=(total_sample_count, action_count_t_minus_one,
-                                                         q_table_predicted.shape[1]))
-                q_tables[t] = q_table_predicted
+            if t == last_level - 1:
+                self.optimalQTables[t] = self.rewardTensors[t]
             else:
-                # Get the rewards for that time step
-                if t == last_level - 1:
-                    q_tables[t] = self.rewardTensors[t]
-                else:
-                    rewards_t = self.rewardTensors[t]
-                    q_next = q_tables[t + 1]
-                    q_star = np.max(q_next, axis=-1)
-                    q_t = rewards_t + discount_rate * q_star[:, np.newaxis, :]
-                    q_tables[t] = q_t
-        return q_tables
+                rewards_t = self.rewardTensors[t]
+                q_star = np.max(self.optimalQTables[t + 1], axis=-1)
+                q_t = rewards_t + discount_rate * q_star[:, np.newaxis, :]
+                self.optimalQTables[t] = q_t
+
+    def calculate_estimated_q_tables(self, dqn_level):
+        arrays = []
+        last_level = self.get_max_trajectory_length()
+        for t in range(last_level):
+            if t < dqn_level:
+                arrays.append(self.optimalQTables[t])
+            else:
+                arrays.append(self.calculate_q_table_with_dqn(level=t))
+        return arrays
+
+    # def calculate_q_tables_with_dqn(self, discount_rate, dqn_lowest_level=np.inf):
+    #     q_tables = [None] * self.get_max_trajectory_length()
+    #     last_level = self.get_max_trajectory_length()
+    #     total_sample_count = self.rewardTensors[0].shape[0]
+    #     for t in range(last_level - 1, -1, -1):
+    #         action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+    #         if t >= dqn_lowest_level:
+    #             state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=t)
+    #             q_table_predicted = self.create_q_values(level=t, sample_indices=state_id_tuples[:, 0],
+    #                                                      action_ids_t_minus_1=state_id_tuples[:, 1])
+    #             # Reshape for further processing
+    #             assert q_table_predicted.shape[0] == total_sample_count * action_count_t_minus_one \
+    #                    and len(q_table_predicted.shape) == 2
+    #             q_table_predicted = np.reshape(q_table_predicted,
+    #                                            newshape=(total_sample_count, action_count_t_minus_one,
+    #                                                      q_table_predicted.shape[1]))
+    #             q_tables[t] = q_table_predicted
+    #         else:
+    #             # Get the rewards for that time step
+    #             if t == last_level - 1:
+    #                 q_tables[t] = self.rewardTensors[t]
+    #             else:
+    #                 rewards_t = self.rewardTensors[t]
+    #                 q_next = q_tables[t + 1]
+    #                 q_star = np.max(q_next, axis=-1)
+    #                 q_t = rewards_t + discount_rate * q_star[:, np.newaxis, :]
+    #                 q_tables[t] = q_t
+    #     return q_tables
 
     def calculate_q_tables_for_test(self, discount_rate, dqn_lowest_level=np.inf):
         last_level = self.get_max_trajectory_length()
@@ -469,8 +507,8 @@ class DqnWithRegression:
             action_count_t = self.actionSpaces[t].shape[0]
             if t >= dqn_lowest_level:
                 state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=t)
-                q_table_predicted = self.create_q_table(level=t, sample_indices=state_id_tuples[:, 0],
-                                                        action_ids_t_minus_1=state_id_tuples[:, 1])
+                q_table_predicted = self.calculate_q_values(level=t, sample_indices=state_id_tuples[:, 0],
+                                                            action_ids_t_minus_1=state_id_tuples[:, 1])
                 # Reshape for further processing
                 assert q_table_predicted.shape[0] == total_sample_count * action_count_t_minus_one \
                        and len(q_table_predicted.shape) == 2
@@ -550,7 +588,7 @@ class DqnWithRegression:
 
     def evaluate(self, run_id, episode_id, level, discount_factor):
         # Get the q-tables for all samples
-        q_tables = self.calculate_q_tables_with_dqn(discount_rate=discount_factor, dqn_lowest_level=level)
+        q_tables = self.calculate_estimated_q_tables(dqn_level=level)
         print("***********Training Set***********")
         training_mean_policy_value, training_mse_score = \
             self.measure_performance(level=level, Q_tables_whole=q_tables,
@@ -598,49 +636,50 @@ class DqnWithRegression:
                    np.asscalar(test_accuracy), np.asscalar(test_computation_cost))],
             table="deep_q_learning_logs", col_count=10)
 
-    def train(self, level, **kwargs):
-        self.saver = tf.train.Saver()
-        sample_count = kwargs["sample_count"]
-        episode_count = kwargs["episode_count"]
+    def setup_before_training(self, level, **kwargs):
         discount_factor = kwargs["discount_factor"]
-        epsilon_discount_factor = kwargs["epsilon_discount_factor"]
-        learning_rate = kwargs["learning_rate"]
-        epsilon = 1.0
         if level != self.get_max_trajectory_length() - 1:
             raise NotImplementedError()
         self.session.run(tf.global_variables_initializer())
         # If we use only information gain for routing (ML: Maximum likelihood routing)
         kwargs["lrValues"] = self.lrValues
         kwargs["lrBoundaries"] = self.lrBoundaries
-        run_id = self.log_meta_data(kwargs=kwargs)
-        losses = []
+        kwargs["run_id"] = self.log_meta_data(kwargs=kwargs)
         # Calculate the ultimate, optimal Q Tables.
-        self.optimalQTables = self.calculate_q_tables_with_dqn(discount_rate=discount_factor)
+        self.calculate_optimal_q_tables(discount_rate=discount_factor)
+
+    def train(self, level, **kwargs):
+        self.saver = tf.train.Saver()
+        losses = []
+        self.setup_before_training(level=level, **kwargs)
         # These are for testing purposes
-        optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=discount_factor)
+        optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=kwargs["discount_factor"])
         assert len(self.optimalQTables) == len(optimal_q_tables_test)
         for t in range(len(self.optimalQTables)):
             assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
-        self.evaluate(run_id=run_id, episode_id=-1, level=level, discount_factor=discount_factor)
-        for episode_id in range(episode_count):
+        self.evaluate(run_id=kwargs["run_id"], episode_id=-1, level=level, discount_factor=kwargs["discount_factor"])
+        for episode_id in range(kwargs["episode_count"]):
             print("Episode:{0}".format(episode_id))
-            sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
-            actions_t_minus_1 = np.random.choice(self.actionSpaces[level - 1].shape[0], sample_count, replace=True)
-            optimal_q_values = self.optimalQTables[level][sample_ids, actions_t_minus_1]
+            sample_ids = np.random.choice(self.routingDataset.trainingIndices, kwargs["sample_count"], replace=True)
+            actions_t_minus_1 = np.random.choice(self.actionSpaces[level - 1].shape[0], kwargs["sample_count"],
+                                                 replace=True)
             for s_id, a_t_minus_1 in zip(sample_ids, actions_t_minus_1):
                 if (s_id, a_t_minus_1) not in self.processedPairs:
                     self.processedPairs[(s_id, a_t_minus_1)] = 0
                 self.processedPairs[(s_id, a_t_minus_1)] += 1
+            optimal_q_values = self.optimalQTables[level][sample_ids, actions_t_minus_1]
             state_features = self.get_state_features(sample_indices=sample_ids,
                                                      action_ids_t_minus_1=actions_t_minus_1,
                                                      level=level)
+            sample_count = kwargs["sample_count"]
+            l2_lambda = kwargs["l2_lambda"]
             results = self.session.run([self.totalLosses[level], self.lossMatrices[level],
                                         self.regressionLossValues[level], self.optimizers[level]],
                                        feed_dict={self.stateCount: sample_count,
                                                   self.stateInputs[level]: state_features,
                                                   self.rewardMatrices[level]: optimal_q_values,
                                                   self.isTrain: True,
-                                                  self.l2LambdaTf: 0.0})
+                                                  self.l2LambdaTf: l2_lambda})
             total_loss = results[0]
             losses.append(total_loss)
             if len(losses) % 10 == 0:
@@ -649,4 +688,8 @@ class DqnWithRegression:
             if (episode_id + 1) % 200 == 0:
                 if (episode_id + 1) == 10000:
                     print("X")
-                self.evaluate(run_id=run_id, episode_id=episode_id, level=level, discount_factor=discount_factor)
+                self.evaluate(run_id=kwargs["run_id"], episode_id=episode_id, level=level,
+                              discount_factor=kwargs["discount_factor"])
+        model_path = os.path.join("..", "dqn_models", "dqn_run_id_{0}".format(kwargs["run_id"]))
+        os.mkdir(model_path)
+        self.saver.save(self.session, os.path.join(model_path, "dqn_run_id_{0}.ckpt".format(kwargs["run_id"])))
