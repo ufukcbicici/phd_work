@@ -76,7 +76,7 @@ class DeepQNetworks:
         pools = class_obj.dqnParameters["LeNet_DQN"]["MAX_POOL"][level]
         net = net_input
         net = tf.layers.batch_normalization(inputs=net, momentum=0.9, training=is_train)
-        reduction_ratio = class_obj.SE_REDUCTION_RATIO[level]
+        reduction_ratio = class_obj.dqnParameters["Squeeze_And_Excitation"]["SE_REDUCTION_RATIO"][level]
         conv_input = DeepQNetworks.get_conv_layers(net_input=net, is_train=is_train,
                                                    conv_features=conv_features, filter_sizes=filter_sizes,
                                                    strides=strides, pools=pools, node=class_obj.nodes[level])

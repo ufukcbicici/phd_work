@@ -8,7 +8,7 @@ class DqnWithReducedRegression(DqnWithRegression):
                  lambda_mac_cost, valid_prediction_reward, invalid_prediction_penalty,
                  include_ig_in_reward_calculations,
                  feature_type,
-                 max_experience_count=100000):
+                 dqn_parameters):
         self.selectionIndices = tf.placeholder(dtype=tf.int32, name="selectionIndices", shape=[None, 2])
         self.selectedRewards = [None] * int(network.depth - 1)
         self.lossVectors = [None] * int(network.depth - 1)
@@ -19,7 +19,7 @@ class DqnWithReducedRegression(DqnWithRegression):
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
                          feature_type,
-                         max_experience_count)
+                         dqn_parameters)
         self.useReachability = True
 
     def build_loss(self, level):

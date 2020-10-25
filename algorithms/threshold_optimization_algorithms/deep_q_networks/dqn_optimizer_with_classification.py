@@ -13,7 +13,7 @@ class DqnWithClassification(DqnWithRegression):
                  lambda_mac_cost, valid_prediction_reward, invalid_prediction_penalty,
                  include_ig_in_reward_calculations,
                  feature_type,
-                 max_experience_count=100000):
+                 dqn_parameters):
         self.selectionLabels = tf.placeholder(dtype=tf.int32, name="selectionLabels", shape=(None,))
         self.crossEntropyLossValues = [None] * int(network.depth - 1)
         self.softmaxOutputs = [None] * int(network.depth - 1)
@@ -24,8 +24,8 @@ class DqnWithClassification(DqnWithRegression):
                          valid_prediction_reward,
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
-                         feature_type,
-                         max_experience_count)
+                         dqn_parameters,
+                         feature_type)
         self.useReachability = True
 
     def build_loss(self, level):

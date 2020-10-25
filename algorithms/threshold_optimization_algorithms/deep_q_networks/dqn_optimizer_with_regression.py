@@ -18,8 +18,7 @@ class DqnWithRegression:
                  invalid_prediction_penalty,
                  include_ig_in_reward_calculations,
                  feature_type,
-                 dqn_parameters,
-                 max_experience_count=100000):
+                 dqn_parameters):
         self.dqnFunc = dqn_func
         self.invalidActionPenalty = invalid_action_penalty
         self.validPredictionReward = valid_prediction_reward

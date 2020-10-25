@@ -96,6 +96,8 @@ def train_deep_q_learning():
                                        lambda_mac_cost=0.0,
                                        valid_prediction_reward=1.0,
                                        invalid_prediction_penalty=0.0,
+                                       include_ig_in_reward_calculations=False,
+                                       dqn_parameters=dqn_parameters,
                                        feature_type="sum")
         # dqn = DqnWithRegression(routing_dataset=routing_data, network=network, network_name=network_name,
         #                         run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
