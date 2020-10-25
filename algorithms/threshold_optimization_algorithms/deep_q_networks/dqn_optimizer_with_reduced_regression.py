@@ -40,8 +40,8 @@ class DqnWithReducedRegression(DqnWithRegression):
         #     minimize(self.totalLoss, global_step=self.globalStep)
 
     def prepare_explanation_string(self, kwargs):
-        explanation_string = super().prepare_explanation_string(kwargs=kwargs)
         kwargs["SE_REDUCTION_RATIO"] = self.dqnParameters["Squeeze_And_Excitation"]["SE_REDUCTION_RATIO"]
+        explanation_string = super().prepare_explanation_string(kwargs=kwargs)
         return explanation_string
 
     def run_training_step(self, level, **kwargs):

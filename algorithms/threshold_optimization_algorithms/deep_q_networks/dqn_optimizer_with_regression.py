@@ -435,7 +435,6 @@ class DqnWithRegression:
         self.optimalQTables = [None] * self.get_max_trajectory_length()
         last_level = self.get_max_trajectory_length()
         for t in range(last_level - 1, -1, -1):
-            action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             if t == last_level - 1:
                 self.optimalQTables[t] = self.rewardTensors[t]
             else:
@@ -685,6 +684,7 @@ class DqnWithRegression:
             sample_ids = np.random.choice(self.routingDataset.trainingIndices, kwargs["sample_count"], replace=True)
             actions_t_minus_1 = np.random.choice(self.actionSpaces[level - 1].shape[0], kwargs["sample_count"],
                                                  replace=True)
+            idx_array = self.get_selection_indices(level=level, actions_t_minus_1=actions_t_minus_1)
             for s_id, a_t_minus_1 in zip(sample_ids, actions_t_minus_1):
                 if (s_id, a_t_minus_1) not in self.processedPairs:
                     self.processedPairs[(s_id, a_t_minus_1)] = 0
@@ -695,16 +695,16 @@ class DqnWithRegression:
                                                      level=level)
             sample_count = kwargs["sample_count"]
             l2_lambda = kwargs["l2_lambda"]
+            measurement_period = kwargs["measurement_period"]
             results = self.run_training_step(level=level, sample_count=sample_count, state_features=state_features,
-                                             optimal_q_values=optimal_q_values, l2_lambda=l2_lambda)
+                                             optimal_q_values=optimal_q_values, idx_array=idx_array,
+                                             l2_lambda=l2_lambda)
             total_loss = results[0]
             losses.append(total_loss)
             if len(losses) % 10 == 0:
                 print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
                 losses = []
-            if (episode_id + 1) % 200 == 0:
-                if (episode_id + 1) == 10000:
-                    print("X")
+            if (episode_id + 1) % measurement_period == 0:
                 self.evaluate(run_id=kwargs["run_id"], episode_id=episode_id, level=level,
                               discount_factor=kwargs["discount_factor"])
         model_path = os.path.join("..", "dqn_models", "dqn_run_id_{0}".format(kwargs["run_id"]))

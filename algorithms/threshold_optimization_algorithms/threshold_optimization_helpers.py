@@ -134,8 +134,8 @@ class MultiIterationRoutingDataset(RoutingDataset):
             assert set(self.dictOfDatasets[iteration_t].dictionaryOfRoutingData["nodeCosts"].keys()) == \
                    set(self.dictOfDatasets[iteration_t_plus_1].dictionaryOfRoutingData["nodeCosts"].keys())
             assert all([self.dictOfDatasets[iteration_t].dictionaryOfRoutingData["nodeCosts"][k] ==
-                    self.dictOfDatasets[iteration_t_plus_1].dictionaryOfRoutingData["nodeCosts"][k]
-                    for k in self.dictOfDatasets[iteration_t].dictionaryOfRoutingData["nodeCosts"].keys()])
+                        self.dictOfDatasets[iteration_t_plus_1].dictionaryOfRoutingData["nodeCosts"][k]
+                        for k in self.dictOfDatasets[iteration_t].dictionaryOfRoutingData["nodeCosts"].keys()])
         self.nodeCosts = self.dictOfDatasets[self.iterations[0]].dictionaryOfRoutingData["nodeCosts"]
         # Linkage Information
         self.linkageInfo = {}
@@ -205,10 +205,6 @@ class MultiIterationRoutingDataset(RoutingDataset):
         # Clear memory
         self.dictOfDatasets = None
         print("X")
-
-
-
-
 
     def split_dataset_with_indices(self, training_indices, test_indices):
         pass

@@ -109,7 +109,8 @@ def train_deep_q_learning():
         # dqn = MultiIterationDQNRegression(routing_dataset=routing_data, network=network, network_name=network_name,
         #                                   run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
         #                                   lambda_mac_cost=0.2)
-        dqn.train(level=1, sample_count=128, episode_count=50000, discount_factor=1.0, l2_lambda=l2_lambda, seed=seed)
+        dqn.train(level=1, sample_count=128, episode_count=50000, discount_factor=1.0,
+                  l2_lambda=l2_lambda, seed=seed, measurement_period=1)
         print("X")
         tf.reset_default_graph()
         break
