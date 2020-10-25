@@ -11,28 +11,20 @@ from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class DqnWithRegression:
-    # invalid_action_penalty = -1.0
-    # valid_prediction_reward = 1.0
-    # invalid_prediction_penalty = 0.0
-    INCLUDE_IG_IN_REWARD_CALCULATIONS = False
-
-    CONV_FEATURES = [[32], [64]]
-    HIDDEN_LAYERS = [[128, 64], [128, 64]]
-    FILTER_SIZES = [[1], [1]]
-    STRIDES = [[1], [1]]
-    MAX_POOL = [[None], [None]]
-
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
                  lambda_mac_cost,
                  invalid_action_penalty,
                  valid_prediction_reward,
                  invalid_prediction_penalty,
+                 include_ig_in_reward_calculations,
                  feature_type,
+                 dqn_parameters,
                  max_experience_count=100000):
         self.dqnFunc = dqn_func
         self.invalidActionPenalty = invalid_action_penalty
         self.validPredictionReward = valid_prediction_reward
         self.invalidPredictionPenalty = invalid_prediction_penalty
+        self.includeIgInRewardCalculations = include_ig_in_reward_calculations
         self.featureType = feature_type
         self.routingDataset = routing_dataset
         self.network = network
@@ -40,6 +32,8 @@ class DqnWithRegression:
         self.runId = run_id
         self.usedFeatureNames = used_feature_names
         self.lambdaMacCost = lambda_mac_cost
+        self.dqnParameters = dqn_parameters
+        self.useReachability = False
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
         self.innerNodes = sorted(self.innerNodes, key=lambda node: node.index)
@@ -246,7 +240,7 @@ class DqnWithRegression:
                     routing_decision = self.actionSpaces[t][action_id, :]
                     routing_matrix = np.repeat(routing_decision[np.newaxis, :], axis=0,
                                                repeats=true_labels.shape[0])
-                    if DqnWithRegression.INCLUDE_IG_IN_REWARD_CALCULATIONS:
+                    if self.includeIgInRewardCalculations:
                         # Set Information Gain routed leaf nodes to 1. They are always evaluated.
                         routing_matrix[np.arange(true_labels.shape[0]), ig_indices] = 1
                     weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
@@ -345,38 +339,25 @@ class DqnWithRegression:
             self.dqnFunc(net_input=self.stateInputs[level], is_train=self.isTrain, level=level, class_obj=self)
             self.build_loss(level=level)
 
-    def log_meta_data(self, kwargs):
-        # If we use only information gain for routing (ML: Maximum likelihood routing)
-        whole_data_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=np.arange(
-            self.routingDataset.labelList.shape[0]))
-        training_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.trainingIndices)
-        test_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.testIndices)
-        # Fill the explanation string for the experiment
-        kwargs["whole_data_ml_accuracy"] = whole_data_ml_accuracy
-        kwargs["training_ml_accuracy"] = training_ml_accuracy
-        kwargs["test_ml_accuracy"] = test_ml_accuracy
+    def prepare_explanation_string(self, kwargs):
         kwargs["featureType"] = self.featureType
         kwargs["invalid_action_penalty"] = self.invalidActionPenalty
         kwargs["valid_prediction_reward"] = self.validPredictionReward
         kwargs["invalid_prediction_penalty"] = self.invalidPredictionPenalty
-        kwargs["INCLUDE_IG_IN_REWARD_CALCULATIONS"] = self.INCLUDE_IG_IN_REWARD_CALCULATIONS
-        kwargs["CONV_FEATURES"] = self.CONV_FEATURES
-        kwargs["HIDDEN_LAYERS"] = self.HIDDEN_LAYERS
-        kwargs["FILTER_SIZES"] = self.FILTER_SIZES
-        kwargs["STRIDES"] = self.STRIDES
-        kwargs["MAX_POOL"] = self.MAX_POOL
+        kwargs["includeIgInRewardCalculations"] = self.includeIgInRewardCalculations
+        kwargs["CONV_FEATURES"] = self.dqnParameters["LeNet_DQN"]["CONV_FEATURES"]
+        kwargs["HIDDEN_LAYERS"] = self.dqnParameters["LeNet_DQN"]["HIDDEN_LAYERS"]
+        kwargs["FILTER_SIZES"] = self.dqnParameters["LeNet_DQN"]["FILTER_SIZES"]
+        kwargs["STRIDES"] = self.dqnParameters["LeNet_DQN"]["STRIDES"]
+        kwargs["MAX_POOL"] = self.dqnParameters["LeNet_DQN"]["MAX_POOL"]
         kwargs["lambdaMacCost"] = self.lambdaMacCost
         kwargs["dqnFunc"] = self.dqnFunc
         kwargs["operationCosts"] = [node.opMacCostsDict for node in self.nodes]
-        run_id = DbLogger.get_run_id()
-        explanation_string = "DQN Experiment. RunID:{0}\n".format(run_id)
+        kwargs["run_id"] = DbLogger.get_run_id()
+        explanation_string = "DQN Experiment. RunID:{0}\n".format(kwargs["run_id"])
         for k, v in kwargs.items():
             explanation_string += "{0}:{1}\n".format(k, v)
-        print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
-        print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
-        print("Test Set ML Accuracy:{0}".format(test_ml_accuracy))
-        DbLogger.write_into_table(rows=[(run_id, explanation_string)], table=DbLogger.runMetaData, col_count=2)
-        return run_id
+        return explanation_string
 
     def get_state_tuples(self, sample_indices, level):
         action_count_t_minus_one = 1 if level == 0 else self.actionSpaces[level - 1].shape[0]
@@ -438,6 +419,11 @@ class DqnWithRegression:
         state_id_tuples = self.get_state_tuples(sample_indices=list(range(total_sample_count)), level=level)
         q_table_predicted = self.calculate_q_values(level=level, sample_indices=state_id_tuples[:, 0],
                                                     action_ids_t_minus_1=state_id_tuples[:, 1])
+        if self.useReachability:
+            # Set non accesible indices to -np.inf
+            idx_array = self.get_selection_indices(level=level, actions_t_minus_1=state_id_tuples[:, 1],
+                                                   non_zeros=False)
+            q_table_predicted[idx_array[:, 0], idx_array[:, 1]] = self.invalidActionPenalty
         # Reshape for further processing
         assert q_table_predicted.shape[0] == total_sample_count * action_count_t_minus_one and \
                len(q_table_predicted.shape) == 2
@@ -542,10 +528,30 @@ class DqnWithRegression:
         mean_policy_value = np.mean(np.max(Q_table_predicted, axis=1))
         # Calculate the MSE between the Q_{t}^{predicted}(s,a) and Q_{t}^{actual}(s,a).
         assert Q_table_predicted.shape == Q_table_truth.shape
-        y_hat = np.reshape(Q_table_predicted, newshape=(np.prod(Q_table_predicted.shape),))
-        y = np.reshape(Q_table_truth, newshape=(np.prod(Q_table_truth.shape),))
+        if self.useReachability:
+            # Account for -np.inf entries
+            reachability_matrix = self.reachabilityMatrices[level][state_id_tuples[:, 1]]
+            assert Q_table_predicted.shape == reachability_matrix.shape
+            y = Q_table_truth[reachability_matrix == 1]
+            y_hat = Q_table_predicted[reachability_matrix == 1]
+        else:
+            y_hat = np.reshape(Q_table_predicted, newshape=(np.prod(Q_table_predicted.shape),))
+            y = np.reshape(Q_table_truth, newshape=(np.prod(Q_table_truth.shape),))
         mse_score = mean_squared_error(y_true=y, y_pred=y_hat)
         return mean_policy_value, mse_score
+
+    def calculate_ml_performance(self, kwargs):
+        # If we use only information gain for routing (ML: Maximum likelihood routing)
+        whole_data_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=np.arange(
+            self.routingDataset.labelList.shape[0]))
+        training_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.trainingIndices)
+        test_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.testIndices)
+        kwargs["whole_data_ml_accuracy"] = whole_data_ml_accuracy
+        kwargs["training_ml_accuracy"] = training_ml_accuracy
+        kwargs["test_ml_accuracy"] = test_ml_accuracy
+        print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
+        print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
+        print("Test Set ML Accuracy:{0}".format(test_ml_accuracy))
 
     def execute_bellman_equation(self, Q_tables, sample_indices):
         last_level = self.get_max_trajectory_length()
@@ -558,7 +564,7 @@ class DqnWithRegression:
         routing_matrix = self.actionSpaces[-1][a_t]
         min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
         posteriors = self.posteriorTensors[sample_indices, :]
-        if DqnWithRegression.INCLUDE_IG_IN_REWARD_CALCULATIONS:
+        if self.includeIgInRewardCalculations:
             # Set Information Gain routed leaf nodes to 1. They are always evaluated.
             ig_idx = self.maxLikelihoodPaths[sample_indices][:, -1] - min_leaf_id
             routing_matrix[np.arange(sample_indices.shape[0]), ig_idx] = 1
@@ -636,7 +642,7 @@ class DqnWithRegression:
                    np.asscalar(test_accuracy), np.asscalar(test_computation_cost))],
             table="deep_q_learning_logs", col_count=10)
 
-    def setup_before_training(self, level, **kwargs):
+    def setup_before_training(self, level, kwargs):
         discount_factor = kwargs["discount_factor"]
         if level != self.get_max_trajectory_length() - 1:
             raise NotImplementedError()
@@ -644,14 +650,31 @@ class DqnWithRegression:
         # If we use only information gain for routing (ML: Maximum likelihood routing)
         kwargs["lrValues"] = self.lrValues
         kwargs["lrBoundaries"] = self.lrBoundaries
-        kwargs["run_id"] = self.log_meta_data(kwargs=kwargs)
+        self.calculate_ml_performance(kwargs=kwargs)
+        explanation_string = self.prepare_explanation_string(kwargs=kwargs)
+        DbLogger.write_into_table(rows=[(kwargs["run_id"], explanation_string)], table=DbLogger.runMetaData,
+                                  col_count=2)
         # Calculate the ultimate, optimal Q Tables.
         self.calculate_optimal_q_tables(discount_rate=discount_factor)
+
+    def run_training_step(self, level, **kwargs):
+        sample_count = kwargs["sample_count"]
+        state_features = kwargs["state_features"]
+        optimal_q_values = kwargs["optimal_q_values"]
+        l2_lambda = kwargs["l2_lambda"]
+        results = self.session.run([self.totalLosses[level], self.lossMatrices[level],
+                                    self.regressionLossValues[level], self.optimizers[level]],
+                                   feed_dict={self.stateCount: sample_count,
+                                              self.stateInputs[level]: state_features,
+                                              self.rewardMatrices[level]: optimal_q_values,
+                                              self.isTrain: True,
+                                              self.l2LambdaTf: l2_lambda})
+        return results
 
     def train(self, level, **kwargs):
         self.saver = tf.train.Saver()
         losses = []
-        self.setup_before_training(level=level, **kwargs)
+        self.setup_before_training(level=level, kwargs=kwargs)
         # These are for testing purposes
         optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=kwargs["discount_factor"])
         assert len(self.optimalQTables) == len(optimal_q_tables_test)
@@ -673,13 +696,8 @@ class DqnWithRegression:
                                                      level=level)
             sample_count = kwargs["sample_count"]
             l2_lambda = kwargs["l2_lambda"]
-            results = self.session.run([self.totalLosses[level], self.lossMatrices[level],
-                                        self.regressionLossValues[level], self.optimizers[level]],
-                                       feed_dict={self.stateCount: sample_count,
-                                                  self.stateInputs[level]: state_features,
-                                                  self.rewardMatrices[level]: optimal_q_values,
-                                                  self.isTrain: True,
-                                                  self.l2LambdaTf: l2_lambda})
+            results = self.run_training_step(level=level, sample_count=sample_count, state_features=state_features,
+                                             optimal_q_values=optimal_q_values, l2_lambda=l2_lambda)
             total_loss = results[0]
             losses.append(total_loss)
             if len(losses) % 10 == 0:

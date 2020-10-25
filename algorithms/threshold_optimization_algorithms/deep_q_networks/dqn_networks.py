@@ -52,11 +52,11 @@ class DeepQNetworks:
 
     @staticmethod
     def get_lenet_network(net_input, is_train, level, class_obj):
-        hidden_layers = class_obj.HIDDEN_LAYERS[level]
-        conv_features = class_obj.CONV_FEATURES[level]
-        filter_sizes = class_obj.FILTER_SIZES[level]
-        strides = class_obj.STRIDES[level]
-        pools = class_obj.MAX_POOL[level]
+        hidden_layers = class_obj.dqnParameters["LeNet_DQN"]["HIDDEN_LAYERS"][level]
+        conv_features = class_obj.dqnParameters["LeNet_DQN"]["CONV_FEATURES"][level]
+        filter_sizes = class_obj.dqnParameters["LeNet_DQN"]["FILTER_SIZES"][level]
+        strides = class_obj.dqnParameters["LeNet_DQN"]["STRIDES"][level]
+        pools = class_obj.dqnParameters["LeNet_DQN"]["MAX_POOL"][level]
         net = net_input
         net = tf.layers.batch_normalization(inputs=net, momentum=0.9, training=is_train)
         net = DeepQNetworks.get_conv_layers(net_input=net, is_train=is_train,
@@ -69,11 +69,11 @@ class DeepQNetworks:
 
     @staticmethod
     def get_squeeze_and_excitation_block(net_input, is_train, level, class_obj):
-        hidden_layers = class_obj.HIDDEN_LAYERS[level]
-        conv_features = class_obj.CONV_FEATURES[level]
-        filter_sizes = class_obj.FILTER_SIZES[level]
-        strides = class_obj.STRIDES[level]
-        pools = class_obj.MAX_POOL[level]
+        hidden_layers = class_obj.dqnParameters["LeNet_DQN"]["HIDDEN_LAYERS"][level]
+        conv_features = class_obj.dqnParameters["LeNet_DQN"]["CONV_FEATURES"][level]
+        filter_sizes = class_obj.dqnParameters["LeNet_DQN"]["FILTER_SIZES"][level]
+        strides = class_obj.dqnParameters["LeNet_DQN"]["STRIDES"][level]
+        pools = class_obj.dqnParameters["LeNet_DQN"]["MAX_POOL"][level]
         net = net_input
         net = tf.layers.batch_normalization(inputs=net, momentum=0.9, training=is_train)
         reduction_ratio = class_obj.SE_REDUCTION_RATIO[level]

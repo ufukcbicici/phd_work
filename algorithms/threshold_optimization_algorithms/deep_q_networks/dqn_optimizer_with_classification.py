@@ -9,23 +9,10 @@ from sklearn.metrics import log_loss
 
 
 class DqnWithClassification(DqnWithRegression):
-    invalid_action_penalty = -1.0e10
-    valid_prediction_reward = 1.0
-    invalid_prediction_penalty = 0.0
-    INCLUDE_IG_IN_REWARD_CALCULATIONS = False
-
-    # LeNet DQN Parameters
-    CONV_FEATURES = [[32], [32]]
-    HIDDEN_LAYERS = [[64, 32], [64, 32]]
-    FILTER_SIZES = [[3], [3]]
-    STRIDES = [[1], [2]]
-    MAX_POOL = [[None], [None]]
-
-    # Squeeze and Excitation Parameters
-    SE_REDUCTION_RATIO = [2, 2]
-
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
-                 lambda_mac_cost, valid_prediction_reward, invalid_prediction_penalty, feature_type,
+                 lambda_mac_cost, valid_prediction_reward, invalid_prediction_penalty,
+                 include_ig_in_reward_calculations,
+                 feature_type,
                  max_experience_count=100000):
         self.selectionLabels = tf.placeholder(dtype=tf.int32, name="selectionLabels", shape=(None,))
         self.crossEntropyLossValues = [None] * int(network.depth - 1)
@@ -33,11 +20,13 @@ class DqnWithClassification(DqnWithRegression):
         self.lossVectors = [None] * int(network.depth - 1)
         super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
                          lambda_mac_cost,
-                         DqnWithClassification.invalid_action_penalty,
+                         -1.0e10,
                          valid_prediction_reward,
                          invalid_prediction_penalty,
+                         include_ig_in_reward_calculations,
                          feature_type,
                          max_experience_count)
+        self.useReachability = True
 
     def build_loss(self, level):
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
@@ -59,7 +48,7 @@ class DqnWithClassification(DqnWithRegression):
         q_table_predicted = self.calculate_q_values(level=level, sample_indices=state_id_tuples[:, 0],
                                                     action_ids_t_minus_1=state_id_tuples[:, 1])
         # Set non accesible indices to -np.inf
-        idx_array = self.get_selection_indices(level=t, actions_t_minus_1=state_id_tuples[:, 1],
+        idx_array = self.get_selection_indices(level=level, actions_t_minus_1=state_id_tuples[:, 1],
                                                non_zeros=False)
         q_table_predicted[idx_array[:, 0], idx_array[:, 1]] = DqnWithClassification.invalid_action_penalty
         # Reshape for further processing
@@ -136,40 +125,6 @@ class DqnWithClassification(DqnWithRegression):
                    np.asscalar(test_mean_accuracy), test_cross_entropy_loss,
                    np.asscalar(test_accuracy), np.asscalar(test_computation_cost))],
             table="deep_q_learning_logs", col_count=10)
-
-    def log_meta_data(self, kwargs):
-        # If we use only information gain for routing (ML: Maximum likelihood routing)
-        whole_data_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=np.arange(
-            self.routingDataset.labelList.shape[0]))
-        training_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.trainingIndices)
-        test_ml_accuracy = self.get_max_likelihood_accuracy(sample_indices=self.routingDataset.testIndices)
-        # Fill the explanation string for the experiment
-        kwargs["whole_data_ml_accuracy"] = whole_data_ml_accuracy
-        kwargs["training_ml_accuracy"] = training_ml_accuracy
-        kwargs["test_ml_accuracy"] = test_ml_accuracy
-        kwargs["featureType"] = self.featureType
-        kwargs["invalid_action_penalty"] = self.invalidActionPenalty
-        kwargs["valid_prediction_reward"] = self.validPredictionReward
-        kwargs["invalid_prediction_penalty"] = self.invalidPredictionPenalty
-        kwargs["INCLUDE_IG_IN_REWARD_CALCULATIONS"] = self.INCLUDE_IG_IN_REWARD_CALCULATIONS
-        kwargs["CONV_FEATURES"] = self.CONV_FEATURES
-        kwargs["HIDDEN_LAYERS"] = self.HIDDEN_LAYERS
-        kwargs["FILTER_SIZES"] = self.FILTER_SIZES
-        kwargs["STRIDES"] = self.STRIDES
-        kwargs["MAX_POOL"] = self.MAX_POOL
-        kwargs["lambdaMacCost"] = self.lambdaMacCost
-        kwargs["dqnFunc"] = self.dqnFunc
-        kwargs["SE_REDUCTION_RATIO"] = self.SE_REDUCTION_RATIO
-        kwargs["operationCosts"] = [node.opMacCostsDict for node in self.nodes]
-        run_id = DbLogger.get_run_id()
-        explanation_string = "DQN Experiment. RunID:{0}\n".format(run_id)
-        for k, v in kwargs.items():
-            explanation_string += "{0}:{1}\n".format(k, v)
-        print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
-        print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
-        print("Test Set ML Accuracy:{0}".format(test_ml_accuracy))
-        DbLogger.write_into_table(rows=[(run_id, explanation_string)], table=DbLogger.runMetaData, col_count=2)
-        return run_id
 
     def train(self, level, **kwargs):
         self.setup_before_training(level=level, **kwargs)

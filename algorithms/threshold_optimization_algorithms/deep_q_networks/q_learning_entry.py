@@ -55,6 +55,23 @@ def train_deep_q_learning():
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
     used_output_names = ["pre_branch_feature"]
+
+    dqn_parameters = \
+        {
+            "LeNet_DQN":
+                {
+                    "CONV_FEATURES": [[32], [32]],
+                    "HIDDEN_LAYERS": [[64, 32], [64, 32]],
+                    "FILTER_SIZES": [[3], [3]],
+                    "STRIDES": [[1], [2]],
+                    "MAX_POOL": [[None], [None]]
+                },
+            "Squeeze_And_Excitation":
+                {
+                    "SE_REDUCTION_RATIO": [2, 2]
+                }
+        }
+
     param_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=[list_of_l2_coeffs, list_of_seeds])
     for param_tpl in param_tuples:
         l2_lambda = param_tpl[0]
@@ -67,18 +84,19 @@ def train_deep_q_learning():
                                                                                  46080, 46560, 47040, 47520, 48000])
         routing_data.apply_validation_test_split(test_ratio=0.1)
         routing_data.switch_to_single_iteration_mode()
-        dqn = DqnWithClassification(routing_dataset=routing_data, network=network, network_name=network_name,
-                                    run_id=453, used_feature_names=used_output_names,
-                                    dqn_func=DeepQNetworks.get_squeeze_and_excitation_block,
-                                    lambda_mac_cost=0.0,
-                                    valid_prediction_reward=1.0,
-                                    invalid_prediction_penalty=0.0, feature_type="sum")
-        # dqn = DqnWithReducedRegression(routing_dataset=routing_data, network=network, network_name=network_name,
-        #                                run_id=453, used_feature_names=used_output_names,
-        #                                dqn_func=DeepQNetworks.get_squeeze_and_excitation_block,
-        #                                lambda_mac_cost=0.0,
-        #                                valid_prediction_reward=1.0,
-        #                                invalid_prediction_penalty=0.0, feature_type="sum")
+        # dqn = DqnWithClassification(routing_dataset=routing_data, network=network, network_name=network_name,
+        #                             run_id=453, used_feature_names=used_output_names,
+        #                             dqn_func=DeepQNetworks.get_squeeze_and_excitation_block,
+        #                             lambda_mac_cost=0.0,
+        #                             valid_prediction_reward=1.0,
+        #                             invalid_prediction_penalty=0.0, feature_type="sum")
+        dqn = DqnWithReducedRegression(routing_dataset=routing_data, network=network, network_name=network_name,
+                                       run_id=453, used_feature_names=used_output_names,
+                                       dqn_func=DeepQNetworks.get_squeeze_and_excitation_block,
+                                       lambda_mac_cost=0.0,
+                                       valid_prediction_reward=1.0,
+                                       invalid_prediction_penalty=0.0,
+                                       feature_type="sum")
         # dqn = DqnWithRegression(routing_dataset=routing_data, network=network, network_name=network_name,
         #                         run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
         #                         lambda_mac_cost=0.0,
