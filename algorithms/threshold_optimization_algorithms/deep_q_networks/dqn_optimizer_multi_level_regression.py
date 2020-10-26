@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import os
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_regression import DqnWithRegression
 from auxillary.db_logger import DbLogger
 
@@ -11,6 +12,15 @@ class DqnMultiLevelRegression(DqnWithRegression):
         super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, dqn_func, lambda_mac_cost,
                          invalid_action_penalty, valid_prediction_reward, invalid_prediction_penalty,
                          include_ig_in_reward_calculations, feature_type, dqn_parameters)
+        self.totalSystemLoss = None
+        self.totalOptimizer = None
+        self.totalGlobalStep = tf.Variable(0, name="total_global_step", trainable=False)
+
+    def build_total_loss(self):
+        with tf.control_dependencies(self.totalLosses):
+            self.totalSystemLoss = tf.add_n(self.totalLosses)
+            self.totalOptimizer = tf.train.AdamOptimizer().minimize(self.totalSystemLoss,
+                                                                    global_step=self.totalGlobalStep)
 
     def setup_before_training(self, kwargs, level=None):
         discount_factor = kwargs["discount_factor"]
@@ -73,7 +83,7 @@ class DqnMultiLevelRegression(DqnWithRegression):
         log_string = str(results_dict)
 
         DbLogger.write_into_table(
-            rows=[(run_id, 
+            rows=[(run_id,
                    episode_id,
                    0.0,
                    np.asscalar(training_total_mse),
@@ -82,6 +92,60 @@ class DqnMultiLevelRegression(DqnWithRegression):
                    0.0,
                    np.asscalar(test_total_mse),
                    np.asscalar(test_accuracy),
-                   np.asscalar(test_computation_cost)),
-                  log_string],
+                   np.asscalar(test_computation_cost),
+                   log_string)],
             table="deep_q_learning_logs", col_count=11)
+
+    def run_training_step(self, level=None, **kwargs):
+        pass
+
+    def fill_eval_list_feed_dict(self, level, eval_list, feed_dict, **kwargs):
+        state_features = kwargs["state_features"]
+        optimal_q_values = kwargs["optimal_q_values"]
+        eval_list.extend([self.totalLosses[level], self.lossMatrices[level], self.regressionLossValues[level]])
+        feed_dict[self.stateInputs[level]] = state_features
+        feed_dict[self.rewardMatrices[level]] = optimal_q_values
+
+    def train(self, level=None, **kwargs):
+        self.saver = tf.train.Saver()
+        losses = []
+        self.setup_before_training(kwargs=kwargs)
+        # These are for testing purposes
+        optimal_q_tables_test = self.calculate_q_tables_for_test(discount_rate=kwargs["discount_factor"])
+        assert len(self.optimalQTables) == len(optimal_q_tables_test)
+        for t in range(len(self.optimalQTables)):
+            assert np.allclose(self.optimalQTables[t], optimal_q_tables_test[t])
+        self.evaluate(run_id=kwargs["run_id"], episode_id=-1, discount_factor=kwargs["discount_factor"])
+        sample_count = kwargs["sample_count"]
+        l2_lambda = kwargs["l2_lambda"]
+        measurement_period = kwargs["measurement_period"]
+        eval_list = [self.totalSystemLoss, self.totalOptimizer]
+        feed_dict = {self.stateCount: sample_count,
+                     self.isTrain: True,
+                     self.l2LambdaTf: l2_lambda}
+        for episode_id in range(kwargs["episode_count"]):
+            print("Episode:{0}".format(episode_id))
+            last_level = self.get_max_trajectory_length()
+            for t in range(last_level):
+                sample_ids = np.random.choice(self.routingDataset.trainingIndices, sample_count, replace=True)
+                action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+                actions_t_minus_1 = np.random.choice(action_count_t_minus_one, sample_count, replace=True)
+                idx_array = self.get_selection_indices(level=t, actions_t_minus_1=actions_t_minus_1)
+                optimal_q_values = self.optimalQTables[t][sample_ids, actions_t_minus_1]
+                state_features = self.get_state_features(sample_indices=sample_ids,
+                                                         action_ids_t_minus_1=actions_t_minus_1,
+                                                         level=t)
+                self.fill_eval_list_feed_dict(level=t, eval_list=eval_list,
+                                              feed_dict=feed_dict, state_features=state_features,
+                                              optimal_q_values=optimal_q_values, idx_array=idx_array)
+            results = self.session.run(eval_list, feed_dict=feed_dict)
+            total_loss = results[0]
+            losses.append(total_loss)
+            if len(losses) % 10 == 0:
+                print("Episode:{0} MSE:{1}".format(episode_id, np.mean(np.array(losses))))
+                losses = []
+            if (episode_id + 1) % measurement_period == 0:
+                self.evaluate(run_id=kwargs["run_id"], episode_id=episode_id, discount_factor=kwargs["discount_factor"])
+        model_path = os.path.join("..", "dqn_models", "dqn_run_id_{0}".format(kwargs["run_id"]))
+        os.mkdir(model_path)
+        self.saver.save(self.session, os.path.join(model_path, "dqn_run_id_{0}.ckpt".format(kwargs["run_id"])))

@@ -395,7 +395,7 @@ class DqnWithRegression:
         idx_array = np.stack([indices[0], indices[1]], axis=1)
         return idx_array
 
-    def calculate_q_values(self, level, sample_indices, action_ids_t_minus_1, batch_size=5000):
+    def calculate_q_values(self, level, sample_indices, action_ids_t_minus_1, batch_size=100):
         q_values = []
         assert len({len(sample_indices), len(action_ids_t_minus_1)}) == 1
         for offset in range(0, sample_indices.shape[0], batch_size):

@@ -6,6 +6,8 @@ from algorithms.dataset_linking_algorithm import DatasetLinkingAlgorithm
 from algorithms.threshold_optimization_algorithms.deep_q_networks.deep_q_threshold_optimizer import \
     DeepQThresholdOptimizer
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_networks import DeepQNetworks
+from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_multi_level_reduced_regression import \
+    DqnMultiLevelReducedRegression
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_classification import \
     DqnWithClassification
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_reduced_regression import \
@@ -63,7 +65,7 @@ def train_deep_q_learning():
                     "CONV_FEATURES": [[32], [32]],
                     "HIDDEN_LAYERS": [[64, 32], [64, 32]],
                     "FILTER_SIZES": [[3], [3]],
-                    "STRIDES": [[1], [2]],
+                    "STRIDES": [[2], [2]],
                     "MAX_POOL": [[None], [None]]
                 },
             "Squeeze_And_Excitation":
@@ -84,21 +86,31 @@ def train_deep_q_learning():
                                                                                  46080, 46560, 47040, 47520, 48000])
         routing_data.apply_validation_test_split(test_ratio=0.1)
         routing_data.switch_to_single_iteration_mode()
+        dqn = DqnMultiLevelReducedRegression(routing_dataset=routing_data, network=network, network_name=network_name,
+                                             run_id=453, used_feature_names=used_output_names,
+                                             dqn_func=DeepQNetworks.get_squeeze_and_excitation_block,
+                                             lambda_mac_cost=0.0,
+                                             valid_prediction_reward=1.0,
+                                             invalid_prediction_penalty=0.0,
+                                             include_ig_in_reward_calculations=False,
+                                             dqn_parameters=dqn_parameters,
+                                             feature_type="sum")
+
         # dqn = DqnWithClassification(routing_dataset=routing_data, network=network, network_name=network_name,
         #                             run_id=453, used_feature_names=used_output_names,
         #                             dqn_func=DeepQNetworks.get_squeeze_and_excitation_block,
         #                             lambda_mac_cost=0.0,
         #                             valid_prediction_reward=1.0,
         #                             invalid_prediction_penalty=0.0, feature_type="sum")
-        dqn = DqnWithReducedRegression(routing_dataset=routing_data, network=network, network_name=network_name,
-                                       run_id=453, used_feature_names=used_output_names,
-                                       dqn_func=DeepQNetworks.get_squeeze_and_excitation_block,
-                                       lambda_mac_cost=0.0,
-                                       valid_prediction_reward=1.0,
-                                       invalid_prediction_penalty=0.0,
-                                       include_ig_in_reward_calculations=False,
-                                       dqn_parameters=dqn_parameters,
-                                       feature_type="sum")
+        # dqn = DqnWithReducedRegression(routing_dataset=routing_data, network=network, network_name=network_name,
+        #                                run_id=453, used_feature_names=used_output_names,
+        #                                dqn_func=DeepQNetworks.get_squeeze_and_excitation_block,
+        #                                lambda_mac_cost=0.0,
+        #                                valid_prediction_reward=1.0,
+        #                                invalid_prediction_penalty=0.0,
+        #                                include_ig_in_reward_calculations=False,
+        #                                dqn_parameters=dqn_parameters,
+        #                                feature_type="sum")
         # dqn = DqnWithRegression(routing_dataset=routing_data, network=network, network_name=network_name,
         #                         run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
         #                         lambda_mac_cost=0.0,
@@ -110,7 +122,7 @@ def train_deep_q_learning():
         #                                   run_id=453, used_feature_names=used_output_names, q_learning_func="cnn",
         #                                   lambda_mac_cost=0.2)
         dqn.train(level=1, sample_count=128, episode_count=50000, discount_factor=1.0,
-                  l2_lambda=l2_lambda, seed=seed, measurement_period=10)
+                  l2_lambda=l2_lambda, seed=seed, measurement_period=1000)
         print("X")
         tf.reset_default_graph()
         break
