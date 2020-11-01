@@ -11,7 +11,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from sklearn.metrics import log_loss
 
 
-class DqnWithClassification(DqnMultiLevelRegression):
+class DqnMultiLevelWithClassification(DqnMultiLevelRegression):
     def __init__(self, routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
                  lambda_mac_cost, valid_prediction_reward, invalid_prediction_penalty,
                  include_ig_in_reward_calculations,
@@ -19,7 +19,6 @@ class DqnWithClassification(DqnMultiLevelRegression):
                  dqn_parameters):
         self.selectionLabels = [tf.placeholder(dtype=tf.int32, name="selectionLabels_{0}".format(idx),
                                                shape=(None,)) for idx in range(network.depth - 1)]
-
         self.crossEntropyLossValues = [None] * int(network.depth - 1)
         self.softmaxOutputs = [None] * int(network.depth - 1)
         self.lossVectors = [None] * int(network.depth - 1)
@@ -29,15 +28,16 @@ class DqnWithClassification(DqnMultiLevelRegression):
                          valid_prediction_reward,
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
-                         dqn_parameters,
-                         feature_type)
+                         feature_type,
+                         dqn_parameters)
         self.useReachability = True
+        self.build_total_loss()
 
     def build_loss(self, level):
         # Get selected q values; build the regression loss: MSE or Huber between Last layer Q outputs and the reward
         update_ops = tf.get_collection(key=tf.GraphKeys.UPDATE_OPS, scope="dqn_{0}".format(level))
         with tf.control_dependencies(update_ops):
-            self.lossVectors[level] = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.selectionLabels,
+            self.lossVectors[level] = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.selectionLabels[level],
                                                                                      logits=self.qFuncs[level])
             self.softmaxOutputs[level] = tf.nn.softmax(self.qFuncs[level])
             self.crossEntropyLossValues[level] = tf.reduce_mean(self.lossVectors[level])
@@ -131,8 +131,8 @@ class DqnWithClassification(DqnMultiLevelRegression):
         state_features = kwargs["state_features"]
         selection_labels = kwargs["selection_labels"]
         eval_list.extend(
-            [self.totalLosses[level], self.selectionLabels[level],
-             self.lossVectors[level], self.crossEntropyLossValues[level], self.l2Losses[level]])
+            [self.selectionLabels[level], self.lossVectors[level],
+             self.crossEntropyLossValues[level], self.l2Losses[level]])
         feed_dict[self.stateInputs[level]] = state_features
         feed_dict[self.selectionLabels[level]] = selection_labels
 

@@ -522,6 +522,16 @@ class DqnWithRegression:
         state_id_tuples = self.get_state_tuples(sample_indices=sample_indices, level=level)
         Q_table_predicted = Q_tables_whole[level][state_id_tuples[:, 0], state_id_tuples[:, 1]]
         Q_table_truth = self.optimalQTables[level][state_id_tuples[:, 0], state_id_tuples[:, 1]]
+        # Calculate the accuracy of action predictions
+        truth_actions = []
+        for idx in range(Q_table_truth.shape[0]):
+            max_score = np.max(Q_table_truth[idx])
+            max_indices = set(np.nonzero(Q_table_truth[idx] == max_score)[0])
+            truth_actions.append(max_indices)
+        predicted_actions = np.argmax(Q_table_predicted, axis=-1)
+        truth_vector = [a in truth_set for a, truth_set in zip(predicted_actions, truth_actions)]
+        prediction_accuracy = np.mean(np.array(truth_vector))
+        print("Level:{0} Prediction Accuracy:{1}".format(level, prediction_accuracy))
         # Calculate the mean policy value
         mean_policy_value = np.mean(np.max(Q_table_predicted, axis=1))
         # Calculate the MSE between the Q_{t}^{predicted}(s,a) and Q_{t}^{actual}(s,a).
@@ -550,6 +560,24 @@ class DqnWithRegression:
         print("Whole Data ML Accuracy{0}".format(whole_data_ml_accuracy))
         print("Training Set ML Accuracy:{0}".format(training_ml_accuracy))
         print("Test Set ML Accuracy:{0}".format(test_ml_accuracy))
+
+    def calculate_accuracy_from_decisions(self, a_t, sample_indices):
+        routing_matrix = self.actionSpaces[-1][a_t]
+        min_leaf_id = min([node.index for node in self.network.orderedNodesPerLevel[self.network.depth - 1]])
+        posteriors = self.posteriorTensors[sample_indices, :]
+        if self.includeIgInRewardCalculations:
+            # Set Information Gain routed leaf nodes to 1. They are always evaluated.
+            ig_idx = self.maxLikelihoodPaths[sample_indices][:, -1] - min_leaf_id
+            routing_matrix[np.arange(sample_indices.shape[0]), ig_idx] = 1
+        weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
+        routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
+        assert routing_matrix.shape[1] == posteriors.shape[2]
+        weighted_posteriors = posteriors * routing_matrix_weighted[:, np.newaxis, :]
+        final_posteriors = np.sum(weighted_posteriors, axis=2)
+        predicted_labels = np.argmax(final_posteriors, axis=1)
+        truth_vector = self.routingDataset.labelList[sample_indices] == predicted_labels
+        accuracy = np.mean(truth_vector)
+        return accuracy
 
     def execute_bellman_equation(self, Q_tables, sample_indices):
         last_level = self.get_max_trajectory_length()

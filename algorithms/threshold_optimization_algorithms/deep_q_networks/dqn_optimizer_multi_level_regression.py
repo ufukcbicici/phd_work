@@ -1,8 +1,23 @@
 import tensorflow as tf
 import numpy as np
 import os
+
+from sklearn.neural_network import MLPClassifier
+
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_regression import DqnWithRegression
 from auxillary.db_logger import DbLogger
+from sklearn.linear_model import Ridge
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import classification_report
+from sklearn.model_selection import GridSearchCV, RepeatedStratifiedKFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import imblearn
+from imblearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
+from collections import Counter
+from sklearn.linear_model import LogisticRegression
 
 
 class DqnMultiLevelRegression(DqnWithRegression):
@@ -105,6 +120,98 @@ class DqnMultiLevelRegression(DqnWithRegression):
         eval_list.extend([self.totalLosses[level], self.lossMatrices[level], self.regressionLossValues[level]])
         feed_dict[self.stateInputs[level]] = state_features
         feed_dict[self.rewardMatrices[level]] = optimal_q_values
+
+    @staticmethod
+    def get_optimal_actions_list_from_q_table(q_table):
+        a_truth_actions = []
+        for idx in range(q_table.shape[0]):
+            max_score = np.max(q_table[idx])
+            max_indices = tuple(sorted(np.nonzero(q_table[idx] == max_score)[0]))
+            a_truth_actions.append(max_indices)
+        return a_truth_actions
+
+    def train_non_deep_learning(self, **kwargs):
+        tf.reset_default_graph()
+        self.calculate_optimal_q_tables(discount_rate=kwargs["discount_factor"])
+        last_level = self.get_max_trajectory_length()
+        under_sample_ratio = 2.0
+        over_sample_ratio = 2.5
+        for t in range(last_level):
+            X_ = {}
+            Q_ = {}
+            for data_type, indices in zip(["training", "test"],
+                                          [self.routingDataset.trainingIndices, self.routingDataset.testIndices]):
+                state_tuples = self.get_state_tuples(sample_indices=indices, level=t)
+                X = self.get_state_features(sample_indices=state_tuples[:, 0], action_ids_t_minus_1=state_tuples[:, 1],
+                                            level=t)
+                X_[data_type] = np.reshape(X, newshape=(X.shape[0], np.prod(X.shape[1:])))
+                Q_[data_type] = self.optimalQTables[t][state_tuples[:, 0], state_tuples[:, 1]]
+            a_truth_actions = self.get_optimal_actions_list_from_q_table(q_table=Q_["training"])
+            le = LabelEncoder()
+            y_truth = le.fit_transform(a_truth_actions)
+            label_counter = Counter(y_truth)
+            most_common_two_labels = label_counter.most_common(n=2)
+            curr_ratio = most_common_two_labels[0][1] / most_common_two_labels[1][1]
+            # Undersample
+            X_hat, y_hat = X_["training"], y_truth
+            if curr_ratio > under_sample_ratio:
+                new_sample_counts = {
+                        most_common_two_labels[0][0]: int(under_sample_ratio * most_common_two_labels[1][1]),
+                        most_common_two_labels[1][0]: most_common_two_labels[1][1]
+                    }
+                sample_counts = {}
+                for k, v in label_counter.items():
+                    if k not in new_sample_counts:
+                        sample_counts[k] = v
+                    else:
+                        sample_counts[k] = new_sample_counts[k]
+                under_sampler = imblearn.under_sampling.RandomUnderSampler(sampling_strategy=sample_counts)
+                X_hat, y_hat = under_sampler.fit_resample(X=X_hat, y=y_hat)
+            print("X")
+            # Oversample
+            label_counter = Counter(y_hat)
+            max_sample_count = label_counter.most_common(n=1)[0][1]
+            over_sample_counts = {}
+            for k, v in label_counter.items():
+                ratio_to_max = max_sample_count / v
+                over_sample_counts[k] = int(min(over_sample_ratio, ratio_to_max) * v)
+            over_sampler = imblearn.over_sampling.SMOTE(sampling_strategy=over_sample_counts, n_jobs=8)
+            X_hat, y_hat = over_sampler.fit_resample(X=X_hat, y=y_hat)
+            # Classification pipeline
+            standard_scaler = StandardScaler()
+            pca = PCA()
+            mlp = MLPClassifier()
+            pipe = Pipeline(steps=[("scaler", standard_scaler),
+                                   ('pca', pca),
+                                   ('mlp', mlp)])
+            param_grid = \
+                [{
+                    "pca__n_components": [None, 1000, 500, 250, 100, 50],
+                    "mlp__hidden_layer_sizes": [(128, 64)],
+                    "mlp__activation": ["relu"],
+                    "mlp__solver": ["adam"],
+                    # "mlp__learning_rate": ["adaptive"],
+                    "mlp__alpha": [0.0, 0.00001, 0.1, 1.0],
+                    "mlp__max_iter": [10000],
+                    "mlp__early_stopping": [True],
+                    "mlp__n_iter_no_change": [100]
+                }]
+            search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
+                                  scoring=["accuracy", "f1_weighted", "f1_micro", "f1_macro", "balanced_accuracy"],
+                                  refit="accuracy")
+            search.fit(X_, y_)
+            print("Best parameter (CV score=%0.3f):" % search.best_score_)
+            print(search.best_params_)
+            # Classify training and test sets
+            y_pred = {"training": search.best_estimator_.predict(X_["training"]),
+                      "test": search.best_estimator_.predict(X_["test"])}
+            print("*************Training*************")
+            print(classification_report(y_pred=y_pred["training"], y_truth=y_truth))
+            print("*************Test*************")
+            a_truth_actions_test = self.get_optimal_actions_list_from_q_table(q_table=Q_["test"])
+            y_truth_test = le.transform(a_truth_actions_test)
+            print(classification_report(y_pred=y_pred["test"], y_truth=y_truth_test))
+            print("X")
 
     def train(self, level=None, **kwargs):
         self.saver = tf.train.Saver()
