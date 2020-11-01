@@ -199,7 +199,7 @@ class DqnMultiLevelRegression(DqnWithRegression):
             search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
                                   scoring=["accuracy", "f1_weighted", "f1_micro", "f1_macro", "balanced_accuracy"],
                                   refit="accuracy")
-            search.fit(X_, y_)
+            search.fit(X_hat, y_hat)
             print("Best parameter (CV score=%0.3f):" % search.best_score_)
             print(search.best_params_)
             # Classify training and test sets
