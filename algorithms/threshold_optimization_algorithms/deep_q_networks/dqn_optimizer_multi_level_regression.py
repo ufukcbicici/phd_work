@@ -143,24 +143,24 @@ class DqnMultiLevelRegression(DqnWithRegression):
             q_estimated = np.zeros_like(self.optimalQTables[t])
             for action_id in range(action_count_t_minus_one):
                 file_name = "classifier_model_level_{0}_action_{1}.sav".format(t, action_id)
+                X_ = {}
+                Q_ = {}
+                for data_type, indices in zip(["training", "test"],
+                                              [self.routingDataset.trainingIndices, self.routingDataset.testIndices]):
+                    idx_arr = np.array(indices)
+                    actions_arr = np.zeros_like(idx_arr)
+                    actions_arr[:] = action_id
+                    X = self.get_state_features(sample_indices=idx_arr, action_ids_t_minus_1=actions_arr, level=t)
+                    X_[data_type] = np.reshape(X, newshape=(X.shape[0], np.prod(X.shape[1:])))
+                    Q_[data_type] = self.optimalQTables[t][idx_arr, actions_arr]
+                a_truth_actions = self.get_optimal_actions_list_from_q_table(q_table=Q_["training"])
+                le = LabelEncoder()
+                y_truth = le.fit_transform(a_truth_actions)
                 if os.path.exists(file_name):
                     f = open(file_name, "rb")
                     model = pickle.load(f)
                     f.close()
                 else:
-                    X_ = {}
-                    Q_ = {}
-                    for data_type, indices in zip(["training", "test"],
-                                                  [self.routingDataset.trainingIndices, self.routingDataset.testIndices]):
-                        idx_arr = np.array(indices)
-                        actions_arr = np.zeros_like(idx_arr)
-                        actions_arr[:] = action_id
-                        X = self.get_state_features(sample_indices=idx_arr, action_ids_t_minus_1=actions_arr, level=t)
-                        X_[data_type] = np.reshape(X, newshape=(X.shape[0], np.prod(X.shape[1:])))
-                        Q_[data_type] = self.optimalQTables[t][idx_arr, actions_arr]
-                    a_truth_actions = self.get_optimal_actions_list_from_q_table(q_table=Q_["training"])
-                    le = LabelEncoder()
-                    y_truth = le.fit_transform(a_truth_actions)
                     label_counter = Counter(y_truth)
                     most_common_two_labels = label_counter.most_common(n=2)
                     curr_ratio = most_common_two_labels[0][1] / most_common_two_labels[1][1]
@@ -218,22 +218,22 @@ class DqnMultiLevelRegression(DqnWithRegression):
                     f = open(file_name, "wb")
                     pickle.dump(model, f)
                     f.close()
-                    # Classify training and test sets
-                    y_pred = {"training": model.predict(X_["training"]),
-                              "test": model.predict(X_["test"])}
-                    print("*************Training*************")
-                    print(classification_report(y_pred=y_pred["training"], y_true=y_truth))
-                    print("*************Test*************")
-                    a_truth_actions_test = self.get_optimal_actions_list_from_q_table(q_table=Q_["test"])
-                    y_truth_test = le.transform(a_truth_actions_test)
-                    print(classification_report(y_pred=y_pred["test"], y_true=y_truth_test))
-                    # Process the whole data
-                    idx_arr = np.arange(self.routingDataset.labelList.shape[0])
-                    actions_arr = np.zeros_like(idx_arr)
-                    actions_arr[:] = action_id
-                    X_whole = self.get_state_features(sample_indices=idx_arr, action_ids_t_minus_1=actions_arr, level=t)
-                    X_whole = np.reshape(X_whole, newshape=(X_whole.shape[0], np.prod(X_whole.shape[1:])))
-                    estimated_actions = model.predict(X_whole)
+                # Classify training and test sets
+                y_pred = {"training": model.predict(X_["training"]),
+                          "test": model.predict(X_["test"])}
+                print("*************Training*************")
+                print(classification_report(y_pred=y_pred["training"], y_true=y_truth))
+                print("*************Test*************")
+                a_truth_actions_test = self.get_optimal_actions_list_from_q_table(q_table=Q_["test"])
+                y_truth_test = le.transform(a_truth_actions_test)
+                print(classification_report(y_pred=y_pred["test"], y_true=y_truth_test))
+                # Process the whole data
+                idx_arr = np.arange(self.routingDataset.labelList.shape[0])
+                actions_arr = np.zeros_like(idx_arr)
+                actions_arr[:] = action_id
+                X_whole = self.get_state_features(sample_indices=idx_arr, action_ids_t_minus_1=actions_arr, level=t)
+                X_whole = np.reshape(X_whole, newshape=(X_whole.shape[0], np.prod(X_whole.shape[1:])))
+                estimated_actions = model.predict(X_whole)
 
     def train(self, level=None, **kwargs):
         self.saver = tf.train.Saver()
