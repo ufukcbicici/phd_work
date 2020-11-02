@@ -187,7 +187,8 @@ class DqnMultiLevelRegression(DqnWithRegression):
                     for k, v in label_counter.items():
                         ratio_to_max = max_sample_count / v
                         over_sample_counts[k] = int(min(over_sample_ratio, ratio_to_max) * v)
-                    over_sampler = imblearn.over_sampling.SMOTE(sampling_strategy=over_sample_counts, n_jobs=8)
+                    over_sampler = imblearn.over_sampling.SMOTE(sampling_strategy=over_sample_counts,
+                                                                n_jobs=8, k_neighbors=3)
                     X_hat, y_hat = over_sampler.fit_resample(X=X_hat, y=y_hat)
                     # Classification pipeline
                     standard_scaler = StandardScaler()
@@ -234,6 +235,19 @@ class DqnMultiLevelRegression(DqnWithRegression):
                 X_whole = self.get_state_features(sample_indices=idx_arr, action_ids_t_minus_1=actions_arr, level=t)
                 X_whole = np.reshape(X_whole, newshape=(X_whole.shape[0], np.prod(X_whole.shape[1:])))
                 estimated_actions = model.predict(X_whole)
+                inverse_actions = le.inverse_transform(estimated_actions)
+                valid_entries = np.array([[idx, jdx] for idx in range(inverse_actions.shape[0])
+                                          for jdx in inverse_actions[idx]])
+                q_estimated[idx_arr, actions_arr][valid_entries[:, 0], valid_entries[:, 1]] = 1
+            estimated_q_tables.append(q_estimated)
+        _, _, training_accuracy, training_computation_cost = self.execute_bellman_equation(
+            Q_tables=estimated_q_tables, sample_indices=self.routingDataset.trainingIndices)
+        _, _, test_accuracy, test_computation_cost = self.execute_bellman_equation(
+            Q_tables=estimated_q_tables, sample_indices=self.routingDataset.testIndices)
+        print("training_accuracy:{0} training_computation_cost:{1}".format(
+            training_accuracy, training_computation_cost))
+        print("test_accuracy:{0} test_computation_cost:{1}".format(
+            training_accuracy, training_computation_cost))
 
     def train(self, level=None, **kwargs):
         self.saver = tf.train.Saver()
