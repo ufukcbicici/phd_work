@@ -211,8 +211,7 @@ class DqnMultiLevelRegression(DqnWithRegression):
                             "mlp__activation": ["relu"],
                             "mlp__solver": ["adam"],
                             # "mlp__learning_rate": ["adaptive"],
-                            "mlp__alpha": [0.0, 0.00001, 0.0001, 0.001, 0.01, 0.05,
-                                           0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 100.0],
+                            "mlp__alpha": [10.0, 25.0, 50.0, 100.0, 150.0, 200.0, 500.0, 1000.0],
                             "mlp__max_iter": [1000],
                             "mlp__early_stopping": [True],
                             "mlp__n_iter_no_change": [25]
