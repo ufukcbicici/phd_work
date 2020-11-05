@@ -3,8 +3,9 @@ import numpy as np
 import os
 import pickle
 
-from sklearn.neural_network import MLPClassifier
+from sklearn.neural_network import MLPClassifier, MLPRegressor
 
+from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_networks import DeepQNetworks
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_regression import DqnWithRegression
 from auxillary.db_logger import DbLogger
 from sklearn.linear_model import Ridge
@@ -131,6 +132,120 @@ class DqnMultiLevelRegression(DqnWithRegression):
             a_truth_actions.append(max_indices)
         return a_truth_actions
 
+    def get_formatted_input(self, action_id, level):
+        batch_size = 10000
+        all_indices = np.arange(self.routingDataset.labelList.shape[0])
+        actions_arr = np.zeros_like(all_indices)
+        actions_arr[:] = action_id
+        X = self.get_state_features(sample_indices=np.arange(self.routingDataset.labelList.shape[0]),
+                                    action_ids_t_minus_1=actions_arr,
+                                    level=level)
+        sess = tf.Session()
+        X_shape = list(X.shape)
+        X_shape[0] = None
+        x_input = tf.placeholder(dtype=tf.float32, shape=X_shape, name="x_input")
+        x_output = DeepQNetworks.global_average_pooling(net_input=x_input)
+        X_arr = []
+        for batch_idx in range(0, all_indices.shape[0], batch_size):
+            X_batch = X[batch_idx: batch_idx + batch_size]
+            X_formatted_batch = sess.run([x_output], feed_dict={x_input: X_batch})[0]
+            X_arr.append(X_formatted_batch)
+        X_formatted = np.concatenate(X_arr, axis=0)
+        return X_formatted
+
+    def convert_q_table_to_regression_target(self, level, action_id, Q_table):
+        reachability_vector = self.reachabilityMatrices[level][action_id]
+        valid_column_ids = sorted(np.nonzero(reachability_vector)[0])
+        valid_columns = [Q_table[:, idx] for idx in valid_column_ids]
+        regression_Q = np.stack(valid_columns, axis=-1)
+        return regression_Q
+
+    def convert_regression_target_to_q_table(self, level, action_id, R_table):
+        reachability_vector = self.reachabilityMatrices[level][action_id]
+        valid_column_ids = sorted(np.nonzero(reachability_vector)[0])
+        Q_table = np.zeros_like(self.optimalQTables[level][:, action_id, :])
+        Q_table[:] = -np.inf
+        for R_table_id, Q_table_id in enumerate(valid_column_ids):
+            Q_table[:, Q_table_id] = R_table[:, R_table_id]
+        return Q_table
+
+    def train_non_deep_learning_regression(self, **kwargs):
+        tf.reset_default_graph()
+        self.calculate_optimal_q_tables(discount_rate=kwargs["discount_factor"])
+        last_level = self.get_max_trajectory_length()
+        under_sample_ratio = 2.0
+        over_sample_ratio = 2.5
+        estimated_q_tables = []
+        for t in range(last_level):
+            action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+            q_estimated = np.zeros_like(self.optimalQTables[t])
+            for action_id in range(action_count_t_minus_one):
+                file_name = "regression_model_level_{0}_action_{1}.sav".format(t, action_id)
+                X = self.get_formatted_input(action_id=action_id, level=t)
+                all_indices = np.arange(self.routingDataset.labelList.shape[0])
+                actions_arr = np.zeros_like(all_indices)
+                actions_arr[:] = action_id
+                Q = self.convert_q_table_to_regression_target(level=t,
+                                                              action_id=action_id,
+                                                              Q_table=self.optimalQTables[t][all_indices, actions_arr])
+                X_train = X[self.routingDataset.trainingIndices]
+                Q_train = Q[self.routingDataset.trainingIndices]
+                X_test = X[self.routingDataset.testIndices]
+                Q_test = Q[self.routingDataset.testIndices]
+                if os.path.exists(file_name):
+                    f = open(file_name, "rb")
+                    model = pickle.load(f)
+                    f.close()
+                else:
+                    # Regression pipeline
+                    standard_scaler = StandardScaler()
+                    pca = PCA()
+                    mlp = MLPRegressor()
+                    pipe = Pipeline(steps=[("scaler", standard_scaler),
+                                           ('pca', pca),
+                                           ('mlp', mlp)])
+                    param_grid = \
+                        [{
+                            "pca__n_components": [None],
+                            "mlp__hidden_layer_sizes": [(64, 32)],
+                            "mlp__activation": ["relu"],
+                            "mlp__solver": ["adam"],
+                            # "mlp__learning_rate": ["adaptive"],
+                            "mlp__alpha": [0.0, 0.00001, 0.0001, 0.001, 0.01, 0.05,
+                                           0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 100.0],
+                            "mlp__max_iter": [1000],
+                            "mlp__early_stopping": [True],
+                            "mlp__n_iter_no_change": [25]
+                        }]
+                    search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
+                                          scoring=["neg_mean_squared_error", "r2"], refit="neg_mean_squared_error")
+                    search.fit(X_train, Q_train)
+                    print("Best parameter (CV score=%0.3f):" % search.best_score_)
+                    print(search.best_params_)
+                    model = search.best_estimator_
+                    f = open(file_name, "wb")
+                    pickle.dump(model, f)
+                    f.close()
+                Q_train_pred = model.predict(X_train)
+                Q_test_pred = model.predict(X_test)
+                Q_pred = model.predict(X)
+                a_train_optimal = self.get_optimal_actions_list_from_q_table(Q_train)
+                a_train_predicted = self.get_optimal_actions_list_from_q_table(Q_train_pred)
+                a_test_optimal = self.get_optimal_actions_list_from_q_table(Q_test)
+                a_test_predicted = self.get_optimal_actions_list_from_q_table(Q_test_pred)
+                comparison_vector_train = np.array([len(set(s1).intersection(set(s2))) > 0
+                                                    for s1, s2 in zip(a_train_optimal, a_train_predicted)])
+                comparison_vector_test = np.array([len(set(s1).intersection(set(s2))) > 0
+                                                   for s1, s2 in zip(a_test_optimal, a_test_predicted)])
+                train_accuracy = np.mean(comparison_vector_train)
+                test_accuracy = np.mean(comparison_vector_test)
+                print("train_accuracy={0}".format(train_accuracy))
+                print("test_accuracy={0}".format(test_accuracy))
+                Q_pred_converted = self.convert_regression_target_to_q_table(level=t,
+                                                                             action_id=action_id,
+                                                                             R_table=Q_pred)
+                q_estimated[:, action_id, :] = Q_pred_converted
+
     def train_non_deep_learning_classification(self, **kwargs):
         tf.reset_default_graph()
         self.calculate_optimal_q_tables(discount_rate=kwargs["discount_factor"])
@@ -168,9 +283,9 @@ class DqnMultiLevelRegression(DqnWithRegression):
                     X_hat, y_hat = X_["training"], y_truth
                     if curr_ratio > under_sample_ratio:
                         new_sample_counts = {
-                                most_common_two_labels[0][0]: int(under_sample_ratio * most_common_two_labels[1][1]),
-                                most_common_two_labels[1][0]: most_common_two_labels[1][1]
-                            }
+                            most_common_two_labels[0][0]: int(under_sample_ratio * most_common_two_labels[1][1]),
+                            most_common_two_labels[1][0]: most_common_two_labels[1][1]
+                        }
                         sample_counts = {}
                         for k, v in label_counter.items():
                             if k not in new_sample_counts:
@@ -210,7 +325,8 @@ class DqnMultiLevelRegression(DqnWithRegression):
                             "mlp__n_iter_no_change": [100]
                         }]
                     search = GridSearchCV(pipe, param_grid, n_jobs=4, cv=5, verbose=10,
-                                          scoring=["accuracy", "f1_weighted", "f1_micro", "f1_macro", "balanced_accuracy"],
+                                          scoring=["accuracy", "f1_weighted", "f1_micro", "f1_macro",
+                                                   "balanced_accuracy"],
                                           refit="accuracy")
                     search.fit(X_hat, y_hat)
                     print("Best parameter (CV score=%0.3f):" % search.best_score_)
@@ -238,7 +354,9 @@ class DqnMultiLevelRegression(DqnWithRegression):
                 inverse_actions = le.inverse_transform(estimated_actions)
                 valid_entries = np.array([[idx, jdx] for idx in range(inverse_actions.shape[0])
                                           for jdx in inverse_actions[idx]])
-                q_estimated[idx_arr, actions_arr][valid_entries[:, 0], valid_entries[:, 1]] = 1
+                actions_arr = np.zeros_like(valid_entries[:, 0])
+                actions_arr[:] = action_id
+                q_estimated[valid_entries[:, 0], actions_arr, valid_entries[:, 1]] = 1
             estimated_q_tables.append(q_estimated)
         _, _, training_accuracy, training_computation_cost = self.execute_bellman_equation(
             Q_tables=estimated_q_tables, sample_indices=self.routingDataset.trainingIndices)
@@ -247,7 +365,7 @@ class DqnMultiLevelRegression(DqnWithRegression):
         print("training_accuracy:{0} training_computation_cost:{1}".format(
             training_accuracy, training_computation_cost))
         print("test_accuracy:{0} test_computation_cost:{1}".format(
-            training_accuracy, training_computation_cost))
+            test_accuracy, test_computation_cost))
 
     def train(self, level=None, **kwargs):
         self.saver = tf.train.Saver()
