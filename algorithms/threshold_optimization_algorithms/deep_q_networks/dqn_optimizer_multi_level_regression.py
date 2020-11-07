@@ -207,12 +207,11 @@ class DqnMultiLevelRegression(DqnWithRegression):
                     param_grid = \
                         [{
                             "pca__n_components": [None],
-                            "mlp__hidden_layer_sizes": [(128, 64)],
+                            "mlp__hidden_layer_sizes": [(64, 32)],
                             "mlp__activation": ["relu"],
                             "mlp__solver": ["adam"],
                             # "mlp__learning_rate": ["adaptive"],
-                            "mlp__alpha": [0.0, 0.001, 0.01, 0.1, 1.0,
-                                           10.0, 25.0, 50.0, 100.0, 150.0, 200.0, 500.0, 1000.0],
+                            "mlp__alpha": [25.0, 50.0, 100.0, 150.0, 200.0, 500.0, 1000.0, 1500.0, 2000.0],
                             "mlp__max_iter": [10000],
                             "mlp__early_stopping": [True],
                             "mlp__n_iter_no_change": [25]
