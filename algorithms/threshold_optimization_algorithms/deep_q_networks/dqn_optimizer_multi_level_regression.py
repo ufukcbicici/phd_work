@@ -169,6 +169,35 @@ class DqnMultiLevelRegression(DqnWithRegression):
             Q_table[:, Q_table_id] = R_table[:, R_table_id]
         return Q_table
 
+    def process_estimated_q_table_with_nn(self, estimated_q, q_train):
+        q_centroids = set([tuple(arr) for arr in q_train])
+        q_centroids = np.stack([arr for arr in q_centroids], axis=0)
+        distance_matrix = []
+        for arr in estimated_q:
+            differences = q_centroids - np.expand_dims(arr, axis=0)
+            squared_differences = np.square(differences)
+            squared_distances = np.sum(squared_differences, axis=1)
+            euclidean_distances = np.sqrt(squared_distances)
+            distance_matrix.append(euclidean_distances)
+        distance_matrix = np.stack(distance_matrix, axis=0)
+        selected_ids = np.argmin(distance_matrix, axis=1)
+        processed_q = q_centroids[selected_ids]
+        return processed_q
+
+    def measure_action_accuracy(self, Q_train, Q_train_pred, Q_test, Q_test_pred):
+        a_train_optimal = self.get_optimal_actions_list_from_q_table(Q_train)
+        a_train_predicted = self.get_optimal_actions_list_from_q_table(Q_train_pred)
+        a_test_optimal = self.get_optimal_actions_list_from_q_table(Q_test)
+        a_test_predicted = self.get_optimal_actions_list_from_q_table(Q_test_pred)
+        comparison_vector_train = np.array([len(set(s1).intersection(set(s2))) > 0
+                                            for s1, s2 in zip(a_train_optimal, a_train_predicted)])
+        comparison_vector_test = np.array([len(set(s1).intersection(set(s2))) > 0
+                                           for s1, s2 in zip(a_test_optimal, a_test_predicted)])
+        train_accuracy = np.mean(comparison_vector_train)
+        test_accuracy = np.mean(comparison_vector_test)
+        print("train_accuracy={0}".format(train_accuracy))
+        print("test_accuracy={0}".format(test_accuracy))
+
     def train_non_deep_learning_regression(self, **kwargs):
         tf.reset_default_graph()
         self.calculate_optimal_q_tables(discount_rate=kwargs["discount_factor"])
@@ -176,9 +205,11 @@ class DqnMultiLevelRegression(DqnWithRegression):
         under_sample_ratio = 2.0
         over_sample_ratio = 2.5
         estimated_q_tables = []
+        estimated_and_processed_q_tables = []
         for t in range(last_level):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             q_estimated = np.zeros_like(self.optimalQTables[t])
+            q_estimated_processed = np.zeros_like(self.optimalQTables[t])
             for action_id in range(action_count_t_minus_one):
                 file_name = "regression_model_level_{0}_action_{1}.sav".format(t, action_id)
                 X = self.get_formatted_input(action_id=action_id, level=t)
@@ -228,23 +259,24 @@ class DqnMultiLevelRegression(DqnWithRegression):
                 Q_train_pred = model.predict(X_train)
                 Q_test_pred = model.predict(X_test)
                 Q_pred = model.predict(X)
-                a_train_optimal = self.get_optimal_actions_list_from_q_table(Q_train)
-                a_train_predicted = self.get_optimal_actions_list_from_q_table(Q_train_pred)
-                a_test_optimal = self.get_optimal_actions_list_from_q_table(Q_test)
-                a_test_predicted = self.get_optimal_actions_list_from_q_table(Q_test_pred)
-                comparison_vector_train = np.array([len(set(s1).intersection(set(s2))) > 0
-                                                    for s1, s2 in zip(a_train_optimal, a_train_predicted)])
-                comparison_vector_test = np.array([len(set(s1).intersection(set(s2))) > 0
-                                                   for s1, s2 in zip(a_test_optimal, a_test_predicted)])
-                train_accuracy = np.mean(comparison_vector_train)
-                test_accuracy = np.mean(comparison_vector_test)
-                print("train_accuracy={0}".format(train_accuracy))
-                print("test_accuracy={0}".format(test_accuracy))
                 Q_pred_converted = self.convert_regression_target_to_q_table(level=t,
                                                                              action_id=action_id,
                                                                              R_table=Q_pred)
+                self.measure_action_accuracy(Q_train=Q_train, Q_train_pred=Q_train_pred,
+                                             Q_test=Q_test, Q_test_pred=Q_test_pred)
                 q_estimated[:, action_id, :] = Q_pred_converted
+                Q_train_pred_processed = self.process_estimated_q_table_with_nn(estimated_q=Q_train_pred,
+                                                                                q_train=Q_train)
+                Q_test_pred_processed = self.process_estimated_q_table_with_nn(estimated_q=Q_test_pred, q_train=Q_train)
+                self.measure_action_accuracy(Q_train=Q_train, Q_train_pred=Q_train_pred_processed,
+                                             Q_test=Q_test, Q_test_pred=Q_test_pred_processed)
+                Q_pred_processed = self.process_estimated_q_table_with_nn(estimated_q=Q_pred, q_train=Q_train)
+                Q_pred_processed_converted = self.convert_regression_target_to_q_table(level=t,
+                                                                             action_id=action_id,
+                                                                             R_table=Q_pred_processed)
+                q_estimated_processed[:, action_id, :] = Q_pred_processed_converted
             estimated_q_tables.append(q_estimated)
+            estimated_and_processed_q_tables.append(q_estimated_processed)
         _, _, training_accuracy, training_computation_cost = self.execute_bellman_equation(
             Q_tables=estimated_q_tables, sample_indices=self.routingDataset.trainingIndices)
         _, _, test_accuracy, test_computation_cost = self.execute_bellman_equation(
