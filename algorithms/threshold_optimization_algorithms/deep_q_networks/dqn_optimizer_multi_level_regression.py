@@ -238,7 +238,7 @@ class DqnMultiLevelRegression(DqnWithRegression):
                     param_grid = \
                         [{
                             "pca__n_components": [None],
-                            "mlp__hidden_layer_sizes": [(64, 32)],
+                            "mlp__hidden_layer_sizes": [(128, 64)],
                             "mlp__activation": ["relu"],
                             "mlp__solver": ["adam"],
                             # "mlp__learning_rate": ["adaptive"],
@@ -272,19 +272,27 @@ class DqnMultiLevelRegression(DqnWithRegression):
                                              Q_test=Q_test, Q_test_pred=Q_test_pred_processed)
                 Q_pred_processed = self.process_estimated_q_table_with_nn(estimated_q=Q_pred, q_train=Q_train)
                 Q_pred_processed_converted = self.convert_regression_target_to_q_table(level=t,
-                                                                             action_id=action_id,
-                                                                             R_table=Q_pred_processed)
+                                                                                       action_id=action_id,
+                                                                                       R_table=Q_pred_processed)
                 q_estimated_processed[:, action_id, :] = Q_pred_processed_converted
             estimated_q_tables.append(q_estimated)
             estimated_and_processed_q_tables.append(q_estimated_processed)
-        _, _, training_accuracy, training_computation_cost = self.execute_bellman_equation(
+        tv_training, cov_training, training_accuracy, training_computation_cost = self.execute_bellman_equation(
             Q_tables=estimated_q_tables, sample_indices=self.routingDataset.trainingIndices)
-        _, _, test_accuracy, test_computation_cost = self.execute_bellman_equation(
+        tv_test, cov_test, test_accuracy, test_computation_cost = self.execute_bellman_equation(
             Q_tables=estimated_q_tables, sample_indices=self.routingDataset.testIndices)
         print("training_accuracy:{0} training_computation_cost:{1}".format(
             training_accuracy, training_computation_cost))
         print("test_accuracy:{0} test_computation_cost:{1}".format(
             test_accuracy, test_computation_cost))
+        tv_training2, cov_training2, training_accuracy2, training_computation_cost2 = self.execute_bellman_equation(
+            Q_tables=estimated_and_processed_q_tables, sample_indices=self.routingDataset.trainingIndices)
+        tv_test2, cov_test2, test_accuracy2, test_computation_cost2 = self.execute_bellman_equation(
+            Q_tables=estimated_and_processed_q_tables, sample_indices=self.routingDataset.testIndices)
+        print("training_accuracy:{0} training_computation_cost:{1}".format(
+            training_accuracy2, training_computation_cost2))
+        print("test_accuracy:{0} test_computation_cost:{1}".format(
+            test_accuracy2, test_computation_cost2))
 
     def train_non_deep_learning_classification(self, **kwargs):
         tf.reset_default_graph()
