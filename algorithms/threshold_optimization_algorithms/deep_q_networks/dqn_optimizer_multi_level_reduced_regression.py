@@ -17,7 +17,7 @@ class DqnMultiLevelReducedRegression(DqnMultiLevelRegression):
         self.lossVectors = [None] * int(network.depth - 1)
         super().__init__(routing_dataset, network, network_name, run_id, used_feature_names, dqn_func,
                          lambda_mac_cost,
-                         -1.0e10,
+                         -100,
                          valid_prediction_reward,
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
