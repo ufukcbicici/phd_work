@@ -7,6 +7,8 @@ from sklearn.neural_network import MLPClassifier, MLPRegressor
 
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_networks import DeepQNetworks
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_optimizer_with_regression import DqnWithRegression
+from algorithms.threshold_optimization_algorithms.deep_q_networks.ensemble_resampler_regressor import \
+    EnsembleResamplerRegressor
 from auxillary.db_logger import DbLogger
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error
@@ -20,6 +22,7 @@ from imblearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 from collections import Counter
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 
 
 class DqnMultiLevelRegression(DqnWithRegression):
@@ -140,11 +143,17 @@ class DqnMultiLevelRegression(DqnWithRegression):
         X = self.get_state_features(sample_indices=np.arange(self.routingDataset.labelList.shape[0]),
                                     action_ids_t_minus_1=actions_arr,
                                     level=level)
-        sess = tf.Session()
+        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+        config = tf.ConfigProto(device_count={'GPU': 0})
+        sess = tf.Session(config=config)
         X_shape = list(X.shape)
         X_shape[0] = None
         x_input = tf.placeholder(dtype=tf.float32, shape=X_shape, name="x_input")
-        x_output = DeepQNetworks.global_average_pooling(net_input=x_input)
+        net = x_input
+        # net = tf.nn.max_pool(net, ksize=[1, 4, 4, 1], strides=[1, 4, 4, 1], padding='SAME')
+        # net = tf.contrib.layers.flatten(net)
+        # x_output = net
+        x_output = DeepQNetworks.global_average_pooling(net_input=net)
         X_arr = []
         for batch_idx in range(0, all_indices.shape[0], batch_size):
             X_batch = X[batch_idx: batch_idx + batch_size]
@@ -231,21 +240,20 @@ class DqnMultiLevelRegression(DqnWithRegression):
                     # Regression pipeline
                     standard_scaler = StandardScaler()
                     pca = PCA()
-                    mlp = MLPRegressor()
+                    err = EnsembleResamplerRegressor(max_cluster_size=5000,
+                                                     max_upsample_ratio=3.0,
+                                                     regressor_count=5,
+                                                     regressor_shape=(16, 8),
+                                                     alpha=1.0)
                     pipe = Pipeline(steps=[("scaler", standard_scaler),
                                            ('pca', pca),
-                                           ('mlp', mlp)])
+                                           ('err', err)])
                     param_grid = \
                         [{
                             "pca__n_components": [None],
-                            "mlp__hidden_layer_sizes": [(128, 64)],
-                            "mlp__activation": ["relu"],
-                            "mlp__solver": ["adam"],
-                            # "mlp__learning_rate": ["adaptive"],
-                            "mlp__alpha": [25.0, 50.0, 100.0, 150.0, 200.0, 500.0, 1000.0, 1500.0, 2000.0],
-                            "mlp__max_iter": [10000],
-                            "mlp__early_stopping": [True],
-                            "mlp__n_iter_no_change": [25]
+                            "err__max_cluster_size": [2500],
+                            "err__max_upsample_ratio": [3.0],
+                            "err__alpha": [100.0, 150.0, 200.0, 500.0, 1000.0, 1500.0, 2000.0]
                         }]
                     search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
                                           scoring=["neg_mean_squared_error", "r2"], refit="neg_mean_squared_error")
@@ -294,6 +302,175 @@ class DqnMultiLevelRegression(DqnWithRegression):
         print("test_accuracy:{0} test_computation_cost:{1}".format(
             test_accuracy2, test_computation_cost2))
 
+    def train_non_deep_learning_regression_v3(self, **kwargs):
+        tf.reset_default_graph()
+        self.calculate_optimal_q_tables(discount_rate=kwargs["discount_factor"])
+        last_level = self.get_max_trajectory_length()
+        under_sample_ratio = 2.0
+        over_sample_ratio = 2.5
+        estimated_q_tables = []
+        estimated_and_processed_q_tables = []
+        for t in range(last_level):
+            action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+            q_estimated = np.zeros_like(self.optimalQTables[t])
+            q_estimated_processed = np.zeros_like(self.optimalQTables[t])
+            for action_id in range(action_count_t_minus_one):
+                X = self.get_formatted_input(action_id=action_id, level=t)
+                all_indices = np.arange(self.routingDataset.labelList.shape[0])
+                actions_arr = np.zeros_like(all_indices)
+                actions_arr[:] = action_id
+                Q = self.convert_q_table_to_regression_target(level=t,
+                                                              action_id=action_id,
+                                                              Q_table=self.optimalQTables[t][all_indices, actions_arr])
+                X_train = X[self.routingDataset.trainingIndices]
+                Q_train = Q[self.routingDataset.trainingIndices]
+                X_test = X[self.routingDataset.testIndices]
+                Q_test = Q[self.routingDataset.testIndices]
+                for action_id_next in range(Q.shape[1]):
+                    file_name = "regression_model_level_{0}_action{1}{2}.sav".format(t, action_id, action_id_next)
+                    q = Q_train[:, action_id_next]
+                    if os.path.exists(file_name):
+                        f = open(file_name, "rb")
+                        model = pickle.load(f)
+                        f.close()
+                    else:
+                        # Regression pipeline
+                        standard_scaler = StandardScaler()
+                        pca = PCA()
+                        err = EnsembleResamplerRegressor(max_cluster_size=5000,
+                                                         max_upsample_ratio=3.0,
+                                                         regressor_count=1,
+                                                         regressor_shape=(16, 8),
+                                                         alpha=1.0)
+                        pipe = Pipeline(steps=[("scaler", standard_scaler),
+                                               ('pca', pca),
+                                               ('err', err)])
+                        param_grid = \
+                            [{
+                                "pca__n_components": [None],
+                                "err__max_cluster_size": [5000],
+                                "err__max_upsample_ratio": [3.0],
+                                "err__alpha": [0.0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 25.0, 50.0,
+                                               100.0, 150.0, 200.0, 500.0, 1000.0, 1500.0, 2000.0]
+                            }]
+                        search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
+                                              scoring=["neg_mean_squared_error", "r2"], refit="neg_mean_squared_error")
+                        search.fit(X_train, q)
+                        print("Best parameter (CV score=%0.3f):" % search.best_score_)
+                        print(search.best_params_)
+                        model = search.best_estimator_
+                        f = open(file_name, "wb")
+                        pickle.dump(model, f)
+                        f.close()
+                    print("X")
+
+        #         X = self.get_formatted_input(action_id=action_id, level=t)
+        #         all_indices = np.arange(self.routingDataset.labelList.shape[0])
+        #         actions_arr = np.zeros_like(all_indices)
+        #         actions_arr[:] = action_id
+        #         Q = self.convert_q_table_to_regression_target(level=t,
+        #                                                       action_id=action_id,
+        #                                                       Q_table=self.optimalQTables[t][all_indices, actions_arr])
+        #         X_train = X[self.routingDataset.trainingIndices]
+        #         Q_train = Q[self.routingDataset.trainingIndices]
+        #         X_test = X[self.routingDataset.testIndices]
+        #         Q_test = Q[self.routingDataset.testIndices]
+        #         if os.path.exists(file_name):
+        #             f = open(file_name, "rb")
+        #             model = pickle.load(f)
+        #             f.close()
+        #         else:
+        #             # Regression pipeline
+        #             standard_scaler = StandardScaler()
+        #             pca = PCA()
+        #             err = EnsembleResamplerRegressor(max_cluster_size=5000,
+        #                                              max_upsample_ratio=3.0,
+        #                                              regressor_count=2,
+        #                                              regressor_shape=(16, 8),
+        #                                              alpha=1.0)
+        #             pipe = Pipeline(steps=[("scaler", standard_scaler),
+        #                                    ('pca', pca),
+        #                                    ('err', err)])
+        #             param_grid = \
+        #                 [{
+        #                     "pca__n_components": [None],
+        #                     "err__max_cluster_size": [1000],
+        #                     "err__max_upsample_ratio": [3.0],
+        #                     "err__alpha": [100.0, 150.0, 200.0, 500.0, 1000.0, 1500.0, 2000.0]
+        #                 }]
+        #             search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
+        #                                   scoring=["neg_mean_squared_error", "r2"], refit="neg_mean_squared_error")
+        #             search.fit(X_train, Q_train)
+        #             print("Best parameter (CV score=%0.3f):" % search.best_score_)
+        #             print(search.best_params_)
+        #             model = search.best_estimator_
+        #             f = open(file_name, "wb")
+        #             pickle.dump(model, f)
+        #             f.close()
+        #         Q_train_pred = model.predict(X_train)
+        #         Q_test_pred = model.predict(X_test)
+        #         Q_pred = model.predict(X)
+        #         Q_pred_converted = self.convert_regression_target_to_q_table(level=t,
+        #                                                                      action_id=action_id,
+        #                                                                      R_table=Q_pred)
+        #         self.measure_action_accuracy(Q_train=Q_train, Q_train_pred=Q_train_pred,
+        #                                      Q_test=Q_test, Q_test_pred=Q_test_pred)
+        #         q_estimated[:, action_id, :] = Q_pred_converted
+        #         Q_train_pred_processed = self.process_estimated_q_table_with_nn(estimated_q=Q_train_pred,
+        #                                                                         q_train=Q_train)
+        #         Q_test_pred_processed = self.process_estimated_q_table_with_nn(estimated_q=Q_test_pred, q_train=Q_train)
+        #         self.measure_action_accuracy(Q_train=Q_train, Q_train_pred=Q_train_pred_processed,
+        #                                      Q_test=Q_test, Q_test_pred=Q_test_pred_processed)
+        #         Q_pred_processed = self.process_estimated_q_table_with_nn(estimated_q=Q_pred, q_train=Q_train)
+        #         Q_pred_processed_converted = self.convert_regression_target_to_q_table(level=t,
+        #                                                                                action_id=action_id,
+        #                                                                                R_table=Q_pred_processed)
+        #         q_estimated_processed[:, action_id, :] = Q_pred_processed_converted
+        #     estimated_q_tables.append(q_estimated)
+        #     estimated_and_processed_q_tables.append(q_estimated_processed)
+        # tv_training, cov_training, training_accuracy, training_computation_cost = self.execute_bellman_equation(
+        #     Q_tables=estimated_q_tables, sample_indices=self.routingDataset.trainingIndices)
+        # tv_test, cov_test, test_accuracy, test_computation_cost = self.execute_bellman_equation(
+        #     Q_tables=estimated_q_tables, sample_indices=self.routingDataset.testIndices)
+        # print("training_accuracy:{0} training_computation_cost:{1}".format(
+        #     training_accuracy, training_computation_cost))
+        # print("test_accuracy:{0} test_computation_cost:{1}".format(
+        #     test_accuracy, test_computation_cost))
+        # tv_training2, cov_training2, training_accuracy2, training_computation_cost2 = self.execute_bellman_equation(
+        #     Q_tables=estimated_and_processed_q_tables, sample_indices=self.routingDataset.trainingIndices)
+        # tv_test2, cov_test2, test_accuracy2, test_computation_cost2 = self.execute_bellman_equation(
+        #     Q_tables=estimated_and_processed_q_tables, sample_indices=self.routingDataset.testIndices)
+        # print("training_accuracy:{0} training_computation_cost:{1}".format(
+        #     training_accuracy2, training_computation_cost2))
+        # print("test_accuracy:{0} test_computation_cost:{1}".format(
+        #     test_accuracy2, test_computation_cost2))
+
+    def resample_training_set(self, X, y, max_sample_count, up_sample_ratio):
+        q_counter = Counter(y)
+        under_sample_counts = {lbl: min(max_sample_count, cnt) for lbl, cnt in q_counter.items()}
+        under_sampler = imblearn.under_sampling.RandomUnderSampler(sampling_strategy=under_sample_counts)
+        X_hat, y_hat = under_sampler.fit_resample(X=X, y=y)
+        over_sample_counts = {lbl: min(int(up_sample_ratio * cnt), max_sample_count)
+                              for lbl, cnt in under_sample_counts.items()}
+        X_hat_2, y_hat_2 = None, None
+        neighbor_count = 10
+        while neighbor_count > 0:
+            print("Trying with neighbor count:{0}".format(neighbor_count))
+            try:
+                over_sampler = imblearn.over_sampling.SMOTE(sampling_strategy=over_sample_counts,
+                                                            n_jobs=1, k_neighbors=neighbor_count)
+                X_hat_2, y_hat_2 = over_sampler.fit_resample(X=X_hat, y=y_hat)
+            except:
+                print("Failed with neighbor count:{0}".format(neighbor_count))
+                neighbor_count = neighbor_count - 1
+                continue
+            break
+        print("------->Fitted with neighbor count:{0}".format(neighbor_count))
+        if X_hat_2 is None or y_hat_2 is None:
+            X_hat_2 = X_hat
+            y_hat_2 = y_hat
+        return X_hat_2, y_hat_2
+
     def train_non_deep_learning_classification(self, **kwargs):
         tf.reset_default_graph()
         self.calculate_optimal_q_tables(discount_rate=kwargs["discount_factor"])
@@ -305,74 +482,62 @@ class DqnMultiLevelRegression(DqnWithRegression):
             action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
             q_estimated = np.zeros_like(self.optimalQTables[t])
             for action_id in range(action_count_t_minus_one):
-                file_name = "classifier_model_level_{0}_action_{1}.sav".format(t, action_id)
+                file_name = "svm_classifier_model_level_{0}_action_{1}.sav".format(t, action_id)
                 X_ = {}
                 Q_ = {}
+                y_ = {}
+                le = LabelEncoder()
+                X = self.get_formatted_input(action_id=action_id, level=t)
                 for data_type, indices in zip(["training", "test"],
                                               [self.routingDataset.trainingIndices, self.routingDataset.testIndices]):
                     idx_arr = np.array(indices)
                     actions_arr = np.zeros_like(idx_arr)
                     actions_arr[:] = action_id
-                    X = self.get_state_features(sample_indices=idx_arr, action_ids_t_minus_1=actions_arr, level=t)
-                    X_[data_type] = np.reshape(X, newshape=(X.shape[0], np.prod(X.shape[1:])))
+                    X_[data_type] = X[indices]
                     Q_[data_type] = self.optimalQTables[t][idx_arr, actions_arr]
-                a_truth_actions = self.get_optimal_actions_list_from_q_table(q_table=Q_["training"])
-                le = LabelEncoder()
-                y_truth = le.fit_transform(a_truth_actions)
+                    a_truth_actions = np.argmax(Q_[data_type], axis=-1)
+                    if data_type == "training":
+                        y_truth = le.fit_transform(a_truth_actions)
+                    else:
+                        y_truth = le.transform(a_truth_actions)
+                    y_[data_type] = y_truth
                 if os.path.exists(file_name):
                     f = open(file_name, "rb")
                     model = pickle.load(f)
                     f.close()
                 else:
-                    label_counter = Counter(y_truth)
-                    most_common_two_labels = label_counter.most_common(n=2)
-                    curr_ratio = most_common_two_labels[0][1] / most_common_two_labels[1][1]
-                    # Undersample
-                    X_hat, y_hat = X_["training"], y_truth
-                    if curr_ratio > under_sample_ratio:
-                        new_sample_counts = {
-                            most_common_two_labels[0][0]: int(under_sample_ratio * most_common_two_labels[1][1]),
-                            most_common_two_labels[1][0]: most_common_two_labels[1][1]
-                        }
-                        sample_counts = {}
-                        for k, v in label_counter.items():
-                            if k not in new_sample_counts:
-                                sample_counts[k] = v
-                            else:
-                                sample_counts[k] = new_sample_counts[k]
-                        under_sampler = imblearn.under_sampling.RandomUnderSampler(sampling_strategy=sample_counts)
-                        X_hat, y_hat = under_sampler.fit_resample(X=X_hat, y=y_hat)
-                    print("X")
-                    # Oversample
-                    label_counter = Counter(y_hat)
-                    max_sample_count = label_counter.most_common(n=1)[0][1]
-                    over_sample_counts = {}
-                    for k, v in label_counter.items():
-                        ratio_to_max = max_sample_count / v
-                        over_sample_counts[k] = int(min(over_sample_ratio, ratio_to_max) * v)
-                    over_sampler = imblearn.over_sampling.SMOTE(sampling_strategy=over_sample_counts,
-                                                                n_jobs=8, k_neighbors=3)
-                    X_hat, y_hat = over_sampler.fit_resample(X=X_hat, y=y_hat)
+                    # X_hat, y_hat = self.resample_training_set(X=X_["training"],
+                    #                                           y=y_["training"],
+                    #                                           max_sample_count=5000,
+                    #                                           up_sample_ratio=3.0)
+                    X_hat, y_hat = X_["training"], y_["training"]
                     # Classification pipeline
                     standard_scaler = StandardScaler()
                     pca = PCA()
-                    mlp = MLPClassifier()
+                    # mlp = MLPClassifier()
+                    svm = SVC()
                     pipe = Pipeline(steps=[("scaler", standard_scaler),
                                            ('pca', pca),
-                                           ('mlp', mlp)])
+                                           ('svm', svm)])
                     param_grid = \
                         [{
-                            "pca__n_components": [100],
-                            "mlp__hidden_layer_sizes": [(64, 32)],
-                            "mlp__activation": ["relu"],
-                            "mlp__solver": ["adam"],
-                            # "mlp__learning_rate": ["adaptive"],
-                            "mlp__alpha": [0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0],
-                            "mlp__max_iter": [10000],
-                            "mlp__early_stopping": [True],
-                            "mlp__n_iter_no_change": [100]
+                            "pca__n_components": [None],
+                            "svm__C": [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0],
+                            "svm__kernel": ["linear", "rbf"],
                         }]
-                    search = GridSearchCV(pipe, param_grid, n_jobs=4, cv=5, verbose=10,
+                    # param_grid = \
+                    #     [{
+                    #         "pca__n_components": [None],
+                    #         "mlp__hidden_layer_sizes": [(64, 32)],
+                    #         "mlp__activation": ["relu"],
+                    #         "mlp__solver": ["adam"],
+                    #         # "mlp__learning_rate": ["adaptive"],
+                    #         "mlp__alpha": [0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 2.0, 5.0],
+                    #         "mlp__max_iter": [10000],
+                    #         "mlp__early_stopping": [True],
+                    #         "mlp__n_iter_no_change": [100]
+                    #     }]
+                    search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
                                           scoring=["accuracy", "f1_weighted", "f1_micro", "f1_macro",
                                                    "balanced_accuracy"],
                                           refit="accuracy")
@@ -387,29 +552,33 @@ class DqnMultiLevelRegression(DqnWithRegression):
                 y_pred = {"training": model.predict(X_["training"]),
                           "test": model.predict(X_["test"])}
                 print("*************Training*************")
-                print(classification_report(y_pred=y_pred["training"], y_true=y_truth))
+                print(classification_report(y_pred=y_pred["training"], y_true=y_["training"]))
                 print("*************Test*************")
-                a_truth_actions_test = self.get_optimal_actions_list_from_q_table(q_table=Q_["test"])
-                y_truth_test = le.transform(a_truth_actions_test)
-                print(classification_report(y_pred=y_pred["test"], y_true=y_truth_test))
+                print(classification_report(y_pred=y_pred["test"], y_true=y_["test"]))
                 # Process the whole data
                 idx_arr = np.arange(self.routingDataset.labelList.shape[0])
                 actions_arr = np.zeros_like(idx_arr)
                 actions_arr[:] = action_id
-                X_whole = self.get_state_features(sample_indices=idx_arr, action_ids_t_minus_1=actions_arr, level=t)
-                X_whole = np.reshape(X_whole, newshape=(X_whole.shape[0], np.prod(X_whole.shape[1:])))
-                estimated_actions = model.predict(X_whole)
+                estimated_actions = model.predict(X)
                 inverse_actions = le.inverse_transform(estimated_actions)
+                if len(inverse_actions.shape) == 1:
+                    inverse_actions = np.expand_dims(inverse_actions, axis=-1)
                 valid_entries = np.array([[idx, jdx] for idx in range(inverse_actions.shape[0])
                                           for jdx in inverse_actions[idx]])
                 actions_arr = np.zeros_like(valid_entries[:, 0])
                 actions_arr[:] = action_id
                 q_estimated[valid_entries[:, 0], actions_arr, valid_entries[:, 1]] = 1
             estimated_q_tables.append(q_estimated)
-        _, _, training_accuracy, training_computation_cost = self.execute_bellman_equation(
+        tv_training, cov_training, training_accuracy, training_computation_cost = self.execute_bellman_equation(
             Q_tables=estimated_q_tables, sample_indices=self.routingDataset.trainingIndices)
-        _, _, test_accuracy, test_computation_cost = self.execute_bellman_equation(
+        tv_test, cov_test, test_accuracy, test_computation_cost = self.execute_bellman_equation(
             Q_tables=estimated_q_tables, sample_indices=self.routingDataset.testIndices)
+        tv_training_optimal, cov_training_optimal, training_accuracy_optimal, training_computation_cost_optimal = \
+            self.execute_bellman_equation(
+                Q_tables=self.optimalQTables, sample_indices=self.routingDataset.trainingIndices)
+        tv_test_optimal, cov_test_optimal, test_accuracy_optimal, test_computation_cost_optimal = \
+            self.execute_bellman_equation(
+                Q_tables=self.optimalQTables, sample_indices=self.routingDataset.testIndices)
         print("training_accuracy:{0} training_computation_cost:{1}".format(
             training_accuracy, training_computation_cost))
         print("test_accuracy:{0} test_computation_cost:{1}".format(
