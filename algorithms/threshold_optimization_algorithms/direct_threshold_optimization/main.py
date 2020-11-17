@@ -66,7 +66,7 @@ def train_direct_threshold_optimizer():
                                                                                  46080, 46560, 47040, 47520, 48000])
 
         dto = DirectThresholdOptimizer(network=network, routing_data=routing_data)
-        dto.train(iteration=43680)
+        dto.train(run_id=network_id, iteration=43680)
         print("X")
         tf.reset_default_graph()
         break

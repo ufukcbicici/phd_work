@@ -39,33 +39,48 @@ class DirectThresholdOptimizer:
                                                         name="temperature_node{0}".format(node.index))
                              for node in self.innerNodes}
 
-    def calibrate_branching_probabilities(self, iteration):
-        for node in self.innerNodes:
-            # Determine clusters, map labels to the most likely children
-            logits = self.routingData.dictOfDatasets[iteration].get_dict("activations")[node.index][self.trainIndices]
-            labels = self.routingData.dictOfDatasets[iteration].labelList[self.trainIndices]
-            child_nodes = self.network.dagObject.children(node)
-            child_nodes = sorted(child_nodes, key=lambda n: n.index)
-            selected_branches = np.argmax(logits, axis=-1)
-            siblings_dict = {sibling_node.index: order_index for order_index, sibling_node in enumerate(child_nodes)}
-            counters_dict = {}
-            for child_node in child_nodes:
-                child_labels = labels[selected_branches == siblings_dict[child_node.index]]
-                label_counter = Counter(child_labels)
-                counters_dict[child_node.index] = label_counter
-            label_mapping = {}
-            for label_id in range(self.labelCount):
-                branch_distribution = [(nd.index, counters_dict[nd.index][label_id])
-                                       for nd in child_nodes if label_id in counters_dict[nd.index]]
-                mode_tpl = sorted(branch_distribution, key=lambda tpl: tpl[1], reverse=True)[0]
-                label_mapping[label_id] = siblings_dict[mode_tpl[0]]
-            mapped_labels = [label_mapping[l_id] for l_id in labels]
-            network_calibration = NetworkCalibrationWithTemperatureScaling(logits=logits, labels=mapped_labels)
-            temperature = network_calibration.train()
-            print("X")
+    def calibrate_branching_probabilities(self, run_id, iteration):
+        temperatures_dict = {}
+        file_name = "network{0}_iteration{1}".format(run_id, iteration)
+        if os.path.exists(file_name):
+            f = open(file_name, "rb")
+            temperatures_dict = pickle.load(f)
+            f.close()
+        else:
+            indices_dict = {self.innerNodes[0].index: self.trainIndices}
+            for node in self.innerNodes:
+                # Determine clusters, map labels to the most likely children
+                node_indices = indices_dict[node.index]
+                logits = self.routingData.dictOfDatasets[iteration].get_dict("activations")[node.index][node_indices]
+                labels = self.routingData.dictOfDatasets[iteration].labelList[node_indices]
+                child_nodes = self.network.dagObject.children(node)
+                child_nodes = sorted(child_nodes, key=lambda n: n.index)
+                selected_branches = np.argmax(logits, axis=-1)
+                siblings_dict = {sibling_node.index: order_index for order_index, sibling_node in enumerate(child_nodes)}
+                counters_dict = {}
+                for child_node in child_nodes:
+                    child_labels = labels[selected_branches == siblings_dict[child_node.index]]
+                    label_counter = Counter(child_labels)
+                    counters_dict[child_node.index] = label_counter
+                    indices_dict[child_node.index] = node_indices[selected_branches == siblings_dict[child_node.index]]
+                label_mapping = {}
+                for label_id in range(self.labelCount):
+                    branch_distribution = [(nd.index, counters_dict[nd.index][label_id])
+                                           for nd in child_nodes if label_id in counters_dict[nd.index]]
+                    mode_tpl = sorted(branch_distribution, key=lambda tpl: tpl[1], reverse=True)[0]
+                    label_mapping[label_id] = siblings_dict[mode_tpl[0]]
+                mapped_labels = [label_mapping[l_id] for l_id in labels]
+                network_calibration = NetworkCalibrationWithTemperatureScaling(logits=logits, labels=mapped_labels)
+                temperature = network_calibration.train()
+                temperatures_dict[node.index] = temperature
+                tf.reset_default_graph()
+            f = open(file_name, "wb")
+            pickle.dump(temperatures_dict, f)
+            f.close()
+        return temperatures_dict
 
-    def train(self, iteration, test_ratio=0.1):
+    def train(self, run_id, iteration, test_ratio=0.1):
         indices = np.arange(self.routingData.dictOfDatasets[iteration].labelList.shape[0])
         self.trainIndices, self.testIndices = train_test_split(indices, test_size=test_ratio)
-        self.calibrate_branching_probabilities(iteration=iteration)
+        self.calibrate_branching_probabilities(run_id=run_id, iteration=iteration)
         print("X")
