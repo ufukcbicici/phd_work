@@ -24,6 +24,8 @@ class DirectThresholdOptimizer:
         self.branchingLogits = None
         self.temperatures = None
         self.trainIndices, self.testIndices = None, None
+        self.routingProbabilities = None
+        self.routingProbabilitiesUncalibrated = None
 
     def build_network(self):
         self.posteriorsDict = {node.index: tf.placeholder(dtype=tf.float32,
@@ -38,6 +40,11 @@ class DirectThresholdOptimizer:
         self.temperatures = {node.index: tf.placeholder(dtype=tf.float32,
                                                         name="temperature_node{0}".format(node.index))
                              for node in self.innerNodes}
+        self.routingProbabilities = {node.index:
+                                         tf.nn.softmax(self.branchingLogits[node.index] / self.temperatures[node.index])
+                                     for node in self.innerNodes}
+        self.routingProbabilitiesUncalibrated = {node.index: tf.nn.softmax(self.branchingLogits[node.index])
+                                                 for node in self.innerNodes}
 
     def calibrate_branching_probabilities(self, run_id, iteration):
         temperatures_dict = {}
@@ -56,7 +63,8 @@ class DirectThresholdOptimizer:
                 child_nodes = self.network.dagObject.children(node)
                 child_nodes = sorted(child_nodes, key=lambda n: n.index)
                 selected_branches = np.argmax(logits, axis=-1)
-                siblings_dict = {sibling_node.index: order_index for order_index, sibling_node in enumerate(child_nodes)}
+                siblings_dict = {sibling_node.index: order_index for order_index, sibling_node in
+                                 enumerate(child_nodes)}
                 counters_dict = {}
                 for child_node in child_nodes:
                     child_labels = labels[selected_branches == siblings_dict[child_node.index]]
@@ -82,5 +90,27 @@ class DirectThresholdOptimizer:
     def train(self, run_id, iteration, test_ratio=0.1):
         indices = np.arange(self.routingData.dictOfDatasets[iteration].labelList.shape[0])
         self.trainIndices, self.testIndices = train_test_split(indices, test_size=test_ratio)
-        self.calibrate_branching_probabilities(run_id=run_id, iteration=iteration)
+        temperatures_dict = self.calibrate_branching_probabilities(run_id=run_id, iteration=iteration)
+        self.build_network()
+        sess = tf.Session()
+        feed_dict = \
+            self.prepare_feed_dict(indices=self.trainIndices, iteration=iteration, temperatures_dict=temperatures_dict)
+        results = sess.run([self.routingProbabilities, self.routingProbabilitiesUncalibrated,
+                            self.branchingLogits], feed_dict=feed_dict)
         print("X")
+
+    def prepare_feed_dict(self, indices, iteration, temperatures_dict):
+        feed_dict = {}
+        routing_obj = self.routingData.dictOfDatasets[iteration]
+        # Leaf nodes
+        for node in self.leafNodes:
+            arr = routing_obj.get_dict("posterior_probs")[node.index][indices]
+            feed_dict[self.posteriorsDict[node.index]] = arr
+        # Inner nodes
+        for node in self.innerNodes:
+            logits_arr = routing_obj.get_dict("activations")[node.index][indices]
+            temperature = temperatures_dict[node.index]
+            feed_dict[self.branchingLogits[node.index]] = logits_arr
+            feed_dict[self.temperatures[node.index]] = temperature
+        feed_dict[self.gtLabels] = routing_obj.labelList[indices]
+        return feed_dict
