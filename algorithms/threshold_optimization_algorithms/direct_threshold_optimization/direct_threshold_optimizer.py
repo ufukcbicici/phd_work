@@ -56,7 +56,7 @@ class DirectThresholdOptimizer:
             if node.isLeaf:
                 continue
             routing_probs = self.routingProbabilities[node.index]
-            self.thresholdTests[node.index] = routing_probs >= self.thresholds[node.index]
+            self.thresholdTests[node.index] = tf.cast(routing_probs >= self.thresholds[node.index], tf.float32)
 
     def calibrate_branching_probabilities(self, run_id, iteration):
         temperatures_dict = {}
