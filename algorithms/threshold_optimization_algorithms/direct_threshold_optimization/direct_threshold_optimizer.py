@@ -26,6 +26,8 @@ class DirectThresholdOptimizer:
         self.trainIndices, self.testIndices = None, None
         self.routingProbabilities = None
         self.routingProbabilitiesUncalibrated = None
+        self.thresholds = None
+        self.thresholdTests = {}
 
     def build_network(self):
         self.posteriorsDict = {node.index: tf.placeholder(dtype=tf.float32,
@@ -45,6 +47,16 @@ class DirectThresholdOptimizer:
                                      for node in self.innerNodes}
         self.routingProbabilitiesUncalibrated = {node.index: tf.nn.softmax(self.branchingLogits[node.index])
                                                  for node in self.innerNodes}
+        self.thresholds = {node.index: tf.placeholder(dtype=tf.float32,
+                                                      name="thresholds{0}".format(node.index),
+                                                      shape=(1, len(self.network.dagObject.children(node))))
+                           for node in self.innerNodes}
+        # Branching
+        for node in self.network.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            routing_probs = self.routingProbabilities[node.index]
+            self.thresholdTests[node.index] = routing_probs >= self.thresholds[node.index]
 
     def calibrate_branching_probabilities(self, run_id, iteration):
         temperatures_dict = {}
@@ -93,13 +105,20 @@ class DirectThresholdOptimizer:
         temperatures_dict = self.calibrate_branching_probabilities(run_id=run_id, iteration=iteration)
         self.build_network()
         sess = tf.Session()
+
+        thresholds_dict = {}
+        for node in self.innerNodes:
+            child_count = len(self.network.dagObject.children(node))
+            thresholds_dict[node.index] = np.random.uniform(low=0.0, high=1.0 / child_count, size=(1, child_count))
+
         feed_dict = \
-            self.prepare_feed_dict(indices=self.trainIndices, iteration=iteration, temperatures_dict=temperatures_dict)
-        results = sess.run([self.routingProbabilities, self.routingProbabilitiesUncalibrated,
+            self.prepare_feed_dict(indices=self.trainIndices, iteration=iteration, temperatures_dict=temperatures_dict,
+                                   thresholds_dict=thresholds_dict)
+        results = sess.run([self.thresholdTests, self.routingProbabilities, self.routingProbabilitiesUncalibrated,
                             self.branchingLogits], feed_dict=feed_dict)
         print("X")
 
-    def prepare_feed_dict(self, indices, iteration, temperatures_dict):
+    def prepare_feed_dict(self, indices, iteration, temperatures_dict, thresholds_dict):
         feed_dict = {}
         routing_obj = self.routingData.dictOfDatasets[iteration]
         # Leaf nodes
@@ -110,7 +129,9 @@ class DirectThresholdOptimizer:
         for node in self.innerNodes:
             logits_arr = routing_obj.get_dict("activations")[node.index][indices]
             temperature = temperatures_dict[node.index]
+            thresholds_arr = thresholds_dict[node.index]
             feed_dict[self.branchingLogits[node.index]] = logits_arr
             feed_dict[self.temperatures[node.index]] = temperature
+            feed_dict[self.thresholds[node.index]] = thresholds_arr
         feed_dict[self.gtLabels] = routing_obj.labelList[indices]
         return feed_dict
