@@ -21,6 +21,17 @@ class Dag:
         descendants = list(nx.descendants(self.dagObject, node))
         return descendants
 
+    def siblings(self, node):
+        parents = self.parents(node=node)
+        children_dict = {}
+        for parent in parents:
+            child_nodes = self.children(node=parent)
+            for child_node in  child_nodes:
+                children_dict[child_node.index] = child_node
+        siblings = list(children_dict.values())
+        siblings = sorted(siblings, key=lambda nd: nd.index)
+        return siblings
+
     def get_leaves(self):
         leaf_nodes = [node for node in self.dagObject.nodes() if
                       self.dagObject.in_degree(node) != 0 and self.dagObject.out_degree(node) == 0]
