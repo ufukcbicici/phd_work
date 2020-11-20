@@ -21,12 +21,16 @@ class DirectThresholdOptimizer:
         self.labelCount = len(set(self.routingData.dictOfDatasets[self.routingData.iterations[0]].labelList))
         self.posteriorsDict = None
         self.gtLabels = None
+        self.sigmoidDecay = None
+        self.useHardThreshold = None
         self.branchingLogits = None
         self.temperatures = None
         self.trainIndices, self.testIndices = None, None
         self.routingProbabilities = None
         self.routingProbabilitiesUncalibrated = None
         self.thresholds = None
+        self.hardThresholdTests = {}
+        self.softThresholdTests = {}
         self.thresholdTests = {}
         self.pathScores = {}
         self.selectionWeights = None
@@ -34,13 +38,49 @@ class DirectThresholdOptimizer:
         self.weightedPosteriors = None
         self.weightsArray = None
         self.finalPosteriors = None
+        self.predictedLabels = None
+        self.accuracy = None
+
+    def threshold_test(self, node, routing_probs):
+        # Hard
+        self.hardThresholdTests[node.index] = tf.cast(routing_probs >= self.thresholds[node.index], tf.float32)
+        # Soft
+        self.softThresholdTests[node.index] = \
+            tf.sigmoid((routing_probs - self.thresholds[node.index]) * self.sigmoidDecay)
+        self.thresholdTests[node.index] = tf.where(
+            self.useHardThreshold, self.hardThresholdTests[node.index], self.softThresholdTests[node.index])
+
+    def prepare_branching(self):
+        for node in self.network.topologicalSortedNodes:
+            if node.isRoot:
+                parent_node = None
+                sibling_index = 0
+            else:
+                sibling_nodes = self.network.dagObject.siblings(node=node)
+                sibling_index = np.argmax(np.array([nd.index == node.index for nd in sibling_nodes]))
+                parent_node = self.network.dagObject.parents(node=node)
+                assert len(parent_node) == 1
+                parent_node = parent_node[0]
+
+            if not node.isLeaf:
+                routing_probs = self.routingProbabilities[node.index]
+                self.threshold_test(node=node, routing_probs=routing_probs)
+                if node.isRoot:
+                    self.pathScores[node.index] = tf.identity(self.thresholdTests[node.index])
+                else:
+                    self.pathScores[node.index] = self.thresholdTests[node.index] * tf.expand_dims(
+                        self.pathScores[parent_node.index][:, sibling_index], axis=-1)
+            else:
+                self.pathScores[node.index] = tf.identity(self.pathScores[parent_node.index][:, sibling_index])
 
     def build_network(self):
         self.posteriorsDict = {node.index: tf.placeholder(dtype=tf.float32,
                                                           name="posteriors_node{0}".format(node.index),
                                                           shape=(None, self.labelCount))
                                for node in self.leafNodes}
-        self.gtLabels = tf.placeholder(dtype=tf.int32, shape=(None,), name="gt_labels")
+        self.gtLabels = tf.placeholder(dtype=tf.int64, shape=(None,), name="gt_labels")
+        self.sigmoidDecay = tf.placeholder(dtype=tf.float32, name="sigmoidDecay")
+        self.useHardThreshold = tf.placeholder(dtype=tf.bool, name="useHardThreshold")
         self.branchingLogits = {node.index: tf.placeholder(dtype=tf.float32,
                                                            name="brancing_logits_node{0}".format(node.index),
                                                            shape=(None, len(self.network.dagObject.children(node))))
@@ -58,29 +98,9 @@ class DirectThresholdOptimizer:
                                                       shape=(1, len(self.network.dagObject.children(node))))
                            for node in self.innerNodes}
         self.selectionWeights = None
-
         # Branching
-        for node in self.network.topologicalSortedNodes:
-            if node.isRoot:
-                parent_node = None
-                sibling_index = 0
-            else:
-                sibling_nodes = self.network.dagObject.siblings(node=node)
-                sibling_index = np.argmax(np.array([nd.index == node.index for nd in sibling_nodes]))
-                parent_node = self.network.dagObject.parents(node=node)
-                assert len(parent_node) == 1
-                parent_node = parent_node[0]
+        self.prepare_branching()
 
-            if not node.isLeaf:
-                routing_probs = self.routingProbabilities[node.index]
-                self.thresholdTests[node.index] = tf.cast(routing_probs >= self.thresholds[node.index], tf.float32)
-                if node.isRoot:
-                    self.pathScores[node.index] = tf.identity(self.thresholdTests[node.index])
-                else:
-                    self.pathScores[node.index] = self.thresholdTests[node.index] * tf.expand_dims(
-                        self.pathScores[parent_node.index][:, sibling_index], axis=-1)
-            else:
-                self.pathScores[node.index] = tf.identity(self.pathScores[parent_node.index][:, sibling_index])
         # Combine all weights
         self.selectionWeights = tf.stack(values=[self.pathScores[node.index] for node in self.leafNodes], axis=-1)
         self.weightsArray = tf.reduce_sum(self.selectionWeights, axis=1, keepdims=True)
@@ -90,6 +110,9 @@ class DirectThresholdOptimizer:
         self.posteriorsTensor = tf.stack(values=[self.posteriorsDict[node.index] for node in self.leafNodes], axis=-1)
         self.weightedPosteriors = self.posteriorsTensor * tf.expand_dims(self.selectionWeights, axis=1)
         self.finalPosteriors = tf.reduce_sum(self.weightedPosteriors, axis=-1)
+        # Performance
+        self.predictedLabels = tf.argmax(self.finalPosteriors, axis=-1)
+        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictedLabels, self.gtLabels), tf.float32))
 
     def calibrate_branching_probabilities(self, run_id, iteration):
         temperatures_dict = {}
@@ -147,7 +170,10 @@ class DirectThresholdOptimizer:
         feed_dict = \
             self.prepare_feed_dict(indices=self.trainIndices, iteration=iteration, temperatures_dict=temperatures_dict,
                                    thresholds_dict=thresholds_dict)
-        results = sess.run([self.finalPosteriors,
+        results = sess.run([self.accuracy,
+                            self.predictedLabels,
+                            self.gtLabels,
+                            self.finalPosteriors,
                             self.weightsArray,
                             self.weightedPosteriors,
                             self.posteriorsTensor,
