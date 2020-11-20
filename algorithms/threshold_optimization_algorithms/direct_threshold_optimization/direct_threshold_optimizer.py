@@ -30,6 +30,10 @@ class DirectThresholdOptimizer:
         self.thresholdTests = {}
         self.pathScores = {}
         self.selectionWeights = None
+        self.posteriorsTensor = None
+        self.weightedPosteriors = None
+        self.weightsArray = None
+        self.finalPosteriors = None
 
     def build_network(self):
         self.posteriorsDict = {node.index: tf.placeholder(dtype=tf.float32,
@@ -78,7 +82,14 @@ class DirectThresholdOptimizer:
             else:
                 self.pathScores[node.index] = tf.identity(self.pathScores[parent_node.index][:, sibling_index])
         # Combine all weights
-        self.selectionWeights = tf.stack(values=[self.pathScores[node.index] for node in self.leafNodes], axis=1)
+        self.selectionWeights = tf.stack(values=[self.pathScores[node.index] for node in self.leafNodes], axis=-1)
+        self.weightsArray = tf.reduce_sum(self.selectionWeights, axis=1, keepdims=True)
+        self.weightsArray = tf.reciprocal(self.weightsArray)
+        self.selectionWeights = self.selectionWeights * self.weightsArray
+        # Combine all posteriors
+        self.posteriorsTensor = tf.stack(values=[self.posteriorsDict[node.index] for node in self.leafNodes], axis=-1)
+        self.weightedPosteriors = self.posteriorsTensor * tf.expand_dims(self.selectionWeights, axis=1)
+        self.finalPosteriors = tf.reduce_sum(self.weightedPosteriors, axis=-1)
 
     def calibrate_branching_probabilities(self, run_id, iteration):
         temperatures_dict = {}
@@ -136,7 +147,11 @@ class DirectThresholdOptimizer:
         feed_dict = \
             self.prepare_feed_dict(indices=self.trainIndices, iteration=iteration, temperatures_dict=temperatures_dict,
                                    thresholds_dict=thresholds_dict)
-        results = sess.run([self.selectionWeights,
+        results = sess.run([self.finalPosteriors,
+                            self.weightsArray,
+                            self.weightedPosteriors,
+                            self.posteriorsTensor,
+                            self.selectionWeights,
                             self.pathScores,
                             self.thresholdTests,
                             self.routingProbabilities,
