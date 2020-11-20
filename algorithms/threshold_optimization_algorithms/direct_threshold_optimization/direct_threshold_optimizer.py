@@ -29,6 +29,7 @@ class DirectThresholdOptimizer:
         self.routingProbabilities = None
         self.routingProbabilitiesUncalibrated = None
         self.thresholds = None
+        self.thresholdsSigmoid = None
         self.hardThresholdTests = {}
         self.softThresholdTests = {}
         self.thresholdTests = {}
@@ -43,10 +44,11 @@ class DirectThresholdOptimizer:
 
     def threshold_test(self, node, routing_probs):
         # Hard
-        self.hardThresholdTests[node.index] = tf.cast(routing_probs >= self.thresholds[node.index], tf.float32)
+        self.hardThresholdTests[node.index] = tf.cast(routing_probs >=
+                                                      self.thresholdsSigmoid[node.index], tf.float32)
         # Soft
         self.softThresholdTests[node.index] = \
-            tf.sigmoid((routing_probs - self.thresholds[node.index]) * self.sigmoidDecay)
+            tf.sigmoid((routing_probs - self.thresholdsSigmoid[node.index]) * self.sigmoidDecay)
         self.thresholdTests[node.index] = tf.where(
             self.useHardThreshold, self.hardThresholdTests[node.index], self.softThresholdTests[node.index])
 
@@ -93,10 +95,15 @@ class DirectThresholdOptimizer:
                                      for node in self.innerNodes}
         self.routingProbabilitiesUncalibrated = {node.index: tf.nn.softmax(self.branchingLogits[node.index])
                                                  for node in self.innerNodes}
-        self.thresholds = {node.index: tf.placeholder(dtype=tf.float32,
-                                                      name="thresholds{0}".format(node.index),
-                                                      shape=(1, len(self.network.dagObject.children(node))))
+        # self.thresholds = {node.index: tf.placeholder(dtype=tf.float32,
+        #                                               name="thresholds{0}".format(node.index),
+        #                                               shape=(1, len(self.network.dagObject.children(node))))
+        #                    for node in self.innerNodes}
+        self.thresholds = {node.index: tf.get_variable(name="thresholds{0}".format(node.index),
+                                                       dtype=tf.float32,
+                                                       shape=(1, len(self.network.dagObject.children(node))))
                            for node in self.innerNodes}
+        self.thresholdsSigmoid = {tf.sigmoid(self.thresholds[node.index]) for node in self.innerNodes}
         self.selectionWeights = None
         # Branching
         self.prepare_branching()
