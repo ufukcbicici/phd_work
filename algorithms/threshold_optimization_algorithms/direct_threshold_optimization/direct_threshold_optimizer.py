@@ -47,10 +47,11 @@ class DirectThresholdOptimizer:
         self.hardThresholdTests[node.index] = tf.cast(routing_probs >=
                                                       self.thresholdsSigmoid[node.index], tf.float32)
         # Soft
-        self.softThresholdTests[node.index] = \
-            tf.sigmoid((routing_probs - self.thresholdsSigmoid[node.index]) * self.sigmoidDecay)
-        self.thresholdTests[node.index] = tf.where(
+        self.softThresholdTests[node.index] = tf.sigmoid((routing_probs - self.thresholdsSigmoid[node.index]) *
+                                                         self.sigmoidDecay)
+        thresholds_arr = tf.where(
             self.useHardThreshold, self.hardThresholdTests[node.index], self.softThresholdTests[node.index])
+        return thresholds_arr
 
     def prepare_branching(self):
         for node in self.network.topologicalSortedNodes:
@@ -66,7 +67,7 @@ class DirectThresholdOptimizer:
 
             if not node.isLeaf:
                 routing_probs = self.routingProbabilities[node.index]
-                self.threshold_test(node=node, routing_probs=routing_probs)
+                self.thresholdTests[node.index] = self.threshold_test(node=node, routing_probs=routing_probs)
                 if node.isRoot:
                     self.pathScores[node.index] = tf.identity(self.thresholdTests[node.index])
                 else:
@@ -103,7 +104,8 @@ class DirectThresholdOptimizer:
                                                        dtype=tf.float32,
                                                        shape=(1, len(self.network.dagObject.children(node))))
                            for node in self.innerNodes}
-        self.thresholdsSigmoid = {tf.sigmoid(self.thresholds[node.index]) for node in self.innerNodes}
+        self.thresholdsSigmoid = {node.index: (1.0 / len(self.network.dagObject.children(node))) * tf.sigmoid(
+            self.thresholds[node.index]) for node in self.innerNodes}
         self.selectionWeights = None
         # Branching
         self.prepare_branching()
@@ -169,32 +171,44 @@ class DirectThresholdOptimizer:
         self.build_network()
         sess = tf.Session()
 
-        thresholds_dict = {}
-        for node in self.innerNodes:
-            child_count = len(self.network.dagObject.children(node))
-            thresholds_dict[node.index] = np.random.uniform(low=0.0, high=1.0 / child_count, size=(1, child_count))
-
+        # thresholds_dict = {}
+        # for node in self.innerNodes:
+        #     child_count = len(self.network.dagObject.children(node))
+        #     thresholds_dict[node.index] = np.random.uniform(low=0.0, high=1.0 / child_count, size=(1, child_count))
+        sess.run(tf.global_variables_initializer())
         feed_dict = \
-            self.prepare_feed_dict(indices=self.trainIndices, iteration=iteration, temperatures_dict=temperatures_dict,
-                                   thresholds_dict=thresholds_dict)
-        results = sess.run([self.accuracy,
-                            self.predictedLabels,
-                            self.gtLabels,
-                            self.finalPosteriors,
-                            self.weightsArray,
-                            self.weightedPosteriors,
-                            self.posteriorsTensor,
-                            self.selectionWeights,
-                            self.pathScores,
-                            self.thresholdTests,
-                            self.routingProbabilities,
-                            self.routingProbabilitiesUncalibrated,
-                            self.branchingLogits], feed_dict=feed_dict)
+            self.prepare_feed_dict(indices=self.trainIndices,
+                                   iteration=iteration,
+                                   temperatures_dict=temperatures_dict,
+                                   use_hard_threshold=False,
+                                   sigmoid_decay=1.0)
+        results = sess.run({"accuracy": self.accuracy,
+                            "predictedLabels": self.predictedLabels,
+                            "gtLabels": self.gtLabels,
+                            "finalPosteriors": self.finalPosteriors,
+                            "weightsArray": self.weightsArray,
+                            "weightedPosteriors": self.weightedPosteriors,
+                            "posteriorsTensor": self.posteriorsTensor,
+                            "selectionWeights": self.selectionWeights,
+                            "pathScores": self.pathScores,
+                            "thresholdTests": self.thresholdTests,
+                            "softThresholdTests": self.softThresholdTests,
+                            "hardThresholdTests": self.hardThresholdTests,
+                            "routingProbabilities": self.routingProbabilities,
+                            "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
+                            "branchingLogits": self.branchingLogits,
+                            "thresholds": self.thresholds,
+                            "thresholdsSigmoid": self.thresholdsSigmoid},
+                           feed_dict=feed_dict)
         print("X")
 
-    def prepare_feed_dict(self, indices, iteration, temperatures_dict, thresholds_dict):
+    def prepare_feed_dict(self, indices, iteration, temperatures_dict,
+                          use_hard_threshold, sigmoid_decay):
         feed_dict = {}
         routing_obj = self.routingData.dictOfDatasets[iteration]
+        feed_dict[self.gtLabels] = routing_obj.labelList[indices]
+        feed_dict[self.useHardThreshold] = use_hard_threshold
+        feed_dict[self.sigmoidDecay] = sigmoid_decay
         # Leaf nodes
         for node in self.leafNodes:
             arr = routing_obj.get_dict("posterior_probs")[node.index][indices]
@@ -203,9 +217,6 @@ class DirectThresholdOptimizer:
         for node in self.innerNodes:
             logits_arr = routing_obj.get_dict("activations")[node.index][indices]
             temperature = temperatures_dict[node.index]
-            thresholds_arr = thresholds_dict[node.index]
             feed_dict[self.branchingLogits[node.index]] = logits_arr
             feed_dict[self.temperatures[node.index]] = temperature
-            feed_dict[self.thresholds[node.index]] = thresholds_arr
-        feed_dict[self.gtLabels] = routing_obj.labelList[indices]
         return feed_dict
