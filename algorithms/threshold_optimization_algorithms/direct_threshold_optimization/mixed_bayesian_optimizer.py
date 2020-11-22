@@ -26,7 +26,8 @@ class MixedBayesianOptimizer:
         leaf_nodes = sorted(leaf_nodes, key=lambda node: node.index)
         leaf_indices = {node.index: idx for idx, node in enumerate(leaf_nodes)}
         label_count = len(set(routing_data.dictOfDatasets[routing_data.iterations[0]].labelList))
-        dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, seed=seed)
+        dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, seed=seed,
+                                       train_indices=train_indices, test_indices=test_indices)
         temperatures_dict = dto.calibrate_branching_probabilities(run_id=run_id, iteration=iteration, seed=seed)
         dto.build_network()
         sess = tf.Session()

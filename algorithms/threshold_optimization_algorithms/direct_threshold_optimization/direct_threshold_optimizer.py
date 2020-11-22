@@ -10,7 +10,7 @@ from algorithms.network_calibration import NetworkCalibrationWithTemperatureScal
 
 
 class DirectThresholdOptimizer:
-    def __init__(self, network, routing_data, seed):
+    def __init__(self, network, routing_data, seed, train_indices, test_indices):
         self.network = network
         self.routingData = routing_data
         self.seed = seed
@@ -26,7 +26,7 @@ class DirectThresholdOptimizer:
         self.useHardThreshold = None
         self.branchingLogits = None
         self.temperatures = None
-        self.trainIndices, self.testIndices = None, None
+        self.trainIndices, self.testIndices = train_indices, test_indices
         self.routingProbabilities = None
         self.routingProbabilitiesUncalibrated = None
         self.thresholds = None
@@ -143,7 +143,7 @@ class DirectThresholdOptimizer:
 
     def calibrate_branching_probabilities(self, run_id, iteration, seed):
         temperatures_dict = {}
-        file_name = "network{0}_iteration{1}_seed{2}".format(run_id, iteration, seed)
+        file_name = "network{0}_iteration{1}_seed{2}.sav".format(run_id, iteration, seed)
         if os.path.exists(file_name):
             f = open(file_name, "rb")
             temperatures_dict = pickle.load(f)
@@ -170,6 +170,8 @@ class DirectThresholdOptimizer:
                 for label_id in range(self.labelCount):
                     branch_distribution = [(nd.index, counters_dict[nd.index][label_id])
                                            for nd in child_nodes if label_id in counters_dict[nd.index]]
+                    if len(branch_distribution) == 0:
+                        continue
                     mode_tpl = sorted(branch_distribution, key=lambda tpl: tpl[1], reverse=True)[0]
                     label_mapping[label_id] = siblings_dict[mode_tpl[0]]
                 mapped_labels = [label_mapping[l_id] for l_id in labels]
