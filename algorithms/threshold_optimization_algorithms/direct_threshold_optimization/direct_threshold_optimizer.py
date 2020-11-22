@@ -10,9 +10,10 @@ from algorithms.network_calibration import NetworkCalibrationWithTemperatureScal
 
 
 class DirectThresholdOptimizer:
-    def __init__(self, network, routing_data):
+    def __init__(self, network, routing_data, seed):
         self.network = network
         self.routingData = routing_data
+        self.seed = seed
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
         self.innerNodes = sorted(self.innerNodes, key=lambda node: node.index)
@@ -29,9 +30,9 @@ class DirectThresholdOptimizer:
         self.routingProbabilities = None
         self.routingProbabilitiesUncalibrated = None
         self.thresholds = None
-        self.thresholdsSigmoid = None
-        self.hardThresholdTests = {}
-        self.softThresholdTests = {}
+        # self.thresholdsSigmoid = None
+        # self.hardThresholdTests = {}
+        # self.softThresholdTests = {}
         self.thresholdTests = {}
         self.pathScores = {}
         self.selectionWeights = None
@@ -41,17 +42,24 @@ class DirectThresholdOptimizer:
         self.finalPosteriors = None
         self.predictedLabels = None
         self.accuracy = None
+        self.oneHotGtLabels = None
+        self.diffMatrix = None
+        self.diffMatrixSquared = None
+        self.meanSquaredDistances = None
+        self.meanSquaredLoss = None
+        self.totalOptimizer = None
+        self.totalGlobalStep = None
 
     def threshold_test(self, node, routing_probs):
         # Hard
-        self.hardThresholdTests[node.index] = tf.cast(routing_probs >=
-                                                      self.thresholdsSigmoid[node.index], tf.float32)
-        # Soft
-        self.softThresholdTests[node.index] = tf.sigmoid((routing_probs - self.thresholdsSigmoid[node.index]) *
-                                                         self.sigmoidDecay)
-        thresholds_arr = tf.where(
-            self.useHardThreshold, self.hardThresholdTests[node.index], self.softThresholdTests[node.index])
-        return thresholds_arr
+        comparison_arr = tf.cast(routing_probs >= self.thresholds[node.index], tf.float32)
+        return comparison_arr
+        # # Soft
+        # self.softThresholdTests[node.index] = tf.sigmoid((routing_probs - self.thresholdsSigmoid[node.index]) *
+        #                                                  self.sigmoidDecay)
+        # thresholds_arr = tf.where(
+        #     self.useHardThreshold, self.hardThresholdTests[node.index], self.softThresholdTests[node.index])
+        # return thresholds_arr
 
     def prepare_branching(self):
         for node in self.network.topologicalSortedNodes:
@@ -82,6 +90,7 @@ class DirectThresholdOptimizer:
                                                           shape=(None, self.labelCount))
                                for node in self.leafNodes}
         self.gtLabels = tf.placeholder(dtype=tf.int64, shape=(None,), name="gt_labels")
+        self.totalGlobalStep = tf.Variable(0, name="total_global_step", trainable=False)
         self.sigmoidDecay = tf.placeholder(dtype=tf.float32, name="sigmoidDecay")
         self.useHardThreshold = tf.placeholder(dtype=tf.bool, name="useHardThreshold")
         self.branchingLogits = {node.index: tf.placeholder(dtype=tf.float32,
@@ -96,16 +105,16 @@ class DirectThresholdOptimizer:
                                      for node in self.innerNodes}
         self.routingProbabilitiesUncalibrated = {node.index: tf.nn.softmax(self.branchingLogits[node.index])
                                                  for node in self.innerNodes}
-        # self.thresholds = {node.index: tf.placeholder(dtype=tf.float32,
-        #                                               name="thresholds{0}".format(node.index),
-        #                                               shape=(1, len(self.network.dagObject.children(node))))
-        #                    for node in self.innerNodes}
-        self.thresholds = {node.index: tf.get_variable(name="thresholds{0}".format(node.index),
-                                                       dtype=tf.float32,
-                                                       shape=(1, len(self.network.dagObject.children(node))))
+        self.thresholds = {node.index: tf.placeholder(dtype=tf.float32,
+                                                      name="thresholds{0}".format(node.index),
+                                                      shape=(1, len(self.network.dagObject.children(node))))
                            for node in self.innerNodes}
-        self.thresholdsSigmoid = {node.index: (1.0 / len(self.network.dagObject.children(node))) * tf.sigmoid(
-            self.thresholds[node.index]) for node in self.innerNodes}
+        # self.thresholds = {node.index: tf.get_variable(name="thresholds{0}".format(node.index),
+        #                                                dtype=tf.float32,
+        #                                                shape=(1, len(self.network.dagObject.children(node))))
+        #                    for node in self.innerNodes}
+        # self.thresholdsSigmoid = {node.index: (1.0 / len(self.network.dagObject.children(node))) * tf.sigmoid(
+        #     self.thresholds[node.index]) for node in self.innerNodes}
         self.selectionWeights = None
         # Branching
         self.prepare_branching()
@@ -122,10 +131,19 @@ class DirectThresholdOptimizer:
         # Performance
         self.predictedLabels = tf.argmax(self.finalPosteriors, axis=-1)
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictedLabels, self.gtLabels), tf.float32))
+        # Loss for accuracy metric
+        # self.oneHotGtLabels = tf.one_hot(self.gtLabels, self.labelCount)
+        # self.diffMatrix = self.finalPosteriors - self.oneHotGtLabels
+        # self.diffMatrixSquared = tf.square(self.diffMatrix)
+        # self.meanSquaredDistances = tf.reduce_sum(self.diffMatrixSquared, axis=-1)
+        # self.meanSquaredLoss = tf.reduce_mean(self.meanSquaredDistances)
+        # # Optimization
+        # self.totalOptimizer = tf.train.AdamOptimizer().minimize(self.meanSquaredLoss,
+        #                                                         global_step=self.totalGlobalStep)
 
-    def calibrate_branching_probabilities(self, run_id, iteration):
+    def calibrate_branching_probabilities(self, run_id, iteration, seed):
         temperatures_dict = {}
-        file_name = "network{0}_iteration{1}".format(run_id, iteration)
+        file_name = "network{0}_iteration{1}_seed{2}".format(run_id, iteration, seed)
         if os.path.exists(file_name):
             f = open(file_name, "rb")
             temperatures_dict = pickle.load(f)
@@ -167,21 +185,44 @@ class DirectThresholdOptimizer:
     def train(self, run_id, iteration, test_ratio=0.1):
         indices = np.arange(self.routingData.dictOfDatasets[iteration].labelList.shape[0])
         self.trainIndices, self.testIndices = train_test_split(indices, test_size=test_ratio)
-        temperatures_dict = self.calibrate_branching_probabilities(run_id=run_id, iteration=iteration)
+        temperatures_dict = self.calibrate_branching_probabilities(run_id=run_id, iteration=iteration, seed=self.seed)
         self.build_network()
         sess = tf.Session()
 
-        # thresholds_dict = {}
-        # for node in self.innerNodes:
-        #     child_count = len(self.network.dagObject.children(node))
-        #     thresholds_dict[node.index] = np.random.uniform(low=0.0, high=1.0 / child_count, size=(1, child_count))
+        thresholds_dict = {}
+        for node in self.innerNodes:
+            child_count = len(self.network.dagObject.children(node))
+            thresholds_dict[node.index] = np.random.uniform(low=0.0, high=1.0 / child_count, size=(1, child_count))
         sess.run(tf.global_variables_initializer())
         feed_dict = \
             self.prepare_feed_dict(indices=self.trainIndices,
                                    iteration=iteration,
                                    temperatures_dict=temperatures_dict,
-                                   use_hard_threshold=False,
-                                   sigmoid_decay=1.0)
+                                   thresholds_dict=thresholds_dict)
+        # results = sess.run({"accuracy": self.accuracy,
+        #                     "predictedLabels": self.predictedLabels,
+        #                     "gtLabels": self.gtLabels,
+        #                     "finalPosteriors": self.finalPosteriors,
+        #                     "weightsArray": self.weightsArray,
+        #                     "weightedPosteriors": self.weightedPosteriors,
+        #                     "posteriorsTensor": self.posteriorsTensor,
+        #                     "selectionWeights": self.selectionWeights,
+        #                     "pathScores": self.pathScores,
+        #                     "thresholdTests": self.thresholdTests,
+        #                     "softThresholdTests": self.softThresholdTests,
+        #                     "hardThresholdTests": self.hardThresholdTests,
+        #                     "routingProbabilities": self.routingProbabilities,
+        #                     "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
+        #                     "branchingLogits": self.branchingLogits,
+        #                     "thresholds": self.thresholds,
+        #                     "thresholdsSigmoid": self.thresholdsSigmoid,
+        #                     "oneHotGtLabels": self.oneHotGtLabels,
+        #                     "diffMatrix": self.diffMatrix,
+        #                     "diffMatrixSquared": self.diffMatrixSquared,
+        #                     "meanSquaredDistances": self.meanSquaredDistances,
+        #                     "meanSquaredLoss": self.meanSquaredLoss},
+        #                    feed_dict=feed_dict)
+
         results = sess.run({"accuracy": self.accuracy,
                             "predictedLabels": self.predictedLabels,
                             "gtLabels": self.gtLabels,
@@ -192,23 +233,38 @@ class DirectThresholdOptimizer:
                             "selectionWeights": self.selectionWeights,
                             "pathScores": self.pathScores,
                             "thresholdTests": self.thresholdTests,
-                            "softThresholdTests": self.softThresholdTests,
-                            "hardThresholdTests": self.hardThresholdTests,
                             "routingProbabilities": self.routingProbabilities,
                             "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
                             "branchingLogits": self.branchingLogits,
-                            "thresholds": self.thresholds,
-                            "thresholdsSigmoid": self.thresholdsSigmoid},
+                            "thresholds": self.thresholds},
                            feed_dict=feed_dict)
-        print("X")
 
-    def prepare_feed_dict(self, indices, iteration, temperatures_dict,
-                          use_hard_threshold, sigmoid_decay):
+        print("accuracy:{0}".format(results["accuracy"]))
+        # print("meanSquaredLoss:{0}".format(results["meanSquaredLoss"]))
+        # for idx in range(10000):
+        #     feed_dict = \
+        #         self.prepare_feed_dict(indices=self.trainIndices,
+        #                                iteration=iteration,
+        #                                temperatures_dict=temperatures_dict,
+        #                                use_hard_threshold=False,
+        #                                sigmoid_decay=10.0)
+        #     results = sess.run({
+        #         "accuracy": self.accuracy,
+        #         "meanSquaredLoss": self.meanSquaredLoss,
+        #         "thresholds": self.thresholds,
+        #         "thresholdsSigmoid": self.thresholdsSigmoid,
+        #         "selectionWeights": self.selectionWeights,
+        #         "optimizer": self.totalOptimizer}, feed_dict=feed_dict)
+        #     print("***** Iteration:{0} *****".format(idx))
+        #     print("accuracy:{0}".format(results["accuracy"]))
+        #     print("meanSquaredLoss:{0}".format(results["meanSquaredLoss"]))
+        #     print("***** Iteration:{0} *****".format(idx))
+        # print("X")
+
+    def prepare_feed_dict(self, indices, iteration, temperatures_dict, thresholds_dict):
         feed_dict = {}
         routing_obj = self.routingData.dictOfDatasets[iteration]
         feed_dict[self.gtLabels] = routing_obj.labelList[indices]
-        feed_dict[self.useHardThreshold] = use_hard_threshold
-        feed_dict[self.sigmoidDecay] = sigmoid_decay
         # Leaf nodes
         for node in self.leafNodes:
             arr = routing_obj.get_dict("posterior_probs")[node.index][indices]
@@ -217,6 +273,8 @@ class DirectThresholdOptimizer:
         for node in self.innerNodes:
             logits_arr = routing_obj.get_dict("activations")[node.index][indices]
             temperature = temperatures_dict[node.index]
+            thresholds_arr = thresholds_dict[node.index]
             feed_dict[self.branchingLogits[node.index]] = logits_arr
             feed_dict[self.temperatures[node.index]] = temperature
+            feed_dict[self.thresholds[node.index]] = thresholds_arr
         return feed_dict
