@@ -182,84 +182,84 @@ class DirectThresholdOptimizer:
             f.close()
         return temperatures_dict
 
-    def train(self, run_id, iteration, test_ratio=0.1):
-        indices = np.arange(self.routingData.dictOfDatasets[iteration].labelList.shape[0])
-        self.trainIndices, self.testIndices = train_test_split(indices, test_size=test_ratio)
-        temperatures_dict = self.calibrate_branching_probabilities(run_id=run_id, iteration=iteration, seed=self.seed)
-        self.build_network()
-        sess = tf.Session()
-
-        thresholds_dict = {}
-        for node in self.innerNodes:
-            child_count = len(self.network.dagObject.children(node))
-            thresholds_dict[node.index] = np.random.uniform(low=0.0, high=1.0 / child_count, size=(1, child_count))
-        sess.run(tf.global_variables_initializer())
-        feed_dict = \
-            self.prepare_feed_dict(indices=self.trainIndices,
-                                   iteration=iteration,
-                                   temperatures_dict=temperatures_dict,
-                                   thresholds_dict=thresholds_dict)
-        # results = sess.run({"accuracy": self.accuracy,
-        #                     "predictedLabels": self.predictedLabels,
-        #                     "gtLabels": self.gtLabels,
-        #                     "finalPosteriors": self.finalPosteriors,
-        #                     "weightsArray": self.weightsArray,
-        #                     "weightedPosteriors": self.weightedPosteriors,
-        #                     "posteriorsTensor": self.posteriorsTensor,
-        #                     "selectionWeights": self.selectionWeights,
-        #                     "pathScores": self.pathScores,
-        #                     "thresholdTests": self.thresholdTests,
-        #                     "softThresholdTests": self.softThresholdTests,
-        #                     "hardThresholdTests": self.hardThresholdTests,
-        #                     "routingProbabilities": self.routingProbabilities,
-        #                     "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
-        #                     "branchingLogits": self.branchingLogits,
-        #                     "thresholds": self.thresholds,
-        #                     "thresholdsSigmoid": self.thresholdsSigmoid,
-        #                     "oneHotGtLabels": self.oneHotGtLabels,
-        #                     "diffMatrix": self.diffMatrix,
-        #                     "diffMatrixSquared": self.diffMatrixSquared,
-        #                     "meanSquaredDistances": self.meanSquaredDistances,
-        #                     "meanSquaredLoss": self.meanSquaredLoss},
-        #                    feed_dict=feed_dict)
-
-        results = sess.run({"accuracy": self.accuracy,
-                            "predictedLabels": self.predictedLabels,
-                            "gtLabels": self.gtLabels,
-                            "finalPosteriors": self.finalPosteriors,
-                            "weightsArray": self.weightsArray,
-                            "weightedPosteriors": self.weightedPosteriors,
-                            "posteriorsTensor": self.posteriorsTensor,
-                            "selectionWeights": self.selectionWeights,
-                            "pathScores": self.pathScores,
-                            "thresholdTests": self.thresholdTests,
-                            "routingProbabilities": self.routingProbabilities,
-                            "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
-                            "branchingLogits": self.branchingLogits,
-                            "thresholds": self.thresholds},
-                           feed_dict=feed_dict)
-
-        print("accuracy:{0}".format(results["accuracy"]))
-        # print("meanSquaredLoss:{0}".format(results["meanSquaredLoss"]))
-        # for idx in range(10000):
-        #     feed_dict = \
-        #         self.prepare_feed_dict(indices=self.trainIndices,
-        #                                iteration=iteration,
-        #                                temperatures_dict=temperatures_dict,
-        #                                use_hard_threshold=False,
-        #                                sigmoid_decay=10.0)
-        #     results = sess.run({
-        #         "accuracy": self.accuracy,
-        #         "meanSquaredLoss": self.meanSquaredLoss,
-        #         "thresholds": self.thresholds,
-        #         "thresholdsSigmoid": self.thresholdsSigmoid,
-        #         "selectionWeights": self.selectionWeights,
-        #         "optimizer": self.totalOptimizer}, feed_dict=feed_dict)
-        #     print("***** Iteration:{0} *****".format(idx))
-        #     print("accuracy:{0}".format(results["accuracy"]))
-        #     print("meanSquaredLoss:{0}".format(results["meanSquaredLoss"]))
-        #     print("***** Iteration:{0} *****".format(idx))
-        # print("X")
+    # def train(self, run_id, iteration, test_ratio=0.1):
+    #     indices = np.arange(self.routingData.dictOfDatasets[iteration].labelList.shape[0])
+    #     self.trainIndices, self.testIndices = train_test_split(indices, test_size=test_ratio)
+    #     temperatures_dict = self.calibrate_branching_probabilities(run_id=run_id, iteration=iteration, seed=self.seed)
+    #     self.build_network()
+    #     sess = tf.Session()
+    #
+    #     thresholds_dict = {}
+    #     for node in self.innerNodes:
+    #         child_count = len(self.network.dagObject.children(node))
+    #         thresholds_dict[node.index] = np.random.uniform(low=0.0, high=1.0 / child_count, size=(1, child_count))
+    #     sess.run(tf.global_variables_initializer())
+    #     feed_dict = \
+    #         self.prepare_feed_dict(indices=self.trainIndices,
+    #                                iteration=iteration,
+    #                                temperatures_dict=temperatures_dict,
+    #                                thresholds_dict=thresholds_dict)
+    #     # results = sess.run({"accuracy": self.accuracy,
+    #     #                     "predictedLabels": self.predictedLabels,
+    #     #                     "gtLabels": self.gtLabels,
+    #     #                     "finalPosteriors": self.finalPosteriors,
+    #     #                     "weightsArray": self.weightsArray,
+    #     #                     "weightedPosteriors": self.weightedPosteriors,
+    #     #                     "posteriorsTensor": self.posteriorsTensor,
+    #     #                     "selectionWeights": self.selectionWeights,
+    #     #                     "pathScores": self.pathScores,
+    #     #                     "thresholdTests": self.thresholdTests,
+    #     #                     "softThresholdTests": self.softThresholdTests,
+    #     #                     "hardThresholdTests": self.hardThresholdTests,
+    #     #                     "routingProbabilities": self.routingProbabilities,
+    #     #                     "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
+    #     #                     "branchingLogits": self.branchingLogits,
+    #     #                     "thresholds": self.thresholds,
+    #     #                     "thresholdsSigmoid": self.thresholdsSigmoid,
+    #     #                     "oneHotGtLabels": self.oneHotGtLabels,
+    #     #                     "diffMatrix": self.diffMatrix,
+    #     #                     "diffMatrixSquared": self.diffMatrixSquared,
+    #     #                     "meanSquaredDistances": self.meanSquaredDistances,
+    #     #                     "meanSquaredLoss": self.meanSquaredLoss},
+    #     #                    feed_dict=feed_dict)
+    #
+    #     results = sess.run({"accuracy": self.accuracy,
+    #                         "predictedLabels": self.predictedLabels,
+    #                         "gtLabels": self.gtLabels,
+    #                         "finalPosteriors": self.finalPosteriors,
+    #                         "weightsArray": self.weightsArray,
+    #                         "weightedPosteriors": self.weightedPosteriors,
+    #                         "posteriorsTensor": self.posteriorsTensor,
+    #                         "selectionWeights": self.selectionWeights,
+    #                         "pathScores": self.pathScores,
+    #                         "thresholdTests": self.thresholdTests,
+    #                         "routingProbabilities": self.routingProbabilities,
+    #                         "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
+    #                         "branchingLogits": self.branchingLogits,
+    #                         "thresholds": self.thresholds},
+    #                        feed_dict=feed_dict)
+    #
+    #     print("accuracy:{0}".format(results["accuracy"]))
+    #     # print("meanSquaredLoss:{0}".format(results["meanSquaredLoss"]))
+    #     # for idx in range(10000):
+    #     #     feed_dict = \
+    #     #         self.prepare_feed_dict(indices=self.trainIndices,
+    #     #                                iteration=iteration,
+    #     #                                temperatures_dict=temperatures_dict,
+    #     #                                use_hard_threshold=False,
+    #     #                                sigmoid_decay=10.0)
+    #     #     results = sess.run({
+    #     #         "accuracy": self.accuracy,
+    #     #         "meanSquaredLoss": self.meanSquaredLoss,
+    #     #         "thresholds": self.thresholds,
+    #     #         "thresholdsSigmoid": self.thresholdsSigmoid,
+    #     #         "selectionWeights": self.selectionWeights,
+    #     #         "optimizer": self.totalOptimizer}, feed_dict=feed_dict)
+    #     #     print("***** Iteration:{0} *****".format(idx))
+    #     #     print("accuracy:{0}".format(results["accuracy"]))
+    #     #     print("meanSquaredLoss:{0}".format(results["meanSquaredLoss"]))
+    #     #     print("***** Iteration:{0} *****".format(idx))
+    #     # print("X")
 
     def prepare_feed_dict(self, indices, iteration, temperatures_dict, thresholds_dict):
         feed_dict = {}
@@ -278,3 +278,26 @@ class DirectThresholdOptimizer:
             feed_dict[self.temperatures[node.index]] = temperature
             feed_dict[self.thresholds[node.index]] = thresholds_arr
         return feed_dict
+
+    def measure_score(self, sess, indices, iteration, temperatures_dict, thresholds_dict):
+        feed_dict = \
+            self.prepare_feed_dict(indices=indices,
+                                   iteration=iteration,
+                                   temperatures_dict=temperatures_dict,
+                                   thresholds_dict=thresholds_dict)
+        results = sess.run({"accuracy": self.accuracy,
+                            "predictedLabels": self.predictedLabels,
+                            "gtLabels": self.gtLabels,
+                            "finalPosteriors": self.finalPosteriors,
+                            "weightsArray": self.weightsArray,
+                            "weightedPosteriors": self.weightedPosteriors,
+                            "posteriorsTensor": self.posteriorsTensor,
+                            "selectionWeights": self.selectionWeights,
+                            "pathScores": self.pathScores,
+                            "thresholdTests": self.thresholdTests,
+                            "routingProbabilities": self.routingProbabilities,
+                            "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
+                            "branchingLogits": self.branchingLogits,
+                            "thresholds": self.thresholds},
+                           feed_dict=feed_dict)
+        return results["accuracy"]

@@ -23,6 +23,8 @@ from algorithms.threshold_optimization_algorithms.deep_q_networks.q_learning_thr
     QLearningThresholdOptimizer
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer import \
     DirectThresholdOptimizer
+from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.mixed_bayesian_optimizer import \
+    MixedBayesianOptimizer
 from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
@@ -65,9 +67,15 @@ def train_direct_threshold_optimizer():
                                                                test_iterations_=[43680, 44160, 44640, 45120, 45600,
                                                                                  46080, 46560, 47040, 47520, 48000])
 
-        dto = DirectThresholdOptimizer(network=network, routing_data=routing_data)
-        dto.train(run_id=network_id, iteration=43680)
-        print("X")
+        MixedBayesianOptimizer.optimize(run_id=network_id,
+                                        network=network,
+                                        iteration=iteration,
+                                        routing_data=routing_data,
+                                        seed=seed, test_ratio=0.1)
+
+        # dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, seed=seed)
+        # dto.train(run_id=network_id, iteration=43680)
+        # print("X")
         tf.reset_default_graph()
         break
 
