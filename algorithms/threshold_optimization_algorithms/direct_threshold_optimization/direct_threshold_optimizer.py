@@ -6,13 +6,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from collections import Counter
 
+from algorithms.cign_activation_cost_calculator import CignActivationCostCalculator
 from algorithms.network_calibration import NetworkCalibrationWithTemperatureScaling
 
 
 class DirectThresholdOptimizer:
-    def __init__(self, network, routing_data, seed, train_indices, test_indices):
+    def __init__(self, network, routing_data, iteration, seed, train_indices, test_indices):
         self.network = network
         self.routingData = routing_data
+        self.iteration = iteration
         self.seed = seed
         self.innerNodes = [node for node in self.network.topologicalSortedNodes if not node.isLeaf]
         self.leafNodes = [node for node in self.network.topologicalSortedNodes if node.isLeaf]
@@ -35,6 +37,7 @@ class DirectThresholdOptimizer:
         # self.softThresholdTests = {}
         self.thresholdTests = {}
         self.pathScores = {}
+        self.selectionTuples = None
         self.selectionWeights = None
         self.posteriorsTensor = None
         self.weightedPosteriors = None
@@ -49,6 +52,10 @@ class DirectThresholdOptimizer:
         self.meanSquaredLoss = None
         self.totalOptimizer = None
         self.totalGlobalStep = None
+        self.powersOfTwoArr = None
+        self.activationCodes = None
+        self.networkActivationCosts, self.networkActivationCostsDict = CignActivationCostCalculator.calculate(
+            network=self.network, node_costs=self.routingData.dictOfDatasets[self.iteration].get_dict("nodeCosts"))
 
     def threshold_test(self, node, routing_probs):
         # Hard
@@ -109,6 +116,7 @@ class DirectThresholdOptimizer:
                                                       name="thresholds{0}".format(node.index),
                                                       shape=(1, len(self.network.dagObject.children(node))))
                            for node in self.innerNodes}
+        self.powersOfTwoArr = tf.reverse(2 ** tf.range(len(self.leafNodes)), axis=[0])
         # self.thresholds = {node.index: tf.get_variable(name="thresholds{0}".format(node.index),
         #                                                dtype=tf.float32,
         #                                                shape=(1, len(self.network.dagObject.children(node))))
@@ -120,10 +128,10 @@ class DirectThresholdOptimizer:
         self.prepare_branching()
 
         # Combine all weights
-        self.selectionWeights = tf.stack(values=[self.pathScores[node.index] for node in self.leafNodes], axis=-1)
-        self.weightsArray = tf.reduce_sum(self.selectionWeights, axis=1, keepdims=True)
+        self.selectionTuples = tf.stack(values=[self.pathScores[node.index] for node in self.leafNodes], axis=-1)
+        self.weightsArray = tf.reduce_sum(self.selectionTuples, axis=1, keepdims=True)
         self.weightsArray = tf.reciprocal(self.weightsArray)
-        self.selectionWeights = self.selectionWeights * self.weightsArray
+        self.selectionWeights = self.selectionTuples * self.weightsArray
         # Combine all posteriors
         self.posteriorsTensor = tf.stack(values=[self.posteriorsDict[node.index] for node in self.leafNodes], axis=-1)
         self.weightedPosteriors = self.posteriorsTensor * tf.expand_dims(self.selectionWeights, axis=1)
@@ -131,6 +139,8 @@ class DirectThresholdOptimizer:
         # Performance
         self.predictedLabels = tf.argmax(self.finalPosteriors, axis=-1)
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictedLabels, self.gtLabels), tf.float32))
+        self.activationCodes = tf.cast(self.selectionTuples, tf.int32) * tf.expand_dims(self.powersOfTwoArr, axis=0)
+        self.activationCodes = tf.reduce_sum(self.activationCodes, axis=1) - 1
         # Loss for accuracy metric
         # self.oneHotGtLabels = tf.one_hot(self.gtLabels, self.labelCount)
         # self.diffMatrix = self.finalPosteriors - self.oneHotGtLabels
@@ -300,6 +310,9 @@ class DirectThresholdOptimizer:
                             "routingProbabilities": self.routingProbabilities,
                             "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
                             "branchingLogits": self.branchingLogits,
-                            "thresholds": self.thresholds},
+                            "thresholds": self.thresholds,
+                            "powersOfTwoArr": self.powersOfTwoArr,
+                            "activationCodes": self.activationCodes,
+                            "selectionTuples": self.selectionTuples},
                            feed_dict=feed_dict)
         return results["accuracy"]
