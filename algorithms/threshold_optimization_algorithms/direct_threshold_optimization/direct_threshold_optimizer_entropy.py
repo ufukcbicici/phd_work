@@ -27,8 +27,8 @@ class DirectThresholdOptimizerEntropy(DirectThresholdOptimizer):
         log_prob = tf.log(routing_probs + GlobalConstants.INFO_GAIN_LOG_EPSILON)
         prob_log_prob = routing_probs * log_prob
         self.entropies[node.index] = -1.0 * tf.reduce_sum(prob_log_prob, axis=1)
-        comparison_arr = tf.cast(self.entropies[node.index] >= self.thresholds[node.index], tf.float32)
-        arg_max_selections = tf.argmax(routing_probs, axis=1)
+        comparison_arr = tf.cast(self.entropies[node.index] >= self.thresholds[node.index], tf.bool)
+        arg_max_selections = tf.one_hot(tf.argmax(routing_probs, axis=1), len(self.network.dagObject.children(node)))
         both_selections = tf.ones_like(arg_max_selections)
         thresholds = tf.where(comparison_arr, both_selections, arg_max_selections)
         return thresholds
