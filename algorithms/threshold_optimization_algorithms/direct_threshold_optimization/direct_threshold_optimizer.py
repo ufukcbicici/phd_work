@@ -54,11 +54,21 @@ class DirectThresholdOptimizer:
         self.totalGlobalStep = None
         self.powersOfTwoArr = None
         self.activationCodes = None
-        self.networkActivationCosts, self.networkActivationCostsDict = CignActivationCostCalculator.calculate(
-            network=self.network, node_costs=self.routingData.dictOfDatasets[self.iteration].get_dict("nodeCosts"))
+        self.networkActivationCosts, self.networkActivationCostsDict = \
+            CignActivationCostCalculator.calculate(
+                network=self.network,
+                node_costs=self.routingData.dictOfDatasets[self.iteration].get_dict("nodeCosts"))
+        self.activationCostsArr = None
+        self.meanActivationCost = None
+        self.mixingLambda = None
+        self.score = None
 
     def threshold_test(self, node, routing_probs):
         # Hard
+        child_nodes = self.network.dagObject.children(node)
+        self.thresholds[node.index] = tf.placeholder(dtype=tf.float32,
+                                                     name="thresholds{0}".format(node.index),
+                                                     shape=(1, len(child_nodes)))
         comparison_arr = tf.cast(routing_probs >= self.thresholds[node.index], tf.float32)
         return comparison_arr
         # # Soft
@@ -100,6 +110,7 @@ class DirectThresholdOptimizer:
         self.totalGlobalStep = tf.Variable(0, name="total_global_step", trainable=False)
         self.sigmoidDecay = tf.placeholder(dtype=tf.float32, name="sigmoidDecay")
         self.useHardThreshold = tf.placeholder(dtype=tf.bool, name="useHardThreshold")
+        self.mixingLambda = tf.placeholder(dtype=tf.float64, name="mixingLambda")
         self.branchingLogits = {node.index: tf.placeholder(dtype=tf.float32,
                                                            name="brancing_logits_node{0}".format(node.index),
                                                            shape=(None, len(self.network.dagObject.children(node))))
@@ -112,11 +123,9 @@ class DirectThresholdOptimizer:
                                      for node in self.innerNodes}
         self.routingProbabilitiesUncalibrated = {node.index: tf.nn.softmax(self.branchingLogits[node.index])
                                                  for node in self.innerNodes}
-        self.thresholds = {node.index: tf.placeholder(dtype=tf.float32,
-                                                      name="thresholds{0}".format(node.index),
-                                                      shape=(1, len(self.network.dagObject.children(node))))
-                           for node in self.innerNodes}
+        self.thresholds = {}
         self.powersOfTwoArr = tf.reverse(2 ** tf.range(len(self.leafNodes)), axis=[0])
+        self.networkActivationCosts = tf.constant(self.networkActivationCosts)
         # self.thresholds = {node.index: tf.get_variable(name="thresholds{0}".format(node.index),
         #                                                dtype=tf.float32,
         #                                                shape=(1, len(self.network.dagObject.children(node))))
@@ -138,9 +147,14 @@ class DirectThresholdOptimizer:
         self.finalPosteriors = tf.reduce_sum(self.weightedPosteriors, axis=-1)
         # Performance
         self.predictedLabels = tf.argmax(self.finalPosteriors, axis=-1)
-        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictedLabels, self.gtLabels), tf.float32))
+        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictedLabels, self.gtLabels), tf.float64))
         self.activationCodes = tf.cast(self.selectionTuples, tf.int32) * tf.expand_dims(self.powersOfTwoArr, axis=0)
         self.activationCodes = tf.reduce_sum(self.activationCodes, axis=1) - 1
+        self.networkActivationCosts = tf.expand_dims(self.networkActivationCosts, axis=-1)
+        self.activationCodes = tf.stack([self.activationCodes, tf.zeros_like(self.activationCodes)], axis=1)
+        self.activationCostsArr = tf.gather_nd(self.networkActivationCosts, self.activationCodes)
+        self.meanActivationCost = tf.reduce_mean(self.activationCostsArr)
+        self.score = self.mixingLambda * self.accuracy + (1.0 - self.mixingLambda) * self.meanActivationCost
         # Loss for accuracy metric
         # self.oneHotGtLabels = tf.one_hot(self.gtLabels, self.labelCount)
         # self.diffMatrix = self.finalPosteriors - self.oneHotGtLabels
@@ -273,10 +287,11 @@ class DirectThresholdOptimizer:
     #     #     print("***** Iteration:{0} *****".format(idx))
     #     # print("X")
 
-    def prepare_feed_dict(self, indices, iteration, temperatures_dict, thresholds_dict):
+    def prepare_feed_dict(self, indices, iteration, mixing_lambda, temperatures_dict, thresholds_dict):
         feed_dict = {}
         routing_obj = self.routingData.dictOfDatasets[iteration]
         feed_dict[self.gtLabels] = routing_obj.labelList[indices]
+        feed_dict[self.mixingLambda] = mixing_lambda
         # Leaf nodes
         for node in self.leafNodes:
             arr = routing_obj.get_dict("posterior_probs")[node.index][indices]
@@ -291,10 +306,11 @@ class DirectThresholdOptimizer:
             feed_dict[self.thresholds[node.index]] = thresholds_arr
         return feed_dict
 
-    def measure_score(self, sess, indices, iteration, temperatures_dict, thresholds_dict):
+    def measure_score(self, sess, indices, iteration, mixing_lambda, temperatures_dict, thresholds_dict):
         feed_dict = \
             self.prepare_feed_dict(indices=indices,
                                    iteration=iteration,
+                                   mixing_lambda=mixing_lambda,
                                    temperatures_dict=temperatures_dict,
                                    thresholds_dict=thresholds_dict)
         results = sess.run({"accuracy": self.accuracy,
@@ -313,6 +329,12 @@ class DirectThresholdOptimizer:
                             "thresholds": self.thresholds,
                             "powersOfTwoArr": self.powersOfTwoArr,
                             "activationCodes": self.activationCodes,
-                            "selectionTuples": self.selectionTuples},
+                            "selectionTuples": self.selectionTuples,
+                            "networkActivationCosts": self.networkActivationCosts,
+                            "activationCostsArr": self.activationCostsArr,
+                            "meanActivationCost": self.meanActivationCost,
+                            "score": self.score},
                            feed_dict=feed_dict)
-        return results["accuracy"]
+        print("score:{0} accuracy:{1} meanActivationCost:{2}".format(
+            results["score"], results["accuracy"], results["meanActivationCost"]))
+        return results["score"]

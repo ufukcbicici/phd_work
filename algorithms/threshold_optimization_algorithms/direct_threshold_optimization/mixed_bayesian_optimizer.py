@@ -5,28 +5,41 @@ from bayes_opt import BayesianOptimization
 
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer import \
     DirectThresholdOptimizer
+from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer_entropy import \
+    DirectThresholdOptimizerEntropy
 
 
 class MixedBayesianOptimizer:
 
     @staticmethod
-    def get_random_probability_thresholds(network, inner_nodes):
+    def get_random_thresholds(network, kind):
+        inner_nodes = [node for node in network.topologicalSortedNodes if not node.isLeaf]
+        inner_nodes = sorted(inner_nodes, key=lambda node: node.index)
         thresholds_dict = {}
         for node in inner_nodes:
             child_count = len(network.dagObject.children(node))
-            thresholds_dict[node.index] = np.random.uniform(low=0.0, high=1.0 / child_count, size=(1, child_count))
+            if kind == "probability":
+                max_bound = 1.0 / child_count
+                thresholds_dict[node.index] = np.random.uniform(low=0.0, high=max_bound, size=(1, child_count))
+            elif kind == "entropy":
+                max_bound = -np.log(1.0 / child_count)
+                thresholds_dict[node.index] = np.random.uniform(low=0.0, high=max_bound)
         return thresholds_dict
 
     @staticmethod
-    def calculate_bounds(network):
+    def calculate_bounds(network, kind):
         inner_nodes = [node for node in network.topologicalSortedNodes if not node.isLeaf]
         inner_nodes = sorted(inner_nodes, key=lambda node: node.index)
-        # pbounds = {'x': (2, 4), 'y': (-3, 3)}
         pbounds = {}
         for node in inner_nodes:
             child_nodes = network.dagObject.children(node)
             child_nodes = sorted(child_nodes, key=lambda nd: nd.index)
-            max_bound = 1.0 / len(child_nodes)
+            if kind == "probability":
+                max_bound = 1.0 / len(child_nodes)
+            elif kind == "entropy":
+                max_bound = -np.log(1.0 / len(child_nodes))
+            else:
+                raise NotImplementedError()
             for c_nd in child_nodes:
                 pbounds["t_{0}_{1}".format(node.index, c_nd.index)] = (0.0, max_bound)
         return pbounds
@@ -41,17 +54,25 @@ class MixedBayesianOptimizer:
         leaf_nodes = sorted(leaf_nodes, key=lambda node: node.index)
         leaf_indices = {node.index: idx for idx, node in enumerate(leaf_nodes)}
         label_count = len(set(routing_data.dictOfDatasets[routing_data.iterations[0]].labelList))
-        dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, iteration=iteration, seed=seed,
-                                       train_indices=train_indices, test_indices=test_indices)
+        # dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, iteration=iteration, seed=seed,
+        #                                train_indices=train_indices, test_indices=test_indices)
+        dto = DirectThresholdOptimizerEntropy(network=network, routing_data=routing_data, iteration=iteration,
+                                              seed=seed,
+                                              train_indices=train_indices, test_indices=test_indices)
         temperatures_dict = dto.calibrate_branching_probabilities(run_id=run_id, iteration=iteration, seed=seed)
         dto.build_network()
         sess = tf.Session()
 
-        thresholds_dict = MixedBayesianOptimizer.get_random_probability_thresholds(
-            network=network, inner_nodes=inner_nodes)
-        accuracy = dto.measure_score(sess=sess, indices=train_indices,
-                                     iteration=iteration, temperatures_dict=temperatures_dict,
-                                     thresholds_dict=thresholds_dict)
+        mixing_lambda = 1.0
+        scores = []
+        for i in range(100):
+            thresholds_dict = MixedBayesianOptimizer.get_random_thresholds(network=network, kind="entropy")
+            score = dto.measure_score(sess=sess, indices=train_indices,
+                                      iteration=iteration,
+                                      mixing_lambda=mixing_lambda,
+                                      temperatures_dict=temperatures_dict,
+                                      thresholds_dict=thresholds_dict)
+            scores.append(score)
 
         def f_(**kwargs):
             # Reconstruct the thresholds dict
@@ -60,22 +81,22 @@ class MixedBayesianOptimizer:
                 child_nodes = network.dagObject.children(node)
                 child_nodes = sorted(child_nodes, key=lambda nd: nd.index)
                 thrs_arr = np.array([kwargs["t_{0}_{1}".format(node.index, c_nd.index)] for c_nd in child_nodes])
-                thrs_dict[node.index] = thrs_arr
+                thrs_dict[node.index] = thrs_arr[np.newaxis, :]
             # Calculate the score
-            acc = dto.measure_score(sess=sess, indices=train_indices,
+            scr = dto.measure_score(sess=sess, indices=train_indices,
                                     iteration=iteration, temperatures_dict=temperatures_dict,
-                                    thresholds_dict=thresholds_dict)
-            return acc
+                                    thresholds_dict=thrs_dict, mixing_lambda=mixing_lambda)
+            return scr
 
-        pbounds = {'x': (2, 4), 'y': (-3, 3)}
-
+        pbounds = MixedBayesianOptimizer.calculate_bounds(network=network, kind="entropy")
         optimizer = BayesianOptimization(
             f=f_,
             pbounds=pbounds,
-            random_state=1,
         )
         optimizer.maximize(
-            init_points=2,
-            n_iter=3,
+            init_points=1000,
+            n_iter=1000,
+            acq="ei",
+            xi=0.0
         )
         print("X")
