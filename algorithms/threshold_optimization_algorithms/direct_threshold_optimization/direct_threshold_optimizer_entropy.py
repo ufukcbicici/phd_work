@@ -18,6 +18,7 @@ class DirectThresholdOptimizerEntropy(DirectThresholdOptimizer):
     def __init__(self, network, routing_data, iteration, seed, train_indices, test_indices):
         super().__init__(network, routing_data, iteration, seed, train_indices, test_indices)
         self.entropies = {}
+        self.kind = "entropy"
 
     def threshold_test(self, node, routing_probs):
         # Hard
