@@ -13,6 +13,7 @@ from simple_tf.fashion_net.fashion_net_baseline import FashionNetBaseline
 from simple_tf.fashion_net.fashion_net_single_late_exit import FashionNetSingleLateExit
 from simple_tf.global_params import GlobalConstants
 from auxillary.constants import DatasetTypes
+from simple_tf.lenet.lenet_baseline import LeNetBaseline
 from simple_tf.lenet.lenet_cign import LenetCign
 from simple_tf.lenet.lenet_cign_early_exit import LenetCignEarlyExit
 from simple_tf.lenet.lenet_random_sample import LenetCignRandomSample
@@ -36,7 +37,7 @@ def get_network(dataset, network_name):
         network = LenetCignRandomSample(dataset=dataset, degree_list=GlobalConstants.TREE_DEGREE_LIST,
                                         network_name="LeNetMNIST_CIGN_RandomSample")
     else:
-        raise NotImplementedError()
+        network = LeNetBaseline(dataset=dataset, network_name="LeNetBaseline")
     return network
 
 
