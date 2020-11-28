@@ -4,6 +4,7 @@ import os
 from sklearn.model_selection import train_test_split
 from bayes_opt import BayesianOptimization
 
+from algorithms.information_gain_routing_accuracy_calculator import InformationGainRoutingAccuracyCalculator
 from algorithms.threshold_optimization_algorithms.bayesian_clusterer import BayesianClusterer
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_networks import DeepQNetworks
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer import \
@@ -79,6 +80,15 @@ class MixedBayesianOptimizer:
         train_indices, test_indices = train_test_split(indices, test_size=test_ratio)
         leaf_indices = {node.index: idx for idx, node in enumerate(network.leafNodes)}
         label_count = len(set(routing_data.dictOfDatasets[routing_data.iterations[0]].labelList))
+        # Learn the standard information gain based accuracies
+        train_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=network,
+                                                                               routing_data=routing_data,
+                                                                               indices=train_indices)
+        test_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=network,
+                                                                              routing_data=routing_data,
+                                                                              indices=test_indices)
+        print("train_ig_accuracy={0}".format(train_ig_accuracy))
+        print("test_ig_accuracy={0}".format(test_ig_accuracy))
         # Threshold Optimizer
         dto = DirectThresholdOptimizerEntropy(network=network, routing_data=routing_data, iteration=iteration,
                                               seed=seed,
