@@ -34,36 +34,28 @@ class DirectThresholdOptimizerEntropy(DirectThresholdOptimizer):
         thresholds = tf.where(comparison_arr, both_selections, arg_max_selections)
         return thresholds
 
-    def measure_score(self, sess, indices, iteration, mixing_lambda, temperatures_dict, thresholds_dict):
-        feed_dict = \
-            self.prepare_feed_dict(indices=indices,
-                                   iteration=iteration,
-                                   mixing_lambda=mixing_lambda,
-                                   temperatures_dict=temperatures_dict,
-                                   thresholds_dict=thresholds_dict)
-        results = sess.run({"accuracy": self.accuracy,
-                            "predictedLabels": self.predictedLabels,
-                            "gtLabels": self.gtLabels,
-                            "finalPosteriors": self.finalPosteriors,
-                            "weightsArray": self.weightsArray,
-                            "weightedPosteriors": self.weightedPosteriors,
-                            "posteriorsTensor": self.posteriorsTensor,
-                            "selectionWeights": self.selectionWeights,
-                            "pathScores": self.pathScores,
-                            "thresholdTests": self.thresholdTests,
-                            "routingProbabilities": self.routingProbabilities,
-                            "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
-                            "branchingLogits": self.branchingLogits,
-                            "thresholds": self.thresholds,
-                            "powersOfTwoArr": self.powersOfTwoArr,
-                            "activationCodes": self.activationCodes,
-                            "selectionTuples": self.selectionTuples,
-                            "networkActivationCosts": self.networkActivationCosts,
-                            "activationCostsArr": self.activationCostsArr,
-                            "meanActivationCost": self.meanActivationCost,
-                            "score": self.score,
-                            "entropies": self.entropies},
-                           feed_dict=feed_dict)
-        print("score:{0} accuracy:{1} meanActivationCost:{2}".format(
-            results["score"], results["accuracy"], results["meanActivationCost"]))
-        return results["score"]
+    def get_run_dict(self):
+        run_dict = {"accuracy": self.accuracy,
+                    "predictedLabels": self.predictedLabels,
+                    "gtLabels": self.gtLabels,
+                    "finalPosteriors": self.finalPosteriors,
+                    "weightsArray": self.weightsArray,
+                    "weightedPosteriors": self.weightedPosteriors,
+                    "posteriorsTensor": self.posteriorsTensor,
+                    "selectionWeights": self.selectionWeights,
+                    "pathScores": self.pathScores,
+                    "thresholdTests": self.thresholdTests,
+                    "routingProbabilities": self.routingProbabilities,
+                    "routingProbabilitiesUncalibrated": self.routingProbabilitiesUncalibrated,
+                    "branchingLogits": self.branchingLogits,
+                    "thresholds": self.thresholds,
+                    "powersOfTwoArr": self.powersOfTwoArr,
+                    "activationCodes": self.activationCodes,
+                    "selectionTuples": self.selectionTuples,
+                    "networkActivationCosts": self.networkActivationCosts,
+                    "activationCostsArr": self.activationCostsArr,
+                    "meanActivationCost": self.meanActivationCost,
+                    "score": self.score,
+                    "correctnessVector": self.correctnessVector,
+                    "entropies": self.entropies}
+        return run_dict

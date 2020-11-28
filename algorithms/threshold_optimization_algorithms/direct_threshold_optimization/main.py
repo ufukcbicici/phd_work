@@ -71,7 +71,10 @@ def train_direct_threshold_optimizer():
                                         network=network,
                                         iteration=iteration,
                                         routing_data=routing_data,
-                                        seed=seed, test_ratio=0.1)
+                                        seed=seed,
+                                        test_ratio=0.1,
+                                        cluster_count=2,
+                                        fc_layers=[64, 32])
 
         # dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, seed=seed)
         # dto.train(run_id=network_id, iteration=43680)

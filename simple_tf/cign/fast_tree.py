@@ -35,6 +35,8 @@ class FastTreeNetwork(TreeNetwork):
         self.networkName = network_name
         self.dbName = None
         self.saver = None
+        self.innerNodes = None
+        self.leafNodes = None
         self.batchSizeTf = tf.placeholder(dtype=tf.int32, name="batch_size")
 
     @staticmethod
@@ -136,6 +138,11 @@ class FastTreeNetwork(TreeNetwork):
             nodes_per_level_dict[node.depth].append(node)
         for level in nodes_per_level_dict.keys():
             self.orderedNodesPerLevel[level] = sorted(nodes_per_level_dict[level], key=lambda n: n.index)
+        self.topologicalSortedNodes = self.dagObject.get_topological_sort()
+        self.innerNodes = [node for node in self.topologicalSortedNodes if not node.isLeaf]
+        self.leafNodes = [node for node in self.topologicalSortedNodes if node.isLeaf]
+        self.innerNodes = sorted(self.innerNodes, key=lambda nd: nd.index)
+        self.leafNodes = sorted(self.leafNodes, key=lambda nd: nd.index)
 
     @staticmethod
     def get_mock_tree(degree_list, network_name):
@@ -233,7 +240,6 @@ class FastTreeNetwork(TreeNetwork):
         # Build the tree topologically and create the Tensorflow placeholders
         self.build_tree()
         # Build symbolic networks
-        self.topologicalSortedNodes = self.dagObject.get_topological_sort()
         self.isBaseline = len(self.topologicalSortedNodes) == 1
         # Disable some properties if we are using a baseline
         if self.isBaseline:

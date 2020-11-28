@@ -44,6 +44,7 @@ class DirectThresholdOptimizer:
         self.weightsArray = None
         self.finalPosteriors = None
         self.predictedLabels = None
+        self.correctnessVector = None
         self.accuracy = None
         self.oneHotGtLabels = None
         self.diffMatrix = None
@@ -55,7 +56,7 @@ class DirectThresholdOptimizer:
         self.powersOfTwoArr = None
         self.activationCodes = None
         self.networkActivationCosts, self.networkActivationCostsDict = \
-            CignActivationCostCalculator.calculate(
+            CignActivationCostCalculator.calculate_mac_cost(
                 network=self.network,
                 node_costs=self.routingData.dictOfDatasets[self.iteration].get_dict("nodeCosts"))
         self.activationCostsArr = None
@@ -85,6 +86,7 @@ class DirectThresholdOptimizer:
                     "networkActivationCosts": self.networkActivationCosts,
                     "activationCostsArr": self.activationCostsArr,
                     "meanActivationCost": self.meanActivationCost,
+                    "correctnessVector": self.correctnessVector,
                     "score": self.score}
         return run_dict
 
@@ -172,7 +174,8 @@ class DirectThresholdOptimizer:
         self.finalPosteriors = tf.reduce_sum(self.weightedPosteriors, axis=-1)
         # Performance
         self.predictedLabels = tf.argmax(self.finalPosteriors, axis=-1)
-        self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictedLabels, self.gtLabels), tf.float64))
+        self.correctnessVector = tf.cast(tf.equal(self.predictedLabels, self.gtLabels), tf.float64)
+        self.accuracy = tf.reduce_mean(self.correctnessVector)
         self.activationCodes = tf.cast(self.selectionTuples, tf.int32) * tf.expand_dims(self.powersOfTwoArr, axis=0)
         self.activationCodes = tf.reduce_sum(self.activationCodes, axis=1) - 1
         self.networkActivationCosts = tf.expand_dims(self.networkActivationCosts, axis=-1)
@@ -252,7 +255,7 @@ class DirectThresholdOptimizer:
             feed_dict[self.thresholds[node.index]] = thresholds_arr
         return feed_dict
 
-    def measure_score(self, sess, indices, iteration, mixing_lambda, temperatures_dict, thresholds_dict):
+    def run_threshold_calculator(self, sess, indices, iteration, mixing_lambda, temperatures_dict, thresholds_dict):
         feed_dict = \
             self.prepare_feed_dict(indices=indices,
                                    iteration=iteration,
@@ -261,6 +264,4 @@ class DirectThresholdOptimizer:
                                    thresholds_dict=thresholds_dict)
         run_dict = self.get_run_dict()
         results = sess.run(run_dict, feed_dict=feed_dict)
-        print("score:{0} accuracy:{1} meanActivationCost:{2}".format(
-            results["score"], results["accuracy"], results["meanActivationCost"]))
-        return results["score"]
+        return results

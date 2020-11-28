@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import os
 from sklearn.model_selection import train_test_split
 from bayes_opt import BayesianOptimization
 
@@ -17,12 +18,10 @@ class MixedBayesianOptimizer:
 
     @staticmethod
     def get_random_thresholds(cluster_count, network, kind):
-        inner_nodes = [node for node in network.topologicalSortedNodes if not node.isLeaf]
-        inner_nodes = sorted(inner_nodes, key=lambda node: node.index)
         list_of_threshold_dicts = []
         for cluster_id in range(cluster_count):
             thresholds_dict = {}
-            for node in inner_nodes:
+            for node in network.innerNodes:
                 child_nodes = network.dagObject.children(node)
                 child_nodes = sorted(child_nodes, key=lambda nd: nd.index)
                 child_count = len(child_nodes)
@@ -39,11 +38,9 @@ class MixedBayesianOptimizer:
 
     @staticmethod
     def calculate_bounds(cluster_count, network, kind):
-        inner_nodes = [node for node in network.topologicalSortedNodes if not node.isLeaf]
-        inner_nodes = sorted(inner_nodes, key=lambda node: node.index)
         pbounds = {}
         for cluster_id in range(cluster_count):
-            for node in inner_nodes:
+            for node in network.innerNodes:
                 child_nodes = network.dagObject.children(node)
                 child_nodes = sorted(child_nodes, key=lambda nd: nd.index)
                 if kind == "probability":
@@ -59,12 +56,10 @@ class MixedBayesianOptimizer:
 
     @staticmethod
     def decode_bayesian_optimization_parameters(args_dict, network, cluster_count, kind):
-        inner_nodes = [node for node in network.topologicalSortedNodes if not node.isLeaf]
-        inner_nodes = sorted(inner_nodes, key=lambda node: node.index)
         list_of_threshold_dicts = []
         for cluster_id in range(cluster_count):
             thrs_dict = {}
-            for node in inner_nodes:
+            for node in network.innerNodes:
                 child_nodes = network.dagObject.children(node)
                 child_nodes = sorted(child_nodes, key=lambda nd: nd.index)
                 if kind == "probabiliy":
@@ -82,14 +77,8 @@ class MixedBayesianOptimizer:
     def optimize(cluster_count, fc_layers, run_id, network, iteration, routing_data, seed, test_ratio):
         indices = np.arange(routing_data.dictOfDatasets[iteration].labelList.shape[0])
         train_indices, test_indices = train_test_split(indices, test_size=test_ratio)
-        inner_nodes = [node for node in network.topologicalSortedNodes if not node.isLeaf]
-        leaf_nodes = [node for node in network.topologicalSortedNodes if node.isLeaf]
-        inner_nodes = sorted(inner_nodes, key=lambda node: node.index)
-        leaf_nodes = sorted(leaf_nodes, key=lambda node: node.index)
-        leaf_indices = {node.index: idx for idx, node in enumerate(leaf_nodes)}
+        leaf_indices = {node.index: idx for idx, node in enumerate(network.leafNodes)}
         label_count = len(set(routing_data.dictOfDatasets[routing_data.iterations[0]].labelList))
-        # dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, iteration=iteration, seed=seed,
-        #                                train_indices=train_indices, test_indices=test_indices)
         # Threshold Optimizer
         dto = DirectThresholdOptimizerEntropy(network=network, routing_data=routing_data, iteration=iteration,
                                               seed=seed,
@@ -99,7 +88,9 @@ class MixedBayesianOptimizer:
         # Clusterer
         bc = BayesianClusterer(network=network, routing_data=routing_data,
                                cluster_count=cluster_count, fc_layers=fc_layers)
-        sess = tf.Session()
+        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+        config = tf.ConfigProto(device_count={'GPU': 0})
+        sess = tf.Session(config=config)
         sess.run(tf.global_variables_initializer())
         mixing_lambda = 1.0
 
@@ -107,30 +98,33 @@ class MixedBayesianOptimizer:
         def f_(**kwargs):
             list_of_threshold_dicts = MixedBayesianOptimizer.decode_bayesian_optimization_parameters(
                 args_dict=kwargs, network=network, cluster_count=cluster_count, kind=dto.kind)
+            cluster_weights = bc.get_cluster_scores(sess=sess, indices=train_indices)
+            correctness_results = []
+            activation_costs = []
+            score_vectors = []
+            accuracies = []
+            for cluster_id in range(cluster_count):
+                thrs_dict = list_of_threshold_dicts[cluster_id]
+                optimizer_results = dto.run_threshold_calculator(sess=sess, indices=train_indices,
+                                                                 iteration=iteration,
+                                                                 temperatures_dict=temperatures_dict,
+                                                                 thresholds_dict=thrs_dict, mixing_lambda=mixing_lambda)
+                correctness_vector = optimizer_results["correctnessVector"]
+                activation_costs_vector = optimizer_results["activationCostsArr"]
+                accuracies.append(optimizer_results["accuracy"])
+                correctness_results.append(correctness_vector)
+                activation_costs.append(activation_costs_vector)
+                score_vector = mixing_lambda * correctness_vector + (1.0 - mixing_lambda) * activation_costs_vector
+                score_vectors.append(score_vector)
+            correctness_matrix = np.stack(correctness_results, axis=-1)
+            activation_cost_matrix = np.stack(activation_costs, axis=-1)
+            scores_matrix = np.stack(score_vectors, axis=-1)
+            weighted_scores_matrix = cluster_weights * scores_matrix
+            weighted_scores_vector = np.sum(weighted_scores_matrix, axis=-1)
+            final_score = np.mean(weighted_scores_vector)
+            return final_score
 
-
-
-
-
-            # Reconstruct the thresholds dict
-            # thrs_dict = {}
-            # for node in inner_nodes:
-            #     child_nodes = network.dagObject.children(node)
-            #     child_nodes = sorted(child_nodes, key=lambda nd: nd.index)
-            #     if dto.kind == "probabiliy":
-            #         thrs_arr = np.array([kwargs["t_{0}_{1}".format(node.index, c_nd.index)] for c_nd in child_nodes])
-            #         thrs_dict[node.index] = thrs_arr[np.newaxis, :]
-            #     elif dto.kind == "entropy":
-            #         thrs_dict[node.index] = kwargs["t_{0}".format(node.index)]
-            #     else:
-            #         raise NotImplementedError()
-            # # Calculate the score
-            # scr = dto.measure_score(sess=sess, indices=train_indices,
-            #                         iteration=iteration, temperatures_dict=temperatures_dict,
-            #                         thresholds_dict=thrs_dict, mixing_lambda=mixing_lambda)
-            # return scr
-
-        pbounds = MixedBayesianOptimizer.calculate_bounds(network=network, kind=dto.kind)
+        pbounds = MixedBayesianOptimizer.calculate_bounds(cluster_count=cluster_count, network=network, kind=dto.kind)
         optimizer = BayesianOptimization(
             f=f_,
             pbounds=pbounds,
