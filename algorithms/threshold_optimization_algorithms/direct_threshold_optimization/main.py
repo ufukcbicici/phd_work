@@ -66,11 +66,13 @@ def train_direct_threshold_optimizer():
                                                                degree_list_=[2, 2],
                                                                test_iterations_=[43680, 44160, 44640, 45120, 45600,
                                                                                  46080, 46560, 47040, 47520, 48000])
+        routing_data.apply_validation_test_split(test_ratio=0.1)
+        routing_data.switch_to_single_iteration_mode()
 
         MixedBayesianOptimizer.optimize(optimization_iterations_count=3,
                                         run_id=network_id,
                                         network=network,
-                                        iteration=iteration,
+                                        iteration=0,
                                         routing_data=routing_data,
                                         seed=seed,
                                         test_ratio=0.1,

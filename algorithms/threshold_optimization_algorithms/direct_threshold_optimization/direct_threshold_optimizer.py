@@ -13,10 +13,9 @@ from algorithms.network_calibration import NetworkCalibrationWithTemperatureScal
 class DirectThresholdOptimizer:
     def __init__(self, network, routing_data, seed, train_indices, test_indices):
         self.network = network
-        self.routingData = routing_data
         self.seed = seed
         self.leafIndices = {node.index: idx for idx, node in enumerate(self.network.leafNodes)}
-        self.labelCount = len(set(self.routingData.labelList))
+        self.labelCount = len(set(routing_data.labelList))
         self.posteriorsDict = None
         self.gtLabels = None
         self.sigmoidDecay = None
@@ -53,7 +52,7 @@ class DirectThresholdOptimizer:
         self.networkActivationCosts, self.networkActivationCostsDict = \
             CignActivationCostCalculator.calculate_mac_cost(
                 network=self.network,
-                node_costs=self.routingData.dictOfDatasets[self.iteration].get_dict("nodeCosts"))
+                node_costs=routing_data.get_dict("nodeCosts"))
         self.activationCostsArr = None
         self.meanActivationCost = None
         self.mixingLambda = None
@@ -159,12 +158,14 @@ class DirectThresholdOptimizer:
         self.prepare_branching()
 
         # Combine all weights
-        self.selectionTuples = tf.stack(values=[self.pathScores[node.index] for node in self.network.leafNodes], axis=-1)
+        self.selectionTuples = tf.stack(values=[self.pathScores[node.index] for node in self.network.leafNodes],
+                                        axis=-1)
         self.weightsArray = tf.reduce_sum(self.selectionTuples, axis=1, keepdims=True)
         self.weightsArray = tf.reciprocal(self.weightsArray)
         self.selectionWeights = self.selectionTuples * self.weightsArray
         # Combine all posteriors
-        self.posteriorsTensor = tf.stack(values=[self.posteriorsDict[node.index] for node in self.network.leafNodes], axis=-1)
+        self.posteriorsTensor = tf.stack(values=[self.posteriorsDict[node.index] for node in self.network.leafNodes],
+                                         axis=-1)
         self.weightedPosteriors = self.posteriorsTensor * tf.expand_dims(self.selectionWeights, axis=1)
         self.finalPosteriors = tf.reduce_sum(self.weightedPosteriors, axis=-1)
         # Performance
@@ -188,17 +189,17 @@ class DirectThresholdOptimizer:
         # self.totalOptimizer = tf.train.AdamOptimizer().minimize(self.meanSquaredLoss,
         #                                                         global_step=self.totalGlobalStep)
 
-    def prepare_feed_dict(self, indices, mixing_lambda, temperatures_dict, thresholds_dict):
+    def prepare_feed_dict(self, routing_data, indices, mixing_lambda, temperatures_dict, thresholds_dict):
         feed_dict = {}
-        feed_dict[self.gtLabels] = self.routingData.labelList[indices]
+        feed_dict[self.gtLabels] = routing_data.labelList[indices]
         feed_dict[self.mixingLambda] = mixing_lambda
         # Leaf nodes
         for node in self.network.leafNodes:
-            arr = self.routingData.get_dict("posterior_probs")[node.index][indices]
+            arr = routing_data.get_dict("posterior_probs")[node.index][indices]
             feed_dict[self.posteriorsDict[node.index]] = arr
         # Inner nodes
         for node in self.network.innerNodes:
-            logits_arr = self.routingData.get_dict("activations")[node.index][indices]
+            logits_arr = routing_data.get_dict("activations")[node.index][indices]
             temperature = temperatures_dict[node.index]
             thresholds_arr = thresholds_dict[node.index]
             feed_dict[self.branchingLogits[node.index]] = logits_arr
@@ -206,9 +207,10 @@ class DirectThresholdOptimizer:
             feed_dict[self.thresholds[node.index]] = thresholds_arr
         return feed_dict
 
-    def run_threshold_calculator(self, sess, indices, mixing_lambda, temperatures_dict, thresholds_dict):
+    def run_threshold_calculator(self, sess, routing_data, indices, mixing_lambda, temperatures_dict, thresholds_dict):
         feed_dict = \
-            self.prepare_feed_dict(indices=indices,
+            self.prepare_feed_dict(routing_data=routing_data,
+                                   indices=indices,
                                    mixing_lambda=mixing_lambda,
                                    temperatures_dict=temperatures_dict,
                                    thresholds_dict=thresholds_dict)

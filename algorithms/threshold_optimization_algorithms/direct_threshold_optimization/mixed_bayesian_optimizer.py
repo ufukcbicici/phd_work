@@ -91,6 +91,7 @@ class MixedBayesianOptimizer:
         for cluster_id in range(cluster_count):
             thrs_dict = list_of_threshold_dicts[cluster_id]
             optimizer_results = threshold_optimizer.run_threshold_calculator(sess=sess,
+                                                                             routing_data=routing_data,
                                                                              indices=indices,
                                                                              mixing_lambda=mixing_lambda,
                                                                              temperatures_dict=temperatures_dict,
@@ -124,8 +125,8 @@ class MixedBayesianOptimizer:
     @staticmethod
     def optimize(optimization_iterations_count, iteration,
                  cluster_count, fc_layers, run_id, network, routing_data, seed, test_ratio):
-        indices = np.arange(routing_data.labelList.shape[0])
-        train_indices, test_indices = train_test_split(indices, test_size=test_ratio)
+        train_indices = routing_data.trainingIndices
+        test_indices = routing_data.testIndices
         # Learn the standard information gain based accuracies
         train_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=network,
                                                                                routing_data=routing_data,
@@ -170,7 +171,12 @@ class MixedBayesianOptimizer:
                     temperatures_dict=temperatures_dict,
                     mixing_lambda=mixing_lambda)
                 results_dict[data_type] = results
-            print("Train Accuracy: {0} Train Computation Load:{1} Train Score:{2}".format(results_dict["train"]))
+            print("Train Accuracy: {0} Train Computation Load:{1} Train Score:{2}".format(
+                results_dict["train"]["final_accuracy"],
+                results_dict["train"]["final_cost"], results_dict["train"]["final_score"]))
+            print("Test Accuracy: {0} Test Computation Load:{1} Test Score:{2}".format(
+                results_dict["test"]["final_accuracy"],
+                results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
 
         pbounds = MixedBayesianOptimizer.calculate_bounds(cluster_count=cluster_count, network=network, kind=dto.kind)
 

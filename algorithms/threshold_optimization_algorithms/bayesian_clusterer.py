@@ -46,9 +46,13 @@ class BayesianClusterer:
             self.weightedScoresVector = tf.reduce_sum(self.weightedScores, axis=1)
             self.totalScore = tf.reduce_mean(self.weightedScoresVector)
 
-    def get_cluster_scores(self, sess, features):
-        results = sess.run([self.clustererOutput], feed_dict={self.netInput: features})
-        cluster_scores = results[0]
+    def get_cluster_scores(self, sess, features, batch_size=10000):
+        cluster_scores_list = []
+        for batch_idx in range(0, features.shape[0], batch_size):
+            X_batch = features[batch_idx: batch_idx + batch_size]
+            cluster_scores_batch = sess.run([self.clustererOutput], feed_dict={self.netInput: X_batch})[0]
+            cluster_scores_list.append(cluster_scores_batch)
+        cluster_scores = np.concatenate(cluster_scores_list, axis=0)
         return cluster_scores
 
     def optimize_clustering(self, sess, features, scores, batch_size=256, iteration_count=10000):
