@@ -12,6 +12,8 @@ class BayesianClusterer:
         self.rootNode = [node for node in self.network.topologicalSortedNodes if node.isRoot]
         self.routingData = routing_data
         self.featureName = feature_name
+        self.globalStep = None
+        self.optimizer = None
         with tf.variable_scope("clusterer"):
             assert len(self.rootNode) == 1
             self.rootNode = self.rootNode[0]
@@ -38,12 +40,42 @@ class BayesianClusterer:
                     net = tf.nn.relu(net)
                 else:
                     self.clustererOutput = tf.nn.softmax(net)
+            # Optimizer
+            self.scoresMatrix = tf.placeholder(dtype=tf.float32, shape=[None, cluster_count], name="scores_matrix")
+            self.weightedScores = self.clustererOutput * self.scoresMatrix
+            self.weightedScoresVector = tf.reduce_sum(self.weightedScores, axis=1)
+            self.totalScore = tf.reduce_mean(self.weightedScoresVector)
 
-    def get_cluster_scores(self, sess, indices):
-        feature_arr = self.routingData.get_dict(self.featureName)[self.rootNode.index]
-        X = feature_arr[indices]
-        results = sess.run([self.clustererOutput], feed_dict={self.netInput: X})
+    def get_cluster_scores(self, sess, features):
+        results = sess.run([self.clustererOutput], feed_dict={self.netInput: features})
         cluster_scores = results[0]
         return cluster_scores
+
+    def optimize_clustering(self, sess, features, scores, batch_size=256, iteration_count=10000):
+        # X = feature_arr[indices]
+        assert features.shape[0] == scores.shape[0]
+        losses = []
+        # Set up a new solver
+        self.globalStep = tf.Variable(0, name='global_step', trainable=False)
+        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalScore, global_step=self.globalStep)
+        for iteration_id in range(iteration_count):
+            sample_indices = np.random.choice(np.arange(features.shape[0]), size=batch_size, replace=True)
+            X = features[sample_indices]
+            scores_sample = scores[sample_indices]
+            results = sess.run([self.totalScore, self.optimizer],
+                               feed_dict={self.netInput: X, self.scoresMatrix: scores_sample})
+            losses.append(results[0])
+            if len(losses) == 10:
+                curr_score = np.mean(np.array(losses))
+                losses = []
+                print("Bayesian Clusterer Iteration Id:{0} Curr Score:{1}".format(iteration_id, curr_score))
+
+
+
+
+
+
+
+
 
 

@@ -4,6 +4,7 @@ import os
 from sklearn.model_selection import train_test_split
 from bayes_opt import BayesianOptimization
 
+from algorithms.branching_probability_calibration import BranchingProbabilityOptimization
 from algorithms.information_gain_routing_accuracy_calculator import InformationGainRoutingAccuracyCalculator
 from algorithms.threshold_optimization_algorithms.bayesian_clusterer import BayesianClusterer
 from algorithms.threshold_optimization_algorithms.deep_q_networks.dqn_networks import DeepQNetworks
@@ -75,11 +76,59 @@ class MixedBayesianOptimizer:
         return list_of_threshold_dicts
 
     @staticmethod
-    def optimize(cluster_count, fc_layers, run_id, network, iteration, routing_data, seed, test_ratio):
+    def get_thresholding_results(sess, clusterer, cluster_count,
+                                 threshold_optimizer, routing_data, indices,
+                                 list_of_threshold_dicts, mixing_lambda):
+        # Get features for training samples
+        features = routing_data.get_dict("pre_branch_feature")[0][indices]
+        # Get cluster weights for training samples
+        cluster_weights = clusterer.get_cluster_scores(sess=sess, features=features)
+        # Get thresholding results for all clusters
+        correctness_results = []
+        activation_costs = []
+        score_vectors = []
+        accuracies = []
+        for cluster_id in range(cluster_count):
+            thrs_dict = list_of_threshold_dicts[cluster_id]
+            optimizer_results = threshold_optimizer.run_threshold_calculator(sess=sess, indices=train_indices,
+                                                                             iteration=iteration,
+                                                                             temperatures_dict=temperatures_dict,
+                                                                             thresholds_dict=thrs_dict,
+                                                                             mixing_lambda=mixing_lambda)
+
+        # # Get scores for both clusters
+        # correctness_results = []
+        # activation_costs = []
+        # score_vectors = []
+        # accuracies = []
+        # for cluster_id in range(cluster_count):
+        #     thrs_dict = list_of_threshold_dicts[cluster_id]
+        #     optimizer_results = dto.run_threshold_calculator(sess=sess, indices=train_indices,
+        #                                                      iteration=iteration,
+        #                                                      temperatures_dict=temperatures_dict,
+        #                                                      thresholds_dict=thrs_dict, mixing_lambda=mixing_lambda)
+        #     correctness_vector = optimizer_results["correctnessVector"]
+        #     activation_costs_vector = optimizer_results["activationCostsArr"]
+        #     accuracies.append(optimizer_results["accuracy"])
+        #     correctness_results.append(correctness_vector)
+        #     activation_costs.append(activation_costs_vector)
+        #     score_vector = mixing_lambda * correctness_vector + (1.0 - mixing_lambda) * activation_costs_vector
+        #     score_vectors.append(score_vector)
+        # correctness_matrix = np.stack(correctness_results, axis=-1)
+        # activation_cost_matrix = np.stack(activation_costs, axis=-1)
+        # scores_matrix = np.stack(score_vectors, axis=-1)
+        # weighted_scores_matrix = cluster_weights * scores_matrix
+        # weighted_scores_vector = np.sum(weighted_scores_matrix, axis=-1)
+        # final_score = np.mean(weighted_scores_vector)
+        # return final_score
+
+    @staticmethod
+    def optimize(optimization_iterations_count,
+                 cluster_count, fc_layers, run_id, network, iteration, routing_data, seed, test_ratio):
         indices = np.arange(routing_data.dictOfDatasets[iteration].labelList.shape[0])
         train_indices, test_indices = train_test_split(indices, test_size=test_ratio)
-        leaf_indices = {node.index: idx for idx, node in enumerate(network.leafNodes)}
-        label_count = len(set(routing_data.dictOfDatasets[routing_data.iterations[0]].labelList))
+        # leaf_indices = {node.index: idx for idx, node in enumerate(network.leafNodes)}
+        # label_count = len(set(routing_data.dictOfDatasets[routing_data.iterations[0]].labelList))
         # Learn the standard information gain based accuracies
         train_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=network,
                                                                                routing_data=routing_data,
@@ -93,7 +142,9 @@ class MixedBayesianOptimizer:
         dto = DirectThresholdOptimizerEntropy(network=network, routing_data=routing_data, iteration=iteration,
                                               seed=seed,
                                               train_indices=train_indices, test_indices=test_indices)
-        temperatures_dict = dto.calibrate_branching_probabilities(run_id=run_id, iteration=iteration, seed=seed)
+        temperatures_dict = BranchingProbabilityOptimization.calibrate_branching_probabilities(
+            network=network, routing_data=routing_data.dictOfDatasets[iteration], run_id=run_id,
+            iteration=iteration, indices=train_indices, seed=seed)
         dto.build_network()
         # Clusterer
         bc = BayesianClusterer(network=network, routing_data=routing_data,
@@ -106,9 +157,14 @@ class MixedBayesianOptimizer:
 
         # Loss Function
         def f_(**kwargs):
+            # Convert Bayesian Optimization space sample into usable thresholds
             list_of_threshold_dicts = MixedBayesianOptimizer.decode_bayesian_optimization_parameters(
                 args_dict=kwargs, network=network, cluster_count=cluster_count, kind=dto.kind)
-            cluster_weights = bc.get_cluster_scores(sess=sess, indices=train_indices)
+            # Get features for training samples
+            features = routing_data.dictOfDatasets[iteration].get_dict("pre_branch_feature")[0][train_indices]
+            # Get cluster weights for training samples
+            cluster_weights = bc.get_cluster_scores(sess=sess, features=features)
+            # Get scores for both clusters
             correctness_results = []
             activation_costs = []
             score_vectors = []
@@ -135,14 +191,19 @@ class MixedBayesianOptimizer:
             return final_score
 
         pbounds = MixedBayesianOptimizer.calculate_bounds(cluster_count=cluster_count, network=network, kind=dto.kind)
-        optimizer = BayesianOptimization(
-            f=f_,
-            pbounds=pbounds,
-        )
-        optimizer.maximize(
-            init_points=1000,
-            n_iter=1000,
-            acq="ei",
-            xi=0.0
-        )
+        for iteration_id in range(optimization_iterations_count):
+            optimizer = BayesianOptimization(
+                f=f_,
+                pbounds=pbounds,
+            )
+            optimizer.maximize(
+                init_points=1000,
+                n_iter=1000,
+                acq="ei",
+                xi=0.0
+            )
+            best_params = optimizer.max["params"]
+            list_of_best_thresholds = MixedBayesianOptimizer.decode_bayesian_optimization_parameters(
+                args_dict=best_params, network=network, cluster_count=cluster_count, kind=dto.kind)
+
         print("X")
