@@ -67,7 +67,8 @@ def train_direct_threshold_optimizer():
                                                                test_iterations_=[43680, 44160, 44640, 45120, 45600,
                                                                                  46080, 46560, 47040, 47520, 48000])
 
-        MixedBayesianOptimizer.optimize(run_id=network_id,
+        MixedBayesianOptimizer.optimize(optimization_iterations_count=3,
+                                        run_id=network_id,
                                         network=network,
                                         iteration=iteration,
                                         routing_data=routing_data,

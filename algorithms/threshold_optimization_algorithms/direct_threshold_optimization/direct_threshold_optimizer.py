@@ -188,18 +188,17 @@ class DirectThresholdOptimizer:
         # self.totalOptimizer = tf.train.AdamOptimizer().minimize(self.meanSquaredLoss,
         #                                                         global_step=self.totalGlobalStep)
 
-    def prepare_feed_dict(self, indices, iteration, mixing_lambda, temperatures_dict, thresholds_dict):
+    def prepare_feed_dict(self, indices, mixing_lambda, temperatures_dict, thresholds_dict):
         feed_dict = {}
-        routing_obj = self.routingData.dictOfDatasets[iteration]
-        feed_dict[self.gtLabels] = routing_obj.labelList[indices]
+        feed_dict[self.gtLabels] = self.routingData.labelList[indices]
         feed_dict[self.mixingLambda] = mixing_lambda
         # Leaf nodes
         for node in self.network.leafNodes:
-            arr = routing_obj.get_dict("posterior_probs")[node.index][indices]
+            arr = self.routingData.get_dict("posterior_probs")[node.index][indices]
             feed_dict[self.posteriorsDict[node.index]] = arr
         # Inner nodes
         for node in self.network.innerNodes:
-            logits_arr = routing_obj.get_dict("activations")[node.index][indices]
+            logits_arr = self.routingData.get_dict("activations")[node.index][indices]
             temperature = temperatures_dict[node.index]
             thresholds_arr = thresholds_dict[node.index]
             feed_dict[self.branchingLogits[node.index]] = logits_arr
@@ -207,10 +206,9 @@ class DirectThresholdOptimizer:
             feed_dict[self.thresholds[node.index]] = thresholds_arr
         return feed_dict
 
-    def run_threshold_calculator(self, sess, indices, iteration, mixing_lambda, temperatures_dict, thresholds_dict):
+    def run_threshold_calculator(self, sess, indices, mixing_lambda, temperatures_dict, thresholds_dict):
         feed_dict = \
             self.prepare_feed_dict(indices=indices,
-                                   iteration=iteration,
                                    mixing_lambda=mixing_lambda,
                                    temperatures_dict=temperatures_dict,
                                    thresholds_dict=thresholds_dict)

@@ -1,22 +1,13 @@
 import tensorflow as tf
-import numpy as np
-import os
-import pickle
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
-from collections import Counter
 
-from algorithms.cign_activation_cost_calculator import CignActivationCostCalculator
-from algorithms.info_gain import InfoGainLoss
-from algorithms.network_calibration import NetworkCalibrationWithTemperatureScaling
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer import \
     DirectThresholdOptimizer
 from simple_tf.global_params import GlobalConstants
 
 
 class DirectThresholdOptimizerEntropy(DirectThresholdOptimizer):
-    def __init__(self, network, routing_data, iteration, seed, train_indices, test_indices):
-        super().__init__(network, routing_data, iteration, seed, train_indices, test_indices)
+    def __init__(self, network, routing_data, seed, train_indices, test_indices):
+        super().__init__(network, routing_data, seed, train_indices, test_indices)
         self.entropies = {}
         self.kind = "entropy"
 
