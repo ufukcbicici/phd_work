@@ -177,11 +177,13 @@ class MixedBayesianOptimizer:
             print("Test Accuracy: {0} Test Computation Load:{1} Test Score:{2}".format(
                 results_dict["test"]["final_accuracy"],
                 results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
+            return results_dict["train"]["final_cost"]
 
         pbounds = MixedBayesianOptimizer.calculate_bounds(cluster_count=cluster_count, network=network, kind=dto.kind)
 
         # Two - Phase optimization iterations
         for iteration_id in range(optimization_iterations_count):
+            # Phase - 1 Bayesian Optimization of the thresholds
             optimizer = BayesianOptimization(
                 f=f_,
                 pbounds=pbounds,
@@ -193,7 +195,23 @@ class MixedBayesianOptimizer:
                 xi=0.0
             )
             best_params = optimizer.max["params"]
+            f_(**best_params)
+            # Phase - 2 Gradient Based Optimization of the Clusterer
             list_of_best_thresholds = MixedBayesianOptimizer.decode_bayesian_optimization_parameters(
                 args_dict=best_params, network=network, cluster_count=cluster_count, kind=dto.kind)
-
+            res = MixedBayesianOptimizer.get_thresholding_results(
+                sess=sess,
+                clusterer=bc,
+                cluster_count=cluster_count,
+                threshold_optimizer=dto,
+                routing_data=routing_data,
+                indices=train_indices,
+                list_of_threshold_dicts=list_of_best_thresholds,
+                temperatures_dict=temperatures_dict,
+                mixing_lambda=mixing_lambda)
+            features = routing_data.get_dict("pre_branch_feature")[0][train_indices]
+            scores_after_bo = res["scores_matrix"]
+            assert features.shape[0] == scores_after_bo.shape[0]
+            bc.optimize_clustering(sess=sess, features=features, scores=scores_after_bo)
+            f_(**best_params)
         print("X")
