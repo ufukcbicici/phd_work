@@ -177,7 +177,7 @@ class MixedBayesianOptimizer:
             print("Test Accuracy: {0} Test Computation Load:{1} Test Score:{2}".format(
                 results_dict["test"]["final_accuracy"],
                 results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
-            return results_dict["train"]["final_cost"]
+            return results_dict["train"]["final_score"]
 
         pbounds = MixedBayesianOptimizer.calculate_bounds(cluster_count=cluster_count, network=network, kind=dto.kind)
 
