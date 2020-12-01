@@ -62,6 +62,9 @@ class BayesianClusterer:
         # Set up a new solver
         self.globalStep = tf.Variable(0, name='global_step', trainable=False)
         self.optimizer = tf.train.AdamOptimizer().minimize(self.totalScore, global_step=self.globalStep)
+        trainable_variables = set(tf.trainable_variables())
+        non_trainable_variables = [vr for vr in tf.global_variables() if vr not in trainable_variables]
+        sess.run(tf.variables_initializer(non_trainable_variables))
         for iteration_id in range(iteration_count):
             sample_indices = np.random.choice(np.arange(features.shape[0]), size=batch_size, replace=True)
             X = features[sample_indices]

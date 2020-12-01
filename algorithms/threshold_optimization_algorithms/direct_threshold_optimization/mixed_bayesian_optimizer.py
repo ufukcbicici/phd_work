@@ -17,6 +17,8 @@ from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 
 
 class MixedBayesianOptimizer:
+    train_accuracies = []
+    test_accuracies = []
 
     @staticmethod
     def get_random_thresholds(cluster_count, network, kind):
@@ -64,7 +66,7 @@ class MixedBayesianOptimizer:
             for node in network.innerNodes:
                 child_nodes = network.dagObject.children(node)
                 child_nodes = sorted(child_nodes, key=lambda nd: nd.index)
-                if kind == "probabiliy":
+                if kind == "probability":
                     thrs_arr = np.array([args_dict["c_{0}_t_{1}_{2}".format(cluster_id, node.index, c_nd.index)]
                                          for c_nd in child_nodes])
                     thrs_dict[node.index] = thrs_arr[np.newaxis, :]
@@ -137,8 +139,7 @@ class MixedBayesianOptimizer:
         print("train_ig_accuracy={0}".format(train_ig_accuracy))
         print("test_ig_accuracy={0}".format(test_ig_accuracy))
         # Threshold Optimizer
-        dto = DirectThresholdOptimizerEntropy(network=network, routing_data=routing_data, seed=seed,
-                                              train_indices=train_indices, test_indices=test_indices)
+        dto = DirectThresholdOptimizerEntropy(network=network, routing_data=routing_data, seed=seed)
         temperatures_dict = BranchingProbabilityOptimization.calibrate_branching_probabilities(
             network=network, routing_data=routing_data, run_id=run_id, iteration=iteration, indices=train_indices,
             seed=seed)
@@ -146,9 +147,10 @@ class MixedBayesianOptimizer:
         # Clusterer
         bc = BayesianClusterer(network=network, routing_data=routing_data, cluster_count=cluster_count,
                                fc_layers=fc_layers)
-        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-        config = tf.ConfigProto(device_count={'GPU': 0})
-        sess = tf.Session(config=config)
+        # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+        # config = tf.ConfigProto(device_count={'GPU': 0})
+        # sess = tf.Session(config=config)
+        sess = tf.Session()
         sess.run(tf.global_variables_initializer())
         mixing_lambda = 1.0
 
@@ -177,6 +179,8 @@ class MixedBayesianOptimizer:
             print("Test Accuracy: {0} Test Computation Load:{1} Test Score:{2}".format(
                 results_dict["test"]["final_accuracy"],
                 results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
+            MixedBayesianOptimizer.train_accuracies.append(results_dict["train"]["final_accuracy"])
+            MixedBayesianOptimizer.test_accuracies.append(results_dict["test"]["final_accuracy"])
             return results_dict["train"]["final_score"]
 
         pbounds = MixedBayesianOptimizer.calculate_bounds(cluster_count=cluster_count, network=network, kind=dto.kind)
@@ -189,8 +193,8 @@ class MixedBayesianOptimizer:
                 pbounds=pbounds,
             )
             optimizer.maximize(
-                init_points=1000,
-                n_iter=1000,
+                init_points=100,
+                n_iter=100,
                 acq="ei",
                 xi=0.0
             )

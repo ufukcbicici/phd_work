@@ -11,7 +11,7 @@ from algorithms.network_calibration import NetworkCalibrationWithTemperatureScal
 
 
 class DirectThresholdOptimizer:
-    def __init__(self, network, routing_data, seed, train_indices, test_indices):
+    def __init__(self, network, routing_data, seed):
         self.network = network
         self.seed = seed
         self.leafIndices = {node.index: idx for idx, node in enumerate(self.network.leafNodes)}
@@ -22,7 +22,6 @@ class DirectThresholdOptimizer:
         self.useHardThreshold = None
         self.branchingLogits = None
         self.temperatures = None
-        self.trainIndices, self.testIndices = train_indices, test_indices
         self.routingProbabilities = None
         self.routingProbabilitiesUncalibrated = None
         self.thresholds = None
@@ -190,9 +189,7 @@ class DirectThresholdOptimizer:
         #                                                         global_step=self.totalGlobalStep)
 
     def prepare_feed_dict(self, routing_data, indices, mixing_lambda, temperatures_dict, thresholds_dict):
-        feed_dict = {}
-        feed_dict[self.gtLabels] = routing_data.labelList[indices]
-        feed_dict[self.mixingLambda] = mixing_lambda
+        feed_dict = {self.gtLabels: routing_data.labelList[indices], self.mixingLambda: mixing_lambda}
         # Leaf nodes
         for node in self.network.leafNodes:
             arr = routing_data.get_dict("posterior_probs")[node.index][indices]

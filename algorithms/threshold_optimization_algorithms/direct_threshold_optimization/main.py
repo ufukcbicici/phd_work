@@ -23,6 +23,8 @@ from algorithms.threshold_optimization_algorithms.deep_q_networks.q_learning_thr
     QLearningThresholdOptimizer
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer import \
     DirectThresholdOptimizer
+from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.ig_clustered_bayesian_optimization import \
+    IgBasedBayesianOptimization
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.mixed_bayesian_optimizer import \
     MixedBayesianOptimizer
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -69,15 +71,18 @@ def train_direct_threshold_optimizer():
         routing_data.apply_validation_test_split(test_ratio=0.1)
         routing_data.switch_to_single_iteration_mode()
 
-        MixedBayesianOptimizer.optimize(optimization_iterations_count=3,
-                                        run_id=network_id,
-                                        network=network,
-                                        iteration=0,
-                                        routing_data=routing_data,
-                                        seed=seed,
-                                        test_ratio=0.1,
-                                        cluster_count=2,
-                                        fc_layers=[64, 32])
+        IgBasedBayesianOptimization.optimize(run_id=network_id, network=network,
+                                             routing_data=routing_data, seed=seed, test_ratio=0.1, mixing_lambda=1.0)
+
+        # MixedBayesianOptimizer.optimize(optimization_iterations_count=3,
+        #                                 run_id=network_id,
+        #                                 network=network,
+        #                                 iteration=0,
+        #                                 routing_data=routing_data,
+        #                                 seed=seed,
+        #                                 test_ratio=0.1,
+        #                                 cluster_count=2,
+        #                                 fc_layers=[64, 32])
 
         # dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, seed=seed)
         # dto.train(run_id=network_id, iteration=43680)
