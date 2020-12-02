@@ -177,7 +177,7 @@ class DirectThresholdOptimizer:
         self.activationCodes = tf.stack([self.activationCodes, tf.zeros_like(self.activationCodes)], axis=1)
         self.activationCostsArr = tf.gather_nd(self.networkActivationCosts, self.activationCodes)
         self.meanActivationCost = tf.reduce_mean(self.activationCostsArr)
-        self.score = self.mixingLambda * self.accuracy + (1.0 - self.mixingLambda) * self.meanActivationCost
+        self.score = self.mixingLambda * self.accuracy - (1.0 - self.mixingLambda) * self.meanActivationCost
         # Loss for accuracy metric
         # self.oneHotGtLabels = tf.one_hot(self.gtLabels, self.labelCount)
         # self.diffMatrix = self.finalPosteriors - self.oneHotGtLabels

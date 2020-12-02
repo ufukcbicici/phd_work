@@ -65,7 +65,7 @@ class IgBasedBayesianOptimization:
                 "score": optimizer_results["score"]}
 
     @staticmethod
-    def optimize(run_id, network, routing_data, seed, mixing_lambda, test_ratio):
+    def optimize(run_id, network, routing_data, seed, mixing_lambda):
         train_indices = routing_data.trainingIndices
         test_indices = routing_data.testIndices
         # Learn the standard information gain based accuracies
@@ -208,9 +208,9 @@ class IgBasedBayesianOptimization:
             )
             optimizer.maximize(
                 init_points=100,
-                n_iter=500,
+                n_iter=250,
                 acq="ei",
-                xi=0.0
+                xi=0.1
             )
             best_params = optimizer.max["params"]
             bo_cost_function(**best_params)

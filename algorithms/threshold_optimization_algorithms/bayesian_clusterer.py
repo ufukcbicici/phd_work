@@ -55,13 +55,21 @@ class BayesianClusterer:
         cluster_scores = np.concatenate(cluster_scores_list, axis=0)
         return cluster_scores
 
-    def optimize_clustering(self, sess, features, scores, batch_size=256, iteration_count=10000):
+    def optimize_clustering(self, sess, features, scores, accuracies, batch_size=256, iteration_count=10000):
+        # Detect classes which are detected by some clusters
+        # cluster_count = accuracies.shape[1]
+        # accuracy_sums = np.sum(accuracies, axis=1)
+        # arr_A = accuracy_sums > 0
+        # arr_B = accuracy_sums < cluster_count
+        # cluster_target_filter = np.logical_and(arr_A, arr_B)
+        # features = features[cluster_target_filter]
+        # scores = scores[cluster_target_filter]
         # X = feature_arr[indices]
         assert features.shape[0] == scores.shape[0]
         losses = []
         # Set up a new solver
         self.globalStep = tf.Variable(0, name='global_step', trainable=False)
-        self.optimizer = tf.train.AdamOptimizer().minimize(self.totalScore, global_step=self.globalStep)
+        self.optimizer = tf.train.AdamOptimizer().minimize(-self.totalScore, global_step=self.globalStep)
         trainable_variables = set(tf.trainable_variables())
         non_trainable_variables = [vr for vr in tf.global_variables() if vr not in trainable_variables]
         sess.run(tf.variables_initializer(non_trainable_variables))

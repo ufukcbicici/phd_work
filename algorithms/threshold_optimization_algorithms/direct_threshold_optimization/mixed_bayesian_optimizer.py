@@ -14,6 +14,7 @@ from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.
     DirectThresholdOptimizerEntropy
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
+from collections import Counter
 
 
 class MixedBayesianOptimizer:
@@ -78,13 +79,18 @@ class MixedBayesianOptimizer:
         return list_of_threshold_dicts
 
     @staticmethod
-    def get_thresholding_results(sess, clusterer, cluster_count,
+    def get_thresholding_results(sess, optimization_step, clusterer, cluster_count,
                                  threshold_optimizer, routing_data, indices,
                                  list_of_threshold_dicts, temperatures_dict, mixing_lambda):
         # Get features for training samples
         features = routing_data.get_dict("pre_branch_feature")[0][indices]
         # Get cluster weights for training samples
         cluster_weights = clusterer.get_cluster_scores(sess=sess, features=features)
+        c_ids = np.argmax(cluster_weights, axis=1)
+        print(Counter(c_ids))
+        if optimization_step == 0:
+            cluster_weights = np.ones_like(cluster_weights)
+            cluster_weights = (1.0 / cluster_weights.shape[1]) * cluster_weights
         # Get thresholding results for all clusters
         correctness_results = []
         activation_costs = []
@@ -153,40 +159,41 @@ class MixedBayesianOptimizer:
         sess = tf.Session()
         sess.run(tf.global_variables_initializer())
         mixing_lambda = 1.0
-
-        # Loss Function
-        def f_(**kwargs):
-            # Convert Bayesian Optimization space sample into usable thresholds
-            list_of_threshold_dicts = MixedBayesianOptimizer.decode_bayesian_optimization_parameters(
-                args_dict=kwargs, network=network, cluster_count=cluster_count, kind=dto.kind)
-            results_dict = {}
-            sample_indices = {"train": train_indices, "test": test_indices}
-            for data_type in ["train", "test"]:
-                results = MixedBayesianOptimizer.get_thresholding_results(
-                    sess=sess,
-                    clusterer=bc,
-                    cluster_count=cluster_count,
-                    threshold_optimizer=dto,
-                    routing_data=routing_data,
-                    indices=sample_indices[data_type],
-                    list_of_threshold_dicts=list_of_threshold_dicts,
-                    temperatures_dict=temperatures_dict,
-                    mixing_lambda=mixing_lambda)
-                results_dict[data_type] = results
-            print("Train Accuracy: {0} Train Computation Load:{1} Train Score:{2}".format(
-                results_dict["train"]["final_accuracy"],
-                results_dict["train"]["final_cost"], results_dict["train"]["final_score"]))
-            print("Test Accuracy: {0} Test Computation Load:{1} Test Score:{2}".format(
-                results_dict["test"]["final_accuracy"],
-                results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
-            MixedBayesianOptimizer.train_accuracies.append(results_dict["train"]["final_accuracy"])
-            MixedBayesianOptimizer.test_accuracies.append(results_dict["test"]["final_accuracy"])
-            return results_dict["train"]["final_score"]
-
         pbounds = MixedBayesianOptimizer.calculate_bounds(cluster_count=cluster_count, network=network, kind=dto.kind)
 
         # Two - Phase optimization iterations
         for iteration_id in range(optimization_iterations_count):
+            # Loss Function
+            def f_(**kwargs):
+                # Convert Bayesian Optimization space sample into usable thresholds
+                list_of_threshold_dicts = MixedBayesianOptimizer.decode_bayesian_optimization_parameters(
+                    args_dict=kwargs, network=network, cluster_count=cluster_count, kind=dto.kind)
+                results_dict = {}
+                sample_indices = {"train": train_indices, "test": test_indices}
+                for data_type in ["train", "test"]:
+                    results = MixedBayesianOptimizer.get_thresholding_results(
+                        sess=sess,
+                        optimization_step=iteration_id,
+                        clusterer=bc,
+                        cluster_count=cluster_count,
+                        threshold_optimizer=dto,
+                        routing_data=routing_data,
+                        indices=sample_indices[
+                            data_type],
+                        list_of_threshold_dicts=list_of_threshold_dicts,
+                        temperatures_dict=temperatures_dict,
+                        mixing_lambda=mixing_lambda)
+                    results_dict[data_type] = results
+                print("Train Accuracy: {0} Train Computation Load:{1} Train Score:{2}".format(
+                    results_dict["train"]["final_accuracy"],
+                    results_dict["train"]["final_cost"], results_dict["train"]["final_score"]))
+                print("Test Accuracy: {0} Test Computation Load:{1} Test Score:{2}".format(
+                    results_dict["test"]["final_accuracy"],
+                    results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
+                MixedBayesianOptimizer.train_accuracies.append(results_dict["train"]["final_accuracy"])
+                MixedBayesianOptimizer.test_accuracies.append(results_dict["test"]["final_accuracy"])
+                return results_dict["train"]["final_score"]
+
             # Phase - 1 Bayesian Optimization of the thresholds
             optimizer = BayesianOptimization(
                 f=f_,
@@ -206,6 +213,7 @@ class MixedBayesianOptimizer:
             res = MixedBayesianOptimizer.get_thresholding_results(
                 sess=sess,
                 clusterer=bc,
+                optimization_step=iteration_id,
                 cluster_count=cluster_count,
                 threshold_optimizer=dto,
                 routing_data=routing_data,
@@ -215,7 +223,8 @@ class MixedBayesianOptimizer:
                 mixing_lambda=mixing_lambda)
             features = routing_data.get_dict("pre_branch_feature")[0][train_indices]
             scores_after_bo = res["scores_matrix"]
+            accuracies_after_bo = res["accuracy_matrix"]
             assert features.shape[0] == scores_after_bo.shape[0]
-            bc.optimize_clustering(sess=sess, features=features, scores=scores_after_bo)
+            bc.optimize_clustering(sess=sess, features=features, scores=scores_after_bo, accuracies=accuracies_after_bo)
             f_(**best_params)
         print("X")
