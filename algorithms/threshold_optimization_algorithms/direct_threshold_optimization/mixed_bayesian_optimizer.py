@@ -12,6 +12,7 @@ from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.
     DirectThresholdOptimizer
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer_entropy import \
     DirectThresholdOptimizerEntropy
+from auxillary.db_logger import DbLogger
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from simple_tf.fashion_net.fashion_cign_lite import FashionCignLite
 from collections import Counter
@@ -141,8 +142,18 @@ class MixedBayesianOptimizer:
         return cluster_weights
 
     @staticmethod
-    def optimize(optimization_iterations_count, iteration,
-                 cluster_count, fc_layers, run_id, network, routing_data, seed):
+    def optimize(optimization_iterations_count,
+                 iteration,
+                 xi,
+                 mixing_lambda,
+                 cluster_count,
+                 fc_layers,
+                 run_id,
+                 network,
+                 routing_data,
+                 seed):
+        experiment_id = DbLogger.get_run_id()
+        DbLogger.write_into_table(rows=[(experiment_id, "BO Experiment")], table=DbLogger.runMetaData, col_count=2)
         train_indices = routing_data.trainingIndices
         test_indices = routing_data.testIndices
         # Learn the standard information gain based accuracies
@@ -168,11 +179,11 @@ class MixedBayesianOptimizer:
         # sess = tf.Session(config=config)
         sess = tf.Session()
         sess.run(tf.global_variables_initializer())
-        mixing_lambda = 1.0
         pbounds = MixedBayesianOptimizer.calculate_bounds(cluster_count=cluster_count, network=network, kind=dto.kind)
 
         # Two - Phase optimization iterations
         for iteration_id in range(optimization_iterations_count):
+            bo_iteration = 0
             sample_indices = {"train": train_indices, "test": test_indices}
             cluster_weights = MixedBayesianOptimizer.get_cluster_weights(
                 routing_data=routing_data, sess=sess, bc=bc, train_indices=train_indices, test_indices=test_indices)
@@ -205,6 +216,19 @@ class MixedBayesianOptimizer:
                     results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
                 MixedBayesianOptimizer.train_accuracies.append(results_dict["train"]["final_accuracy"])
                 MixedBayesianOptimizer.test_accuracies.append(results_dict["test"]["final_accuracy"])
+                # DB recording
+                row = (run_id, experiment_id, seed, iteration_id, "BO Optimization", cluster_count,
+                       "x", mixing_lambda, 0,
+                       results_dict["train"]["final_score"],
+                       results_dict["train"]["final_accuracy"],
+                       results_dict["train"]["final_cost"],
+                       results_dict["test"]["final_score"],
+                       results_dict["test"]["final_accuracy"],
+                       results_dict["test"]["final_cost"],
+                       "x"
+                       )
+
+                # bo_iteration += 1
                 return results_dict["train"]["final_score"]
 
             # Phase - 1 Bayesian Optimization of the thresholds
@@ -216,7 +240,7 @@ class MixedBayesianOptimizer:
                 init_points=100,
                 n_iter=150,
                 acq="ei",
-                xi=0.0
+                xi=xi
             )
             best_params = optimizer.max["params"]
             print("After BO Result")

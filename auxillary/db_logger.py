@@ -220,6 +220,9 @@ class DbLogger:
         print("Enter write_into_table")
         DbLogger.lock.acquire()
         rows_as_tuple = tuple(rows)
+        col_counts = set(len(row) for row in rows_as_tuple)
+        assert len(col_counts) == 1
+        col_count = col_counts[0]
         con = lite.connect(DbLogger.log_db_path)
         with con:
             cur = con.cursor()
