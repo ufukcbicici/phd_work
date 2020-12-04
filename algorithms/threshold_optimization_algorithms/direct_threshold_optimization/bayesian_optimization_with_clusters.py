@@ -8,6 +8,7 @@ from imblearn.pipeline import Pipeline
 from collections import Counter
 from sklearn.metrics import classification_report
 from sklearn.model_selection import GridSearchCV, RepeatedStratifiedKFold
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -140,24 +141,40 @@ class BayesianOptimizationWithClusters:
         y_arr = []
         selected_samples = set()
         sample_count_dict = {s_id: 0 for s_id in range(cluster_count)}
+        # for sample_id, id_tpl in enumerate(max_score_ids):
+        #     if len(id_tpl) == 1:
+        #         cluster_id = id_tpl[0]
+        #         X_arr.append(X[sample_id])
+        #         y_arr.append(cluster_id)
+        #         selected_samples.add(sample_id)
+        # print("X")
+        for cluster_id in range(cluster_count):
+            # candidate_ids = np.array([idx for idx in range(score_matrix.shape[0]) if idx not in selected_samples])
+            selected_ids = np.arange(cluster_id * max_sample_count, (cluster_id + 1) * max_sample_count)
+            # selected_ids = np.random.choice(candidate_ids, max_sample_count)
+            for sample_id in selected_ids:
+                if cluster_id in max_score_ids[sample_id]:
+                    X_arr.append(X[sample_id])
+                    y_arr.append(cluster_id)
+                    selected_samples.add(sample_id)
+        X_hat = np.stack(X_arr, axis=0)
+        y_hat = np.stack(y_arr, axis=0)
+        return X_hat, y_hat
+
+    @staticmethod
+    def resample_training_set_v3(X, score_matrix, accuracy_matrix, max_sample_count):
+        accurate_counts = np.sum(accuracy_matrix, axis=1)
+        max_score_ids = BayesianOptimizationWithClusters.get_optimal_ids(matrix=score_matrix)
+        cluster_count = score_matrix.shape[1]
+        X_arr = []
+        y_arr = []
+        selected_samples = set()
         for sample_id, id_tpl in enumerate(max_score_ids):
             if len(id_tpl) == 1:
                 cluster_id = id_tpl[0]
                 X_arr.append(X[sample_id])
                 y_arr.append(cluster_id)
                 selected_samples.add(sample_id)
-        print("X")
-        while len(X_arr) < max_sample_count * cluster_count:
-            for sample_id, id_tpl in enumerate(max_score_ids):
-                if sample_id in selected_samples:
-                    continue
-                cluster_id = np.asscalar(np.random.choice(id_tpl, 1))
-                if sample_count_dict[cluster_id] >= max_sample_count:
-                    continue
-                X_arr.append(X[sample_id])
-                y_arr.append(cluster_id)
-                selected_samples.add(sample_id)
-                sample_count_dict[cluster_id] += 1
         X_hat = np.stack(X_arr, axis=0)
         y_hat = np.stack(y_arr, axis=0)
         return X_hat, y_hat
@@ -260,12 +277,15 @@ class BayesianOptimizationWithClusters:
         y_train = np.argmax(scores_train, axis=1)
         y_test = np.argmax(scores_test, axis=1)
 
-        max_sample_count = 10000
+        max_sample_count = 1000
         up_sample_ratio = 5.0
-        X_hat, y_hat = BayesianOptimizationWithClusters.resample_training_set_v2(X=X_train,
-                                                                                 accuracy_matrix=accuracies_train,
-                                                                                 score_matrix=scores_train,
-                                                                                 max_sample_count=max_sample_count)
+        X_hat, y_hat = BayesianOptimizationWithClusters.resample_training_set(X=X_train, y=y_train,
+                                                                              max_sample_count=max_sample_count,
+                                                                              up_sample_ratio=up_sample_ratio)
+        # X_hat, y_hat = BayesianOptimizationWithClusters.resample_training_set_v3(X=X_train,
+        #                                                                          accuracy_matrix=accuracies_train,
+        #                                                                          score_matrix=scores_train,
+        #                                                                          max_sample_count=max_sample_count)
         # q_counter = Counter(y_train)
         # under_sample_counts = {lbl: min(max_sample_count, cnt) for lbl, cnt in q_counter.items()}
         # under_sampler = imblearn.under_sampling.RandomUnderSampler(sampling_strategy=under_sample_counts)
@@ -274,14 +294,22 @@ class BayesianOptimizationWithClusters:
         pca = PCA()
         # mlp = MLPClassifier()
         svm = SVC()
+        pca = PCA()
+        mlp = MLPClassifier()
         pipe = Pipeline(steps=[("scaler", standard_scaler),
                                ('pca', pca),
-                               ('svm', svm)])
+                               ('mlp', mlp)])
         param_grid = \
             [{
                 "pca__n_components": [None],
-                "svm__C": [0.0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 20.0, 50.0, 100.0, 250.0, 500.0],
-                "svm__kernel": ["linear", "rbf"],
+                "mlp__hidden_layer_sizes": [(64, 32)],
+                "mlp__activation": ["relu"],
+                "mlp__solver": ["adam"],
+                # "mlp__learning_rate": ["adaptive"],
+                "mlp__alpha": [0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 2.0, 5.0],
+                "mlp__max_iter": [10000],
+                "mlp__early_stopping": [True],
+                "mlp__n_iter_no_change": [100]
             }]
         search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
                               scoring=["accuracy", "f1_weighted", "f1_micro", "f1_macro",
@@ -311,3 +339,4 @@ class BayesianOptimizationWithClusters:
                 temperatures_dict=temperatures_dict,
                 mixing_lambda=mixing_lambda)
             results_dict[data_type] = results
+        print("X")

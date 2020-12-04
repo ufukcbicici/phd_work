@@ -80,7 +80,7 @@ class BayesianClusterer:
             results = sess.run([self.totalScore, self.optimizer],
                                feed_dict={self.netInput: X, self.scoresMatrix: scores_sample})
             losses.append(results[0])
-            if len(losses) == 10:
+            if len(losses) == 100:
                 curr_score = np.mean(np.array(losses))
                 losses = []
                 print("Bayesian Clusterer Iteration Id:{0} Curr Score:{1}".format(iteration_id, curr_score))

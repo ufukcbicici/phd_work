@@ -33,25 +33,6 @@ class IgBasedBayesianOptimization:
         pass
 
     @staticmethod
-    def get_formatted_input(routing_data):
-        sess = tf.Session()
-        batch_size = 10000
-        X = routing_data.get_dict("pre_branch_feature")[0]
-        all_indices = np.arange(X.shape[0])
-        X_shape = list(X.shape)
-        X_shape[0] = None
-        x_input = tf.placeholder(dtype=tf.float32, shape=X_shape, name="x_input")
-        net = x_input
-        x_output = DeepQNetworks.global_average_pooling(net_input=net)
-        X_arr = []
-        for batch_idx in range(0, all_indices.shape[0], batch_size):
-            X_batch = X[batch_idx: batch_idx + batch_size]
-            X_formatted_batch = sess.run([x_output], feed_dict={x_input: X_batch})[0]
-            X_arr.append(X_formatted_batch)
-        X_formatted = np.concatenate(X_arr, axis=0)
-        return X_formatted
-
-    @staticmethod
     def get_thresholding_results(sess, dto, routing_data, indices,
                                  network, mixing_lambda, temperatures_dict, threshold_dict):
         optimizer_results = dto.run_threshold_calculator(sess=sess,

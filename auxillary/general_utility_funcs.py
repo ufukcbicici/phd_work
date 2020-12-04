@@ -302,3 +302,30 @@ class UtilityFuncs:
             expanded_indices.extend(list(range(edx, edx + index_multiplier, 1)))
         assert len(set(expanded_indices)) == len(expanded_indices)
         return np.array(expanded_indices)
+
+    @staticmethod
+    def global_average_pooling(net_input):
+        net = net_input
+        net_shape = net.get_shape().as_list()
+        net = tf.nn.avg_pool(net, ksize=[1, net_shape[1], net_shape[2], 1], strides=[1, 1, 1, 1], padding='VALID')
+        net_shape = net.get_shape().as_list()
+        net = tf.reshape(net, [-1, net_shape[1] * net_shape[2] * net_shape[3]])
+        return net
+
+    @staticmethod
+    def vectorize_with_gap(X):
+        sess = tf.Session()
+        batch_size = 10000
+        all_indices = np.arange(X.shape[0])
+        X_shape = list(X.shape)
+        X_shape[0] = None
+        x_input = tf.placeholder(dtype=tf.float32, shape=X_shape, name="x_input")
+        net = x_input
+        x_output = UtilityFuncs.global_average_pooling(net_input=net)
+        X_arr = []
+        for batch_idx in range(0, all_indices.shape[0], batch_size):
+            X_batch = X[batch_idx: batch_idx + batch_size]
+            X_formatted_batch = sess.run([x_output], feed_dict={x_input: X_batch})[0]
+            X_arr.append(X_formatted_batch)
+        X_formatted = np.concatenate(X_arr, axis=0)
+        return X_formatted
