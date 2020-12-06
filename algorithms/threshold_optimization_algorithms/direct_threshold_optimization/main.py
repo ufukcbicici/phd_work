@@ -76,14 +76,18 @@ def train_direct_threshold_optimizer():
         # IgBasedBayesianOptimization.optimize(run_id=network_id, network=network,
         #                                      routing_data=routing_data, seed=seed, mixing_lambda=0.995)
 
-        MixedBayesianOptimizer.optimize(optimization_iterations_count=3,
-                                        run_id=network_id,
-                                        network=network,
-                                        iteration=0,
-                                        routing_data=routing_data,
-                                        seed=seed,
-                                        cluster_count=5,
-                                        fc_layers=[64, 32])
+        for e_id in range(10):
+            MixedBayesianOptimizer.optimize(optimization_iterations_count=2,
+                                            run_id=network_id,
+                                            network=network,
+                                            iteration=0,
+                                            routing_data=routing_data,
+                                            seed=seed,
+                                            cluster_count=5,
+                                            fc_layers=[64, 32],
+                                            xi=0.0,
+                                            mixing_lambda=1.0)
+            tf.reset_default_graph()
 
         # BayesianOptimizationWithClusters.optimize(mixing_lambda=1.0, iteration=0,
         #                                           cluster_count=3, fc_layers=[64, 32], run_id=network_id,
@@ -92,7 +96,6 @@ def train_direct_threshold_optimizer():
         # dto = DirectThresholdOptimizer(network=network, routing_data=routing_data, seed=seed)
         # dto.train(run_id=network_id, iteration=43680)
         # print("X")
-        tf.reset_default_graph()
         break
 
 

@@ -329,3 +329,10 @@ class UtilityFuncs:
             X_arr.append(X_formatted_batch)
         X_formatted = np.concatenate(X_arr, axis=0)
         return X_formatted
+
+    @staticmethod
+    def get_argmax_matrix_from_weight_matrix(weight_matrix):
+        argmax_clusters = np.argmax(weight_matrix, axis=1)
+        argmax_weights = np.zeros_like(weight_matrix)
+        argmax_weights[np.arange(weight_matrix.shape[0]), argmax_clusters] = 1.0
+        return argmax_weights
