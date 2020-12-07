@@ -413,19 +413,34 @@ class MixedBayesianOptimizer:
         print("X")
 
     @staticmethod
-    def calculate_mixing_coefficients(network, routing_data, selection_tuples, train_indices, test_indices):
+    def calculate_mixing_coefficients(network, routing_data, selection_tuples, train_indices, test_indices,
+                                      cut_off_value = 10.0):
         X = routing_data.get_dict("pre_branch_feature")[0]
         y = routing_data.labelList
-        X_formatted = UtilityFuncs.global_average_pooling(net_input=X)
-        posteriors = [routing_data.get_dict("posterior_probs"[node.index]) for node in network.leafNodes]
+        X_formatted = UtilityFuncs.vectorize_with_gap(X)
+        posteriors = [routing_data.get_dict("posterior_probs")[node.index] for node in network.leafNodes]
         posteriors = np.stack(posteriors, axis=-1)
         label_count = posteriors.shape[1]
         # Get optimal coefficients
+        optimal_coefficients = []
+        predicted_y = []
         for idx in range(y.shape[0]):
             y_one_hot = np.zeros((label_count, ), dtype=np.float32)
             y_one_hot[y[idx]] = 1.0
             b = y_one_hot
             posterior_matrix = posteriors[idx]
-
-
+            selection_of_posteriors = selection_tuples[idx]
+            posteriors_with_selection = posterior_matrix * selection_of_posteriors[np.newaxis, :]
+            coeffs = np.linalg.lstsq(posteriors_with_selection, b)[0]
+            coeffs = coeffs * selection_of_posteriors
+            optimal_coefficients.append(coeffs)
+            y_hat = np.squeeze(np.dot(posteriors_with_selection, coeffs[:, np.newaxis]))
+            y_hat = np.argmax(y_hat)
+            predicted_y.append(y_hat)
+        predicted_y = np.array(predicted_y)
+        optimal_coefficients = np.stack(optimal_coefficients, axis=0)
+        ideal_train_accuracy = np.mean(y[train_indices] == predicted_y[train_indices])
+        ideal_test_accuracy = np.mean(y[test_indices] == predicted_y[test_indices])
+        print("ideal_train_accuracy={0}".format(ideal_train_accuracy))
+        print("ideal_test_accuracy={0}".format(ideal_test_accuracy))
         print("X")
