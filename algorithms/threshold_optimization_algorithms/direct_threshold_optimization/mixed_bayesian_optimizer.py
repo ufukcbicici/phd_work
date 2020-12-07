@@ -334,7 +334,8 @@ class MixedBayesianOptimizer:
                 scores_after_bo = res["scores_matrix"]
                 accuracies_after_bo = res["accuracy_matrix"]
                 assert features.shape[0] == scores_after_bo.shape[0]
-                bc.optimize_clustering(sess=sess, features=features, scores=scores_after_bo, accuracies=accuracies_after_bo)
+                bc.optimize_clustering(sess=sess, features=features, scores=scores_after_bo,
+                                       accuracies=accuracies_after_bo)
                 cluster_weights = MixedBayesianOptimizer.get_cluster_weights(
                     routing_data=routing_data, sess=sess, bc=bc, train_indices=train_indices, test_indices=test_indices)
                 results_dict = {}
@@ -385,7 +386,8 @@ class MixedBayesianOptimizer:
                     cluster_count=cluster_count, mixing_lambda=mixing_lambda, xi=xi, results_dict=results_dict,
                     kwargs=best_params, operation_type="After Clustering {0} - Argmax".format(iteration_id))
             print("X")
-            all_cluster_weights = bc.get_cluster_scores(sess=sess, features=routing_data.get_dict("pre_branch_feature")[0])
+            all_cluster_weights = bc.get_cluster_scores(sess=sess,
+                                                        features=routing_data.get_dict("pre_branch_feature")[0])
             final_results = MixedBayesianOptimizer.get_thresholding_results(
                 sess=sess,
                 network=network,
@@ -414,7 +416,7 @@ class MixedBayesianOptimizer:
 
     @staticmethod
     def calculate_mixing_coefficients(network, routing_data, selection_tuples, train_indices, test_indices,
-                                      cut_off_value = 10.0):
+                                      cut_off_value=5.0):
         X = routing_data.get_dict("pre_branch_feature")[0]
         y = routing_data.labelList
         X_formatted = UtilityFuncs.vectorize_with_gap(X)
@@ -425,7 +427,7 @@ class MixedBayesianOptimizer:
         optimal_coefficients = []
         predicted_y = []
         for idx in range(y.shape[0]):
-            y_one_hot = np.zeros((label_count, ), dtype=np.float32)
+            y_one_hot = np.zeros((label_count,), dtype=np.float32)
             y_one_hot[y[idx]] = 1.0
             b = y_one_hot
             posterior_matrix = posteriors[idx]
@@ -433,6 +435,7 @@ class MixedBayesianOptimizer:
             posteriors_with_selection = posterior_matrix * selection_of_posteriors[np.newaxis, :]
             coeffs = np.linalg.lstsq(posteriors_with_selection, b)[0]
             coeffs = coeffs * selection_of_posteriors
+            coeffs = np.clip(coeffs, a_min=-cut_off_value, a_max=cut_off_value)
             optimal_coefficients.append(coeffs)
             y_hat = np.squeeze(np.dot(posteriors_with_selection, coeffs[:, np.newaxis]))
             y_hat = np.argmax(y_hat)
