@@ -155,8 +155,8 @@ class CowChickenDataset:
         data = tf.data.Dataset.from_tensor_slices((file_paths, labels))
         data = data.map(CowChickenDataset.process_path)
         data = data.map(self.augment_for_testing)
-        data = data.batch(batch_size=self.batchSize)
-        data = data.prefetch(buffer_size=self.batchSize)
+        # data = data.batch(batch_size=self.batchSize)
+        # data = data.prefetch(buffer_size=self.batchSize)
         iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
         outputs = iterator.get_next()
         initializer = iterator.make_initializer(data)
@@ -408,13 +408,14 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
 
     def predict(self, X, dataset):
         test_data_generator = dataset.create_test_dataset(X=X)
-        self.sess.run(test_data_generator.initializer, feed_dict={dataset.batchSize: 1})
+        batch_size = 1
+        self.sess.run(test_data_generator.initializer, feed_dict={dataset.batchSize: batch_size})
         y_hat = []
         while True:
             minibatch = dataset.get_next_batch(sess=self.sess, outputs=test_data_generator.outputs)
             if minibatch is None:
                 break
-            test_crops = minibatch[0][0]
+            test_crops = minibatch[0]
             results_dict = self.sess.run({
                 "probs": self.posteriors
             }, feed_dict={
