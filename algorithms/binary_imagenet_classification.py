@@ -135,9 +135,9 @@ class CowChickenDataset:
         crops = tf.stack(img_list, axis=0)
         return crops, label, img
 
-    def create_tf_dataset(self, sess, data, data_type):
-        file_paths = data[:, 0]
-        labels = data[:, 1]
+    def create_tf_dataset(self, sess, X, y, data_type):
+        file_paths = X
+        labels = y
         data = tf.data.Dataset.from_tensor_slices((file_paths, labels))
         data = data.map(CowChickenDataset.process_path)
         if data_type == "training":
@@ -253,11 +253,11 @@ class ResnetGenerator:
 
     # MultiGpu OK
     @staticmethod
-    def get_input(input_net, out_filters, first_conv_filter_size):
+    def get_input(input_net, out_filters, first_conv_filter_size, stride):
         assert input_net.get_shape().ndims == 4
         input_filters = input_net.get_shape().as_list()[-1]
         x = ResnetGenerator.conv("init_conv", input_net, first_conv_filter_size, input_filters, out_filters,
-                                 ResnetGenerator.stride_arr(1))
+                                 ResnetGenerator.stride_arr(stride))
         return x
 
     # MultiGpu OK
@@ -278,7 +278,9 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
                  num_of_units_per_block,
                  relu_leakiness,
                  first_conv_filter_size,
-                 class_count):
+                 class_count,
+                 batch_size,
+                 iterations):
         self.regularizer_coeff = regularizer_coeff
         self.strides = strides
         self.activate_before_residual = activate_before_residual
@@ -287,6 +289,9 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
         self.relu_leakiness = relu_leakiness
         self.first_conv_filter_size = first_conv_filter_size
         self.class_count = class_count
+        self.batch_size = batch_size
+        self.iterations = iterations
+        self.sess = tf.Session()
 
         assert len(self.strides) + 1 == len(self.activate_before_residual) + 1 == \
                len(self.features) == len(self.num_of_units_per_block) + 1
@@ -301,9 +306,11 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
             self.inputLabels = tf.placeholder(dtype=tf.int32,
                                               shape=[None])
             self.isTrain = tf.placeholder(name="isTrain", dtype=tf.bool)
-            # Input Layer
+            self.globalStep = tf.Variable(0, name='global_step', trainable=False)
+            # Input Block
             x = ResnetGenerator.get_input(input_net=self.inputImages, out_filters=self.features[0],
-                                          first_conv_filter_size=first_conv_filter_size)
+                                          first_conv_filter_size=first_conv_filter_size, stride=2)
+            x = tf.nn.max_pool(x, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME')
 
             for block_id, unit_count in enumerate(self.num_of_units_per_block):
                 for unit_id in range(unit_count):
@@ -329,29 +336,62 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
             with tf.variable_scope('loss_layer'):
                 self.gapOutput = ResnetGenerator.get_output(x=x, is_train=self.isTrain, leakiness=self.relu_leakiness,
                                                             bn_momentum=0.9)
-                # Cross Entropy Loss
                 self.logits = tf.layers.dense(name="logits_fc", inputs=self.gapOutput, units=self.class_count,
                                               activation=None)
+                self.posteriors = tf.nn.softmax(self.logits)
+
             # Loss Calculations
             self.cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.inputLabels,
                                                                                             logits=self.logits)
             self.cross_entropy_loss = tf.reduce_mean(self.cross_entropy_loss_tensor)
             # L2-Weight Decay Regularization
             trainable_vars = tf.trainable_variables(scope="ResNet50")
+            kernel_vars = [var for var in trainable_vars if "kernel" in var.name]
+            l2_norms = [tf.nn.l2_loss(kv) for kv in kernel_vars]
+            self.l2Norm = self.regularizer_coeff * tf.add_n(l2_norms)
+            # Total Loss
+            self.total_loss = self.cross_entropy_loss + self.l2Norm
+            # Optimizer
+            self.optimizer = tf.train.AdamOptimizer().minimize(self.total_loss, global_step=self.globalStep)
             print("X")
+
+    def fit(self, X, y):
+        dataset = CowChickenDataset()
+        dataset.create_tf_dataset(sess=self.sess, X=X, y=y, data_type="training")
+        self.sess.run(dataset.datasetsDict["training"].initializer, feed_dict={dataset.batchSize: self.batch_size})
+        losses = []
+        for iteration_id in range(self.iterations):
+            minibatch = dataset.get_next_batch(sess=self.sess, outputs=dataset.datasetsDict["training"].outputs)
+            if minibatch is None:
+                self.sess.run(dataset.datasetsDict["training"].initializer,
+                              feed_dict={dataset.batchSize: self.batch_size})
+                continue
+            images = minibatch[0]
+            labels = minibatch[1]
+            results_dict = self.sess.run({
+                "optimizer": self.optimizer,
+                "loss": self.total_loss,
+                "probs": self.posteriors
+            }, feed_dict={
+                self.inputImages: images, self.inputLabels: labels, self.isTrain: True})
+            losses.append(results_dict["loss"])
+            if len(losses) % 10 == 0:
+                avg_loss = np.mean(losses)
+                print("Iteration:{0} Loss:{1]".format(iteration_id, avg_loss))
+                losses = []
 
 
 if __name__ == '__main__':
     # Always get the same train-test split
     np.random.seed(67)
-    sess = tf.Session()
+    # sess = tf.Session()
 
     train_data, test_data = CowChickenDataset.farm_data_reader(data_path=join("..", "data", "farm_data"))
-    dataset = CowChickenDataset()
-    dataset.create_tf_dataset(sess=sess, data=train_data, data_type="training")
-    dataset.create_tf_dataset(sess=sess, data=test_data, data_type="test")
-    sess.run(dataset.datasetsDict["training"].initializer, feed_dict={dataset.batchSize: 256})
-    sess.run(dataset.datasetsDict["test"].initializer, feed_dict={dataset.batchSize: 1})
+    # dataset = CowChickenDataset()
+    # dataset.create_tf_dataset(sess=sess, data=train_data, data_type="training")
+    # dataset.create_tf_dataset(sess=sess, data=test_data, data_type="test")
+    # sess.run(dataset.datasetsDict["training"].initializer, feed_dict={dataset.batchSize: 256})
+    # sess.run(dataset.datasetsDict["test"].initializer, feed_dict={dataset.batchSize: 1})
 
     resnet50_classifier = ResNet50Classifier(
         regularizer_coeff=0.0001,
@@ -361,7 +401,11 @@ if __name__ == '__main__':
         num_of_units_per_block=[3, 4, 6, 3],
         relu_leakiness=0.1,
         first_conv_filter_size=7,
-        class_count=2)
+        class_count=2,
+        batch_size=256,
+        iterations=10000)
+
+    resnet50_classifier.fit(X=train_data[:, 0], y=train_data[:, 1].astype(np.int32))
 
     # X_hat = []
     # y_hat = []
