@@ -143,6 +143,7 @@ class CowChickenDataset:
         data = data.shuffle(buffer_size=file_paths.shape[0])
         data = data.map(self.augment_for_training)
         data = data.batch(batch_size=self.batchSize)
+        data = data.prefetch(buffer_size=self.batchSize)
         iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
         outputs = iterator.get_next()
         initializer = iterator.make_initializer(data)
@@ -154,6 +155,8 @@ class CowChickenDataset:
         data = tf.data.Dataset.from_tensor_slices((file_paths, labels))
         data = data.map(CowChickenDataset.process_path)
         data = data.map(self.augment_for_testing)
+        data = data.batch(batch_size=self.batchSize)
+        data = data.prefetch(buffer_size=self.batchSize)
         iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
         outputs = iterator.get_next()
         initializer = iterator.make_initializer(data)
@@ -295,6 +298,7 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
         self.batch_size = batch_size
         self.iterations = iterations
         self.sess = tf.Session()
+        self.saver = None
 
         assert len(self.strides) + 1 == len(self.activate_before_residual) + 1 == \
                len(self.features) == len(self.num_of_units_per_block) + 1
@@ -359,12 +363,22 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
             with tf.control_dependencies(self.update_ops):
                 self.optimizer = tf.train.AdamOptimizer().minimize(self.total_loss, global_step=self.globalStep)
 
+    @staticmethod
+    def get_checkpoint_path(iteration):
+        curr_path = os.path.dirname(os.path.abspath(__file__))
+        directory_path = os.path.abspath(
+            os.path.join(os.path.join(curr_path, "farm_classifiers"),
+                         "checkpoint_{0}_iteration_{1}".format("resnet50", iteration)))
+        checkpoint_path = os.path.abspath(os.path.join(directory_path, "model.ckpt"))
+        return directory_path, checkpoint_path
+
     def fit(self, X_train, y_train, X_test, y_test):
         self.sess.run(tf.global_variables_initializer())
         dataset = CowChickenDataset()
         train_data_generator = dataset.create_training_set(sess=self.sess, X=X_train, y=y_train)
         self.sess.run(train_data_generator.initializer, feed_dict={dataset.batchSize: self.batch_size})
         losses = []
+        self.saver = tf.train.Saver(max_to_keep=1000)
         for iteration_id in range(self.iterations):
             minibatch = dataset.get_next_batch(sess=self.sess, outputs=train_data_generator.outputs)
             if minibatch is None:
@@ -384,6 +398,9 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
                 print("Iteration:{0} Loss:{1}".format(iteration_id, avg_loss))
                 losses = []
             if (iteration_id + 1) % 100 == 0:
+                directory_path, checkpoint_path = self.get_checkpoint_path(iteration=iteration_id)
+                os.mkdir(directory_path)
+                self.saver.save(self.sess, checkpoint_path)
                 y_train_hat = self.predict(X=X_train, dataset=dataset)
                 y_test_hat = self.predict(X=X_test, dataset=dataset)
                 print("Train Accuracy:{0}".format(np.mean(y_train_hat == y_train)))
@@ -397,7 +414,7 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
             minibatch = dataset.get_next_batch(sess=self.sess, outputs=test_data_generator.outputs)
             if minibatch is None:
                 break
-            test_crops = minibatch[0]
+            test_crops = minibatch[0][0]
             results_dict = self.sess.run({
                 "probs": self.posteriors
             }, feed_dict={
