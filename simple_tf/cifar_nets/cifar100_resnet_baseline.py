@@ -34,7 +34,9 @@ class Cifar100_Baseline(FastTreeNetwork):
                                       first_conv_filter_size=first_conv_filter_size, node=node)
         # Block 1
         with tf.variable_scope(UtilityFuncs.get_variable_name(name="block_1_0", node=node)):
-            x = ResnetGenerator.bottleneck_residual(x=x, in_filter=filters[0], out_filter=filters[1],
+            x = ResnetGenerator.bottleneck_residual(x=x,
+                                                    in_filter=filters[0],
+                                                    out_filter=filters[1],
                                                     stride=ResnetGenerator.stride_arr(strides[0]),
                                                     activate_before_residual=activate_before_residual[0],
                                                     relu_leakiness=relu_leakiness, is_train=network.isTrain,

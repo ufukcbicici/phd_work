@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
+from sklearn.base import BaseEstimator, ClassifierMixin
 import cv2
 from sklearn.decomposition import PCA
 from collections import Counter
@@ -178,6 +179,168 @@ class CowChickenDataset:
         return train_data_, test_data_
 
 
+class ResnetGenerator:
+    @staticmethod
+    def conv(name, x, filter_size, in_filters, out_filters, strides):
+        with tf.variable_scope(name):
+            assert len(x.get_shape().as_list()) == 4
+            assert x.get_shape().as_list()[3] == in_filters
+            assert strides[1] == strides[2]
+            n = filter_size * filter_size * out_filters
+            shape = [filter_size, filter_size, in_filters, out_filters]
+            initializer = tf.random_normal_initializer(stddev=np.sqrt(2.0 / n))
+            kernel = tf.get_variable("conv_kernel", shape, initializer=initializer, dtype=tf.float32, trainable=True)
+            x_hat = tf.nn.conv2d(x, kernel, strides, padding='SAME')
+            return x_hat
+
+    @staticmethod
+    def batch_norm(name, x, is_train, momentum):
+        normalized_x = tf.layers.batch_normalization(inputs=x, name=name, momentum=momentum,
+                                                     training=tf.cast(is_train, tf.bool))
+        return normalized_x
+
+    @staticmethod
+    def stride_arr(stride):
+        """Map a stride scalar to the stride array for tf.nn.conv2d."""
+        return [1, stride, stride, 1]
+
+    @staticmethod
+    def relu(x, leakiness=0.0):
+        """Relu, with optional leaky support."""
+        if leakiness <= 0.0:
+            return tf.nn.relu(features=x, name="relu")
+        else:
+            return tf.nn.leaky_relu(features=x, alpha=leakiness, name="leaky_relu")
+
+    @staticmethod
+    def global_avg_pool(x):
+        assert x.get_shape().ndims == 4
+        return tf.reduce_mean(x, [1, 2])
+
+    @staticmethod
+    def bottleneck_residual(x, is_train, in_filter, out_filter, stride, relu_leakiness, activate_before_residual,
+                            bn_momentum):
+        """Bottleneck residual unit with 3 sub layers."""
+        if activate_before_residual:
+            with tf.variable_scope("common_bn_relu"):
+                x = ResnetGenerator.batch_norm("init_bn", x, is_train, bn_momentum)
+                x = ResnetGenerator.relu(x, relu_leakiness)
+                orig_x = x
+        else:
+            with tf.variable_scope("residual_bn_relu"):
+                orig_x = x
+                x = ResnetGenerator.batch_norm("init_bn", x, is_train, bn_momentum)
+                x = ResnetGenerator.relu(x, relu_leakiness)
+
+        with tf.variable_scope("sub1"):
+            x = ResnetGenerator.conv("conv_1", x, 1, in_filter, out_filter / 4, stride)
+
+        with tf.variable_scope("sub2"):
+            x = ResnetGenerator.batch_norm("bn2", x, is_train, bn_momentum)
+            x = ResnetGenerator.relu(x, relu_leakiness)
+            x = ResnetGenerator.conv("conv2", x, 3, out_filter / 4, out_filter / 4, [1, 1, 1, 1])
+
+        with tf.variable_scope("sub3"):
+            x = ResnetGenerator.batch_norm("bn3", x, is_train, bn_momentum)
+            x = ResnetGenerator.relu(x, relu_leakiness)
+            x = ResnetGenerator.conv("conv3", x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
+
+        with tf.variable_scope("sub_add"):
+            if in_filter != out_filter or not all([d == 1 for d in stride]):
+                orig_x = ResnetGenerator.conv("project", orig_x, 1, in_filter, out_filter, stride)
+            x += orig_x
+        return x
+
+    # MultiGpu OK
+    @staticmethod
+    def get_input(input_net, out_filters, first_conv_filter_size):
+        assert input_net.get_shape().ndims == 4
+        input_filters = input_net.get_shape().as_list()[-1]
+        x = ResnetGenerator.conv("init_conv", input_net, first_conv_filter_size, input_filters, out_filters,
+                                 ResnetGenerator.stride_arr(1))
+        return x
+
+    # MultiGpu OK
+    @staticmethod
+    def get_output(x, is_train, leakiness, bn_momentum):
+        x = ResnetGenerator.batch_norm("final_bn", x, is_train, bn_momentum)
+        x = ResnetGenerator.relu(x, leakiness)
+        x = ResnetGenerator.global_avg_pool(x)
+        return x
+
+
+class ResNet50Classifier(BaseEstimator, ClassifierMixin):
+    def __init__(self,
+                 regularizer_coeff,
+                 strides,
+                 activate_before_residual,
+                 features,
+                 num_of_units_per_block,
+                 relu_leakiness,
+                 first_conv_filter_size,
+                 class_count):
+        self.regularizer_coeff = regularizer_coeff
+        self.strides = strides
+        self.activate_before_residual = activate_before_residual
+        self.features = features
+        self.num_of_units_per_block = num_of_units_per_block
+        self.relu_leakiness = relu_leakiness
+        self.first_conv_filter_size = first_conv_filter_size
+        self.class_count = class_count
+
+        assert len(self.strides) + 1 == len(self.activate_before_residual) + 1 == \
+               len(self.features) == len(self.num_of_units_per_block) + 1
+
+        # Build ResNet-50 Model; preferably with small number for features
+        with tf.variable_scope("ResNet50"):
+            self.inputImages = tf.placeholder(dtype=tf.float32,
+                                              shape=[None,
+                                                     CowChickenDataset.resnet_dimension,
+                                                     CowChickenDataset.resnet_dimension,
+                                                     3])
+            self.inputLabels = tf.placeholder(dtype=tf.int32,
+                                              shape=[None])
+            self.isTrain = tf.placeholder(name="isTrain", dtype=tf.bool)
+            # Input Layer
+            x = ResnetGenerator.get_input(input_net=self.inputImages, out_filters=self.features[0],
+                                          first_conv_filter_size=first_conv_filter_size)
+
+            for block_id, unit_count in enumerate(self.num_of_units_per_block):
+                for unit_id in range(unit_count):
+                    with tf.variable_scope("unit_{0}{1}".format(block_id, unit_id)):
+                        if unit_id == 0:
+                            in_filter = self.features[block_id]
+                            strd = ResnetGenerator.stride_arr(self.strides[block_id])
+                            activate = self.activate_before_residual[block_id]
+                        else:
+                            in_filter = self.features[block_id + 1]
+                            activate = False
+                            strd = ResnetGenerator.stride_arr(1)
+                        x = ResnetGenerator.bottleneck_residual(
+                            x=x,
+                            in_filter=in_filter,
+                            out_filter=self.features[block_id + 1],
+                            stride=strd,
+                            activate_before_residual=activate,
+                            relu_leakiness=self.relu_leakiness,
+                            is_train=self.isTrain,
+                            bn_momentum=0.9)
+            # Logit Layers
+            with tf.variable_scope('loss_layer'):
+                self.gapOutput = ResnetGenerator.get_output(x=x, is_train=self.isTrain, leakiness=self.relu_leakiness,
+                                                            bn_momentum=0.9)
+                # Cross Entropy Loss
+                self.logits = tf.layers.dense(name="logits_fc", inputs=self.gapOutput, units=self.class_count,
+                                              activation=None)
+            # Loss Calculations
+            self.cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.inputLabels,
+                                                                                            logits=self.logits)
+            self.cross_entropy_loss = tf.reduce_mean(self.cross_entropy_loss_tensor)
+            # L2-Weight Decay Regularization
+            trainable_vars = tf.trainable_variables(scope="ResNet50")
+            print("X")
+
+
 if __name__ == '__main__':
     # Always get the same train-test split
     np.random.seed(67)
@@ -189,26 +352,37 @@ if __name__ == '__main__':
     dataset.create_tf_dataset(sess=sess, data=test_data, data_type="test")
     sess.run(dataset.datasetsDict["training"].initializer, feed_dict={dataset.batchSize: 256})
     sess.run(dataset.datasetsDict["test"].initializer, feed_dict={dataset.batchSize: 1})
-    X_hat = []
-    y_hat = []
-    while True:
-        minibatch = dataset.get_next_batch(sess=sess, outputs=dataset.datasetsDict["training"].outputs)
-        if minibatch is None:
-            break
-        X_hat.append(minibatch[0])
-        y_hat.append(minibatch[1].astype(np.int32))
 
-        test_batch = dataset.get_next_batch(sess=sess, outputs=dataset.datasetsDict["test"].outputs)
-        print("X")
+    resnet50_classifier = ResNet50Classifier(
+        regularizer_coeff=0.0001,
+        strides=[1, 2, 2, 2],
+        activate_before_residual=[True, False, False, False],
+        features=[8, 32, 64, 128, 256],
+        num_of_units_per_block=[3, 4, 6, 3],
+        relu_leakiness=0.1,
+        first_conv_filter_size=7,
+        class_count=2)
 
-        # cv2.imshow("img", ret[0][0])
-        # cv2.waitKey(0)
-        # cv2.imshow("resized_img", ret[1][0])
-        # cv2.waitKey(0)
-        # cv2.imshow("cropped_img", ret[2][0])
-        # cv2.waitKey(0)
-        # cv2.imshow("final_img", ret[3][0])
-        # cv2.waitKey(0)
+    # X_hat = []
+    # y_hat = []
+    # while True:
+    #     minibatch = dataset.get_next_batch(sess=sess, outputs=dataset.datasetsDict["training"].outputs)
+    #     if minibatch is None:
+    #         break
+    #     X_hat.append(minibatch[0])
+    #     y_hat.append(minibatch[1].astype(np.int32))
+    #
+    #     test_batch = dataset.get_next_batch(sess=sess, outputs=dataset.datasetsDict["test"].outputs)
+    #     print("X")
+
+    # cv2.imshow("img", ret[0][0])
+    # cv2.waitKey(0)
+    # cv2.imshow("resized_img", ret[1][0])
+    # cv2.waitKey(0)
+    # cv2.imshow("cropped_img", ret[2][0])
+    # cv2.waitKey(0)
+    # cv2.imshow("final_img", ret[3][0])
+    # cv2.waitKey(0)
     print("X")
 
     # print("X")
