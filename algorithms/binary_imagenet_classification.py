@@ -26,7 +26,6 @@ class CowChickenDataset:
     # def __init__(self, data_path, test_ratio):
     #     self.dataPath = data_path
     def __init__(self):
-        self.datasetsDict = {}
         self.isNewEpoch = False
         self.batchSize = tf.placeholder(dtype=tf.int64, name="batchSize")
         self.meanColor = None
@@ -50,7 +49,7 @@ class CowChickenDataset:
             sess.run(initializer)
             images = []
             while True:
-                img = dataset.get_next_batch(sess=sess, outputs=outputs)
+                img = self.get_next_batch(sess=sess, outputs=outputs)
                 if img is None:
                     break
                 images.append(img[0])
@@ -133,28 +132,32 @@ class CowChickenDataset:
                                                    tf.cast(((source_width - dim) / 2), tf.int32), dim, dim)
                 img_list.extend([tl, tr, bl, br, ct])
         crops = tf.stack(img_list, axis=0)
-        return crops, label, img
+        return crops, label
 
-    def create_tf_dataset(self, sess, X, y, data_type):
+    def create_training_set(self, sess, X, y):
         file_paths = X
         labels = y
         data = tf.data.Dataset.from_tensor_slices((file_paths, labels))
         data = data.map(CowChickenDataset.process_path)
-        if data_type == "training":
-            self.data_preparataion(sess=sess, data=data)
-            data = data.shuffle(buffer_size=file_paths.shape[0])
-            # Augmentation for training
-            data = data.map(self.augment_for_training)
-        elif data_type == "test":
-            # Augmentation for testing
-            data = data.map(self.augment_for_testing)
-        else:
-            raise NotImplementedError()
+        self.data_preparataion(sess=sess, data=data)
+        data = data.shuffle(buffer_size=file_paths.shape[0])
+        data = data.map(self.augment_for_training)
         data = data.batch(batch_size=self.batchSize)
         iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
         outputs = iterator.get_next()
         initializer = iterator.make_initializer(data)
-        self.datasetsDict[data_type] = CowChickenDataset.TfDataset(data, iterator, outputs, initializer)
+        return CowChickenDataset.TfDataset(data, iterator, outputs, initializer)
+
+    def create_test_dataset(self, X):
+        file_paths = X
+        labels = np.zeros(shape=(X.shape[0], ), dtype=np.int32)
+        data = tf.data.Dataset.from_tensor_slices((file_paths, labels))
+        data = data.map(CowChickenDataset.process_path)
+        data = data.map(self.augment_for_testing)
+        iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
+        outputs = iterator.get_next()
+        initializer = iterator.make_initializer(data)
+        return CowChickenDataset.TfDataset(data, iterator, outputs, initializer)
 
     def get_next_batch(self, sess, outputs):
         try:
@@ -352,19 +355,20 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
             # Total Loss
             self.total_loss = self.cross_entropy_loss + self.l2Norm
             # Optimizer
-            self.optimizer = tf.train.AdamOptimizer().minimize(self.total_loss, global_step=self.globalStep)
-            print("X")
+            self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            with tf.control_dependencies(self.update_ops):
+                self.optimizer = tf.train.AdamOptimizer().minimize(self.total_loss, global_step=self.globalStep)
 
-    def fit(self, X, y):
+    def fit(self, X_train, y_train, X_test, y_test):
+        self.sess.run(tf.global_variables_initializer())
         dataset = CowChickenDataset()
-        dataset.create_tf_dataset(sess=self.sess, X=X, y=y, data_type="training")
-        self.sess.run(dataset.datasetsDict["training"].initializer, feed_dict={dataset.batchSize: self.batch_size})
+        train_data_generator = dataset.create_training_set(sess=self.sess, X=X_train, y=y_train)
+        self.sess.run(train_data_generator.initializer, feed_dict={dataset.batchSize: self.batch_size})
         losses = []
         for iteration_id in range(self.iterations):
-            minibatch = dataset.get_next_batch(sess=self.sess, outputs=dataset.datasetsDict["training"].outputs)
+            minibatch = dataset.get_next_batch(sess=self.sess, outputs=train_data_generator.outputs)
             if minibatch is None:
-                self.sess.run(dataset.datasetsDict["training"].initializer,
-                              feed_dict={dataset.batchSize: self.batch_size})
+                self.sess.run(train_data_generator.initializer, feed_dict={dataset.batchSize: self.batch_size})
                 continue
             images = minibatch[0]
             labels = minibatch[1]
@@ -377,8 +381,30 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
             losses.append(results_dict["loss"])
             if len(losses) % 10 == 0:
                 avg_loss = np.mean(losses)
-                print("Iteration:{0} Loss:{1]".format(iteration_id, avg_loss))
+                print("Iteration:{0} Loss:{1}".format(iteration_id, avg_loss))
                 losses = []
+            if (iteration_id + 1) % 100 == 0:
+                y_train_hat = self.predict(X=X_train, dataset=dataset)
+                y_test_hat = self.predict(X=X_test, dataset=dataset)
+                print("Train Accuracy:{0}".format(np.mean(y_train_hat == y_train)))
+                print("Test Accuracy:{0}".format(np.mean(y_test_hat == y_test)))
+
+    def predict(self, X, dataset):
+        test_data_generator = dataset.create_test_dataset(X=X)
+        self.sess.run(test_data_generator.initializer, feed_dict={dataset.batchSize: 1})
+        y_hat = []
+        while True:
+            minibatch = dataset.get_next_batch(sess=self.sess, outputs=test_data_generator.outputs)
+            if minibatch is None:
+                break
+            test_crops = minibatch[0]
+            results_dict = self.sess.run({
+                "probs": self.posteriors
+            }, feed_dict={
+                self.inputImages: test_crops, self.isTrain: False})
+            mean_prob = np.mean(results_dict["probs"], axis=0)
+            y_hat.append(np.argmax(mean_prob))
+        return np.array(y_hat)
 
 
 if __name__ == '__main__':
@@ -405,7 +431,10 @@ if __name__ == '__main__':
         batch_size=256,
         iterations=10000)
 
-    resnet50_classifier.fit(X=train_data[:, 0], y=train_data[:, 1].astype(np.int32))
+    resnet50_classifier.fit(X_train=train_data[:, 0],
+                            y_train=train_data[:, 1].astype(np.int32),
+                            X_test=test_data[:, 0],
+                            y_test=test_data[:, 1].astype(np.int32))
 
     # X_hat = []
     # y_hat = []
