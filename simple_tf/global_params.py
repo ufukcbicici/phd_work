@@ -105,9 +105,9 @@ class GlobalConstants:
     # NO_FILTERS_1 = 20
     # NO_FILTERS_2 = 13  # 10
     # NO_HIDDEN = 10  # 30
-    NO_FILTERS_1 = 20
-    NO_FILTERS_2 = 15  # 10
-    NO_HIDDEN = 25  # 30
+    NO_FILTERS_1 = 8
+    NO_FILTERS_2 = 13  # 10
+    NO_HIDDEN = 88  # 30
     NUM_LABELS = 10
     WEIGHT_DECAY_COEFFICIENT = 0.0
     DECISION_WEIGHT_DECAY_COEFFICIENT = 0.0

@@ -15,20 +15,32 @@ routing_data = DatasetLinkingAlgorithm.link_dataset_v3(network_name_="FashionNet
                                                        test_iterations_=[43680, 44160, 44640, 45120, 45600,
                                                                          46080, 46560, 47040, 47520, 48000])
 
+parameter_count_dict = {0: 1322, 1: 8157, 2: 8157, 3: 18660, 4: 18660, 5: 18660, 6: 18660}
 network_activation_costs, network_activation_costs_dict = \
     CignActivationCostCalculator.calculate_mac_cost(
         network=network,
         node_costs=routing_data.dictOfDatasets[43680].get_dict("nodeCosts"))
-parameter_count_dict = {0: 1322, 1: 8157, 2: 8157, 3: 18660, 4: 18660, 5: 18660, 6: 18660}
+network_parameter_costs, network_parameter_costs_dict = \
+    CignActivationCostCalculator.calculate_mac_cost(
+        network=network,
+        node_costs=parameter_count_dict)
+
 
 sample_count = 5000
 # 1.066 * 10^6
 activation_ids = np.zeros((sample_count, ), dtype=np.int32)
-activation_ids[0:100] = 2
-activation_ids[100:110] = 4
+activation_ids[0:900] = 2
+activation_ids[1000:1550] = 4
+activation_ids[2000:2500] = 12
+activation_ids[3000:3210] = 14
+activation_ids[4000:4500] = 10
 mean_cost = np.mean([network_activation_costs[a_id] for a_id in activation_ids])
-total_cost = (1.0 + mean_cost) * 1057.0
-average_parameter_usage = CignActivationCostCalculator.calculate_average_parameter_count(
-    network=network, node_costs=parameter_count_dict, selections_list=activation_ids,
-    selection_tuples=network_activation_costs_dict)
+total_activation_cost = (1.0 + mean_cost) * 1057.0
+base_parameter_cost = parameter_count_dict[0] + parameter_count_dict[1] + parameter_count_dict[3]
+mean_parameter_cost = np.mean([network_parameter_costs[a_id] for a_id in activation_ids])
+total_parameter_cost = (1.0 + mean_parameter_cost) * base_parameter_cost
 print("X")
+# average_parameter_usage = CignActivationCostCalculator.calculate_average_parameter_count(
+#     network=network, node_costs=parameter_count_dict, selections_list=activation_ids,
+#     selection_tuples=network_activation_costs_dict)
+# print("X")

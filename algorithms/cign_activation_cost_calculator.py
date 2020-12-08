@@ -38,7 +38,7 @@ class CignActivationCostCalculator:
     @staticmethod
     def calculate_average_parameter_count(network, node_costs, selections_list, selection_tuples):
         selection_costs_dict = {}
-        for selection_id, selection_tuple in selection_tuples:
+        for selection_id, selection_tuple in enumerate(selection_tuples):
             selected_set = set()
             for leaf_id, leaf_node in enumerate(network.leafNodes):
                 if leaf_id == 0:
