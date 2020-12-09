@@ -16,9 +16,7 @@ class CowChickenDataset:
     test_shortest_edges = [225, 256, 384, 480, 640]
 
     class TfDataset:
-        def __init__(self, dataset_obj, iter_obj, outputs_obj, init_obj):
-            self.dataset = dataset_obj
-            self.iter = iter_obj
+        def __init__(self, outputs_obj, init_obj):
             self.outputs = outputs_obj
             self.initializer = init_obj
 
@@ -149,7 +147,7 @@ class CowChickenDataset:
         iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
         outputs = iterator.get_next()
         initializer = iterator.make_initializer(data)
-        return CowChickenDataset.TfDataset(data, iterator, outputs, initializer)
+        return CowChickenDataset.TfDataset(outputs, initializer)
 
     def create_test_dataset(self, X):
         file_paths = X
@@ -162,7 +160,7 @@ class CowChickenDataset:
         iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
         outputs = iterator.get_next()
         initializer = iterator.make_initializer(data)
-        return CowChickenDataset.TfDataset(data, iterator, outputs, initializer)
+        return CowChickenDataset.TfDataset(outputs, initializer)
 
     def get_next_batch(self, sess, outputs):
         try:
