@@ -1,14 +1,13 @@
+import os
+import pickle
+from os.path import join
+
 import numpy as np
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator, ClassifierMixin
-import cv2
-from sklearn.decomposition import PCA
-from collections import Counter
-from os import listdir
-import os
-from os.path import isfile, join
-import pickle
+from sklearn.model_selection import train_test_split
+from tensorflow.contrib.framework.python.framework import checkpoint_utils
+from sklearn.metrics import classification_report
 
 
 class CowChickenDataset:
@@ -31,43 +30,46 @@ class CowChickenDataset:
         self.meanColor = None
         self.dataEigenValues = None
         self.dataEigenVectors = None
+        self.data_stats_file_name = "data_stats.sav"
 
     # Training-set wise mean subtraction & PCA
-    def data_preparataion(self, sess, data):
-        data_stats_file_name = "data_stats.sav"
-        if os.path.exists(data_stats_file_name):
-            f = open(data_stats_file_name, "rb")
+    def calculate_data_statistics(self, sess, data):
+        iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
+        outputs = iterator.get_next()
+        initializer = iterator.make_initializer(data)
+        sess.run(initializer)
+        images = []
+        while True:
+            img = self.get_next_batch(sess=sess, outputs=outputs)
+            if img is None:
+                break
+            images.append(img[0])
+        # Calculate mean of the dataset
+        means_arr = np.stack([np.mean(img, axis=(0, 1)) for img in images], axis=0)
+        self.meanColor = np.mean(means_arr, axis=0)
+        # Calculate the PCA over the whole training set; like the AlexNet paper (2012)
+        images_flattened = np.concatenate([
+            np.reshape(img,
+                       newshape=(img.shape[0] * img.shape[1], 3)) for img in images], axis=0)
+        cov = np.cov(images_flattened, rowvar=False)
+        self.dataEigenValues, self.dataEigenVectors = np.linalg.eig(cov)
+        f = open(self.data_stats_file_name, "wb")
+        pickle.dump(
+            {"meanColor": self.meanColor,
+             "dataEigenValues": self.dataEigenValues,
+             "dataEigenVectors": self.dataEigenVectors}, f)
+        f.close()
+
+    def load_data_statistics(self):
+        if os.path.exists(self.data_stats_file_name):
+            f = open(self.data_stats_file_name, "rb")
             stats_dict = pickle.load(f)
             self.meanColor = stats_dict["meanColor"]
             self.dataEigenValues = stats_dict["dataEigenValues"]
             self.dataEigenVectors = stats_dict["dataEigenVectors"]
             f.close()
         else:
-            iterator = tf.data.Iterator.from_structure(data.output_types, data.output_shapes)
-            outputs = iterator.get_next()
-            initializer = iterator.make_initializer(data)
-            sess.run(initializer)
-            images = []
-            while True:
-                img = self.get_next_batch(sess=sess, outputs=outputs)
-                if img is None:
-                    break
-                images.append(img[0])
-            # Calculate mean of the dataset
-            means_arr = np.stack([np.mean(img, axis=(0, 1)) for img in images], axis=0)
-            self.meanColor = np.mean(means_arr, axis=0)
-            # Calculate the PCA over the whole training set; like the AlexNet paper (2012)
-            images_flattened = np.concatenate([
-                np.reshape(img,
-                           newshape=(img.shape[0] * img.shape[1], 3)) for img in images], axis=0)
-            cov = np.cov(images_flattened, rowvar=False)
-            self.dataEigenValues, self.dataEigenVectors = np.linalg.eig(cov)
-            f = open(data_stats_file_name, "wb")
-            pickle.dump(
-                {"meanColor": self.meanColor,
-                 "dataEigenValues": self.dataEigenValues,
-                 "dataEigenVectors": self.dataEigenVectors}, f)
-            f.close()
+            raise IOError("Data statistics are not saved.")
 
     @staticmethod
     def process_path(file_path, label):
@@ -139,7 +141,7 @@ class CowChickenDataset:
         labels = y
         data = tf.data.Dataset.from_tensor_slices((file_paths, labels))
         data = data.map(CowChickenDataset.process_path)
-        self.data_preparataion(sess=sess, data=data)
+        self.calculate_data_statistics(sess=sess, data=data)
         data = data.shuffle(buffer_size=file_paths.shape[0])
         data = data.map(self.augment_for_training)
         data = data.batch(batch_size=self.batchSize)
@@ -299,6 +301,7 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
         self.iterations = iterations
         self.sess = tf.Session()
         self.saver = None
+        self.dataset = None
 
         assert len(self.strides) + 1 == len(self.activate_before_residual) + 1 == \
                len(self.features) == len(self.num_of_units_per_block) + 1
@@ -372,17 +375,17 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
         checkpoint_path = os.path.abspath(os.path.join(directory_path, "model.ckpt"))
         return directory_path, checkpoint_path
 
-    def fit(self, X_train, y_train, X_test, y_test):
+    def fit(self, X, y):
         self.sess.run(tf.global_variables_initializer())
-        dataset = CowChickenDataset()
-        train_data_generator = dataset.create_training_set(sess=self.sess, X=X_train, y=y_train)
-        self.sess.run(train_data_generator.initializer, feed_dict={dataset.batchSize: self.batch_size})
+        self.dataset = CowChickenDataset()
+        train_data_generator = self.dataset.create_training_set(sess=self.sess, X=X, y=y)
+        self.sess.run(train_data_generator.initializer, feed_dict={self.dataset.batchSize: self.batch_size})
         losses = []
         self.saver = tf.train.Saver(max_to_keep=1000)
         for iteration_id in range(self.iterations):
-            minibatch = dataset.get_next_batch(sess=self.sess, outputs=train_data_generator.outputs)
+            minibatch = self.dataset.get_next_batch(sess=self.sess, outputs=train_data_generator.outputs)
             if minibatch is None:
-                self.sess.run(train_data_generator.initializer, feed_dict={dataset.batchSize: self.batch_size})
+                self.sess.run(train_data_generator.initializer, feed_dict={self.dataset.batchSize: self.batch_size})
                 continue
             images = minibatch[0]
             labels = minibatch[1]
@@ -401,18 +404,15 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
                 directory_path, checkpoint_path = self.get_checkpoint_path(iteration=iteration_id)
                 os.mkdir(directory_path)
                 self.saver.save(self.sess, checkpoint_path)
-                y_train_hat = self.predict(X=X_train, dataset=dataset)
-                y_test_hat = self.predict(X=X_test, dataset=dataset)
-                print("Train Accuracy:{0}".format(np.mean(y_train_hat == y_train)))
-                print("Test Accuracy:{0}".format(np.mean(y_test_hat == y_test)))
 
-    def predict(self, X, dataset):
-        test_data_generator = dataset.create_test_dataset(X=X)
-        batch_size = 1
-        self.sess.run(test_data_generator.initializer, feed_dict={dataset.batchSize: batch_size})
+    def predict(self, X):
+        assert self.dataset is not None
+        test_data_generator = self.dataset.create_test_dataset(X=X)
+        # self.sess.run(test_data_generator.initializer, feed_dict={self.dataset.batchSize: 1})
+        self.sess.run(test_data_generator.initializer)
         y_hat = []
         while True:
-            minibatch = dataset.get_next_batch(sess=self.sess, outputs=test_data_generator.outputs)
+            minibatch = self.dataset.get_next_batch(sess=self.sess, outputs=test_data_generator.outputs)
             if minibatch is None:
                 break
             test_crops = minibatch[0]
@@ -424,18 +424,26 @@ class ResNet50Classifier(BaseEstimator, ClassifierMixin):
             y_hat.append(np.argmax(mean_prob))
         return np.array(y_hat)
 
+    def load_model(self, iteration):
+        # Load model variables
+        _, checkpoint_path = self.get_checkpoint_path(iteration=iteration)
+        saved_vars = checkpoint_utils.list_variables(checkpoint_dir=checkpoint_path)
+        all_vars = tf.global_variables()
+        for var in all_vars:
+            if "Adam" in var.name:
+                continue
+            source_array = checkpoint_utils.load_variable(checkpoint_dir=checkpoint_path, name=var.name)
+            tf.assign(var, source_array).eval(session=self.sess)
+        # Load a saved dataset; for test statistics
+        self.dataset = CowChickenDataset()
+        self.dataset.load_data_statistics()
+
 
 if __name__ == '__main__':
     # Always get the same train-test split
     np.random.seed(67)
-    # sess = tf.Session()
 
     train_data, test_data = CowChickenDataset.farm_data_reader(data_path=join("..", "data", "farm_data"))
-    # dataset = CowChickenDataset()
-    # dataset.create_tf_dataset(sess=sess, data=train_data, data_type="training")
-    # dataset.create_tf_dataset(sess=sess, data=test_data, data_type="test")
-    # sess.run(dataset.datasetsDict["training"].initializer, feed_dict={dataset.batchSize: 256})
-    # sess.run(dataset.datasetsDict["test"].initializer, feed_dict={dataset.batchSize: 1})
 
     resnet50_classifier = ResNet50Classifier(
         regularizer_coeff=0.0001,
@@ -449,39 +457,23 @@ if __name__ == '__main__':
         batch_size=256,
         iterations=10000)
 
-    resnet50_classifier.fit(X_train=train_data[:, 0],
-                            y_train=train_data[:, 1].astype(np.int32),
-                            X_test=test_data[:, 0],
-                            y_test=test_data[:, 1].astype(np.int32))
+    # Already fitted
+    # resnet50_classifier.fit(X=train_data[:, 0], y=train_data[:, 1].astype(np.int32))
 
-    # X_hat = []
-    # y_hat = []
-    # while True:
-    #     minibatch = dataset.get_next_batch(sess=sess, outputs=dataset.datasetsDict["training"].outputs)
-    #     if minibatch is None:
-    #         break
-    #     X_hat.append(minibatch[0])
-    #     y_hat.append(minibatch[1].astype(np.int32))
-    #
-    #     test_batch = dataset.get_next_batch(sess=sess, outputs=dataset.datasetsDict["test"].outputs)
-    #     print("X")
+    # Load trained model
+    resnet50_classifier.load_model(iteration=2999)
 
-    # cv2.imshow("img", ret[0][0])
-    # cv2.waitKey(0)
-    # cv2.imshow("resized_img", ret[1][0])
-    # cv2.waitKey(0)
-    # cv2.imshow("cropped_img", ret[2][0])
-    # cv2.waitKey(0)
-    # cv2.imshow("final_img", ret[3][0])
-    # cv2.waitKey(0)
-    print("X")
+    # Predict on train and test models
+    X_train = train_data[:, 0]
+    X_test = test_data[:, 0]
+    y_train = train_data[:, 1].astype(np.int32)
+    y_test = test_data[:, 1].astype(np.int32)
 
-    # print("X")
-    # sess.run(dataset.datasetsDict["training"].initializer, feed_dict={dataset.batchSize: 256})
-    # X_hat = []
-    # while True:
-    #     ret = dataset.get_next_batch(sess=sess)
-    #     if ret is None:
-    #         break
-    #     X_hat.append(ret)
-    # print("X")
+    y_train_hat = resnet50_classifier.predict(X=X_train)
+    y_test_hat = resnet50_classifier.predict(X=X_test)
+
+    # Measure performance
+    print("*************Training*************")
+    print(classification_report(y_pred=y_train_hat, y_true=y_train))
+    print("*************Test*************")
+    print(classification_report(y_pred=y_test_hat, y_true=y_test))
