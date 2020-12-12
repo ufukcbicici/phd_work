@@ -225,7 +225,7 @@ class BayesianThresholdOptimizer:
             results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
         return results_dict["train"]["final_score"]
 
-    def optimize(self, weight_bound_min=None, weight_bound_max=None):
+    def optimize(self, init_points, n_iter, xi, weight_bound_min=None, weight_bound_max=None):
         train_indices = self.routingData.trainingIndices
         test_indices = self.routingData.testIndices
         # Learn the standard information gain based accuracies
@@ -243,3 +243,14 @@ class BayesianThresholdOptimizer:
             assert weight_bound_min is not None and weight_bound_max is not None
             weight_bounds = self.calculate_weight_bounds(min_boundary=weight_bound_min, max_boundary=weight_bound_max)
             all_bounds.update(weight_bounds)
+        # Actual optimization part
+        optimizer = BayesianOptimization(
+            f=self.loss_function,
+            pbounds=all_bounds,
+        )
+        optimizer.maximize(
+            init_points=init_points,
+            n_iter=n_iter,
+            acq="ei",
+            xi=xi
+        )
