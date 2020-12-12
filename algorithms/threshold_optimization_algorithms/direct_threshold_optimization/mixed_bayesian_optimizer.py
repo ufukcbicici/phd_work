@@ -415,6 +415,41 @@ class MixedBayesianOptimizer:
         print("X")
 
     @staticmethod
+    def calculate_routing_cost(weights, X, y, posteriors, selection_tuples, indices, lambda_coeff):
+        label_count = posteriors.shape[1]
+        X_ = X[indices]
+        y_ = y[indices]
+        selections = selection_tuples[indices]
+        A_ = posteriors[indices]
+
+        W = weights
+
+        # Squared differences
+        sum_of_diffs = 0.0
+        is_accurate = []
+        N = X_.shape[0]
+        for i in range(N):
+            x_i = X_[i]
+            y_i = np.zeros(shape=(label_count,), dtype=np.float32)
+            label_truth = y_[i]
+            y_i[label_truth] = 1.0
+            A_i = A_[i]
+            A_i = A_i * selections[i][np.newaxis, :]
+            coeffs_i = np.dot(W, x_i[:, np.newaxis])
+            y_i_predicted = np.dot(A_i, coeffs_i)
+            y_i_predicted = np.squeeze(y_i_predicted)
+            delta_i = y_i_predicted - y_i
+            l2_norm_squared = np.linalg.norm(delta_i) ** 2.0
+            sum_of_diffs += l2_norm_squared / (2.0 * N)
+            label_predicted = np.argmax(y_i_predicted)
+            is_accurate.append(label_predicted == label_truth)
+        # Tikhonov Regularizer
+        regularizer_cost = (lambda_coeff / 2.0) * (np.linalg.norm(W) ** 2.0)
+        total_cost = sum_of_diffs + regularizer_cost
+        accuracy = np.mean(np.array(is_accurate))
+        return total_cost, accuracy
+
+    @staticmethod
     def calculate_mixing_coefficients(network, routing_data, selection_tuples, train_indices, test_indices,
                                       cut_off_value=5.0):
         X = routing_data.get_dict("pre_branch_feature")[0]
@@ -423,27 +458,106 @@ class MixedBayesianOptimizer:
         posteriors = [routing_data.get_dict("posterior_probs")[node.index] for node in network.leafNodes]
         posteriors = np.stack(posteriors, axis=-1)
         label_count = posteriors.shape[1]
+        W = np.random.normal(loc=0.0, scale=0.1, size=(posteriors.shape[-1], X_formatted.shape[-1]))
+        lambda_coeff = 0.0
+        train_cost, train_accuracy = MixedBayesianOptimizer.calculate_routing_cost(weights=W,
+                                                                                   X=X_formatted,
+                                                                                   y=y,
+                                                                                   posteriors=posteriors,
+                                                                                   selection_tuples=selection_tuples,
+                                                                                   indices=train_indices,
+                                                                                   lambda_coeff=lambda_coeff)
+        test_cost, test_accuracy = MixedBayesianOptimizer.calculate_routing_cost(weights=W,
+                                                                                 X=X_formatted,
+                                                                                 y=y,
+                                                                                 posteriors=posteriors,
+                                                                                 selection_tuples=selection_tuples,
+                                                                                 indices=test_indices,
+                                                                                 lambda_coeff=lambda_coeff)
+        print("train_cost={0} train_accuracy={1}".format(train_cost, train_accuracy))
+        print("test_cost={0} test_accuracy={1}".format(test_cost, test_accuracy))
+
+        # Build as the least squares solution
+        X_ = X[train_indices]
+        y_ = y[train_indices]
+        selections = selection_tuples[train_indices]
+        A_ = posteriors[train_indices]
+        N = X_.shape[0]
+        W_dim = np.asscalar(np.prod(W.shape)[0])
+        # Build the matrix A and vector b
+        vector_b = np.zeros(shape=(W_dim, 1))
+        matrix_A = np.zeros(shape=(W_dim, W_dim))
+        for i in range(N):
+            x_i = X_[i][:, np.newaxis]
+            y_i = np.zeros(shape=(label_count,), dtype=np.float32)
+            label_truth = y_[i]
+            y_i[label_truth] = 1.0
+            y_i = y[:, np.newaxis]
+            A_i = A_[i]
+            A_i = A_i * selections[i][np.newaxis, :]
+
+            # Matrix A
+            xx_T = np.dot(x_i, x_i.T)
+            A_TA = np.dot(A_i.T, A_i)
+            kron_i = np.kron(xx_T, A_TA)
+            assert matrix_A.shape == kron_i.shape
+            matrix_A = matrix_A + kron_i
+
+            # Vector b
+            A_ty = np.dot(A_i.t, y_i)
+            A_tyx = np.dot(A_ty, x_i.T)
+            vec_b = np.reshape(A_tyx, (A_tyx.shape[0] * A_tyx.shape[1], 1), order='F')
+            vector_b = vector_b + vec_b
+        regularizer_matrix = N * lambda_coeff * np.identity(n=W_dim, dtype=matrix_A.dtype)
+        matrix_A = matrix_A + regularizer_matrix
+
+        # Now we have the following linear system: matrix_A * Vec(W) = vector_b
+        # Solve for Vec(W) and then reshape.
+        vec_W = np.linalg.lstsq(matrix_A, np.squeeze(vector_b))
+        W_optimal = np.reshape(vec_W, W.shape, order='F')
+
+        # Test and pray
+        train_cost_opt, train_accuracy_opt = MixedBayesianOptimizer.calculate_routing_cost(
+            weights=W_optimal,
+            X=X_formatted,
+            y=y,
+            posteriors=posteriors,
+            selection_tuples=selection_tuples,
+            indices=train_indices,
+            lambda_coeff=lambda_coeff)
+        test_cost_opt, test_accuracy_opt = MixedBayesianOptimizer.calculate_routing_cost(
+            weights=W_optimal,
+            X=X_formatted,
+            y=y,
+            posteriors=posteriors,
+            selection_tuples=selection_tuples,
+            indices=test_indices,
+            lambda_coeff=lambda_coeff)
+        print("train_cost_opt={0} train_accuracy_opt={1}".format(train_cost_opt, train_accuracy_opt))
+        print("test_cost_opt={0} test_accuracy_opt={1}".format(test_cost_opt, test_accuracy_opt))
+
         # Get optimal coefficients
-        optimal_coefficients = []
-        predicted_y = []
-        for idx in range(y.shape[0]):
-            y_one_hot = np.zeros((label_count,), dtype=np.float32)
-            y_one_hot[y[idx]] = 1.0
-            b = y_one_hot
-            posterior_matrix = posteriors[idx]
-            selection_of_posteriors = selection_tuples[idx]
-            posteriors_with_selection = posterior_matrix * selection_of_posteriors[np.newaxis, :]
-            coeffs = np.linalg.lstsq(posteriors_with_selection, b)[0]
-            coeffs = coeffs * selection_of_posteriors
-            coeffs = np.clip(coeffs, a_min=-cut_off_value, a_max=cut_off_value)
-            optimal_coefficients.append(coeffs)
-            y_hat = np.squeeze(np.dot(posteriors_with_selection, coeffs[:, np.newaxis]))
-            y_hat = np.argmax(y_hat)
-            predicted_y.append(y_hat)
-        predicted_y = np.array(predicted_y)
-        optimal_coefficients = np.stack(optimal_coefficients, axis=0)
-        ideal_train_accuracy = np.mean(y[train_indices] == predicted_y[train_indices])
-        ideal_test_accuracy = np.mean(y[test_indices] == predicted_y[test_indices])
-        print("ideal_train_accuracy={0}".format(ideal_train_accuracy))
-        print("ideal_test_accuracy={0}".format(ideal_test_accuracy))
+        # optimal_coefficients = []
+        # predicted_y = []
+        # for idx in range(y.shape[0]):
+        #     y_one_hot = np.zeros((label_count,), dtype=np.float32)
+        #     y_one_hot[y[idx]] = 1.0
+        #     b = y_one_hot
+        #     posterior_matrix = posteriors[idx]
+        #     selection_of_posteriors = selection_tuples[idx]
+        #     posteriors_with_selection = posterior_matrix * selection_of_posteriors[np.newaxis, :]
+        #     coeffs = np.linalg.lstsq(posteriors_with_selection, b)[0]
+        #     coeffs = coeffs * selection_of_posteriors
+        #     coeffs = np.clip(coeffs, a_min=-cut_off_value, a_max=cut_off_value)
+        #     optimal_coefficients.append(coeffs)
+        #     y_hat = np.squeeze(np.dot(posteriors_with_selection, coeffs[:, np.newaxis]))
+        #     y_hat = np.argmax(y_hat)
+        #     predicted_y.append(y_hat)
+        # predicted_y = np.array(predicted_y)
+        # optimal_coefficients = np.stack(optimal_coefficients, axis=0)
+        # ideal_train_accuracy = np.mean(y[train_indices] == predicted_y[train_indices])
+        # ideal_test_accuracy = np.mean(y[test_indices] == predicted_y[test_indices])
+
+        # print("ideal_train_accuracy={0}".format(ideal_train_accuracy))
+        # print("ideal_test_accuracy={0}".format(ideal_test_accuracy))
         print("X")

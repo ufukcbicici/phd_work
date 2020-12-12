@@ -20,8 +20,6 @@ class CowChickenDataset:
             self.outputs = outputs_obj
             self.initializer = init_obj
 
-    # def __init__(self, data_path, test_ratio):
-    #     self.dataPath = data_path
     def __init__(self):
         self.isNewEpoch = False
         self.batchSize = tf.placeholder(dtype=tf.int64, name="batchSize")
