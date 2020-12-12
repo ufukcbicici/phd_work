@@ -2,9 +2,18 @@ import numpy as np
 import tensorflow as tf
 import os
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
 from bayes_opt import BayesianOptimization
 from datetime import datetime
 import pickle
+
+from sklearn.cluster import KMeans
+from sklearn.neural_network import MLPRegressor
 
 from algorithms.branching_probability_calibration import BranchingProbabilityOptimization
 from algorithms.information_gain_routing_accuracy_calculator import InformationGainRoutingAccuracyCalculator
@@ -407,20 +416,96 @@ class MixedBayesianOptimizer:
             f = open(bo_results_file_name, "rb")
             final_results = pickle.load(f)
             f.close()
-        MixedBayesianOptimizer.calculate_mixing_coefficients(network=network,
-                                                             routing_data=routing_data,
-                                                             selection_tuples=final_results["selected_tuples"],
-                                                             train_indices=train_indices,
-                                                             test_indices=test_indices)
+        MixedBayesianOptimizer.calculate_routing_weights_with_regression(
+            network=network,
+            routing_data=routing_data,
+            selection_tuples=final_results["selected_tuples"],
+            train_indices=train_indices,
+            test_indices=test_indices)
         print("X")
 
     @staticmethod
-    def calculate_routing_cost(weights, X, y, posteriors, selection_tuples, indices, lambda_coeff):
+    def calculate_routing_weights_with_regression(network, routing_data, selection_tuples, train_indices,
+                                                  test_indices,
+                                                  cut_off_value=5.0):
+        X = routing_data.get_dict("pre_branch_feature")[0]
+        y = routing_data.labelList
+        X_formatted = UtilityFuncs.vectorize_with_gap(X)
+        posteriors = [routing_data.get_dict("posterior_probs")[node.index] for node in network.leafNodes]
+        posteriors = np.stack(posteriors, axis=-1)
         label_count = posteriors.shape[1]
-        X_ = X[indices]
-        y_ = y[indices]
-        selections = selection_tuples[indices]
-        A_ = posteriors[indices]
+        # Get optimal coefficients
+        optimal_coefficients = []
+        predicted_y = []
+        for idx in range(y.shape[0]):
+            y_one_hot = np.zeros((label_count,), dtype=np.float32)
+            y_one_hot[y[idx]] = 1.0
+            b = y_one_hot
+            posterior_matrix = posteriors[idx]
+            selection_of_posteriors = selection_tuples[idx]
+            posteriors_with_selection = posterior_matrix * selection_of_posteriors[np.newaxis, :]
+            coeffs = np.linalg.lstsq(posteriors_with_selection, b)[0]
+            coeffs = coeffs * selection_of_posteriors
+            coeffs = np.clip(coeffs, a_min=-cut_off_value, a_max=cut_off_value)
+            optimal_coefficients.append(coeffs)
+            y_hat = np.squeeze(np.dot(posteriors_with_selection, coeffs[:, np.newaxis]))
+            y_hat = np.argmax(y_hat)
+            predicted_y.append(y_hat)
+        predicted_y = np.array(predicted_y)
+        optimal_coefficients = np.stack(optimal_coefficients, axis=0)
+        ideal_train_accuracy = np.mean(y[train_indices] == predicted_y[train_indices])
+        ideal_test_accuracy = np.mean(y[test_indices] == predicted_y[test_indices])
+        print("ideal_train_accuracy={0}".format(ideal_train_accuracy))
+        print("ideal_test_accuracy={0}".format(ideal_test_accuracy))
+
+        # Build the regression model
+        X_train = X_formatted[train_indices]
+        X_test = X_formatted[test_indices]
+        y_train = y[train_indices]
+        y_test = y[test_indices]
+        posteriors_train = posteriors[train_indices]
+        posteriors_test = posteriors[test_indices]
+        selections_train = selection_tuples[train_indices]
+        selections_test = selection_tuples[test_indices]
+        optimal_coefficients_train = optimal_coefficients[train_indices]
+        optimal_coefficients_test = optimal_coefficients[test_indices]
+
+        file_name = "routing_weights_regressor.sav"
+        standard_scaler = StandardScaler()
+        pca = PCA()
+        mlp = MLPRegressor()
+        pipe = Pipeline(steps=[("scaler", standard_scaler),
+                               ('pca', pca),
+                               ('mlp', mlp)])
+        param_grid = \
+            [{
+                "pca__n_components": [None],
+                "mlp__hidden_layer_sizes": [(64, 32)],
+                "mlp__activation": ["relu"],
+                "mlp__solver": ["adam"],
+                # "mlp__learning_rate": ["adaptive"],
+                "mlp__alpha": [0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 2.0, 5.0],
+                "mlp__max_iter": [10000],
+                "mlp__early_stopping": [True],
+                "mlp__n_iter_no_change": [100]
+            }]
+        search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
+                              scoring=["neg_mean_squared_error", "r2"],
+                              refit="neg_mean_squared_error")
+        search.fit(X_train, optimal_coefficients_train)
+        print("Best parameter (CV score=%0.3f):" % search.best_score_)
+        print(search.best_params_)
+        model = search.best_estimator_
+        f = open(file_name, "wb")
+        pickle.dump(model, f)
+        f.close()
+        print("X")
+
+    @staticmethod
+    def calculate_routing_cost(weights, X_, y_, posteriors, selections, lambda_coeff):
+        A_ = posteriors
+        W_shape = (A_.shape[-1], X_.shape[-1])
+        label_count = A_.shape[1]
 
         W = weights
 
@@ -446,44 +531,17 @@ class MixedBayesianOptimizer:
         # Tikhonov Regularizer
         regularizer_cost = (lambda_coeff / 2.0) * (np.linalg.norm(W) ** 2.0)
         total_cost = sum_of_diffs + regularizer_cost
-        accuracy = np.mean(np.array(is_accurate))
-        return total_cost, accuracy
+        # accuracy = np.mean(np.array(is_accurate))
+        return total_cost, np.array(is_accurate)
 
     @staticmethod
-    def calculate_mixing_coefficients(network, routing_data, selection_tuples, train_indices, test_indices,
-                                      cut_off_value=5.0):
-        X = routing_data.get_dict("pre_branch_feature")[0]
-        y = routing_data.labelList
-        X_formatted = UtilityFuncs.vectorize_with_gap(X)
-        posteriors = [routing_data.get_dict("posterior_probs")[node.index] for node in network.leafNodes]
-        posteriors = np.stack(posteriors, axis=-1)
-        label_count = posteriors.shape[1]
-        W = np.random.normal(loc=0.0, scale=0.1, size=(posteriors.shape[-1], X_formatted.shape[-1]))
-        lambda_coeff = 0.0
-        train_cost, train_accuracy = MixedBayesianOptimizer.calculate_routing_cost(weights=W,
-                                                                                   X=X_formatted,
-                                                                                   y=y,
-                                                                                   posteriors=posteriors,
-                                                                                   selection_tuples=selection_tuples,
-                                                                                   indices=train_indices,
-                                                                                   lambda_coeff=lambda_coeff)
-        test_cost, test_accuracy = MixedBayesianOptimizer.calculate_routing_cost(weights=W,
-                                                                                 X=X_formatted,
-                                                                                 y=y,
-                                                                                 posteriors=posteriors,
-                                                                                 selection_tuples=selection_tuples,
-                                                                                 indices=test_indices,
-                                                                                 lambda_coeff=lambda_coeff)
-        print("train_cost={0} train_accuracy={1}".format(train_cost, train_accuracy))
-        print("test_cost={0} test_accuracy={1}".format(test_cost, test_accuracy))
-
+    def fit_least_squares_routing(X_, y_, posteriors, selections, lambda_coeff):
+        A_ = posteriors
+        W_shape = (A_.shape[-1], X_.shape[-1])
+        label_count = A_.shape[1]
         # Build as the least squares solution
-        X_ = X[train_indices]
-        y_ = y[train_indices]
-        selections = selection_tuples[train_indices]
-        A_ = posteriors[train_indices]
         N = X_.shape[0]
-        W_dim = np.asscalar(np.prod(W.shape)[0])
+        W_dim = np.asscalar(np.prod(W_shape))
         # Build the matrix A and vector b
         vector_b = np.zeros(shape=(W_dim, 1))
         matrix_A = np.zeros(shape=(W_dim, W_dim))
@@ -492,7 +550,7 @@ class MixedBayesianOptimizer:
             y_i = np.zeros(shape=(label_count,), dtype=np.float32)
             label_truth = y_[i]
             y_i[label_truth] = 1.0
-            y_i = y[:, np.newaxis]
+            y_i = y_i[:, np.newaxis]
             A_i = A_[i]
             A_i = A_i * selections[i][np.newaxis, :]
 
@@ -504,7 +562,7 @@ class MixedBayesianOptimizer:
             matrix_A = matrix_A + kron_i
 
             # Vector b
-            A_ty = np.dot(A_i.t, y_i)
+            A_ty = np.dot(A_i.T, y_i)
             A_tyx = np.dot(A_ty, x_i.T)
             vec_b = np.reshape(A_tyx, (A_tyx.shape[0] * A_tyx.shape[1], 1), order='F')
             vector_b = vector_b + vec_b
@@ -513,28 +571,79 @@ class MixedBayesianOptimizer:
 
         # Now we have the following linear system: matrix_A * Vec(W) = vector_b
         # Solve for Vec(W) and then reshape.
-        vec_W = np.linalg.lstsq(matrix_A, np.squeeze(vector_b))
-        W_optimal = np.reshape(vec_W, W.shape, order='F')
+        vec_W = np.linalg.lstsq(matrix_A, np.squeeze(vector_b))[0]
+        W_optimal = np.reshape(vec_W, W_shape, order='F')
+        return W_optimal
 
-        # Test and pray
-        train_cost_opt, train_accuracy_opt = MixedBayesianOptimizer.calculate_routing_cost(
-            weights=W_optimal,
-            X=X_formatted,
-            y=y,
-            posteriors=posteriors,
-            selection_tuples=selection_tuples,
-            indices=train_indices,
-            lambda_coeff=lambda_coeff)
-        test_cost_opt, test_accuracy_opt = MixedBayesianOptimizer.calculate_routing_cost(
-            weights=W_optimal,
-            X=X_formatted,
-            y=y,
-            posteriors=posteriors,
-            selection_tuples=selection_tuples,
-            indices=test_indices,
-            lambda_coeff=lambda_coeff)
-        print("train_cost_opt={0} train_accuracy_opt={1}".format(train_cost_opt, train_accuracy_opt))
-        print("test_cost_opt={0} test_accuracy_opt={1}".format(test_cost_opt, test_accuracy_opt))
+    @staticmethod
+    def calculate_mixing_coefficients_least_squares(network, routing_data, selection_tuples, train_indices,
+                                                    test_indices,
+                                                    cut_off_value=5.0):
+        X = routing_data.get_dict("pre_branch_feature")[0]
+        y = routing_data.labelList
+        X_formatted = UtilityFuncs.vectorize_with_gap(X)
+        posteriors = [routing_data.get_dict("posterior_probs")[node.index] for node in network.leafNodes]
+        posteriors = np.stack(posteriors, axis=-1)
+        label_count = posteriors.shape[1]
+        W = np.random.normal(loc=0.0, scale=0.1, size=(posteriors.shape[-1], X_formatted.shape[-1]))
+        cluster_count = 3
+        X_train = X_formatted[train_indices]
+        X_test = X_formatted[test_indices]
+        y_train = y[train_indices]
+        y_test = y[test_indices]
+        posteriors_train = posteriors[train_indices]
+        posteriors_test = posteriors[test_indices]
+        selections_train = selection_tuples[train_indices]
+        selections_test = selection_tuples[test_indices]
+
+        for cluster_count in range(2, 11):
+            kmeans = KMeans(n_clusters=cluster_count).fit(X_train)
+
+            training_clusters = kmeans.predict(X_train)
+            test_clusters = kmeans.predict(X_test)
+            print("Training Cluster Distribution:{0}".format(Counter(training_clusters)))
+            print("Test Cluster Distribution:{0}".format(Counter(test_clusters)))
+
+            for lambda_coeff in [0.0, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0]:
+                print("**********Cluster Count:{0} Lambda Coeff:{1}**********".format(cluster_count, lambda_coeff))
+                cluster_accuracy_results_train = {}
+                cluster_accuracy_results_test = {}
+                for cluster_id in range(cluster_count):
+                    cluster_mask = training_clusters == cluster_id
+                    X_ = X_train[cluster_mask]
+                    y_ = y_train[cluster_mask]
+                    A_ = posteriors_train[cluster_mask]
+                    S_ = selections_train[cluster_mask]
+                    W_cluster = MixedBayesianOptimizer.fit_least_squares_routing(X_=X_,
+                                                                                 y_=y_,
+                                                                                 posteriors=A_,
+                                                                                 selections=S_,
+                                                                                 lambda_coeff=lambda_coeff)
+                    # Train results
+                    train_cost_opt, train_accuracies = MixedBayesianOptimizer.calculate_routing_cost(
+                        weights=W_cluster,
+                        X_=X_,
+                        y_=y_,
+                        posteriors=A_,
+                        selections=S_,
+                        lambda_coeff=lambda_coeff)
+                    cluster_accuracy_results_train[cluster_id] = train_accuracies
+                    # Test results
+                    # Update the cluster mask
+                    cluster_mask = test_clusters == cluster_id
+                    test_cost_opt, test_accuracies = MixedBayesianOptimizer.calculate_routing_cost(
+                        weights=W_cluster,
+                        X_=X_test[cluster_mask],
+                        y_=y_test[cluster_mask],
+                        posteriors=posteriors_test[cluster_mask],
+                        selections=selections_test[cluster_mask],
+                        lambda_coeff=lambda_coeff)
+                    cluster_accuracy_results_test[cluster_id] = test_accuracies
+
+                train_results_arr = np.mean(np.concatenate(list(cluster_accuracy_results_train.values())))
+                test_results_arr = np.mean(np.concatenate(list(cluster_accuracy_results_test.values())))
+                print("train_results_arr={0}".format(train_results_arr))
+                print("test_results_arr={0}".format(test_results_arr))
 
         # Get optimal coefficients
         # optimal_coefficients = []
