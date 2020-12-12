@@ -11,8 +11,9 @@ from algorithms.network_calibration import NetworkCalibrationWithTemperatureScal
 
 
 class DirectThresholdOptimizer:
-    def __init__(self, network, routing_data, seed):
+    def __init__(self, network, routing_data, seed, use_parametric_weights=False):
         self.network = network
+        self.useParametricWeights = use_parametric_weights
         self.seed = seed
         self.leafIndices = {node.index: idx for idx, node in enumerate(self.network.leafNodes)}
         self.labelCount = len(set(routing_data.labelList))

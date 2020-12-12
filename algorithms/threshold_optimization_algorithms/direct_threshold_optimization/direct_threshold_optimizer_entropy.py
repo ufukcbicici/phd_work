@@ -6,8 +6,8 @@ from simple_tf.global_params import GlobalConstants
 
 
 class DirectThresholdOptimizerEntropy(DirectThresholdOptimizer):
-    def __init__(self, network, routing_data, seed):
-        super().__init__(network, routing_data, seed)
+    def __init__(self, network, routing_data, seed, use_parametric_weights=False):
+        super().__init__(network, routing_data, seed, use_parametric_weights)
         self.entropies = {}
         self.kind = "entropy"
 
