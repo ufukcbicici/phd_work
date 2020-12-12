@@ -26,6 +26,7 @@ class DirectThresholdOptimizer:
         self.routingProbabilities = None
         self.routingProbabilitiesUncalibrated = None
         self.thresholds = None
+        self.routingWeights = None
         # self.thresholdsSigmoid = None
         # self.hardThresholdTests = {}
         # self.softThresholdTests = {}
@@ -127,6 +128,8 @@ class DirectThresholdOptimizer:
                                                           name="posteriors_node{0}".format(node.index),
                                                           shape=(None, self.labelCount))
                                for node in self.network.leafNodes}
+        self.routingWeights = tf.placeholder(dtype=tf.float32, shape=(None, len(self.network.leafNodes)),
+                                             name="routingWeights")
         self.gtLabels = tf.placeholder(dtype=tf.int64, shape=(None,), name="gt_labels")
         self.totalGlobalStep = tf.Variable(0, name="total_global_step", trainable=False)
         self.sigmoidDecay = tf.placeholder(dtype=tf.float32, name="sigmoidDecay")
@@ -160,9 +163,12 @@ class DirectThresholdOptimizer:
         # Combine all weights
         self.selectionTuples = tf.stack(values=[self.pathScores[node.index] for node in self.network.leafNodes],
                                         axis=-1)
-        self.weightsArray = tf.reduce_sum(self.selectionTuples, axis=1, keepdims=True)
-        self.weightsArray = tf.reciprocal(self.weightsArray)
-        self.selectionWeights = self.selectionTuples * self.weightsArray
+        if not self.useParametricWeights:
+            self.weightsArray = tf.reduce_sum(self.selectionTuples, axis=1, keepdims=True)
+            self.weightsArray = tf.reciprocal(self.weightsArray)
+            self.selectionWeights = self.selectionTuples * self.weightsArray
+        else:
+            self.selectionWeights = tf.identity(self.routingWeights)
         # Combine all posteriors
         self.posteriorsTensor = tf.stack(values=[self.posteriorsDict[node.index] for node in self.network.leafNodes],
                                          axis=-1)
@@ -189,8 +195,11 @@ class DirectThresholdOptimizer:
         # self.totalOptimizer = tf.train.AdamOptimizer().minimize(self.meanSquaredLoss,
         #                                                         global_step=self.totalGlobalStep)
 
-    def prepare_feed_dict(self, routing_data, indices, mixing_lambda, temperatures_dict, thresholds_dict):
+    def prepare_feed_dict(self, routing_data, indices, mixing_lambda,
+                          temperatures_dict, thresholds_dict, routing_weights_array):
         feed_dict = {self.gtLabels: routing_data.labelList[indices], self.mixingLambda: mixing_lambda}
+        if routing_weights_array is not None:
+            feed_dict[self.routingWeights] = routing_weights_array
         # Leaf nodes
         for node in self.network.leafNodes:
             arr = routing_data.get_dict("posterior_probs")[node.index][indices]
@@ -205,13 +214,15 @@ class DirectThresholdOptimizer:
             feed_dict[self.thresholds[node.index]] = thresholds_arr
         return feed_dict
 
-    def run_threshold_calculator(self, sess, routing_data, indices, mixing_lambda, temperatures_dict, thresholds_dict):
+    def run_threshold_calculator(self, sess, routing_data, indices, mixing_lambda,
+                                 temperatures_dict, thresholds_dict, routing_weights_array=None):
         feed_dict = \
             self.prepare_feed_dict(routing_data=routing_data,
                                    indices=indices,
                                    mixing_lambda=mixing_lambda,
                                    temperatures_dict=temperatures_dict,
-                                   thresholds_dict=thresholds_dict)
+                                   thresholds_dict=thresholds_dict,
+                                   routing_weights_array=routing_weights_array)
         run_dict = self.get_run_dict()
         results = sess.run(run_dict, feed_dict=feed_dict)
         return results
