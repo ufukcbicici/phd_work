@@ -27,6 +27,8 @@ from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.
     DirectThresholdOptimizer
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.ig_clustered_bayesian_optimization import \
     IgBasedBayesianOptimization
+from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.kmeans_plus_bayesian_optimization import \
+    KmeansPlusBayesianOptimization
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.mixed_bayesian_optimizer import \
     MixedBayesianOptimizer
 from auxillary.general_utility_funcs import UtilityFuncs
@@ -77,16 +79,23 @@ def train_direct_threshold_optimizer():
         #                                      routing_data=routing_data, seed=seed, mixing_lambda=0.995)
 
         for e_id in range(10):
-            MixedBayesianOptimizer.optimize(optimization_iterations_count=2,
-                                            run_id=network_id,
-                                            network=network,
-                                            iteration=0,
-                                            routing_data=routing_data,
-                                            seed=seed,
-                                            cluster_count=5,
-                                            fc_layers=[64, 32],
-                                            xi=0.0,
-                                            mixing_lambda=1.0)
+            # MixedBayesianOptimizer.optimize(optimization_iterations_count=2,
+            #                                 run_id=network_id,
+            #                                 network=network,
+            #                                 iteration=0,
+            #                                 routing_data=routing_data,
+            #                                 seed=seed,
+            #                                 cluster_count=5,
+            #                                 fc_layers=[64, 32],
+            #                                 xi=0.0,
+            #                                 mixing_lambda=1.0)
+            KmeansPlusBayesianOptimization.optimize(cluster_count=1,
+                                                    network=network,
+                                                    routing_data=routing_data,
+                                                    mixing_lambda=1.0,
+                                                    seed=seed,
+                                                    run_id=network_id,
+                                                    iteration=0)
             tf.reset_default_graph()
 
         # BayesianOptimizationWithClusters.optimize(mixing_lambda=1.0, iteration=0,

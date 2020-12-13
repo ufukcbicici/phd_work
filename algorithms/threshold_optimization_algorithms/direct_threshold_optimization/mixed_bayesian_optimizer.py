@@ -471,34 +471,58 @@ class MixedBayesianOptimizer:
         optimal_coefficients_test = optimal_coefficients[test_indices]
 
         file_name = "routing_weights_regressor.sav"
-        standard_scaler = StandardScaler()
-        pca = PCA()
-        mlp = MLPRegressor()
-        pipe = Pipeline(steps=[("scaler", standard_scaler),
-                               ('pca', pca),
-                               ('mlp', mlp)])
-        param_grid = \
-            [{
-                "pca__n_components": [None],
-                "mlp__hidden_layer_sizes": [(64, 32)],
-                "mlp__activation": ["relu"],
-                "mlp__solver": ["adam"],
-                # "mlp__learning_rate": ["adaptive"],
-                "mlp__alpha": [0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 2.0, 5.0],
-                "mlp__max_iter": [10000],
-                "mlp__early_stopping": [True],
-                "mlp__n_iter_no_change": [100]
-            }]
-        search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
-                              scoring=["neg_mean_squared_error", "r2"],
-                              refit="neg_mean_squared_error")
-        search.fit(X_train, optimal_coefficients_train)
-        print("Best parameter (CV score=%0.3f):" % search.best_score_)
-        print(search.best_params_)
-        model = search.best_estimator_
-        f = open(file_name, "wb")
-        pickle.dump(model, f)
-        f.close()
+        if not os.path.exists(file_name):
+            standard_scaler = StandardScaler()
+            pca = PCA()
+            mlp = MLPRegressor()
+            pipe = Pipeline(steps=[("scaler", standard_scaler),
+                                   ('pca', pca),
+                                   ('mlp', mlp)])
+            param_grid = \
+                [{
+                    "pca__n_components": [None],
+                    "mlp__hidden_layer_sizes": [(64, 32)],
+                    "mlp__activation": ["relu"],
+                    "mlp__solver": ["adam"],
+                    # "mlp__learning_rate": ["adaptive"],
+                    "mlp__alpha": [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
+                    "mlp__max_iter": [10000],
+                    "mlp__early_stopping": [True],
+                    "mlp__n_iter_no_change": [100]
+                }]
+            search = GridSearchCV(pipe, param_grid, n_jobs=8, cv=10, verbose=10,
+                                  scoring=["neg_mean_squared_error", "r2"],
+                                  refit="neg_mean_squared_error")
+            search.fit(X_train, optimal_coefficients_train)
+            print("Best parameter (CV score=%0.3f):" % search.best_score_)
+            print(search.best_params_)
+            model = search.best_estimator_
+            f = open(file_name, "wb")
+            pickle.dump(model, f)
+            f.close()
+        else:
+            f = open(file_name, "rb")
+            model = pickle.load(f)
+            f.close()
+
+        # Test results
+        for data_type, idx in zip(["train", "test"], [train_indices, test_indices]):
+            X_= X_formatted[idx]
+            y_ = y[idx]
+            posteriors_ = posteriors[idx]
+            selections_ = selection_tuples[idx]
+            optimal_coefficients_ = optimal_coefficients[idx]
+            coefficients_hat = model.predict(X_)
+            posteriors_selected = posteriors_ * np.expand_dims(selections_, axis=1)
+            posteriors_bo_result = np.sum(posteriors_selected, axis=-1)
+            y_bo_predicted = np.argmax(posteriors_bo_result, axis=-1)
+            accuracy_bo = np.mean(y_ == y_bo_predicted)
+            print("{0} accuracy_bo={1}".format(data_type, accuracy_bo))
+            posteriors_weighted = posteriors_selected * np.expand_dims(coefficients_hat, axis=1)
+            posteriors_hat = np.sum(posteriors_weighted, axis=-1)
+            y_predicted = np.argmax(posteriors_hat, axis=-1)
+            accuracy = np.mean(y_ == y_predicted)
+            print("{0} accuracy={1}".format(data_type, accuracy))
         print("X")
 
     @staticmethod
