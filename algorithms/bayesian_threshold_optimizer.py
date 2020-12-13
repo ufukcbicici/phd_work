@@ -107,7 +107,7 @@ class BayesianThresholdOptimizer:
                                  routing_weights_array,
                                  temperatures_dict,
                                  mixing_lambda):
-        weights_array = np.repeat(routing_weights_array, repeats=indices.shape[0])
+        weights_array = np.repeat(routing_weights_array, repeats=indices.shape[0], axis=0)
         optimizer_results = self.thresholdOptimizer.run_threshold_calculator(
             sess=self.session,
             routing_data=self.routingData,
@@ -155,10 +155,10 @@ class BayesianThresholdOptimizer:
             results_dict[data_type] = results
         print("Train Accuracy: {0} Train Computation Load:{1} Train Score:{2}".format(
             results_dict["train"]["final_accuracy"],
-            results_dict["train"]["final_cost"], results_dict["train"]["final_score"]))
+            results_dict["train"]["final_activation_cost"], results_dict["train"]["final_score"]))
         print("Test Accuracy: {0} Test Computation Load:{1} Test Score:{2}".format(
             results_dict["test"]["final_accuracy"],
-            results_dict["test"]["final_cost"], results_dict["test"]["final_score"]))
+            results_dict["test"]["final_activation_cost"], results_dict["test"]["final_score"]))
         return results_dict
 
     def loss_function(self, **kwargs):
@@ -207,6 +207,12 @@ class BayesianThresholdOptimizer:
         elif use_these_thresholds is not None and use_these_weights is None:
             all_bounds.update(weight_bounds)
             self.fixedThresholds = use_these_thresholds
+        # Else; if both a threshold and weight array has been provided; don't optimize; just return the result.
+        else:
+            self.fixedThresholds = use_these_thresholds
+            self.fixedWeights = use_these_weights
+            results = self.get_thresholding_results_for_args({})
+            return results
 
         # Actual optimization part
         optimizer = BayesianOptimization(

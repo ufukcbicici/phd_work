@@ -168,7 +168,8 @@ class DirectThresholdOptimizer:
             self.weightsArray = tf.reciprocal(self.weightsArray)
             self.selectionWeights = self.selectionTuples * self.weightsArray
         else:
-            self.selectionWeights = self.selectionTuples * tf.identity(self.routingWeights)
+            self.weightsArray = tf.identity(self.routingWeights)
+            self.selectionWeights = self.selectionTuples * self.weightsArray
         # Combine all posteriors
         self.posteriorsTensor = tf.stack(values=[self.posteriorsDict[node.index] for node in self.network.leafNodes],
                                          axis=-1)

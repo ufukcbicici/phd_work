@@ -51,6 +51,18 @@ class KmeansPlusBayesianOptimization:
             seed=seed,
             threshold_kind="entropy",
             mixing_lambda=mixing_lambda)
+
+        good_thresholds = {0: 0.04031152075333284,
+                           1: 0.5072578562024834,
+                           2: 0.3954713354264498}
+        experimental_result = bayesian_optimizer.optimize(init_points=100,
+                                                          n_iter=150,
+                                                          xi=0.0,
+                                                          weight_bound_min=-5.0,
+                                                          weight_bound_max=5.0,
+                                                          use_these_thresholds=good_thresholds,
+                                                          use_these_weights=np.ones(shape=(1, posteriors.shape[-1]),
+                                                                                    dtype=np.float32))
         bayesian_optimizer.optimize(init_points=100,
                                     n_iter=150,
                                     xi=0.0,
