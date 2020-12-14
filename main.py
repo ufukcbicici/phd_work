@@ -19,6 +19,7 @@ from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms imp
 from simple_tf.cigj import cigj_full_training_entry, cigj_approx_training_entry
 from simple_tf.fashion_net import fashion_cign_entry
 from simple_tf.lenet import lenet_cign_entry
+from simple_tf.usps_net import usps_entry
 from tf_experiments.multi_gpu_experiments import multi_gpu
 
 if __name__ == "__main__":
@@ -36,4 +37,5 @@ if __name__ == "__main__":
     # mode_class_visualization.main()
     # routing_visualizer.main()
     # policy_gradients_entry.main()
-    lenet_cign_entry.lenet_cign_training()
+    # lenet_cign_entry.lenet_cign_training()
+    usps_entry.usps_cign_training()
