@@ -1,13 +1,16 @@
 import numpy as np
 
 # MNIST comparions
+from algorithms.boostrap_mean_comparison import BootstrapMeanComparison
+
 lenet_thin_baseline = np.array([99.18, 99.24, 99.25, 99.12, 99.21])
 lenet_thick_baseline = np.array([99.22, 99.27, 99.26, 99.24, 99.25])
-lenet_cign_routing_baseline = np.array([99.337, 99.31, 99.302, 99.299, 99.296, 99.286, 99.271, 99.259, 99.248, 99.233])
+lenet_cign_random_routing_baseline = np.array([99.337, 99.31, 99.302, 99.299, 99.296, 99.286, 99.271, 99.259,
+                                               99.248, 99.233])
 lenet_cign_all_paths = np.array([99.355, 99.302, 99.289, 99.281, 99.274, 99.2525, 99.251, 99.219, 99.216, 99.211])
 lenet_without_annealing = np.array([99.24, 99.34, 99.35, 99.34, 99.329])
 lenet_with_annealing = np.array([99.4, 99.375, 99.37, 99.364, 99.359])
-lenet_smoe_cign_v1 = np.array(
+lenet_smoe_cign_v1 = 100.0 * np.array(
     [0.9942, 0.9935, 0.9937, 0.9941, 0.9945, 0.9948, 0.9943, 0.9946, 0.9947, 0.994, 0.9937, 0.9948, 0.9945, 0.9946,
      0.9946, 0.995, 0.9933, 0.9947, 0.9938, 0.9942, 0.9946, 0.9943, 0.9944, 0.9941, 0.9947, 0.9943, 0.9951, 0.9944,
      0.9946, 0.9943, 0.9945, 0.995, 0.9947, 0.9945, 0.9946, 0.9943, 0.9947, 0.9948, 0.9945, 0.9944, 0.9943, 0.9943,
@@ -42,7 +45,7 @@ lenet_smoe_cign_v1 = np.array(
      0.995, 0.9948, 0.9945, 0.9946, 0.9949, 0.9948, 0.9944, 0.9949, 0.9949, 0.995, 0.9946, 0.995, 0.9949, 0.995, 0.9952,
      0.995, 0.9947, 0.9948, 0.9946, 0.9949, 0.9947, 0.9949, 0.9948, 0.9949, 0.9946, 0.9943, 0.9948, 0.9949, 0.9946,
      0.9946, 0.9948, 0.9948, 0.9949, 0.9944, 0.9949, 0.9949])
-lenet_smoe_cign_v2 = np.array(
+lenet_smoe_cign_v2 = 100.0 * np.array(
     [0.9945, 0.994, 0.9938, 0.9938, 0.9939, 0.994, 0.9944, 0.9937, 0.9932, 0.994, 0.994, 0.9942, 0.9945, 0.9938, 0.9938,
      0.9947, 0.9938, 0.9938, 0.9936, 0.994, 0.9947, 0.9937, 0.9942, 0.9946, 0.9941, 0.9941, 0.9944, 0.9942, 0.9942,
      0.9948, 0.9943, 0.9943, 0.9947, 0.9946, 0.9945, 0.9946, 0.9945, 0.9944, 0.9946, 0.9947, 0.9944, 0.9947, 0.9944,
@@ -77,7 +80,7 @@ lenet_smoe_cign_v2 = np.array(
      0.9947, 0.9944, 0.9947, 0.9944, 0.9947, 0.9946, 0.9948, 0.9942, 0.9948, 0.995, 0.9944, 0.9948, 0.9946, 0.9947,
      0.9943, 0.995, 0.9949, 0.9945, 0.9949, 0.9945, 0.9948, 0.9945, 0.9946, 0.9947, 0.9944, 0.9947, 0.9946, 0.9945,
      0.9943, 0.9944, 0.9944, 0.9947, 0.9945, 0.9945, 0.9947, 0.9946, 0.9946])
-lenet_smoe_cign_v3 = np.array(
+lenet_smoe_cign_v3 = 100.0 * np.array(
     [0.9947, 0.9931, 0.9937, 0.9927, 0.994, 0.9929, 0.9943, 0.9941, 0.9931, 0.9924, 0.9942, 0.9944, 0.9936, 0.9942,
      0.9942, 0.9931, 0.9938, 0.9922, 0.9937, 0.994, 0.9938, 0.9943, 0.9929, 0.9942, 0.9932, 0.9944, 0.9942, 0.9944,
      0.9943, 0.9942, 0.9944, 0.9944, 0.9938, 0.9946, 0.9943, 0.9942, 0.9946, 0.9944, 0.9944, 0.9942, 0.9944, 0.9941,
@@ -115,7 +118,7 @@ lenet_smoe_cign_v3 = np.array(
 
 print(np.mean(lenet_thin_baseline))
 print(np.mean(lenet_thick_baseline))
-print(np.mean(lenet_cign_routing_baseline))
+print(np.mean(lenet_cign_random_routing_baseline))
 print(np.mean(lenet_cign_all_paths))
 print(np.mean(lenet_without_annealing))
 print(np.mean(lenet_with_annealing))
@@ -123,3 +126,34 @@ print(np.mean(lenet_smoe_cign_v1))
 print(np.mean(lenet_smoe_cign_v2))
 print(np.mean(lenet_smoe_cign_v3))
 print("X")
+
+data_samples = {"lenet_thin_baseline": lenet_thin_baseline,
+                "lenet_thick_baseline": lenet_thick_baseline,
+                "lenet_cign_random_routing_baseline": lenet_cign_random_routing_baseline,
+                "lenet_cign_all_paths": lenet_cign_all_paths,
+                "lenet_without_annealing": lenet_without_annealing,
+                "lenet_with_annealing": lenet_with_annealing,
+                "lenet_smoe_cign_v1": lenet_smoe_cign_v1,
+                "lenet_smoe_cign_v2": lenet_smoe_cign_v2,
+                "lenet_smoe_cign_v3": lenet_smoe_cign_v3}
+
+baselines = ["lenet_thin_baseline", "lenet_thick_baseline", "lenet_cign_random_routing_baseline",
+             "lenet_cign_all_paths"]
+cigns = ["lenet_without_annealing", "lenet_with_annealing",
+         "lenet_smoe_cign_v1", "lenet_smoe_cign_v2", "lenet_smoe_cign_v3"]
+
+for cign_method in cigns:
+    print("**********CIGN method:{0}**********".format(cign_method))
+    for baseline_method in baselines:
+        print("Comparing {0} vs {1}".format(cign_method, baseline_method))
+        cign_arr = data_samples[cign_method]
+        baseline_arr = data_samples[baseline_method]
+        p_value, reject_null_hypothesis = BootstrapMeanComparison.compare(x=cign_arr, y=baseline_arr,
+                                                                          boostrap_count=10000)
+        print("p-value:{0} Reject H0 for equal means:{1}".format(p_value, reject_null_hypothesis))
+
+# x = np.random.uniform(low=0.0, high=10.0, size=(1000,))
+# y = np.random.uniform(low=20.0, high=40.0, size=(1250,))
+#
+#
+# p_value, reject_null_hypothesis = BootstrapMeanComparison.compare(x=x, y=y, boostrap_count=10000)

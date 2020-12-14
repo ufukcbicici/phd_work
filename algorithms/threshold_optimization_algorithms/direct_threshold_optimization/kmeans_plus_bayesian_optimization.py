@@ -63,11 +63,27 @@ class KmeansPlusBayesianOptimization:
                                                           use_these_thresholds=good_thresholds,
                                                           use_these_weights=np.ones(shape=(1, posteriors.shape[-1]),
                                                                                     dtype=np.float32))
-        bayesian_optimizer.optimize(init_points=100,
-                                    n_iter=150,
-                                    xi=0.0,
-                                    weight_bound_min=-5.0,
-                                    weight_bound_max=5.0,
-                                    use_these_thresholds=None,
-                                    use_these_weights=np.ones(shape=(1, posteriors.shape[-1]), dtype=np.float32))
+        weights_optimization_result = bayesian_optimizer.optimize(init_points=100,
+                                                                  n_iter=250,
+                                                                  xi=0.01,
+                                                                  weight_bound_min=-2.0,
+                                                                  weight_bound_max=2.0,
+                                                                  use_these_thresholds=good_thresholds,
+                                                                  use_these_weights=None)
+        thrs_optimization_result = bayesian_optimizer.optimize(init_points=100,
+                                                               n_iter=250,
+                                                               xi=0.01,
+                                                               weight_bound_min=-2.0,
+                                                               weight_bound_max=2.0,
+                                                               use_these_thresholds=None,
+                                                               use_these_weights=np.ones(
+                                                                   shape=(1, posteriors.shape[-1]),
+                                                                   dtype=np.float32))
+        complete_optimization_result = bayesian_optimizer.optimize(init_points=100,
+                                                                   n_iter=250,
+                                                                   xi=0.01,
+                                                                   weight_bound_min=-2.0,
+                                                                   weight_bound_max=2.0,
+                                                                   use_these_thresholds=None,
+                                                                   use_these_weights=None)
         print("X")

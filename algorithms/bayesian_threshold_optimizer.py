@@ -98,7 +98,7 @@ class BayesianThresholdOptimizer:
         for node in self.network.leafNodes:
             weight = args_dict["leaf_{0}".format(node.index)]
             weight_list.append(weight)
-        weight_list = np.array(weight_list)
+        weight_list = np.array(weight_list)[np.newaxis, :]
         return weight_list
 
     def get_thresholding_results(self,
@@ -107,7 +107,9 @@ class BayesianThresholdOptimizer:
                                  routing_weights_array,
                                  temperatures_dict,
                                  mixing_lambda):
-        weights_array = np.repeat(routing_weights_array, repeats=indices.shape[0], axis=0)
+        # Convert to probabilities
+        weights_as_probabilities = np.exp(routing_weights_array) * np.reciprocal(np.sum(np.exp(routing_weights_array)))
+        weights_array = np.repeat(weights_as_probabilities, repeats=indices.shape[0], axis=0)
         optimizer_results = self.thresholdOptimizer.run_threshold_calculator(
             sess=self.session,
             routing_data=self.routingData,
@@ -175,6 +177,8 @@ class BayesianThresholdOptimizer:
                  use_these_weights=None):
         train_indices = self.routingData.trainingIndices
         test_indices = self.routingData.testIndices
+        self.fixedWeights = None
+        self.fixedThresholds = None
         # Learn the standard information gain based accuracies
         train_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=self.network,
                                                                                routing_data=self.routingData,
