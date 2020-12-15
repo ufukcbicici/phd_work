@@ -39,6 +39,7 @@ class FastTreeNetwork(TreeNetwork):
         self.leafNodes = None
         self.batchSizeTf = tf.placeholder(dtype=tf.int32, name="batch_size")
 
+    # REVISION OK
     @staticmethod
     def conv_layer(x, kernel, strides, node, bias=None, padding='SAME', name="conv_op"):
         assert len(x.get_shape().as_list()) == 4
@@ -73,6 +74,7 @@ class FastTreeNetwork(TreeNetwork):
             x_hat = tf.nn.bias_add(x_hat, bias)
         return x_hat
 
+    # REVISION OK
     @staticmethod
     def fc_layer(x, W, b, node, name="fc_op"):
         assert len(x.get_shape().as_list()) == 2
@@ -99,7 +101,7 @@ class FastTreeNetwork(TreeNetwork):
             node.opMacCostsDict["{0}_{1}".format(name, op_id)] = cost
         return x_hat
 
-    # OK for MultiGPU
+    # REVISION OK
     def build_tree(self):
         # Create itself
         curr_index = 0
@@ -144,6 +146,7 @@ class FastTreeNetwork(TreeNetwork):
         self.innerNodes = sorted(self.innerNodes, key=lambda nd: nd.index)
         self.leafNodes = sorted(self.leafNodes, key=lambda nd: nd.index)
 
+    # REVISION OK
     @staticmethod
     def get_mock_tree(degree_list, network_name):
         tree = FastTreeNetwork(node_build_funcs=None, grad_func=None, hyperparameter_func=None,
@@ -156,6 +159,7 @@ class FastTreeNetwork(TreeNetwork):
         tree.networkName = network_name
         return tree
 
+    # REVISION OK
     def prepare_evaluation_dictionary(self):
         # Prepare tensors to evaluate
         for node in self.topologicalSortedNodes:
@@ -221,6 +225,7 @@ class FastTreeNetwork(TreeNetwork):
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.infoGainDicts = {k: v for k, v in self.evalDict.items() if "info_gain" in k}
 
+    # REVISION OK
     def build_optimizer(self):
         # Build optimizer
         self.globalCounter = tf.Variable(0, trainable=False)
@@ -236,6 +241,7 @@ class FastTreeNetwork(TreeNetwork):
                                                                                          global_step=self.globalCounter)
             # self.optimizer = tf.train.AdamOptimizer().minimize(self.finalLoss, global_step=self.globalCounter)
 
+    # REVISION OK
     def build_network(self):
         # Build the tree topologically and create the Tensorflow placeholders
         self.build_tree()
@@ -269,6 +275,7 @@ class FastTreeNetwork(TreeNetwork):
             self.build_optimizer()
         self.prepare_evaluation_dictionary()
 
+    # REVISION OK
     def apply_decision(self, node, branching_feature):
         if GlobalConstants.USE_BATCH_NORM_BEFORE_BRANCHING:
             branching_feature = tf.layers.batch_normalization(inputs=branching_feature,
@@ -332,6 +339,7 @@ class FastTreeNetwork(TreeNetwork):
             node.maskTensors[child_index] = mask_tensor
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
 
+    # REVISION OK
     def apply_decision_with_unified_batch_norm(self, node, branching_feature):
         masked_branching_feature = tf.boolean_mask(branching_feature, node.filteredMask)
         if GlobalConstants.USE_MULTI_GPU:
@@ -412,7 +420,7 @@ class FastTreeNetwork(TreeNetwork):
             node.evalDict[self.get_variable_name(name="mask_tensors", node=node)] = node.maskTensors
             node.evalDict[self.get_variable_name(name="masksWithoutThreshold", node=node)] = node.masksWithoutThreshold
 
-    # MultiGPU OK
+    # REVISION OK
     def mask_input_nodes(self, node):
         if node.isRoot:
             node.batchIndicesTensor = tf.range(0, self.batchSizeTf, 1)
@@ -473,6 +481,7 @@ class FastTreeNetwork(TreeNetwork):
                 parent_H = scale * parent_H + (1 - scale) * tf.stop_gradient(parent_H)
             return parent_F, parent_H
 
+    # REVISION OK
     def make_loss(self, node, logits):
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=node.labelTensor,
                                                                                    logits=logits)
@@ -482,7 +491,7 @@ class FastTreeNetwork(TreeNetwork):
         node.lossList.append(loss)
         return loss
 
-    # MultiGPU OK
+    # REVISION OK
     def apply_loss(self, node, final_feature, softmax_weights, softmax_biases):
         node.residueOutputTensor = final_feature
         node.finalFeatures = final_feature
@@ -493,6 +502,7 @@ class FastTreeNetwork(TreeNetwork):
         _ = self.make_loss(node=node, logits=logits)
         return final_feature, logits
 
+    # REVISION OK
     def get_run_ops(self):
         run_ops = [self.optimizer, self.learningRate, self.sampleCountTensors, self.isOpenTensors,
                    self.infoGainDicts]
@@ -500,6 +510,7 @@ class FastTreeNetwork(TreeNetwork):
         #            self.infoGainDicts]
         return run_ops
 
+    # REVISION OK
     def verbose_update(self, eval_dict):
         if GlobalConstants.USE_UNIFIED_BATCH_NORM:
             for level in range(self.depth):
@@ -514,6 +525,7 @@ class FastTreeNetwork(TreeNetwork):
                     print("ERR")
                 assert sum_of_samples == GlobalConstants.BATCH_SIZE
 
+    # REVISION OK
     def update_params(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
@@ -543,6 +555,7 @@ class FastTreeNetwork(TreeNetwork):
                                                   is_open_indicators=is_open_indicators)
         return update_results
 
+    # REVISION OK
     def eval_network(self, sess, dataset, use_masking):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
@@ -570,6 +583,7 @@ class FastTreeNetwork(TreeNetwork):
         #         print("{0}={1}".format(k, v))
         return results, minibatch
 
+    # REVISION OK
     def collect_outputs_into_collection(self, collection, output_names, node, results):
         for output_name in output_names:
             if "original_samples" == output_name:
@@ -580,6 +594,7 @@ class FastTreeNetwork(TreeNetwork):
             output_arr = results[self.get_variable_name(name=output_name, node=node)]
             UtilityFuncs.concat_to_np_array_dict_v2(dct=collection[output_name], key=node.index, array=output_arr)
 
+    # REVISION OK
     def collect_eval_results_from_network(self,
                                           sess,
                                           dataset,
@@ -622,6 +637,7 @@ class FastTreeNetwork(TreeNetwork):
                     nodes_arr_dict[node_idx] = np.concatenate(nodes_arr_dict[node_idx], axis=0)
         return leaf_node_collections, inner_node_collections
 
+    # REVISION OK
     def prepare_feed_dict(self, minibatch, iteration, use_threshold, is_train, use_masking):
         feed_dict = {self.dataTensor: minibatch.samples,
                      self.labelTensor: minibatch.labels,
@@ -683,6 +699,7 @@ class FastTreeNetwork(TreeNetwork):
         explanation += "Optimizer:{0}".format(self.optimizer)
         return explanation
 
+    # REVISION OK
     def print_iteration_info(self, iteration_counter, update_results):
         lr = update_results.lr
         sample_counts = update_results.sampleCounts
@@ -930,6 +947,7 @@ class FastTreeNetwork(TreeNetwork):
                 kv_rows.append((run_id, iteration, "{0} Leaf:{1} True Label:{2}".
                                 format(dataset_type, node.index, l), np.asscalar(label_distribution[l])))
 
+    # REVISION OK
     def calculate_accuracy(self, sess, dataset, dataset_type, run_id, iteration,
                            posterior_entry_name="posterior_probs"):
         kv_rows = []
@@ -1001,6 +1019,7 @@ class FastTreeNetwork(TreeNetwork):
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore, col_count=4)
         return total_accuracy, cm
 
+    # REVISION OK
     def calculate_model_performance(self, sess, dataset, run_id, epoch_id, iteration):
         # moving_results_1 = sess.run(moving_stat_vars)
         is_evaluation_epoch_at_report_period = \

@@ -255,12 +255,14 @@ class TreeNetwork:
         self.isOpenTensors = {k: self.evalDict[k] for k in self.evalDict.keys() if "is_open" in k}
         self.gradFunc(network=self)
 
+    # REVISION OK
     def build_main_loss(self):
         primary_losses = []
         for node in self.topologicalSortedNodes:
             primary_losses.extend(node.lossList)
         self.mainLoss = tf.add_n(primary_losses)
 
+    # REVISION OK
     def build_regularization_loss(self):
         vars = tf.trainable_variables()
         print("Num of trainable variables:{0}".format(len(vars)))
@@ -283,6 +285,7 @@ class TreeNetwork:
                     l2_loss_list.append(self.weightDecayCoeff * loss_tensor)
         self.regularizationLoss = tf.add_n(l2_loss_list)
 
+    # REVISION OK
     def build_decision_loss(self):
         decision_losses = []
         for node in self.topologicalSortedNodes:
