@@ -1,6 +1,7 @@
 import tensorflow as tf
 import os
 
+from algorithms.nnrf_computation_statistics_calculator import NNRFComputationStatisticsCalculator
 from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 from data_handling.fashion_mnist import FashionMnistDataSet
@@ -46,6 +47,9 @@ def usps_cign_training():
     network_name = "USPS_Net"
     dataset = UspsDataset(validation_sample_count=0)
     dataset.set_current_data_set_type(dataset_type=DatasetTypes.training, batch_size=GlobalConstants.BATCH_SIZE)
+    # Comparison with the NNRF algorithm
+    NNRFComputationStatisticsCalculator.calculate(feature_size=dataset.trainingSamples.shape[-1],
+                                                  class_count=dataset.get_label_count())
     classification_wd = [i * 0.00005 for i in range(0, 21)]
     decision_wd = [0.0]
     info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
