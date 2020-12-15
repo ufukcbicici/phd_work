@@ -83,8 +83,8 @@ def usps_cign_training():
         pbounds=pbounds,
     )
     optimizer.maximize(
-        init_points=100,
-        n_iter=150,
+        init_points=25,
+        n_iter=50,
         acq="ei",
         xi=0.0
     )
