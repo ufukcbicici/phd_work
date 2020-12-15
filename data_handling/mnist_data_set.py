@@ -79,15 +79,16 @@ class MnistDataSet(DataSet):
             indices_list = self.currentIndices[self.currentIndex:curr_end_index + 1]
         elif self.currentIndex < num_of_samples <= curr_end_index:
             indices_list = self.currentIndices[self.currentIndex:num_of_samples]
-            curr_end_index = curr_end_index % num_of_samples
-            indices_list.extend(self.currentIndices[0:curr_end_index + 1])
+            if self.currentMode == "train":
+                curr_end_index = curr_end_index % num_of_samples
+                indices_list = np.concatenate([indices_list, self.currentIndices[0:curr_end_index + 1]])
         else:
             raise Exception("Invalid index positions: self.currentIndex={0} - curr_end_index={1}"
                             .format(self.currentIndex, curr_end_index))
         samples = self.currentSamples[indices_list]
         labels = self.currentLabels[indices_list]
         one_hot_labels = np.zeros(shape=(batch_size, self.get_label_count()))
-        one_hot_labels[np.arange(batch_size), labels.astype(np.int)] = 1.0
+        one_hot_labels[np.arange(labels.shape[0]), labels.astype(np.int)] = 1.0
         self.currentIndex = self.currentIndex + batch_size
         if num_of_samples <= self.currentIndex:
             self.currentEpoch += 1
@@ -96,7 +97,8 @@ class MnistDataSet(DataSet):
             self.currentIndex = self.currentIndex % num_of_samples
         else:
             self.isNewEpoch = False
-        samples = np.expand_dims(samples, axis=3)
+        if len(samples.shape) == 3:
+            samples = np.expand_dims(samples, axis=3)
         if GlobalConstants.USE_SAMPLE_HASHING:
             hash_codes = self.get_unique_codes(samples=samples)
             return DataSet.MiniBatch(samples, labels, indices_list.astype(np.int64), one_hot_labels, hash_codes, None,

@@ -17,6 +17,8 @@ from algorithms.info_gain import InfoGainLoss
 from simple_tf.uncategorized.node import Node
 from auxillary.constants import DatasetTypes
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
+from sklearn.metrics import f1_score
 from tensorflow.contrib.framework.python.framework import checkpoint_utils
 
 
@@ -529,6 +531,7 @@ class FastTreeNetwork(TreeNetwork):
     def update_params(self, sess, dataset, epoch, iteration):
         use_threshold = int(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.BATCH_SIZE
+        dataset.set_current_mode("train")
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
         if minibatch is None:
             return TrainingUpdateResult(lr=None, sample_counts=None, is_open_indicators=None)
@@ -558,6 +561,7 @@ class FastTreeNetwork(TreeNetwork):
     # REVISION OK
     def eval_network(self, sess, dataset, use_masking):
         GlobalConstants.CURR_BATCH_SIZE = GlobalConstants.EVAL_BATCH_SIZE
+        dataset.set_current_mode("test")
         minibatch = dataset.get_next_batch(batch_size=GlobalConstants.CURR_BATCH_SIZE)
         if minibatch is None:
             return None, None
@@ -1010,8 +1014,12 @@ class FastTreeNetwork(TreeNetwork):
         total_accuracy = float(total_correct_count) / float(total_sample_count)
         # Prepare the confusion matrix
         cm = confusion_matrix(y_true=all_truths, y_pred=all_predicted)
-        print("*************Overall {0} samples. Overall Accuracy:{1}*************"
-              .format(total_sample_count, total_accuracy))
+        class_report = classification_report(y_true=all_truths, y_pred=all_predicted)
+        f1_macro = f1_score(y_true=all_truths, y_pred=all_predicted, average="macro")
+        f1_micro = f1_score(y_true=all_truths, y_pred=all_predicted, average="micro")
+        print("*************Overall {0} samples. Overall Accuracy:{1} F1-Macro:{2} F2-Micro:{3}*************"
+              .format(total_sample_count, total_accuracy, f1_macro, f1_micro))
+        print(class_report)
         # Calculate modes
         self.modeTracker.calculate_modes(leaf_true_labels_dict=leaf_true_labels_dict,
                                          dataset=dataset, dataset_type=dataset_type, kv_rows=kv_rows,
@@ -1059,9 +1067,13 @@ class FastTreeNetwork(TreeNetwork):
                 rows=[(run_id, iteration, epoch_id, training_accuracy,
                        validation_accuracy, validation_accuracy_corrected,
                        0.0, 0.0, "XXX")], table=DbLogger.logsTable, col_count=9)
+            return training_accuracy, validation_accuracy
+        return None
 
     def train(self, sess, dataset, run_id):
         iteration_counter = 0
+        train_accuracies = []
+        validation_accuracies = []
         self.saver = tf.train.Saver()
         for epoch_id in range(GlobalConstants.TOTAL_EPOCH_COUNT):
             # An epoch is a complete pass on the whole dataset.
@@ -1083,6 +1095,12 @@ class FastTreeNetwork(TreeNetwork):
                     iteration_counter += 1
                 if dataset.isNewEpoch:
                     print("Epoch Time={0}".format(total_time))
-                    self.calculate_model_performance(sess=sess, dataset=dataset, run_id=run_id, epoch_id=epoch_id,
-                                                     iteration=iteration_counter)
+                    performance_result = self.calculate_model_performance(sess=sess, dataset=dataset, run_id=run_id,
+                                                                          epoch_id=epoch_id,
+                                                                          iteration=iteration_counter)
+                    if performance_result is not None:
+                        training_accuracy, validation_accuracy = performance_result
+                        train_accuracies.append(training_accuracy)
+                        validation_accuracies.append(validation_accuracy)
                     break
+        return train_accuracies, validation_accuracies

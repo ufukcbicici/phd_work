@@ -33,5 +33,3 @@ class UspsDataset(MnistDataSet):
         print("X")
 
 
-
-

@@ -21,6 +21,7 @@ class DataSet:
         self.currentIndex = 0
         self.currentEpoch = 0
         self.isNewEpoch = True
+        self.currentMode = "train"
 
     def load_dataset(self):
         pass
@@ -42,6 +43,9 @@ class DataSet:
 
     def visualize_sample(self, sample_index):
         pass
+
+    def set_current_mode(self, mode):
+        self.currentMode = mode
 
     def get_unique_codes(self, samples):
         sample_count = samples.shape[0]
