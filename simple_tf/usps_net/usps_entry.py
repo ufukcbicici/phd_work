@@ -9,18 +9,19 @@ from auxillary.db_logger import DbLogger
 from data_handling.usps_dataset import UspsDataset
 from simple_tf.global_params import GlobalConstants
 from simple_tf.usps_net.usps_baseline import UspsBaseline
+from simple_tf.usps_net.usps_cign import UspsCIGN
 
 use_moe = False
 use_sampling = False
 use_random_sampling = False
-use_baseline = True
+use_baseline = False
 use_early_exit = False
 use_late_exit = False
 
 
 def get_network(dataset, network_name):
     if not (use_baseline or use_early_exit or use_late_exit or use_random_sampling):
-        raise NotImplementedError()
+        network = UspsCIGN(dataset=dataset, network_name=network_name, degree_list=GlobalConstants.TREE_DEGREE_LIST)
     elif use_early_exit:
         raise NotImplementedError()
     elif use_random_sampling:
@@ -31,10 +32,12 @@ def get_network(dataset, network_name):
 
 
 def train_func(**kwargs):
-    network_name = "USPS_CIGN_Baseline"
+    network_name = "USPS_CIGN"
     dataset = UspsDataset(validation_sample_count=0)
     # Arriving from the Bayesian Optimization Step
     classification_wd = kwargs["classification_wd"]
+    decision_wd = 0.0
+    info_gain_balance_coefficient = 1.0
     GlobalConstants.INITIAL_LR = kwargs["initial_lr"]
     # classification_wd = [i * 0.00005 for i in range(0, 21)]
     # decision_wd = [0.0]
@@ -57,8 +60,9 @@ def train_func(**kwargs):
     init = tf.global_variables_initializer()
     print("********************NEW RUN:{0}********************")
     network.set_hyperparameters(weight_decay_coefficient=classification_wd,
-                                decision_weight_decay_coefficient=0.0,
-                                info_gain_balance_coefficient=1.0,
+                                decision_weight_decay_coefficient=decision_wd,
+                                info_gain_balance_coefficient=info_gain_balance_coefficient,
+                                # THESE REST ARE IRRELEVANT
                                 classification_keep_probability=1.0,
                                 decision_keep_probability=1.0,
                                 early_exit_weight=1.0,
@@ -77,28 +81,28 @@ def train_func(**kwargs):
 
 
 def usps_cign_training():
-    pbounds = {"classification_wd": (0.0, 0.001), "initial_lr": (0.0001, 0.1)}
-    # train_func(classification_wd=0.0004, initial_lr=0.001)
+    pbounds = {"classification_wd": (0.0, 0.001),
+               "initial_lr": (0.0001, 0.1)}
 
-    best_hyperparameter_pairs = [(0.09746176130054329, 0.0008120373740661416),
-                                 (0.09767504912890895, 0.0009627508498408631),
-                                 (0.09745033033453893, 0.0008218704639722474)]
-    experiment_count_per_params = 25
-    best_hyperparameter_pairs = experiment_count_per_params * best_hyperparameter_pairs
-    for param_tpl in best_hyperparameter_pairs:
-        initial_lr = param_tpl[0]
-        classification_wd = param_tpl[1]
-        train_func(classification_wd=classification_wd, initial_lr=initial_lr)
+    # Best Pairs
+    # best_hyperparameter_pairs = [(0.09746176130054329, 0.0008120373740661416),
+    #                              (0.09767504912890895, 0.0009627508498408631),
+    #                              (0.09745033033453893, 0.0008218704639722474)]
+    # experiment_count_per_params = 25
+    # best_hyperparameter_pairs = experiment_count_per_params * best_hyperparameter_pairs
+    # for param_tpl in best_hyperparameter_pairs:
+    #     initial_lr = param_tpl[0]
+    #     classification_wd = param_tpl[1]
+    #     train_func(classification_wd=classification_wd, initial_lr=initial_lr)
 
-
-    # optimizer = BayesianOptimization(
-    #     f=train_func,
-    #     pbounds=pbounds,
-    # )
-    # optimizer.maximize(
-    #     init_points=25,
-    #     n_iter=50,
-    #     acq="ei",
-    #     xi=0.0
-    # )
-    # print("X")
+    optimizer = BayesianOptimization(
+        f=train_func,
+        pbounds=pbounds,
+    )
+    optimizer.maximize(
+        init_points=25,
+        n_iter=50,
+        acq="ei",
+        xi=0.0
+    )
+    print("X")

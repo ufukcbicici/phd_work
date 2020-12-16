@@ -19,12 +19,12 @@ class UspsBaseline(FastTreeNetwork):
                                          name="dataTensor_USPS")
 
     @staticmethod
-    def get_mlp_layers(net_input, layers, node, network):
+    def get_mlp_layers(net_input, layers, node, network, op_pre_fix="regular"):
         net = net_input
         list_of_params = []
         for layer_id in range(len(layers)):
-            fc_W_name = "fc{0}_weights".format(layer_id)
-            fc_b_name = "fc{0}_b".format(layer_id)
+            fc_W_name = "{0}_fc{1}_weights".format(op_pre_fix, layer_id)
+            fc_b_name = "{0}_fc{1}_b".format(op_pre_fix, layer_id)
             input_dim = net.get_shape().as_list()[-1]
             output_dim = layers[layer_id]
             fc_W, fc_b = FashionCignLite.get_affine_layer_params(
@@ -163,6 +163,10 @@ class UspsBaseline(FastTreeNetwork):
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False
         GlobalConstants.USE_RANDOM_SAMPLING = False
+        GlobalConstants.SOFTMAX_DECAY_INITIAL = 25.0
+        GlobalConstants.SOFTMAX_DECAY_COEFFICIENT = 0.9999
+        GlobalConstants.SOFTMAX_DECAY_PERIOD = 1
+        GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT = 1.0
         # GlobalConstants.INITIAL_LR = 0.001
         GlobalConstants.LEARNING_RATE_CALCULATOR = \
             DiscreteParameter(name="lr_calculator",
@@ -201,7 +205,7 @@ class UspsBaseline(FastTreeNetwork):
             initial_value = 1.0 / float(node_degree)
             threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
             node.probThresholdCalculator = DecayingParameter(name=threshold_name, value=initial_value, decay=0.8,
-                                                             decay_period=12000,
+                                                             decay_period=2000,
                                                              min_limit=0.4)
             # Softmax Decay
             decay_name = self.get_variable_name(name="softmax_decay", node=node)
