@@ -38,6 +38,7 @@ class UspsBaseline(FastTreeNetwork):
             list_of_params.append(fc_W)
             list_of_params.append(fc_b)
             net = FastTreeNetwork.fc_layer(x=net, W=fc_W, b=fc_b, node=node, name="fc_op")
+            net = tf.nn.relu(net)
         # Build loss
         input_dim = net.get_shape().as_list()[-1]
         output_dim = network.labelCount
@@ -149,8 +150,8 @@ class UspsBaseline(FastTreeNetwork):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 500
-        GlobalConstants.EPOCH_COUNT = 500
+        GlobalConstants.TOTAL_EPOCH_COUNT = 200
+        GlobalConstants.EPOCH_COUNT = 200
         GlobalConstants.EPOCH_REPORT_PERIOD = 10
         GlobalConstants.BATCH_SIZE = 125
         GlobalConstants.EVAL_BATCH_SIZE = 1000

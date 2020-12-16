@@ -78,14 +78,16 @@ def train_func(**kwargs):
 
 def usps_cign_training():
     pbounds = {"classification_wd": (0.0, 0.001), "initial_lr": (0.0001, 0.1)}
-    optimizer = BayesianOptimization(
-        f=train_func,
-        pbounds=pbounds,
-    )
-    optimizer.maximize(
-        init_points=25,
-        n_iter=50,
-        acq="ei",
-        xi=0.0
-    )
+    train_func(classification_wd=0.0004, initial_lr=0.001)
+
+    # optimizer = BayesianOptimization(
+    #     f=train_func,
+    #     pbounds=pbounds,
+    # )
+    # optimizer.maximize(
+    #     init_points=25,
+    #     n_iter=50,
+    #     acq="ei",
+    #     xi=0.0
+    # )
     print("X")
