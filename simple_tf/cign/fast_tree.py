@@ -656,8 +656,8 @@ class FastTreeNetwork(TreeNetwork):
                      self.useMasking: int(use_masking),
                      self.informationGainBalancingCoefficient: GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT,
                      self.iterationHolder: iteration,
-                     self.filteredMask: np.ones((GlobalConstants.CURR_BATCH_SIZE,), dtype=bool),
-                     self.batchSizeTf: GlobalConstants.CURR_BATCH_SIZE}
+                     self.filteredMask: np.ones((minibatch.samples.shape[0],), dtype=bool),
+                     self.batchSizeTf: minibatch.samples.shape[0]}
         if is_train:
             feed_dict[self.classificationDropoutKeepProb] = GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB
             if not self.isBaseline:
