@@ -58,7 +58,7 @@ class UspsCIGN(FastTreeNetwork):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "USPS - CIGN\n"
+        explanation = "USPS - CIGN - IG Balance Experiment\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -150,10 +150,10 @@ class UspsCIGN(FastTreeNetwork):
 
     def set_training_parameters(self):
         # Training Parameters
-        GlobalConstants.TOTAL_EPOCH_COUNT = 400
-        GlobalConstants.EPOCH_COUNT = 400
-        GlobalConstants.EPOCH_REPORT_PERIOD = 20
-        GlobalConstants.BATCH_SIZE = 250
+        GlobalConstants.TOTAL_EPOCH_COUNT = 200
+        GlobalConstants.EPOCH_COUNT = 200
+        GlobalConstants.EPOCH_REPORT_PERIOD = 10
+        GlobalConstants.BATCH_SIZE = 125
         GlobalConstants.EVAL_BATCH_SIZE = 1000
         GlobalConstants.USE_MULTI_GPU = False
         GlobalConstants.USE_SAMPLING_CIGN = False

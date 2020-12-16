@@ -37,7 +37,7 @@ def train_func(**kwargs):
     # Arriving from the Bayesian Optimization Step
     classification_wd = kwargs["classification_wd"]
     decision_wd = 0.0
-    info_gain_balance_coefficient = 1.0
+    info_gain_balance_coefficient = 1.0  # kwargs["info_gain_balance_coefficient"]
     GlobalConstants.INITIAL_LR = kwargs["initial_lr"]
     # classification_wd = [i * 0.00005 for i in range(0, 21)]
     # decision_wd = [0.0]
@@ -83,6 +83,7 @@ def train_func(**kwargs):
 def usps_cign_training():
     pbounds = {"classification_wd": (0.0, 0.001),
                "initial_lr": (0.0001, 0.1)}
+    # "info_gain_balance_coefficient": (1.0, 5.0)}
 
     # Best Pairs
     # best_hyperparameter_pairs = [(0.09746176130054329, 0.0008120373740661416),
