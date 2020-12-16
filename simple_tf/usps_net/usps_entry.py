@@ -80,14 +80,25 @@ def usps_cign_training():
     pbounds = {"classification_wd": (0.0, 0.001), "initial_lr": (0.0001, 0.1)}
     # train_func(classification_wd=0.0004, initial_lr=0.001)
 
-    optimizer = BayesianOptimization(
-        f=train_func,
-        pbounds=pbounds,
-    )
-    optimizer.maximize(
-        init_points=25,
-        n_iter=50,
-        acq="ei",
-        xi=0.0
-    )
-    print("X")
+    best_hyperparameter_pairs = [(0.09746176130054329, 0.0008120373740661416),
+                                 (0.09767504912890895, 0.0009627508498408631),
+                                 (0.09745033033453893, 0.0008218704639722474)]
+    experiment_count_per_params = 25
+    best_hyperparameter_pairs = experiment_count_per_params * best_hyperparameter_pairs
+    for param_tpl in best_hyperparameter_pairs:
+        initial_lr = param_tpl[0]
+        classification_wd = param_tpl[1]
+        train_func(classification_wd=classification_wd, initial_lr=initial_lr)
+
+
+    # optimizer = BayesianOptimization(
+    #     f=train_func,
+    #     pbounds=pbounds,
+    # )
+    # optimizer.maximize(
+    #     init_points=25,
+    #     n_iter=50,
+    #     acq="ei",
+    #     xi=0.0
+    # )
+    # print("X")
