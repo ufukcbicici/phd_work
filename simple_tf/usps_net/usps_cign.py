@@ -8,55 +8,53 @@ from simple_tf.global_params import GlobalConstants
 from algorithms.resnet.resnet_generator import ResnetGenerator
 
 
-class UspsBaseline(FastTreeNetwork):
+class UspsCIGN(FastTreeNetwork):
     FC_LAYERS = [64, 32, 16]
 
-    def __init__(self, dataset, network_name):
-        node_build_funcs = [UspsBaseline.baseline]
-        super().__init__(node_build_funcs, None, None, None, None, [], dataset, network_name)
-        self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
-                                         shape=(None, dataset.trainingSamples.shape[-1]),
-                                         name="dataTensor_USPS")
+    # def __init__(self, dataset, network_name):
+    #     node_build_funcs = [UspsCIGN.baseline]
+    #     super().__init__(node_build_funcs, None, None, None, None, [], dataset, network_name)
+    #     self.dataTensor = tf.placeholder(GlobalConstants.DATA_TYPE,
+    #                                      shape=(None, dataset.trainingSamples.shape[-1]),
+    #                                      name="dataTensor_USPS")
+    #
+    # @staticmethod
 
-    @staticmethod
-    def get_mlp_layers(net_input, layers, node, network):
-        net = net_input
-        list_of_params = []
-        for layer_id in range(len(layers)):
-            fc_W_name = "fc{0}_weights".format(layer_id)
-            fc_b_name = "fc{0}_b".format(layer_id)
-            input_dim = net.get_shape().as_list()[-1]
-            output_dim = layers[layer_id]
-            fc_W, fc_b = FashionCignLite.get_affine_layer_params(
-                layer_shape=[input_dim, output_dim],
-                W_name=network.get_variable_name(name=fc_W_name, node=node),
-                b_name=network.get_variable_name(name=fc_b_name, node=node))
-            list_of_params.append(fc_W)
-            list_of_params.append(fc_b)
-            net = FastTreeNetwork.fc_layer(x=net, W=fc_W, b=fc_b, node=node, name="fc_op")
-            net = tf.nn.relu(net)
-        return net
 
-    @staticmethod
-    def baseline(network, node):
-        network.mask_input_nodes(node=node)
-        net = network.dataTensor
-        layers = []
-        layers.extend(UspsBaseline.FC_LAYERS)
-        net = UspsBaseline.get_mlp_layers(net_input=net, node=node, network=network, layers=UspsBaseline.FC_LAYERS)
-        # Build loss
-        input_dim = net.get_shape().as_list()[-1]
-        output_dim = network.labelCount
-        softmax_weights, softmax_biases = FashionCignLite.get_affine_layer_params(
-            layer_shape=[input_dim, output_dim],
-            W_name=network.get_variable_name(name="fc_softmax_weights", node=node),
-            b_name=network.get_variable_name(name="fc_softmax_b", node=node))
-        final_feature, logits = network.apply_loss(node=node, final_feature=net,
-                                                   softmax_weights=softmax_weights, softmax_biases=softmax_biases)
-        # Evaluation
-        node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
-        node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
-        print("X")
+    # @staticmethod
+    # def baseline(network, node):
+    #     network.mask_input_nodes(node=node)
+    #     net = network.dataTensor
+    #     layers = []
+    #     layers.extend(UspsBaseline.FC_LAYERS)
+    #     # layers.append(network.labelCount)
+    #     list_of_params = []
+    #     for layer_id in range(len(layers)):
+    #         fc_W_name = "fc{0}_weights".format(layer_id)
+    #         fc_b_name = "fc{0}_b".format(layer_id)
+    #         input_dim = net.get_shape().as_list()[-1]
+    #         output_dim = layers[layer_id]
+    #         fc_W, fc_b = FashionCignLite.get_affine_layer_params(
+    #             layer_shape=[input_dim, output_dim],
+    #             W_name=network.get_variable_name(name=fc_W_name, node=node),
+    #             b_name=network.get_variable_name(name=fc_b_name, node=node))
+    #         list_of_params.append(fc_W)
+    #         list_of_params.append(fc_b)
+    #         net = FastTreeNetwork.fc_layer(x=net, W=fc_W, b=fc_b, node=node, name="fc_op")
+    #         net = tf.nn.relu(net)
+    #     # Build loss
+    #     input_dim = net.get_shape().as_list()[-1]
+    #     output_dim = network.labelCount
+    #     softmax_weights, softmax_biases = FashionCignLite.get_affine_layer_params(
+    #         layer_shape=[input_dim, output_dim],
+    #         W_name=network.get_variable_name(name="fc_softmax_weights", node=node),
+    #         b_name=network.get_variable_name(name="fc_softmax_b", node=node))
+    #     final_feature, logits = network.apply_loss(node=node, final_feature=net,
+    #                                                softmax_weights=softmax_weights, softmax_biases=softmax_biases)
+    #     # Evaluation
+    #     node.evalDict[network.get_variable_name(name="posterior_probs", node=node)] = tf.nn.softmax(logits)
+    #     node.evalDict[network.get_variable_name(name="labels", node=node)] = node.labelTensor
+    #     print("X")
 
     def get_explanation_string(self):
         total_param_count = 0
