@@ -23,8 +23,8 @@ class UspsBaseline(FastTreeNetwork):
         net = net_input
         list_of_params = []
         for layer_id in range(len(layers)):
-            fc_W_name = "{0}_fc{1}_weights".format(op_pre_fix, layer_id)
-            fc_b_name = "{0}_fc{1}_b".format(op_pre_fix, layer_id)
+            fc_W_name = "Node{0}_{1}_fc{2}_weights".format(node.index, op_pre_fix, layer_id)
+            fc_b_name = "Node{0}_{1}_fc{2}_b".format(node.index, op_pre_fix, layer_id)
             input_dim = net.get_shape().as_list()[-1]
             output_dim = layers[layer_id]
             fc_W, fc_b = FashionCignLite.get_affine_layer_params(

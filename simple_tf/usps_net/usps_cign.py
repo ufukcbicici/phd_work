@@ -26,6 +26,7 @@ class UspsCIGN(FastTreeNetwork):
         decision_dim = UspsCIGN.DECISION_DIMS[node.depth]
         ig_feature = UspsBaseline.get_mlp_layers(net_input=net, node=node, network=network, layers=[decision_dim],
                                                  op_pre_fix="decision")
+        node.hOpsList.extend([ig_feature])
         network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature)
 
 
