@@ -3,6 +3,8 @@ from data_handling.mnist_data_set import MnistDataSet
 from sklearn.model_selection import train_test_split
 import h5py
 import os
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 from auxillary.general_utility_funcs import UtilityFuncs
 import numpy as np
 import matplotlib.pyplot as plt
@@ -30,6 +32,15 @@ class UspsDataset(MnistDataSet):
         if self.validationSampleCount > 0:
             self.trainingSamples, self.trainingLabels, self.validationSamples, self.validationLabels = \
                 train_test_split(self.trainingSamples, self.trainingLabels, self.validationSampleCount)
+        # Experimental
+        scaler = StandardScaler()
+        scaler.fit(self.trainingSamples)
+        training_samples_scaled = scaler.transform(self.trainingSamples)
+        test_samples_scaled = scaler.transform(self.testSamples)
+        pca = PCA()
+        pca.fit(training_samples_scaled)
+        self.trainingSamples = pca.transform(training_samples_scaled)
+        self.testSamples = pca.transform(test_samples_scaled)
         print("X")
 
 

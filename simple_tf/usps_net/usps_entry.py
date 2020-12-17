@@ -81,29 +81,29 @@ def train_func(**kwargs):
 
 
 def usps_cign_training():
-    pbounds = {"classification_wd": (0.0, 0.001),
-               "initial_lr": (0.0001, 0.1)}
+    # pbounds = {"classification_wd": (0.0, 0.001),
+    #            "initial_lr": (0.0001, 0.1)}
     # "info_gain_balance_coefficient": (1.0, 5.0)}
 
     # Best Pairs
-    # best_hyperparameter_pairs = [(0.09746176130054329, 0.0008120373740661416),
-    #                              (0.09767504912890895, 0.0009627508498408631),
-    #                              (0.09745033033453893, 0.0008218704639722474)]
-    # experiment_count_per_params = 25
-    # best_hyperparameter_pairs = experiment_count_per_params * best_hyperparameter_pairs
-    # for param_tpl in best_hyperparameter_pairs:
-    #     initial_lr = param_tpl[0]
-    #     classification_wd = param_tpl[1]
-    #     train_func(classification_wd=classification_wd, initial_lr=initial_lr)
+    best_hyperparameter_pairs = [(0.06, 0.00146918),
+                                 (0.06, 0.00584801),
+                                 (0.06, 0.00163591)]
+    experiment_count_per_params = 25
+    best_hyperparameter_pairs = experiment_count_per_params * best_hyperparameter_pairs
+    for param_tpl in best_hyperparameter_pairs:
+        initial_lr = param_tpl[0]
+        classification_wd = param_tpl[1]
+        train_func(classification_wd=classification_wd, initial_lr=initial_lr)
 
-    optimizer = BayesianOptimization(
-        f=train_func,
-        pbounds=pbounds,
-    )
-    optimizer.maximize(
-        init_points=25,
-        n_iter=50,
-        acq="ei",
-        xi=0.0
-    )
+    # optimizer = BayesianOptimization(
+    #     f=train_func,
+    #     pbounds=pbounds,
+    # )
+    # optimizer.maximize(
+    #     init_points=25,
+    #     n_iter=50,
+    #     acq="ei",
+    #     xi=0.0
+    # )
     print("X")
