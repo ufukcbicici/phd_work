@@ -33,14 +33,14 @@ class UspsDataset(MnistDataSet):
             self.trainingSamples, self.trainingLabels, self.validationSamples, self.validationLabels = \
                 train_test_split(self.trainingSamples, self.trainingLabels, self.validationSampleCount)
         # Experimental
-        scaler = StandardScaler()
-        scaler.fit(self.trainingSamples)
-        training_samples_scaled = scaler.transform(self.trainingSamples)
-        test_samples_scaled = scaler.transform(self.testSamples)
-        pca = PCA()
-        pca.fit(training_samples_scaled)
-        self.trainingSamples = pca.transform(training_samples_scaled)
-        self.testSamples = pca.transform(test_samples_scaled)
-        print("X")
+        # scaler = StandardScaler()
+        # scaler.fit(self.trainingSamples)
+        # training_samples_scaled = scaler.transform(self.trainingSamples)
+        # test_samples_scaled = scaler.transform(self.testSamples)
+        # pca = PCA()
+        # pca.fit(training_samples_scaled)
+        # self.trainingSamples = pca.transform(training_samples_scaled)
+        # self.testSamples = pca.transform(test_samples_scaled)
+        # print("X")
 
 

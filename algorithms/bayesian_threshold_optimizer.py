@@ -7,17 +7,19 @@ from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.
     DirectThresholdOptimizer
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer_entropy import \
     DirectThresholdOptimizerEntropy
+from auxillary.db_logger import DbLogger
 from auxillary.general_utility_funcs import UtilityFuncs
 
 
 class BayesianThresholdOptimizer:
     def __init__(self,
                  network, routing_data, session, seed, temperatures_dict,
-                 threshold_kind, mixing_lambda):
+                 threshold_kind, mixing_lambda, run_id):
         self.network = network
         self.routingData = routing_data
         self.session = session
         self.seed = seed
+        self.runId = run_id
         self.temperaturesDict = temperatures_dict
         self.thresholdKind = threshold_kind
         self.mixingLambda = mixing_lambda
@@ -33,6 +35,7 @@ class BayesianThresholdOptimizer:
         self.thresholdOptimizer.build_network()
         self.fixedThresholds = None
         self.fixedWeights = None
+        self.listOfResults = []
 
     def get_random_thresholds(self):
         thresholds_dict = {}
@@ -165,7 +168,28 @@ class BayesianThresholdOptimizer:
 
     def loss_function(self, **kwargs):
         results_dict = self.get_thresholding_results_for_args(kwargs)
+        self.listOfResults.append(results_dict)
         return results_dict["train"]["final_score"]
+
+    def write_to_db(self, xi, timestamp):
+        db_rows = []
+        # result = (iteration_id, new_score, new_accuracy, new_computation_overload)
+        for result in self.listOfResults:
+            val_score = result["train"]["final_score"]
+            val_accuracy = result["train"]["final_accuracy"]
+            val_overload = result["train"]["final_activation_cost"]
+            test_score = result["test"]["final_score"]
+            test_accuracy = result["test"]["final_accuracy"]
+            test_overload = result["test"]["final_activation_cost"]
+            db_rows.append((self.runId,
+                            self.network.networkName,
+                            -1,
+                            self.mixingLambda,
+                            0,
+                            val_score, val_accuracy, val_overload,
+                            test_score, test_accuracy, test_overload,
+                            "Bayesian Optimization", xi, timestamp))
+        DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=-1)
 
     def optimize(self,
                  init_points,
@@ -175,6 +199,8 @@ class BayesianThresholdOptimizer:
                  weight_bound_max,
                  use_these_thresholds=None,
                  use_these_weights=None):
+        timestamp = UtilityFuncs.get_timestamp()
+        self.listOfResults = []
         train_indices = self.routingData.trainingIndices
         test_indices = self.routingData.testIndices
         self.fixedWeights = None
@@ -229,4 +255,5 @@ class BayesianThresholdOptimizer:
             acq="ei",
             xi=xi
         )
+        self.write_to_db(xi=xi, timestamp=timestamp)
         print("X")

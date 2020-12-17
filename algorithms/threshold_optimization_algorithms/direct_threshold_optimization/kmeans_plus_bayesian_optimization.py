@@ -18,7 +18,8 @@ class KmeansPlusBayesianOptimization:
         test_indices = routing_data.testIndices
         X = routing_data.get_dict("pre_branch_feature")[0]
         y = routing_data.labelList
-        X_formatted = UtilityFuncs.vectorize_with_gap(X)
+        # X_formatted = UtilityFuncs.vectorize_with_gap(X)
+        X_formatted = X
         posteriors = [routing_data.get_dict("posterior_probs")[node.index] for node in network.leafNodes]
         posteriors = np.stack(posteriors, axis=-1)
         label_count = posteriors.shape[1]
@@ -50,40 +51,41 @@ class KmeansPlusBayesianOptimization:
             temperatures_dict=temperatures_dict,
             seed=seed,
             threshold_kind="entropy",
-            mixing_lambda=mixing_lambda)
+            mixing_lambda=mixing_lambda,
+            run_id=run_id)
 
-        good_thresholds = {0: 0.04031152075333284,
-                           1: 0.5072578562024834,
-                           2: 0.3954713354264498}
-        experimental_result = bayesian_optimizer.optimize(init_points=100,
-                                                          n_iter=150,
-                                                          xi=0.0,
-                                                          weight_bound_min=-5.0,
-                                                          weight_bound_max=5.0,
-                                                          use_these_thresholds=good_thresholds,
-                                                          use_these_weights=np.ones(shape=(1, posteriors.shape[-1]),
-                                                                                    dtype=np.float32))
-        weights_optimization_result = bayesian_optimizer.optimize(init_points=100,
-                                                                  n_iter=250,
-                                                                  xi=0.01,
-                                                                  weight_bound_min=-2.0,
-                                                                  weight_bound_max=2.0,
-                                                                  use_these_thresholds=good_thresholds,
-                                                                  use_these_weights=None)
-        thrs_optimization_result = bayesian_optimizer.optimize(init_points=100,
-                                                               n_iter=250,
-                                                               xi=0.01,
+        # good_thresholds = {0: 0.04031152075333284,
+        #                    1: 0.5072578562024834,
+        #                    2: 0.3954713354264498}
+        # experimental_result = bayesian_optimizer.optimize(init_points=100,
+        #                                                   n_iter=150,
+        #                                                   xi=0.0,
+        #                                                   weight_bound_min=-5.0,
+        #                                                   weight_bound_max=5.0,
+        #                                                   use_these_thresholds=good_thresholds,
+        #                                                   use_these_weights=np.ones(shape=(1, posteriors.shape[-1]),
+        #                                                                             dtype=np.float32))
+        # weights_optimization_result = bayesian_optimizer.optimize(init_points=100,
+        #                                                           n_iter=250,
+        #                                                           xi=0.01,
+        #                                                           weight_bound_min=-2.0,
+        #                                                           weight_bound_max=2.0,
+        #                                                           use_these_thresholds=good_thresholds,
+        #                                                           use_these_weights=None)
+        thrs_optimization_result = bayesian_optimizer.optimize(init_points=50,
+                                                               n_iter=100,
+                                                               xi=0.0,
                                                                weight_bound_min=-2.0,
                                                                weight_bound_max=2.0,
                                                                use_these_thresholds=None,
                                                                use_these_weights=np.ones(
                                                                    shape=(1, posteriors.shape[-1]),
                                                                    dtype=np.float32))
-        complete_optimization_result = bayesian_optimizer.optimize(init_points=100,
-                                                                   n_iter=250,
-                                                                   xi=0.01,
-                                                                   weight_bound_min=-2.0,
-                                                                   weight_bound_max=2.0,
-                                                                   use_these_thresholds=None,
-                                                                   use_these_weights=None)
+        # complete_optimization_result = bayesian_optimizer.optimize(init_points=100,
+        #                                                            n_iter=250,
+        #                                                            xi=0.01,
+        #                                                            weight_bound_min=-2.0,
+        #                                                            weight_bound_max=2.0,
+        #                                                            use_these_thresholds=None,
+        #                                                            use_these_weights=None)
         print("X")

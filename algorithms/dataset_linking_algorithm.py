@@ -8,13 +8,15 @@ from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers
 from auxillary.db_logger import DbLogger
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
-network_id = 453
-network_name = "FashionNet_Lite"
+network_id = 1596
+network_name = "USPS_CIGN"
 
 output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                 "pre_branch_feature"]
 used_output_names = ["pre_branch_feature"]
-iterations = sorted([43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000])
+# iterations = sorted([43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000])
+iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
+                     11741, 11800])
 
 
 class DatasetLinkingAlgorithm:
@@ -260,9 +262,9 @@ class DatasetLinkingAlgorithm:
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
-    # DatasetLinkingAlgorithm.run()
-    DatasetLinkingAlgorithm.link_dataset_v3(network_name_="FashionNet_Lite", run_id_=453, degree_list_=[2, 2],
-                                            test_iterations_=[48000])
+    DatasetLinkingAlgorithm.run()
+    # DatasetLinkingAlgorithm.link_dataset_v3(network_name_="FashionNet_Lite", run_id_=453, degree_list_=[2, 2],
+    #                                         test_iterations_=[48000])
 
 
 if __name__ == "__main__":
