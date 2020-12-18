@@ -10,10 +10,11 @@ from data_handling.usps_dataset import UspsDataset
 from simple_tf.global_params import GlobalConstants
 from simple_tf.usps_net.usps_baseline import UspsBaseline
 from simple_tf.usps_net.usps_cign import UspsCIGN
+from simple_tf.usps_net.usps_random_sample import UspsCIGNRandomSample
 
 use_moe = False
 use_sampling = False
-use_random_sampling = False
+use_random_sampling = True
 use_baseline = False
 use_early_exit = False
 use_late_exit = False
@@ -25,7 +26,8 @@ def get_network(dataset, network_name):
     elif use_early_exit:
         raise NotImplementedError()
     elif use_random_sampling:
-        raise NotImplementedError()
+        network = UspsCIGNRandomSample(dataset=dataset, network_name=network_name,
+                                       degree_list=GlobalConstants.TREE_DEGREE_LIST)
     else:
         network = UspsBaseline(dataset=dataset, network_name=network_name)
     return network
