@@ -12,7 +12,7 @@ class KmeansPlusBayesianOptimization:
         pass
 
     @staticmethod
-    def optimize(cluster_count, network, routing_data, mixing_lambda, seed, run_id, iteration):
+    def optimize(cluster_count, network, routing_data, mixing_lambda, xi, seed, run_id, iteration):
         # Prepare required training - test data
         train_indices = routing_data.trainingIndices
         test_indices = routing_data.testIndices
@@ -74,7 +74,7 @@ class KmeansPlusBayesianOptimization:
         #                                                           use_these_weights=None)
         thrs_optimization_result = bayesian_optimizer.optimize(init_points=50,
                                                                n_iter=100,
-                                                               xi=0.0,
+                                                               xi=xi,
                                                                weight_bound_min=-2.0,
                                                                weight_bound_max=2.0,
                                                                use_these_thresholds=None,

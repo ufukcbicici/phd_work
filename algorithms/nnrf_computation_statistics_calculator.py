@@ -42,14 +42,14 @@ class NNRFComputationStatisticsCalculator:
             node_outputs_dict[node.index] = node_output
             # Add last layer to root
             if node.isRoot:
-                last_layer_input = tf.placeholder(dtype=tf.float32, shape=(None, 2**d), name="last_layer_input")
+                last_layer_input = tf.placeholder(dtype=tf.float32, shape=(None, 2 ** d), name="last_layer_input")
                 node_inputs_dict[-1] = node_input
                 W_C = UtilityFuncs.create_variable(
                     name=network.get_variable_name(name="W_C", node=node),
-                    shape=[2**d, C],
+                    shape=[2 ** d, C],
                     dtype=GlobalConstants.DATA_TYPE,
                     initializer=tf.truncated_normal(
-                        [2**d, C], stddev=0.1, seed=GlobalConstants.SEED,
+                        [2 ** d, C], stddev=0.1, seed=GlobalConstants.SEED,
                         dtype=GlobalConstants.DATA_TYPE))
                 b_C = UtilityFuncs.create_variable(
                     name=network.get_variable_name(name="b_C", node=node),
@@ -71,3 +71,13 @@ class NNRFComputationStatisticsCalculator:
         tree_param_count = np.sum([np.prod(var.get_shape().as_list()) for var in tf.trainable_variables()])
         forest_param_count = N * tree_param_count
         print("forest_mac_cost={0} forest_param_count={1}".format(forest_mac_cost, forest_param_count))
+
+
+def main():
+    # compare_gpu_implementation()
+    # train_basic_q_learning()
+    NNRFComputationStatisticsCalculator.calculate(feature_size=256, class_count=10)
+
+
+if __name__ == "__main__":
+    main()

@@ -8,7 +8,7 @@ from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers
 from auxillary.db_logger import DbLogger
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
-network_id = 1596
+network_id = 1577
 network_name = "USPS_CIGN"
 
 output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
