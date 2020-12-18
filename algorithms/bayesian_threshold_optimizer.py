@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from bayes_opt import BayesianOptimization
-
+from sklearn.metrics import f1_score
 from algorithms.information_gain_routing_accuracy_calculator import InformationGainRoutingAccuracyCalculator
 from algorithms.threshold_optimization_algorithms.direct_threshold_optimization.direct_threshold_optimizer import \
     DirectThresholdOptimizer
@@ -121,6 +121,8 @@ class BayesianThresholdOptimizer:
             temperatures_dict=temperatures_dict,
             thresholds_dict=thresholds_dict,
             routing_weights_array=weights_array)
+        predicted_labels = optimizer_results["predictedLabels"]
+        gt_labels = optimizer_results["gtLabels"]
         correctness_vector = optimizer_results["correctnessVector"]
         activation_costs_vector = optimizer_results["activationCostsArr"]
         selection_tuples = optimizer_results["selectionTuples"]
@@ -131,6 +133,8 @@ class BayesianThresholdOptimizer:
         final_score = np.mean(score_vector)
         final_accuracy = np.mean(correctness_vector)
         final_activation_cost = np.mean(activation_costs_vector)
+        f1_macro = f1_score(y_true=gt_labels, y_pred=predicted_labels, average="macro")
+        f1_micro = f1_score(y_true=gt_labels, y_pred=predicted_labels, average="micro")
         # Results
         results_dict = {"final_score": final_score,
                         "score_vector": score_vector,
@@ -139,7 +143,9 @@ class BayesianThresholdOptimizer:
                         "final_activation_cost": final_activation_cost,
                         "activation_costs_vector": activation_costs_vector,
                         "selection_tuples": selection_tuples,
-                        "selection_weights": selection_weights}
+                        "selection_weights": selection_weights,
+                        "f1_macro": f1_macro,
+                        "f1_micro": f1_micro}
         return results_dict
 
     def get_thresholding_results_for_args(self, kwargs):
@@ -178,16 +184,20 @@ class BayesianThresholdOptimizer:
             val_score = result["train"]["final_score"]
             val_accuracy = result["train"]["final_accuracy"]
             val_overload = result["train"]["final_activation_cost"]
+            val_f1_micro = result["train"]["f1_micro"]
+            val_f1_macro = result["train"]["f1_macro"]
             test_score = result["test"]["final_score"]
             test_accuracy = result["test"]["final_accuracy"]
             test_overload = result["test"]["final_activation_cost"]
+            test_f1_micro = result["test"]["f1_micro"]
+            test_f1_macro = result["test"]["f1_macro"]
             db_rows.append((self.runId,
                             self.network.networkName,
                             -1,
                             self.mixingLambda,
                             0,
-                            val_score, val_accuracy, val_overload,
-                            test_score, test_accuracy, test_overload,
+                            val_score, val_accuracy, val_overload, val_f1_micro, val_f1_macro,
+                            test_score, test_accuracy, test_overload, test_f1_micro, test_f1_macro,
                             "Bayesian Optimization", xi, timestamp))
         DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=-1)
 
