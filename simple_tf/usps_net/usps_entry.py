@@ -14,7 +14,7 @@ from simple_tf.usps_net.usps_random_sample import UspsCIGNRandomSample
 
 use_moe = False
 use_sampling = False
-use_random_sampling = True
+use_random_sampling = False
 use_baseline = False
 use_early_exit = False
 use_late_exit = False
@@ -41,6 +41,11 @@ def train_func(**kwargs):
     decision_wd = 0.0
     info_gain_balance_coefficient = 1.0  # kwargs["info_gain_balance_coefficient"]
     GlobalConstants.INITIAL_LR = kwargs["initial_lr"]
+    UspsCIGN.SOFTMAX_DECAY_INITIAL = kwargs["softmax_decay_initial"]
+    UspsCIGN.SOFTMAX_DECAY_PERIOD = int(kwargs["softmax_decay_period"])
+    UspsCIGN.THRESHOLD_LOWER_LIMIT = kwargs["threshold_lower_limit"]
+    UspsCIGN.THRESHOLD_PERIOD = int(kwargs["threshold_period"])
+
     # classification_wd = [i * 0.00005 for i in range(0, 21)]
     # decision_wd = [0.0]
     # info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -84,7 +89,11 @@ def train_func(**kwargs):
 
 def usps_cign_training():
     pbounds = {"classification_wd": (0.0, 0.001),
-               "initial_lr": (0.0001, 0.1)}
+               "initial_lr": (0.0001, 0.1),
+               "softmax_decay_initial": (1.0, 50.0),
+               "softmax_decay_period": (100.0, 5000.0),
+               "threshold_lower_limit": (0.0, 0.5),
+               "threshold_period": (100.0, 5000.0)}
     # "info_gain_balance_coefficient": (1.0, 5.0)}
 
     # Best Pairs
@@ -103,8 +112,8 @@ def usps_cign_training():
         pbounds=pbounds,
     )
     optimizer.maximize(
-        init_points=25,
-        n_iter=50,
+        init_points=100,
+        n_iter=500,
         acq="ei",
         xi=0.0
     )

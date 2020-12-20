@@ -749,7 +749,7 @@ class FastTreeNetwork(TreeNetwork):
     def get_checkpoint_path(self, run_id, iteration):
         curr_path = os.path.dirname(os.path.abspath(__file__))
         directory_path = os.path.abspath(os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
-                                                                   "saved_training_data"),
+                                                                   GlobalConstants.MODEL_SAVE_FOLDER),
                                                       "checkpoint_{0}_run_{1}_iteration_{2}".format(self.networkName,
                                                                                                     run_id, iteration)))
         checkpoint_path = os.path.abspath(os.path.join(directory_path, "model.ckpt"))
@@ -761,13 +761,13 @@ class FastTreeNetwork(TreeNetwork):
         if data_type != "":
             directory_path = os.path.abspath(
                 os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
-                                          "saved_training_data"),
+                                          GlobalConstants.MODEL_SAVE_FOLDER),
                              "{0}_run_{1}_iteration_{2}_{3}".format(network_name, run_id,
                                                                     iteration, data_type)))
         else:
             directory_path = os.path.abspath(
                 os.path.join(os.path.join(os.path.join(os.path.join(curr_path, ".."), ".."),
-                                          "saved_training_data"),
+                                          GlobalConstants.MODEL_SAVE_FOLDER),
                              "{0}_run_{1}_iteration_{2}".format(network_name,
                                                                 run_id, iteration)))
         return directory_path
