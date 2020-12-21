@@ -916,20 +916,23 @@ class FastTreeNetwork(TreeNetwork):
 
     @staticmethod
     def calculate_branch_probability_histograms(branch_probs):
-        for k, v in branch_probs.items():
-            # Interval analysis
-            print("Node:{0}".format(k))
-            bin_size = 0.1
-            for j in range(v.shape[1]):
-                histogram = {}
-                for i in range(v.shape[0]):
-                    prob = v[i, j]
-                    bin_id = int(prob / bin_size)
-                    if bin_id not in histogram:
-                        histogram[bin_id] = 0
-                    histogram[bin_id] += 1
-                sorted_histogram = sorted(list(histogram.items()), key=lambda e: e[0], reverse=False)
-                print(histogram)
+        try:
+            for k, v in branch_probs.items():
+                # Interval analysis
+                print("Node:{0}".format(k))
+                bin_size = 0.1
+                for j in range(v.shape[1]):
+                    histogram = {}
+                    for i in range(v.shape[0]):
+                        prob = v[i, j]
+                        bin_id = int(prob / bin_size)
+                        if bin_id not in histogram:
+                            histogram[bin_id] = 0
+                        histogram[bin_id] += 1
+                    sorted_histogram = sorted(list(histogram.items()), key=lambda e: e[0], reverse=False)
+                    print(histogram)
+        except:
+            print("Exception in calculate_branch_probability_histograms")
 
     def label_distribution_analysis(self,
                                     run_id,

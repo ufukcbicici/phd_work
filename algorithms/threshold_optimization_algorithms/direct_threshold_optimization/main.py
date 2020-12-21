@@ -17,7 +17,7 @@ def train_direct_threshold_optimizer():
     #                      0.0002, 0.0003, 0.0004, 0.0005, 0.001, 0.002, 0.005, 0.01]
 
     # USPS
-    network_id = 1577
+    network_id = 1892
     network_name = "USPS_CIGN"
     list_of_l2_coeffs = [0.0, 0.00001, 0.000025, 0.00005, 0.000075, 0.0001,
                          0.0002, 0.0003, 0.0004, 0.0005, 0.001, 0.002, 0.005, 0.01]
@@ -26,7 +26,7 @@ def train_direct_threshold_optimizer():
 
     lambdas = [1.0, 0.99, 0.95, 0.9]
     xis = [0.0, 0.001, 0.01]
-    list_of_seeds = np.random.uniform(low=1, high=100000, size=(200, )).astype(np.int32)
+    list_of_seeds = np.random.uniform(low=1, high=100000, size=(25,)).astype(np.int32)
 
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
@@ -60,14 +60,14 @@ def train_direct_threshold_optimizer():
                                                                test_iterations_=iterations)
         routing_data.apply_validation_test_split(test_ratio=0.1)
         routing_data.switch_to_single_iteration_mode()
-        # KmeansPlusBayesianOptimization.optimize(cluster_count=1,
-        #                                         network=network,
-        #                                         routing_data=routing_data,
-        #                                         mixing_lambda=mixing_lambda,
-        #                                         seed=seed,
-        #                                         run_id=network_id,
-        #                                         iteration=0,
-        #                                         xi=xi)
+        KmeansPlusBayesianOptimization.optimize(cluster_count=1,
+                                                network=network,
+                                                routing_data=routing_data,
+                                                mixing_lambda=mixing_lambda,
+                                                seed=seed,
+                                                run_id=network_id,
+                                                iteration=0,
+                                                xi=xi)
         tf.reset_default_graph()
 
 
@@ -79,7 +79,7 @@ def train_ensemble_threshold_optimizer():
                          11741, 11800])
     lambdas = [1.0, 0.99, 0.95, 0.9]
     xis = [0.0, 0.001, 0.01]
-    list_of_seeds = np.random.uniform(low=1, high=100000, size=(200, )).astype(np.int32)
+    list_of_seeds = np.random.uniform(low=1, high=100000, size=(200,)).astype(np.int32)
 
     param_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=[lambdas, xis, list_of_seeds])
     for param_tpl in param_tuples:
@@ -97,12 +97,11 @@ def train_ensemble_threshold_optimizer():
             routing_data.switch_to_single_iteration_mode()
 
 
-
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
-    # train_direct_threshold_optimizer()
-    train_ensemble_threshold_optimizer()
+    train_direct_threshold_optimizer()
+    # train_ensemble_threshold_optimizer()
 
 
 if __name__ == "__main__":
