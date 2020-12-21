@@ -34,8 +34,9 @@ class CignRandomSample(CignWithSampling):
         decayed_activation = node.activationsDict[node.index] / node.softmaxDecay
         p_n_given_x = tf.nn.softmax(decayed_activation)
         p_c_given_x = node.oneHotLabelTensor
-        node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x,
-                                                  balance_coefficient=self.informationGainBalancingCoefficient)
+        # node.infoGainLoss = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x, p_c_given_x_2d=p_c_given_x,
+        #                                           balance_coefficient=self.informationGainBalancingCoefficient)
+        node.infoGainLoss = tf.constant(0, dtype=tf.float32)
         # Step 1: Sample random from uniform distribution. No use of information gain.
         assert self.get_variable_name(name="sample_count", node=node) in node.evalDict
         batch_size = node.evalDict[self.get_variable_name(name="sample_count", node=node)]

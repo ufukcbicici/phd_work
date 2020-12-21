@@ -128,6 +128,7 @@ class BayesianThresholdOptimizer:
         selection_tuples = optimizer_results["selectionTuples"]
         selection_weights = optimizer_results["selectionWeights"]
         posteriors = optimizer_results["posteriorsTensor"]
+        final_posteriors = optimizer_results["finalPosteriors"]
         # Calculate required metrics
         score_vector = mixing_lambda * correctness_vector - (1.0 - mixing_lambda) * activation_costs_vector
         final_score = np.mean(score_vector)
@@ -145,7 +146,9 @@ class BayesianThresholdOptimizer:
                         "selection_tuples": selection_tuples,
                         "selection_weights": selection_weights,
                         "f1_macro": f1_macro,
-                        "f1_micro": f1_micro}
+                        "f1_micro": f1_micro,
+                        "posteriors": posteriors,
+                        "final_posteriors": final_posteriors}
         return results_dict
 
     def get_thresholding_results_for_args(self, kwargs):

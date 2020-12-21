@@ -8,7 +8,7 @@ from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers
 from auxillary.db_logger import DbLogger
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
-network_id = 1577
+network_id = 1700
 network_name = "USPS_CIGN"
 
 output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
@@ -263,7 +263,7 @@ def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
     DatasetLinkingAlgorithm.run()
-    # DatasetLinkingAlgorithm.link_dataset_v3(network_name_="FashionNet_Lite", run_id_=453, degree_list_=[2, 2],
+    # DatasetLinkin90oıgAlgorithm.link_dataset_v3(network_name_="FashionNet_Lite", run_id_=453, degree_list_=[2, 2],
     #                                         test_iterations_=[48000])
 
 

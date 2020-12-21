@@ -17,12 +17,12 @@ mlp = MLPClassifier()
 pipe = Pipeline(steps=[('mlp', mlp)])
 param_grid = \
     [{
-        "mlp__hidden_layer_sizes": [(64, 32, 16)],
+        "mlp__hidden_layer_sizes": [(32, ), (64, ), (128, ), (256, ), (512, ), (1024, )],
         "mlp__activation": ["relu"],
         "mlp__solver": ["adam"],
-        "mlp__batch_size": [125],
+        "mlp__batch_size": [64, 125, 250, 500],
         # "mlp__learning_rate": ["adaptive"],
-        "mlp__alpha": [0.0], #, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 2.0, 5.0],
+        "mlp__alpha": [0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 2.0, 5.0],
         "mlp__max_iter": [10000],
         "mlp__early_stopping": [True],
         "mlp__n_iter_no_change": [100]

@@ -81,9 +81,15 @@ def train_func(**kwargs):
     explanation += "\n Series:{0}".format(series_id)
     DbLogger.write_into_table(rows=[(experiment_id, explanation)], table=DbLogger.runMetaData, col_count=2)
     sess.run(init)
-    train_accuracies, validation_accuracies = network.train(sess=sess, dataset=dataset, run_id=experiment_id)
-    mean_val_accuracy = np.mean(np.array(validation_accuracies[-10:]))
+    train_accuracies, validation_accuracies = None, None
+    try:
+        train_accuracies, validation_accuracies = network.train(sess=sess, dataset=dataset, run_id=experiment_id)
+    except:
+        print("Experiment Failed")
     tf.reset_default_graph()
+    if validation_accuracies is None:
+        return 0.0
+    mean_val_accuracy = np.mean(np.array(validation_accuracies[-10:]))
     return mean_val_accuracy
 
 

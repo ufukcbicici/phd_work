@@ -10,7 +10,7 @@ from simple_tf.usps_net.usps_baseline import UspsBaseline
 
 
 class UspsCIGN(FastTreeNetwork):
-    FC_LAYERS = [16, 12, 8]
+    FC_LAYERS = [64, 32, 16]
     DECISION_DIMS = [4, 4, 4]
     SOFTMAX_DECAY_INITIAL = 10.0
     SOFTMAX_DECAY_PERIOD = 1000
@@ -71,6 +71,16 @@ class UspsCIGN(FastTreeNetwork):
         explanation += "Using Effective Sample Counts:{0}\n".format(GlobalConstants.USE_EFFECTIVE_SAMPLE_COUNTS)
         explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
         explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+
+        # USPS
+        explanation += "USPS FC_LAYERS:{0}\n".format(UspsCIGN.FC_LAYERS)
+        explanation += "USPS DECISION_DIMS:{0}\n".format(UspsCIGN.DECISION_DIMS)
+        explanation += "USPS SOFTMAX_DECAY_INITIAL:{0}\n".format(UspsCIGN.SOFTMAX_DECAY_INITIAL)
+        explanation += "USPS SOFTMAX_DECAY_PERIOD:{0}\n".format(UspsCIGN.SOFTMAX_DECAY_PERIOD)
+        explanation += "USPS THRESHOLD_LOWER_LIMIT:{0}\n".format(UspsCIGN.THRESHOLD_LOWER_LIMIT)
+        explanation += "USPS THRESHOLD_PERIOD:{0}\n".format(UspsCIGN.THRESHOLD_PERIOD)
+        # USPS
+
         explanation += "********Lr Settings********\n"
         explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
         explanation += "********Lr Settings********\n"
@@ -201,7 +211,7 @@ class UspsCIGN(FastTreeNetwork):
             node.probThresholdCalculator = DecayingParameter(name=threshold_name,
                                                              value=initial_value,
                                                              decay=0.5,
-                                                             decay_period=UspsCIGN.SOFTMAX_DECAY_PERIOD,
+                                                             decay_period=UspsCIGN.THRESHOLD_PERIOD,
                                                              min_limit=UspsCIGN.THRESHOLD_LOWER_LIMIT)
             # node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
             # Softmax Decay

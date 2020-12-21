@@ -20,8 +20,8 @@ from simple_tf.lenet.lenet_random_sample import LenetCignRandomSample
 
 use_moe = False
 use_sampling = False
-use_random_sampling = False
-use_baseline = True
+use_random_sampling = True
+use_baseline = False
 use_early_exit = False
 use_late_exit = False
 
