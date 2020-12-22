@@ -26,7 +26,7 @@ def train_direct_threshold_optimizer():
 
     lambdas = [1.0, 0.99, 0.95, 0.9]
     xis = [0.0, 0.001, 0.01]
-    list_of_seeds = np.random.uniform(low=1, high=100000, size=(25,)).astype(np.int32)
+    list_of_seeds = np.random.uniform(low=1, high=100000, size=(50,)).astype(np.int32)
 
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature"]
@@ -58,7 +58,7 @@ def train_direct_threshold_optimizer():
         routing_data = DatasetLinkingAlgorithm.link_dataset_v3(network_name_=network_name, run_id_=network_id,
                                                                degree_list_=[2, 2],
                                                                test_iterations_=iterations)
-        routing_data.apply_validation_test_split(test_ratio=0.1)
+        routing_data.apply_validation_test_split(test_ratio=0.5)
         routing_data.switch_to_single_iteration_mode()
         KmeansPlusBayesianOptimization.optimize(cluster_count=1,
                                                 network=network,
@@ -81,27 +81,42 @@ def train_ensemble_threshold_optimizer():
     xis = [0.0, 0.001, 0.01]
     list_of_seeds = np.random.uniform(low=1, high=100000, size=(200,)).astype(np.int32)
 
+    list_of_networks = []
+    list_of_routing_data = []
+    single_dataset_length = 0
+    for network_id in network_ids:
+        network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
+        routing_data = DatasetLinkingAlgorithm.link_dataset_v3(network_name_=network_name, run_id_=network_id,
+                                                               degree_list_=[2, 2],
+                                                               test_iterations_=iterations)
+        single_dataset_length = routing_data.labelList.shape[0]
+        routing_data.switch_to_single_iteration_mode()
+        list_of_networks.append(network)
+        list_of_routing_data.append(routing_data)
+    DatasetLinkingAlgorithm.align_datasets(list_of_datasets=list_of_routing_data,
+                                           link_node_index=0,
+                                           link_feature="original_samples",
+                                           single_data_set_length=single_dataset_length)
+
     param_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=[lambdas, xis, list_of_seeds])
+    assert all([np.array_equal(
+        list_of_routing_data[idx].dictionaryOfRoutingData["original_samples"][0],
+        list_of_routing_data[idx + 1].dictionaryOfRoutingData["original_samples"][0])
+                for idx in range(len(list_of_routing_data) - 1)])
     for param_tpl in param_tuples:
         mixing_lambda = param_tpl[0]
         xi = param_tpl[1]
         seed = param_tpl[2]
         np.random.seed(seed)
-        list_of_networks = []
-        for network_id in network_ids:
-            network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-            routing_data = DatasetLinkingAlgorithm.link_dataset_v3(network_name_=network_name, run_id_=network_id,
-                                                                   degree_list_=[2, 2],
-                                                                   test_iterations_=iterations)
-            routing_data.apply_validation_test_split(test_ratio=0.1)
-            routing_data.switch_to_single_iteration_mode()
+
+        print("X")
 
 
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
-    train_direct_threshold_optimizer()
-    # train_ensemble_threshold_optimizer()
+    # train_direct_threshold_optimizer()
+    train_ensemble_threshold_optimizer()
 
 
 if __name__ == "__main__":

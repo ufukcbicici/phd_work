@@ -187,21 +187,22 @@ class MultiIterationRoutingDataset(RoutingDataset):
             size_set.add(arr.shape[0])
         self.labelList = np.concatenate(label_list, axis=0)
         # Update the training and test indices
-        assert len(size_set) == 1
-        data_batch_size = list(size_set)[0]
-        its_dict = {"training": self.trainingIterations, "test": self.testIterations}
-        indices_dict = {"training": self.trainingIndices, "test": self.testIndices}
-        new_indices_dict = {"training": [], "test": []}
-        for data_type in ["training", "test"]:
-            tpls = UtilityFuncs.get_cartesian_product(list_of_lists=[indices_dict[data_type], its_dict[data_type]])
-            for s_id, it in tpls:
-                sample_id_in_iteration = self.linkageInfo[(s_id, it)]
-                new_index = (self.iterations.index(it) * data_batch_size) + sample_id_in_iteration
-                new_indices_dict[data_type].append(new_index)
-        self.trainingIndices = np.array(new_indices_dict["training"])
-        self.testIndices = np.array(new_indices_dict["test"])
-        # Intersection of training and tests must be empty.
-        assert len(set(self.trainingIndices).intersection(set(self.testIndices))) == 0
+        if self.trainingIndices is not None and self.testIndices is not None:
+            assert len(size_set) == 1
+            data_batch_size = list(size_set)[0]
+            its_dict = {"training": self.trainingIterations, "test": self.testIterations}
+            indices_dict = {"training": self.trainingIndices, "test": self.testIndices}
+            new_indices_dict = {"training": [], "test": []}
+            for data_type in ["training", "test"]:
+                tpls = UtilityFuncs.get_cartesian_product(list_of_lists=[indices_dict[data_type], its_dict[data_type]])
+                for s_id, it in tpls:
+                    sample_id_in_iteration = self.linkageInfo[(s_id, it)]
+                    new_index = (self.iterations.index(it) * data_batch_size) + sample_id_in_iteration
+                    new_indices_dict[data_type].append(new_index)
+            self.trainingIndices = np.array(new_indices_dict["training"])
+            self.testIndices = np.array(new_indices_dict["test"])
+            # Intersection of training and tests must be empty.
+            assert len(set(self.trainingIndices).intersection(set(self.testIndices))) == 0
         # Clear memory
         self.dictOfDatasets = None
         print("X")

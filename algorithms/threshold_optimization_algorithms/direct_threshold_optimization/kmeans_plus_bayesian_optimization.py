@@ -50,7 +50,7 @@ class KmeansPlusBayesianOptimization:
             session=sess,
             temperatures_dict=temperatures_dict,
             seed=seed,
-            threshold_kind="entropy",
+            threshold_kind="probability",
             mixing_lambda=mixing_lambda,
             run_id=run_id)
 

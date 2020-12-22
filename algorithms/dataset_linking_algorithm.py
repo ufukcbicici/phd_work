@@ -7,6 +7,7 @@ from algorithms.threshold_optimization_algorithms.threshold_optimization_helpers
     MultiIterationRoutingDataset
 from auxillary.db_logger import DbLogger
 from simple_tf.cign.fast_tree import FastTreeNetwork
+from collections import Counter
 
 network_id = 1892
 network_name = "USPS_CIGN"
@@ -24,29 +25,23 @@ class DatasetLinkingAlgorithm:
         pass
 
     @staticmethod
-    def run():
-        data_dict = {}
-        # Load all the data
-        for iteration in iterations:
-            network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-            routing_data = network.load_routing_info(run_id=network_id, iteration=iteration, data_type="test",
-                                                     output_names=output_names)
-            data_dict[iteration] = routing_data
+    def link_datasets_by_closeness(data_dict, outputs, iteration_list):
         data_length_set = set([data.labelList.shape[0] for data in data_dict.values()])
         assert len(data_length_set) == 1
         sample_count = list(data_length_set)[0]
         # Link all samples among all iterations
+        sample_mappings = []
         for sample_id in range(sample_count):
-            sample_id_in_iterations = {iterations[0]: sample_id}
+            sample_id_in_iterations = {iteration_list[0]: sample_id}
             print("*************Sample ID:{0}*************".format(sample_id_in_iterations))
-            for idx, iteration in enumerate(iterations):
+            for idx, iteration in enumerate(iteration_list):
                 print("*************Iteration:{0}*************".format(iteration))
                 sample_id_in_curr_iteration = sample_id_in_iterations[iteration]
-                if iteration == iterations[-1]:
+                if iteration == iteration_list[-1]:
                     break
-                curr_iteration_data = data_dict[iterations[idx]]
-                next_iteration_data = data_dict[iterations[idx + 1]]
-                for feature_name in used_output_names:
+                curr_iteration_data = data_dict[iteration_list[idx]]
+                next_iteration_data = data_dict[iteration_list[idx + 1]]
+                for feature_name in outputs:
                     curr_iteration_feature_dict = curr_iteration_data.get_dict(feature_name)
                     next_iteration_feature_dict = next_iteration_data.get_dict(feature_name)
                     assert set(curr_iteration_feature_dict.keys()) == set(next_iteration_feature_dict.keys())
@@ -64,15 +59,15 @@ class DatasetLinkingAlgorithm:
                         arg_sort_indices = np.argsort(squared_distances)
                         assert squared_distances[arg_sort_indices[0]] < squared_distances[arg_sort_indices[1]]
                         print("SampleId:{0} CurrIteration:{1} NextIteration:{2} FeatureName:{3} NodeId:{4}".format(
-                            sample_id, iterations[idx], iterations[idx + 1], feature_name, node_id))
+                            sample_id, iteration_list[idx], iteration_list[idx + 1], feature_name, node_id))
                         print("arg_sort_indices[0:10]:{0}".format(arg_sort_indices[0:10]))
                         print("squared_distances[arg_sort_indices[0:10]]:{0}".format(
                             squared_distances[arg_sort_indices[0:10]]))
                         sample_id_in_next_iteration = np.asscalar(arg_sort_indices[0])
-                        if iterations[idx + 1] not in sample_id_in_iterations:
-                            sample_id_in_iterations[iterations[idx + 1]] = sample_id_in_next_iteration
+                        if iteration_list[idx + 1] not in sample_id_in_iterations:
+                            sample_id_in_iterations[iteration_list[idx + 1]] = sample_id_in_next_iteration
                         else:
-                            assert sample_id_in_iterations[iterations[idx + 1]] == sample_id_in_next_iteration
+                            assert sample_id_in_iterations[iteration_list[idx + 1]] == sample_id_in_next_iteration
                         x_next = X_next[sample_id_in_next_iteration]
                         assert np.allclose(np.sum(np.square(x_next - x_curr)),
                                            squared_distances[sample_id_in_next_iteration])
@@ -80,7 +75,27 @@ class DatasetLinkingAlgorithm:
             label_set_for_all_iterations = set([data_dict[iteration].labelList[sample_id_in_iterations[iteration]]
                                                 for iteration in data_dict.keys()])
             assert len(label_set_for_all_iterations) == 1
-            db_rows = []
+            sample_mappings.append(sample_id_in_iterations)
+        return sample_mappings
+
+    @staticmethod
+    def run():
+        data_dict = {}
+        # Load all the data
+        for iteration in iterations:
+            network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
+            routing_data = network.load_routing_info(run_id=network_id, iteration=iteration, data_type="test",
+                                                     output_names=output_names)
+            data_dict[iteration] = routing_data
+        data_length_set = set([data.labelList.shape[0] for data in data_dict.values()])
+        assert len(data_length_set) == 1
+        sample_mappings = DatasetLinkingAlgorithm.link_datasets_by_closeness(data_dict=data_dict,
+                                                                             outputs=used_output_names,
+                                                                             iteration_list=iterations)
+
+        db_rows = []
+        for sample_id_in_iterations in sample_mappings:
+            sample_id = sample_id_in_iterations[iterations[0]]
             for iteration in iterations:
                 sample_id_in_curr_iteration = sample_id_in_iterations[iteration]
                 for feature_name in used_output_names:
@@ -88,6 +103,7 @@ class DatasetLinkingAlgorithm:
                         db_rows.append((network_name, network_id, iteration, feature_name, node_id, sample_id,
                                         sample_id_in_curr_iteration))
             DbLogger.write_into_table(rows=db_rows, table="dataset_link", col_count=7)
+            db_rows = []
 
     @staticmethod
     def link_dataset():
@@ -257,6 +273,50 @@ class DatasetLinkingAlgorithm:
             dict_of_routing_datasets=routing_data_dict, sample_linkage_info=db_mappings,
             test_iterations=test_iterations_)
         return multipath_routing_dataset
+
+    @staticmethod
+    def align_datasets(list_of_datasets, link_node_index, link_feature, single_data_set_length):
+        dicts_of_arrays = []
+        # Reverse index of features
+        for dataset in list_of_datasets:
+            features = dataset.get_dict(link_feature)[link_node_index]
+            dataset_reverse_index = {}
+            feature_sums_as_hash_values = np.sum(features, axis=1)
+            for idx in range(feature_sums_as_hash_values.shape[0]):
+                feature_hash = feature_sums_as_hash_values[idx]
+                if feature_hash not in dataset_reverse_index:
+                    dataset_reverse_index[feature_hash] = []
+                dataset_reverse_index[feature_hash].append(idx)
+            assert len(dataset_reverse_index) == single_data_set_length
+            set_of_occurences = set([len(arr) for arr in dataset_reverse_index.values()])
+            assert len(set_of_occurences) == 1
+            dicts_of_arrays.append(dataset_reverse_index)
+        print("X")
+        # Align all other datasets according to the first one. This means i.th feature in the arrays of the first
+        # dataset corresponds to the i.th feature to all other arrays of the datasets.
+        for d_id in range(1, len(list_of_datasets), 1):
+            reference_index = dicts_of_arrays[0]
+            other_index = dicts_of_arrays[d_id]
+            features = list_of_datasets[0].get_dict(link_feature)[link_node_index]
+            feature_sums_as_hash_values = np.sum(features, axis=1)
+            reloc_indices = []
+            for s_id in range(feature_sums_as_hash_values.shape[0]):
+                hash_code = feature_sums_as_hash_values[s_id]
+                iteration_index = s_id // single_data_set_length
+                reloc_indices.append(other_index[hash_code][iteration_index])
+            counter = Counter(reloc_indices)
+            assert len(counter) == feature_sums_as_hash_values.shape[0]
+            # Realign the other dataset
+            reloc_indices = np.array(reloc_indices)
+            other_dataset = list_of_datasets[d_id]
+            other_dataset.labelList = other_dataset.labelList[reloc_indices]
+            other_dataset.linkageInfo = list_of_datasets[0].linkageInfo
+            for feature_name in other_dataset.dictionaryOfRoutingData.keys():
+                if "Cost" in feature_name or "cost" in feature_name:
+                    continue
+                feature_dict = other_dataset.dictionaryOfRoutingData[feature_name]
+                for node_id in feature_dict.keys():
+                    other_dataset.dictionaryOfRoutingData[feature_name][node_id] = feature_dict[node_id][reloc_indices]
 
 
 def main():
