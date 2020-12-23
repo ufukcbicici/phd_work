@@ -74,6 +74,7 @@ def train_direct_threshold_optimizer():
 def train_ensemble_threshold_optimizer():
     # USPS
     network_ids = [1700, 1892]
+    run_id = 17001892
     network_name = "USPS_CIGN"
     iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
                          11741, 11800])
@@ -110,14 +111,14 @@ def train_ensemble_threshold_optimizer():
         for idx in range(len(list_of_routing_data) - 1):
             list_of_routing_data[idx + 1].trainingIndices = list_of_routing_data[0].trainingIndices
             list_of_routing_data[idx + 1].testIndices = list_of_routing_data[0].testIndices
-        KmeansPlusBayesianOptimization.optimize(cluster_count=1,
-                                                network=network,
-                                                routing_data=routing_data,
-                                                mixing_lambda=mixing_lambda,
-                                                seed=seed,
-                                                run_id=network_id,
-                                                iteration=0,
-                                                xi=xi)
+        KmeansPlusBayesianOptimization.optimize_ensemble(
+            list_of_networks=list_of_networks,
+            list_of_routing_data=list_of_routing_data,
+            mixing_lambda=mixing_lambda,
+            xi=xi,
+            seed=seed,
+            run_id=run_id,
+            iteration=0)
         tf.reset_default_graph()
 
         print("X")
