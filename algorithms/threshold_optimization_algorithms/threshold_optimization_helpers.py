@@ -149,6 +149,7 @@ class MultiIterationRoutingDataset(RoutingDataset):
         self.testIterations = test_iterations
         self.trainingIndices = None
         self.testIndices = None
+        self.singleDatasetSize = self.dictOfDatasets[self.iterations[0]].labelList.shape[0]
         super().__init__(self.dictOfDatasets[self.iterations[0]].labelList,
                          self.dictOfDatasets[self.iterations[0]].dictionaryOfRoutingData)
 
@@ -189,16 +190,13 @@ class MultiIterationRoutingDataset(RoutingDataset):
         # Update the training and test indices
         if self.trainingIndices is not None and self.testIndices is not None:
             assert len(size_set) == 1
-            data_batch_size = list(size_set)[0]
-            its_dict = {"training": self.trainingIterations, "test": self.testIterations}
             indices_dict = {"training": self.trainingIndices, "test": self.testIndices}
-            new_indices_dict = {"training": [], "test": []}
+            its_dict = {"training": self.trainingIterations, "test": self.testIterations}
+            new_indices_dict = {}
             for data_type in ["training", "test"]:
-                tpls = UtilityFuncs.get_cartesian_product(list_of_lists=[indices_dict[data_type], its_dict[data_type]])
-                for s_id, it in tpls:
-                    sample_id_in_iteration = self.linkageInfo[(s_id, it)]
-                    new_index = (self.iterations.index(it) * data_batch_size) + sample_id_in_iteration
-                    new_indices_dict[data_type].append(new_index)
+                new_indices_dict[data_type] = \
+                    self.calculate_indices_for_multi_iterations(indices=indices_dict[data_type],
+                                                                iterations=its_dict[data_type])
             self.trainingIndices = np.array(new_indices_dict["training"])
             self.testIndices = np.array(new_indices_dict["test"])
             # Intersection of training and tests must be empty.
@@ -210,9 +208,27 @@ class MultiIterationRoutingDataset(RoutingDataset):
     def split_dataset_with_indices(self, training_indices, test_indices):
         pass
 
+    def calculate_indices_for_multi_iterations(self, indices, iterations):
+        new_indices_list = []
+        tpls = UtilityFuncs.get_cartesian_product(list_of_lists=[indices, iterations])
+        for s_id, it in tpls:
+            sample_id_in_iteration = self.linkageInfo[(s_id, it)]
+            new_index = (self.iterations.index(it) * self.singleDatasetSize) + sample_id_in_iteration
+            new_indices_list.append(new_index)
+        return new_indices_list
+
     def apply_validation_test_split(self, test_ratio):
-        indices = np.array(range(int(self.labelList.shape[0])))
-        self.trainingIndices, self.testIndices = train_test_split(indices, test_size=test_ratio)
+        indices = np.array(range(self.singleDatasetSize))
+        training_indices_single, test_indices_single = train_test_split(indices, test_size=test_ratio)
+        indices_dict = {"training": training_indices_single, "test": test_indices_single}
+        its_dict = {"training": self.trainingIterations, "test": self.testIterations}
+        new_indices_dict = {}
+        for data_type in ["training", "test"]:
+            new_indices_dict[data_type] = \
+                self.calculate_indices_for_multi_iterations(indices=indices_dict[data_type],
+                                                            iterations=its_dict[data_type])
+        self.trainingIndices = new_indices_dict["training"]
+        self.testIndices = new_indices_dict["test"]
 
     def get_dict_of_iteration(self, output_name, iteration):
         if output_name not in self.dictOfDatasets[iteration].dictionaryOfRoutingData:

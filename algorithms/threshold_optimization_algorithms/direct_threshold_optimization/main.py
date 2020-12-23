@@ -83,20 +83,21 @@ def train_ensemble_threshold_optimizer():
 
     list_of_networks = []
     list_of_routing_data = []
-    single_dataset_length = 0
     for network_id in network_ids:
         network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
         routing_data = DatasetLinkingAlgorithm.link_dataset_v3(network_name_=network_name, run_id_=network_id,
                                                                degree_list_=[2, 2],
                                                                test_iterations_=iterations)
-        single_dataset_length = routing_data.labelList.shape[0]
         routing_data.switch_to_single_iteration_mode()
         list_of_networks.append(network)
         list_of_routing_data.append(routing_data)
     DatasetLinkingAlgorithm.align_datasets(list_of_datasets=list_of_routing_data,
                                            link_node_index=0,
-                                           link_feature="original_samples",
-                                           single_data_set_length=single_dataset_length)
+                                           link_feature="original_samples")
+    list_of_routing_data[0].apply_validation_test_split(test_ratio=0.5)
+    for idx in range(len(list_of_routing_data) - 1):
+        list_of_routing_data[idx + 1].trainingIndices = list_of_routing_data[0].trainingIndices
+        list_of_routing_data[idx + 1].testIndices = list_of_routing_data[0].testIndices
 
     param_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=[lambdas, xis, list_of_seeds])
     assert all([np.array_equal(

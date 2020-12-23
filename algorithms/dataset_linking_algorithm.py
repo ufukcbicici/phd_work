@@ -275,7 +275,8 @@ class DatasetLinkingAlgorithm:
         return multipath_routing_dataset
 
     @staticmethod
-    def align_datasets(list_of_datasets, link_node_index, link_feature, single_data_set_length):
+    def align_datasets(list_of_datasets, link_node_index, link_feature):
+        assert len(set([dataset.singleDatasetSize for dataset in list_of_datasets])) == 1
         dicts_of_arrays = []
         # Reverse index of features
         for dataset in list_of_datasets:
@@ -287,7 +288,7 @@ class DatasetLinkingAlgorithm:
                 if feature_hash not in dataset_reverse_index:
                     dataset_reverse_index[feature_hash] = []
                 dataset_reverse_index[feature_hash].append(idx)
-            assert len(dataset_reverse_index) == single_data_set_length
+            assert len(dataset_reverse_index) == dataset.singleDatasetSize
             set_of_occurences = set([len(arr) for arr in dataset_reverse_index.values()])
             assert len(set_of_occurences) == 1
             dicts_of_arrays.append(dataset_reverse_index)
@@ -295,14 +296,14 @@ class DatasetLinkingAlgorithm:
         # Align all other datasets according to the first one. This means i.th feature in the arrays of the first
         # dataset corresponds to the i.th feature to all other arrays of the datasets.
         for d_id in range(1, len(list_of_datasets), 1):
-            reference_index = dicts_of_arrays[0]
+            reference_dataset = list_of_datasets[0]
             other_index = dicts_of_arrays[d_id]
-            features = list_of_datasets[0].get_dict(link_feature)[link_node_index]
+            features = reference_dataset.get_dict(link_feature)[link_node_index]
             feature_sums_as_hash_values = np.sum(features, axis=1)
             reloc_indices = []
             for s_id in range(feature_sums_as_hash_values.shape[0]):
                 hash_code = feature_sums_as_hash_values[s_id]
-                iteration_index = s_id // single_data_set_length
+                iteration_index = s_id // int(reference_dataset.singleDatasetSize)
                 reloc_indices.append(other_index[hash_code][iteration_index])
             counter = Counter(reloc_indices)
             assert len(counter) == feature_sums_as_hash_values.shape[0]
@@ -310,7 +311,7 @@ class DatasetLinkingAlgorithm:
             reloc_indices = np.array(reloc_indices)
             other_dataset = list_of_datasets[d_id]
             other_dataset.labelList = other_dataset.labelList[reloc_indices]
-            other_dataset.linkageInfo = list_of_datasets[0].linkageInfo
+            other_dataset.linkageInfo = reference_dataset.linkageInfo
             for feature_name in other_dataset.dictionaryOfRoutingData.keys():
                 if "Cost" in feature_name or "cost" in feature_name:
                     continue
