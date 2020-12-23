@@ -148,7 +148,8 @@ class BayesianThresholdOptimizer:
                         "f1_macro": f1_macro,
                         "f1_micro": f1_micro,
                         "posteriors": posteriors,
-                        "final_posteriors": final_posteriors}
+                        "final_posteriors": final_posteriors,
+                        "gt_labels": gt_labels}
         return results_dict
 
     def get_thresholding_results_for_args(self, kwargs):
@@ -167,12 +168,14 @@ class BayesianThresholdOptimizer:
                 temperatures_dict=self.temperaturesDict,
                 mixing_lambda=self.mixingLambda)
             results_dict[data_type] = results
-        print("Train Accuracy: {0} Train Computation Load:{1} Train Score:{2}".format(
+        print("Train Accuracy:{0} Train Computation Load:{1} Train Score:{2}".format(
             results_dict["train"]["final_accuracy"],
-            results_dict["train"]["final_activation_cost"], results_dict["train"]["final_score"]))
-        print("Test Accuracy: {0} Test Computation Load:{1} Test Score:{2}".format(
+            results_dict["train"]["final_activation_cost"],
+            results_dict["train"]["final_score"]))
+        print("Test Accuracy:{0} Test Computation Load:{1} Test Score:{2}".format(
             results_dict["test"]["final_accuracy"],
-            results_dict["test"]["final_activation_cost"], results_dict["test"]["final_score"]))
+            results_dict["test"]["final_activation_cost"],
+            results_dict["test"]["final_score"]))
         return results_dict
 
     def loss_function(self, **kwargs):
@@ -204,16 +207,7 @@ class BayesianThresholdOptimizer:
                             "Bayesian Optimization", xi, timestamp))
         DbLogger.write_into_table(rows=db_rows, table=DbLogger.threshold_optimization, col_count=-1)
 
-    def optimize(self,
-                 init_points,
-                 n_iter,
-                 xi,
-                 weight_bound_min,
-                 weight_bound_max,
-                 use_these_thresholds=None,
-                 use_these_weights=None):
-        timestamp = UtilityFuncs.get_timestamp()
-        self.listOfResults = []
+    def calculate_ig_accuracies(self):
         train_indices = self.routingData.trainingIndices
         test_indices = self.routingData.testIndices
         self.fixedWeights = None
@@ -227,6 +221,20 @@ class BayesianThresholdOptimizer:
                                                                               indices=test_indices)
         print("train_ig_accuracy={0}".format(train_ig_accuracy))
         print("test_ig_accuracy={0}".format(test_ig_accuracy))
+
+    def optimize(self,
+                 init_points,
+                 n_iter,
+                 xi,
+                 weight_bound_min,
+                 weight_bound_max,
+                 use_these_thresholds=None,
+                 use_these_weights=None):
+        timestamp = UtilityFuncs.get_timestamp()
+        self.fixedWeights = None
+        self.fixedThresholds = None
+        self.listOfResults = []
+        self.calculate_ig_accuracies()
         sess = tf.Session()
         sess.run(tf.global_variables_initializer())
         # Three modes:

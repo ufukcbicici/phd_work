@@ -83,6 +83,7 @@ def train_ensemble_threshold_optimizer():
 
     list_of_networks = []
     list_of_routing_data = []
+    # Prepare the data
     for network_id in network_ids:
         network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
         routing_data = DatasetLinkingAlgorithm.link_dataset_v3(network_name_=network_name, run_id_=network_id,
@@ -104,12 +105,12 @@ def train_ensemble_threshold_optimizer():
         list_of_routing_data[idx].dictionaryOfRoutingData["original_samples"][0],
         list_of_routing_data[idx + 1].dictionaryOfRoutingData["original_samples"][0])
                 for idx in range(len(list_of_routing_data) - 1)])
+    # Bayesian Optimization of the ensemble
     for param_tpl in param_tuples:
         mixing_lambda = param_tpl[0]
         xi = param_tpl[1]
         seed = param_tpl[2]
         np.random.seed(seed)
-
         print("X")
 
 
