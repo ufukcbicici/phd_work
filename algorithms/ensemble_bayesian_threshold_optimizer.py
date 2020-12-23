@@ -203,95 +203,14 @@ class EnsembleBayesianThresholdOptimizer(BayesianThresholdOptimizer):
     def calculate_ig_accuracies(self):
         train_indices = self.routingData.trainingIndices
         test_indices = self.routingData.testIndices
-        self.fixedWeights = None
-        self.fixedThresholds = None
         # Learn the standard information gain based accuracies
-        train_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=self.network,
-                                                                               routing_data=self.routingData,
-                                                                               indices=train_indices)
-        test_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=self.network,
-                                                                              routing_data=self.routingData,
-                                                                              indices=test_indices)
+        train_ig_accuracy = InformationGainRoutingAccuracyCalculator.\
+            calculate_for_ensembles(list_of_networks=self.listOfNetworks,
+                                    list_of_routing_data=self.listOfRoutingData,
+                                    indices=train_indices)
+        test_ig_accuracy = InformationGainRoutingAccuracyCalculator.\
+            calculate_for_ensembles(list_of_networks=self.listOfNetworks,
+                                    list_of_routing_data=self.listOfRoutingData,
+                                    indices=test_indices)
         print("train_ig_accuracy={0}".format(train_ig_accuracy))
         print("test_ig_accuracy={0}".format(test_ig_accuracy))
-
-    # def optimize(self,
-    #              init_points,
-    #              n_iter,
-    #              xi,
-    #              weight_bound_min,
-    #              weight_bound_max,
-    #              use_these_thresholds=None,
-    #              use_these_weights=None):
-    #     timestamp = UtilityFuncs.get_timestamp()
-    #     for dataset in self.listOfRoutingData:
-
-
-
-
-
-
-
-
-
-
-
-
-
-        self.listOfResults = []
-        train_indices = self.routingData.trainingIndices
-        test_indices = self.routingData.testIndices
-        self.fixedWeights = None
-        self.fixedThresholds = None
-        # Learn the standard information gain based accuracies
-        train_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=self.network,
-                                                                               routing_data=self.routingData,
-                                                                               indices=train_indices)
-        test_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=self.network,
-                                                                              routing_data=self.routingData,
-                                                                              indices=test_indices)
-        print("train_ig_accuracy={0}".format(train_ig_accuracy))
-        print("test_ig_accuracy={0}".format(test_ig_accuracy))
-        sess = tf.Session()
-        sess.run(tf.global_variables_initializer())
-        # Three modes:
-        # 1-Routing Weights fixed, Thresholds are optimized
-        # 2-Routing Weights are optimized, Thresholds are fixed
-        # 3-Routing Weights and Thresholds are optimized
-
-        threshold_bounds = self.calculate_threshold_bounds()
-        weight_bounds = self.calculate_weight_bounds(min_boundary=weight_bound_min, max_boundary=weight_bound_max)
-        all_bounds = {}
-        # Optimize both
-        if use_these_thresholds is None and use_these_weights is None:
-            assert weight_bound_min is not None and weight_bound_max is not None
-            all_bounds.update(threshold_bounds)
-            all_bounds.update(weight_bounds)
-        # Weights fixed; optimize thresholds
-        elif use_these_thresholds is None and use_these_weights is not None:
-            all_bounds.update(threshold_bounds)
-            self.fixedWeights = use_these_weights
-        # Thresholds fixed; optimize weights
-        elif use_these_thresholds is not None and use_these_weights is None:
-            all_bounds.update(weight_bounds)
-            self.fixedThresholds = use_these_thresholds
-        # Else; if both a threshold and weight array has been provided; don't optimize; just return the result.
-        else:
-            self.fixedThresholds = use_these_thresholds
-            self.fixedWeights = use_these_weights
-            results = self.get_thresholding_results_for_args({})
-            return results
-
-        # Actual optimization part
-        optimizer = BayesianOptimization(
-            f=self.loss_function,
-            pbounds=all_bounds,
-        )
-        optimizer.maximize(
-            init_points=init_points,
-            n_iter=n_iter,
-            acq="ei",
-            xi=xi
-        )
-        self.write_to_db(xi=xi, timestamp=timestamp)
-        print("X")

@@ -210,8 +210,6 @@ class BayesianThresholdOptimizer:
     def calculate_ig_accuracies(self):
         train_indices = self.routingData.trainingIndices
         test_indices = self.routingData.testIndices
-        self.fixedWeights = None
-        self.fixedThresholds = None
         # Learn the standard information gain based accuracies
         train_ig_accuracy = InformationGainRoutingAccuracyCalculator.calculate(network=self.network,
                                                                                routing_data=self.routingData,

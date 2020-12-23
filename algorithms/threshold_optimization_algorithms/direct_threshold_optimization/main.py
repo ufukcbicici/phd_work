@@ -95,11 +95,6 @@ def train_ensemble_threshold_optimizer():
     DatasetLinkingAlgorithm.align_datasets(list_of_datasets=list_of_routing_data,
                                            link_node_index=0,
                                            link_feature="original_samples")
-    list_of_routing_data[0].apply_validation_test_split(test_ratio=0.5)
-    for idx in range(len(list_of_routing_data) - 1):
-        list_of_routing_data[idx + 1].trainingIndices = list_of_routing_data[0].trainingIndices
-        list_of_routing_data[idx + 1].testIndices = list_of_routing_data[0].testIndices
-
     param_tuples = UtilityFuncs.get_cartesian_product(list_of_lists=[lambdas, xis, list_of_seeds])
     assert all([np.array_equal(
         list_of_routing_data[idx].dictionaryOfRoutingData["original_samples"][0],
@@ -111,6 +106,20 @@ def train_ensemble_threshold_optimizer():
         xi = param_tpl[1]
         seed = param_tpl[2]
         np.random.seed(seed)
+        list_of_routing_data[0].apply_validation_test_split(test_ratio=0.5)
+        for idx in range(len(list_of_routing_data) - 1):
+            list_of_routing_data[idx + 1].trainingIndices = list_of_routing_data[0].trainingIndices
+            list_of_routing_data[idx + 1].testIndices = list_of_routing_data[0].testIndices
+        KmeansPlusBayesianOptimization.optimize(cluster_count=1,
+                                                network=network,
+                                                routing_data=routing_data,
+                                                mixing_lambda=mixing_lambda,
+                                                seed=seed,
+                                                run_id=network_id,
+                                                iteration=0,
+                                                xi=xi)
+        tf.reset_default_graph()
+
         print("X")
 
 
