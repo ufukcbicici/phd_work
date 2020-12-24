@@ -145,6 +145,8 @@ class EnsembleBayesianThresholdOptimizer(BayesianThresholdOptimizer):
             results_dict = {}
             for data_type in ["train", "test"]:
                 results = self.get_thresholding_results(
+                    threshold_optimizer=self.thresholdOptimizers[network_id],
+                    routing_data=self.listOfRoutingData[network_id],
                     indices=sample_indices[data_type],
                     thresholds_dict=list_of_threshold_dicts[network_id],
                     routing_weights_array=list_of_weight_lists[network_id],
@@ -201,8 +203,8 @@ class EnsembleBayesianThresholdOptimizer(BayesianThresholdOptimizer):
         return ensemble_results_dict["train"]["final_score"]
 
     def calculate_ig_accuracies(self):
-        train_indices = self.routingData.trainingIndices
-        test_indices = self.routingData.testIndices
+        train_indices = self.listOfRoutingData[0].trainingIndices
+        test_indices = self.listOfRoutingData[0].testIndices
         # Learn the standard information gain based accuracies
         train_ig_accuracy = InformationGainRoutingAccuracyCalculator.\
             calculate_for_ensembles(list_of_networks=self.listOfNetworks,

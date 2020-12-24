@@ -227,8 +227,8 @@ class MultiIterationRoutingDataset(RoutingDataset):
             new_indices_dict[data_type] = \
                 self.calculate_indices_for_multi_iterations(indices=indices_dict[data_type],
                                                             iterations=its_dict[data_type])
-        self.trainingIndices = new_indices_dict["training"]
-        self.testIndices = new_indices_dict["test"]
+        self.trainingIndices = np.array(new_indices_dict["training"])
+        self.testIndices = np.array(new_indices_dict["test"])
 
     def get_dict_of_iteration(self, output_name, iteration):
         if output_name not in self.dictOfDatasets[iteration].dictionaryOfRoutingData:

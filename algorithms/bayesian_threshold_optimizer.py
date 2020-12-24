@@ -105,6 +105,8 @@ class BayesianThresholdOptimizer:
         return weight_list
 
     def get_thresholding_results(self,
+                                 threshold_optimizer,
+                                 routing_data,
                                  indices,
                                  thresholds_dict,
                                  routing_weights_array,
@@ -113,9 +115,9 @@ class BayesianThresholdOptimizer:
         # Convert to probabilities
         weights_as_probabilities = np.exp(routing_weights_array) * np.reciprocal(np.sum(np.exp(routing_weights_array)))
         weights_array = np.repeat(weights_as_probabilities, repeats=indices.shape[0], axis=0)
-        optimizer_results = self.thresholdOptimizer.run_threshold_calculator(
+        optimizer_results = threshold_optimizer.run_threshold_calculator(
             sess=self.session,
-            routing_data=self.routingData,
+            routing_data=routing_data,
             indices=indices,
             mixing_lambda=mixing_lambda,
             temperatures_dict=temperatures_dict,
@@ -162,6 +164,8 @@ class BayesianThresholdOptimizer:
         results_dict = {}
         for data_type in ["train", "test"]:
             results = self.get_thresholding_results(
+                threshold_optimizer=self.thresholdOptimizer,
+                routing_data=self.routingData,
                 indices=sample_indices[data_type],
                 thresholds_dict=thresholds,
                 routing_weights_array=weights,
@@ -198,7 +202,7 @@ class BayesianThresholdOptimizer:
             test_f1_micro = result["test"]["f1_micro"]
             test_f1_macro = result["test"]["f1_macro"]
             db_rows.append((self.runId,
-                            self.network.networkName,
+                            "USPS",
                             -1,
                             self.mixingLambda,
                             0,

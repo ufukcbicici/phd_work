@@ -80,7 +80,7 @@ def train_ensemble_threshold_optimizer():
                          11741, 11800])
     lambdas = [1.0, 0.99, 0.95, 0.9]
     xis = [0.0, 0.001, 0.01]
-    list_of_seeds = np.random.uniform(low=1, high=100000, size=(200,)).astype(np.int32)
+    list_of_seeds = np.random.uniform(low=1, high=100000, size=(100,)).astype(np.int32)
 
     list_of_networks = []
     list_of_routing_data = []
