@@ -95,7 +95,7 @@ class GlobalConstants:
     IMAGE_SIZE = 28
     NUM_CHANNELS = 1
 
-    MODEL_SAVE_FOLDER = "saved_training_data"
+    MODEL_SAVE_FOLDER = "saved_training_data_3"
 
     USE_SAMPLING_CIGN = False
     USE_RANDOM_SAMPLING = False

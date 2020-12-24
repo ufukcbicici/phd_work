@@ -13,7 +13,7 @@ import simple_tf.cifar_nets.cifar_entry as cifar_entry
 
 import tensorflow as tf
 
-from algorithms import mode_class_visualization, routing_visualizer
+from algorithms import mode_class_visualization, routing_visualizer, dgx_file_movement_script
 from algorithms.threshold_optimization_algorithms import threshold_optimization_entry
 from algorithms.threshold_optimization_algorithms.policy_gradient_algorithms import policy_gradients_entry
 from simple_tf.cigj import cigj_full_training_entry, cigj_approx_training_entry
@@ -38,4 +38,5 @@ if __name__ == "__main__":
     # routing_visualizer.main()
     # policy_gradients_entry.main()
     # lenet_cign_entry.lenet_cign_training()
-    usps_entry.usps_cign_training()
+    # usps_entry.usps_cign_training()
+    dgx_file_movement_script.move_files()
