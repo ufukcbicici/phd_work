@@ -9,15 +9,21 @@ from auxillary.db_logger import DbLogger
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from collections import Counter
 
-network_id = 1892
-network_name = "USPS_CIGN"
 
-output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
-                "pre_branch_feature", "indices_tensor", "original_samples"]
-used_output_names = ["original_samples"]
-# iterations = sorted([43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000])
-iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
-                     11741, 11800])
+# network_id = 1892
+# list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054, 2036,
+#                        1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043, 2051,
+#                        1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947, 1693,
+#                        2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990, 1842,
+#                        2048]
+# network_name = "USPS_CIGN"
+
+# output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
+#                 "pre_branch_feature", "indices_tensor", "original_samples"]
+# used_output_names = ["original_samples"]
+# # iterations = sorted([43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000])
+# iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
+#                      11741, 11800])
 
 
 class DatasetLinkingAlgorithm:
@@ -79,7 +85,7 @@ class DatasetLinkingAlgorithm:
         return sample_mappings
 
     @staticmethod
-    def run():
+    def run(network_id, network_name, iterations, output_names, used_output_names):
         data_dict = {}
         # Load all the data
         for iteration in iterations:
@@ -106,7 +112,7 @@ class DatasetLinkingAlgorithm:
             db_rows = []
 
     @staticmethod
-    def link_dataset():
+    def link_dataset(network_id, network_name, iterations, output_names, used_output_names):
         data_dict = {}
         # Load all the data
         for iteration in iterations:
@@ -176,7 +182,7 @@ class DatasetLinkingAlgorithm:
         print("X")
 
     @staticmethod
-    def link_dataset_v2(network_name_, run_id_, degree_list_, feature_names_):
+    def link_dataset_v2(network_name_, run_id_, degree_list_, feature_names_, output_names):
         # Get iterations
         db_iteration_tuples = DbLogger.read_query(
             query="SELECT Iteration, COUNT(1) AS CNT FROM dataset_link "
@@ -247,7 +253,7 @@ class DatasetLinkingAlgorithm:
         return routing_dataset
 
     @staticmethod
-    def link_dataset_v3(network_name_, run_id_, degree_list_, test_iterations_):
+    def link_dataset_v3(network_name_, run_id_, degree_list_, test_iterations_, output_names):
         # Get iterations
         db_iteration_tuples = DbLogger.read_query(
             query="SELECT Iteration, COUNT(1) AS CNT FROM dataset_link "
@@ -323,9 +329,28 @@ class DatasetLinkingAlgorithm:
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
-    DatasetLinkingAlgorithm.run()
-    # DatasetLinkin90oıgAlgorithm.link_dataset_v3(network_name_="FashionNet_Lite", run_id_=453, degree_list_=[2, 2],
-    #                                         test_iterations_=[48000])
+
+    list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
+                           2036,
+                           1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
+                           2051,
+                           1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
+                           1693,
+                           2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
+                           1842,
+                           2048]
+    network_name = "USPS_CIGN"
+    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
+                    "pre_branch_feature", "indices_tensor", "original_samples"]
+    used_output_names = ["original_samples"]
+    # iterations = sorted([43680, 44160, 44640, 45120, 45600, 46080, 46560, 47040, 47520, 48000])
+    iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
+                         11741, 11800])
+    for network_id in list_of_network_ids:
+        DatasetLinkingAlgorithm.run(network_id=network_id,
+                                    network_name=network_name,
+                                    iterations=iterations, output_names=output_names,
+                                    used_output_names=used_output_names)
 
 
 if __name__ == "__main__":

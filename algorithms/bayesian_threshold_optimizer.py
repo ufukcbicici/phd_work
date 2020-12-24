@@ -191,17 +191,17 @@ class BayesianThresholdOptimizer:
         db_rows = []
         # result = (iteration_id, new_score, new_accuracy, new_computation_overload)
         for result in self.listOfResults:
-            val_score = result["train"]["final_score"]
-            val_accuracy = result["train"]["final_accuracy"]
-            val_overload = result["train"]["final_activation_cost"]
-            val_f1_micro = result["train"]["f1_micro"]
-            val_f1_macro = result["train"]["f1_macro"]
-            test_score = result["test"]["final_score"]
-            test_accuracy = result["test"]["final_accuracy"]
-            test_overload = result["test"]["final_activation_cost"]
-            test_f1_micro = result["test"]["f1_micro"]
-            test_f1_macro = result["test"]["f1_macro"]
-            db_rows.append((self.runId,
+            val_score = np.asscalar(result["train"]["final_score"])
+            val_accuracy = np.asscalar(result["train"]["final_accuracy"])
+            val_overload = np.asscalar(result["train"]["final_activation_cost"])
+            val_f1_micro = np.asscalar(result["train"]["f1_micro"])
+            val_f1_macro = np.asscalar(result["train"]["f1_macro"])
+            test_score = np.asscalar(result["test"]["final_score"])
+            test_accuracy = np.asscalar(result["test"]["final_accuracy"])
+            test_overload = np.asscalar(result["test"]["final_activation_cost"])
+            test_f1_micro = np.asscalar(result["test"]["f1_micro"])
+            test_f1_macro = np.asscalar(result["test"]["f1_macro"])
+            db_rows.append((str(self.runId),
                             "USPS",
                             -1,
                             self.mixingLambda,

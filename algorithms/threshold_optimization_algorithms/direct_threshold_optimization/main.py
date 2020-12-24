@@ -78,6 +78,8 @@ def train_ensemble_threshold_optimizer():
     network_name = "USPS_CIGN"
     iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
                          11741, 11800])
+    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
+                    "pre_branch_feature", "indices_tensor", "original_samples"]
     lambdas = [1.0, 0.99, 0.95, 0.9]
     xis = [0.0, 0.001, 0.01]
     list_of_seeds = np.random.uniform(low=1, high=100000, size=(100,)).astype(np.int32)
@@ -87,9 +89,11 @@ def train_ensemble_threshold_optimizer():
     # Prepare the data
     for network_id in network_ids:
         network = FastTreeNetwork.get_mock_tree(degree_list=[2, 2], network_name=network_name)
-        routing_data = DatasetLinkingAlgorithm.link_dataset_v3(network_name_=network_name, run_id_=network_id,
+        routing_data = DatasetLinkingAlgorithm.link_dataset_v3(network_name_=network_name,
+                                                               run_id_=network_id,
                                                                degree_list_=[2, 2],
-                                                               test_iterations_=iterations)
+                                                               test_iterations_=iterations,
+                                                               output_names=output_names)
         routing_data.switch_to_single_iteration_mode()
         list_of_networks.append(network)
         list_of_routing_data.append(routing_data)
