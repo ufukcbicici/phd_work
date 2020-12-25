@@ -216,3 +216,5 @@ class EnsembleBayesianThresholdOptimizer(BayesianThresholdOptimizer):
                                     indices=test_indices)
         print("train_ig_accuracy={0}".format(train_ig_accuracy))
         print("test_ig_accuracy={0}".format(test_ig_accuracy))
+        return train_ig_accuracy, test_ig_accuracy
+

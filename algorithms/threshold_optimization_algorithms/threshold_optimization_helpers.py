@@ -203,7 +203,6 @@ class MultiIterationRoutingDataset(RoutingDataset):
             assert len(set(self.trainingIndices).intersection(set(self.testIndices))) == 0
         # Clear memory
         self.dictOfDatasets = None
-        print("X")
 
     def split_dataset_with_indices(self, training_indices, test_indices):
         pass
