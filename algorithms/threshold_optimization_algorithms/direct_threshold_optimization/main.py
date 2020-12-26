@@ -233,12 +233,17 @@ def beam_search_ensembles(max_ensemble_size, beam_size):
 
     for ensemble_id in range(max_ensemble_size):
         results_dict = {}
+        processed_ensembles = set()
         for n_id in list_of_network_ids:
             for ensemble_members in selected_tuples.keys():
                 ensemble = list(ensemble_members)
                 ensemble.append(n_id)
                 if len(ensemble) > len(set(ensemble)):
                     continue
+                ensemble_set = frozenset(ensemble)
+                if ensemble_set in processed_ensembles:
+                    continue
+                processed_ensembles.add(ensemble_set)
                 ensemble_networks = [dict_of_networks[e_id] for e_id in ensemble]
                 ensemble_data = [dict_of_data[e_id] for e_id in ensemble]
                 indices = np.arange(dict_of_data[ensemble[0]].labelList.shape[0])
@@ -248,7 +253,7 @@ def beam_search_ensembles(max_ensemble_size, beam_size):
                                             indices=indices)
                 results_dict[tuple(ensemble)] = accuracy
                 print("{0}={1}".format(ensemble, accuracy))
-                DbLogger.write_into_table(rows=[(run_id, 0, "{0}".format(tuple(ensemble)), run_id)],
+                DbLogger.write_into_table(rows=[(run_id, 0, "{0}".format(tuple(ensemble)), accuracy)],
                                           table=DbLogger.runKvStore, col_count=None)
         sorted_results = sorted([(k, v) for k, v in results_dict.items()], key=lambda tpl: tpl[1], reverse=True)
         beam_results = sorted_results[:beam_size]
@@ -263,7 +268,7 @@ def main():
     # train_direct_threshold_optimizer()
     # train_ensemble_threshold_optimizer()
     # pick_best_ensembles(ensemble_size=2)
-    beam_search_ensembles(max_ensemble_size=10, beam_size=10)
+    beam_search_ensembles(max_ensemble_size=10, beam_size=65)
 
 
 if __name__ == "__main__":
