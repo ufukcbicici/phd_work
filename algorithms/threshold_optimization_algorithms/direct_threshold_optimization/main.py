@@ -94,7 +94,7 @@ def prepare_ensemble_data(network_name, iterations, network_ids, output_names):
     assert all([np.array_equal(
         list_of_routing_data[idx].dictionaryOfRoutingData["original_samples"][0],
         list_of_routing_data[idx + 1].dictionaryOfRoutingData["original_samples"][0])
-                for idx in range(len(list_of_routing_data) - 1)])
+        for idx in range(len(list_of_routing_data) - 1)])
     return list_of_networks, list_of_routing_data
 
 
@@ -180,11 +180,11 @@ def pick_best_ensembles(ensemble_size):
         ids = tuple([data_tpl[0] for data_tpl in tpl])
         nets = [data_tpl[1] for data_tpl in tpl]
         datasets = [data_tpl[2] for data_tpl in tpl]
-        train_ig_accuracy = InformationGainRoutingAccuracyCalculator.\
+        train_ig_accuracy = InformationGainRoutingAccuracyCalculator. \
             calculate_for_ensembles(list_of_networks=nets,
                                     list_of_routing_data=datasets,
                                     indices=train_indices)
-        test_ig_accuracy = InformationGainRoutingAccuracyCalculator.\
+        test_ig_accuracy = InformationGainRoutingAccuracyCalculator. \
             calculate_for_ensembles(list_of_networks=nets,
                                     list_of_routing_data=datasets,
                                     indices=test_indices)
@@ -199,12 +199,71 @@ def pick_best_ensembles(ensemble_size):
     print("X")
 
 
+def beam_search_ensembles(max_ensemble_size, beam_size):
+    list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
+                           2036,
+                           1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
+                           2051,
+                           1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
+                           1693,
+                           2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
+                           1842,
+                           2048]
+    # list_of_network_ids = [1731, 1826, 2013, 1788, 1700]
+    network_name = "USPS_CIGN"
+    iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
+                         11741, 11800])
+    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
+                    "pre_branch_feature", "indices_tensor", "original_samples"]
+    list_of_networks, list_of_routing_data = prepare_ensemble_data(network_name=network_name,
+                                                                   iterations=iterations,
+                                                                   network_ids=list_of_network_ids,
+                                                                   output_names=output_names)
+    dict_of_networks = {n_id: net for n_id, net in zip(list_of_network_ids, list_of_networks)}
+    dict_of_data = {n_id: data for n_id, data in zip(list_of_network_ids, list_of_routing_data)}
+
+    selected_tuples = {(n_id,): InformationGainRoutingAccuracyCalculator.calculate_for_ensembles(
+            list_of_networks=[dict_of_networks[n_id]],
+            list_of_routing_data=[dict_of_data[n_id]],
+            indices=np.arange(dict_of_data[n_id].labelList.shape[0])) for n_id in list_of_network_ids}
+
+    run_id = DbLogger.get_run_id()
+    DbLogger.write_into_table(rows=[(run_id, "Ensemble Beam Search - Ensemble Count:{0}".format(run_id))],
+                              table=DbLogger.runMetaData, col_count=None)
+
+    for ensemble_id in range(max_ensemble_size):
+        results_dict = {}
+        for n_id in list_of_network_ids:
+            for ensemble_members in selected_tuples.keys():
+                ensemble = list(ensemble_members)
+                ensemble.append(n_id)
+                if len(ensemble) > len(set(ensemble)):
+                    continue
+                ensemble_networks = [dict_of_networks[e_id] for e_id in ensemble]
+                ensemble_data = [dict_of_data[e_id] for e_id in ensemble]
+                indices = np.arange(dict_of_data[ensemble[0]].labelList.shape[0])
+                accuracy = InformationGainRoutingAccuracyCalculator. \
+                    calculate_for_ensembles(list_of_networks=ensemble_networks,
+                                            list_of_routing_data=ensemble_data,
+                                            indices=indices)
+                results_dict[tuple(ensemble)] = accuracy
+                print("{0}={1}".format(ensemble, accuracy))
+                DbLogger.write_into_table(rows=[(run_id, 0, "{0}".format(tuple(ensemble)), run_id)],
+                                          table=DbLogger.runKvStore, col_count=None)
+        sorted_results = sorted([(k, v) for k, v in results_dict.items()], key=lambda tpl: tpl[1], reverse=True)
+        beam_results = sorted_results[:beam_size]
+        selected_tuples = {tpl[0]: tpl[1] for tpl in beam_results}
+    print("Selected Ensembles:{0}".format(selected_tuples))
+    print("X")
+
+
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
     # train_direct_threshold_optimizer()
     # train_ensemble_threshold_optimizer()
-    pick_best_ensembles(ensemble_size=2)
+    # pick_best_ensembles(ensemble_size=2)
+    beam_search_ensembles(max_ensemble_size=10, beam_size=10)
 
 
 if __name__ == "__main__":

@@ -38,5 +38,5 @@ if __name__ == "__main__":
     # routing_visualizer.main()
     # policy_gradients_entry.main()
     # lenet_cign_entry.lenet_cign_training()
-    # usps_entry.usps_cign_training()
-    dgx_file_movement_script.move_files()
+    usps_entry.usps_cign_training()
+    # dgx_file_movement_script.move_files()

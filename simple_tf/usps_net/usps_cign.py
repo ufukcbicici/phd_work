@@ -11,7 +11,7 @@ from simple_tf.usps_net.usps_baseline import UspsBaseline
 
 class UspsCIGN(FastTreeNetwork):
     FC_LAYERS = [64, 32, 16]
-    DECISION_DIMS = [4, 4, 4]
+    DECISION_DIMS = [8, 8, 8]
     SOFTMAX_DECAY_INITIAL = 10.0
     SOFTMAX_DECAY_PERIOD = 1000
     THRESHOLD_LOWER_LIMIT = 0.4
@@ -61,7 +61,7 @@ class UspsCIGN(FastTreeNetwork):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "USPS - CIGN - Light Weight\n"
+        explanation = "USPS - CIGN - Bootstrap\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)

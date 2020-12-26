@@ -38,13 +38,13 @@ def train_func(**kwargs):
     dataset = UspsDataset(validation_sample_count=0)
     # Arriving from the Bayesian Optimization Step
     classification_wd = kwargs["classification_wd"]
-    decision_wd = 0.0
-    info_gain_balance_coefficient = 1.0  # kwargs["info_gain_balance_coefficient"]
     GlobalConstants.INITIAL_LR = kwargs["initial_lr"]
     UspsCIGN.SOFTMAX_DECAY_INITIAL = kwargs["softmax_decay_initial"]
     UspsCIGN.SOFTMAX_DECAY_PERIOD = int(kwargs["softmax_decay_period"])
     UspsCIGN.THRESHOLD_LOWER_LIMIT = kwargs["threshold_lower_limit"]
     UspsCIGN.THRESHOLD_PERIOD = int(kwargs["threshold_period"])
+    decision_wd = 0.0
+    info_gain_balance_coefficient = 1.0  # kwargs["info_gain_balance_coefficient"]
 
     # classification_wd = [i * 0.00005 for i in range(0, 21)]
     # decision_wd = [0.0]
