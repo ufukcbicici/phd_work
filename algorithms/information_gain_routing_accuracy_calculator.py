@@ -45,7 +45,7 @@ class InformationGainRoutingAccuracyCalculator:
     def calculate(network, routing_data, indices):
         selected_posteriors = InformationGainRoutingAccuracyCalculator.\
             get_ig_posteriors(network=network, routing_data=routing_data, indices=indices)
-        true_labels = routing_data.labelsList[indices]
+        true_labels = routing_data.labelList[indices]
         predicted_labels = np.argmax(selected_posteriors, axis=1)
         correct_count = np.sum((predicted_labels == true_labels).astype(np.float32))
         accuracy = correct_count / true_labels.shape[0]

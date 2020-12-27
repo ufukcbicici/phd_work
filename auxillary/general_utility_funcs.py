@@ -5,6 +5,7 @@ from os import listdir
 from os.path import isfile, join
 import itertools
 from datetime import datetime
+import pickle
 
 from auxillary.parameters import DecayingParameter, FixedParameter
 from simple_tf.global_params import GlobalConstants
@@ -336,3 +337,16 @@ class UtilityFuncs:
         argmax_weights = np.zeros_like(weight_matrix)
         argmax_weights[np.arange(weight_matrix.shape[0]), argmax_clusters] = 1.0
         return argmax_weights
+
+    @staticmethod
+    def pickle_save_to_file(path, file_content):
+        f = open(path, "wb")
+        pickle.dump(file_content, f)
+        f.close()
+
+    @staticmethod
+    def pickle_load_from_file(path):
+        f = open(path, "rb")
+        content = pickle.load(f)
+        f.close()
+        return content

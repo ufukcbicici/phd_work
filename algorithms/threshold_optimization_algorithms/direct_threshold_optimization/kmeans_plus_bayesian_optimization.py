@@ -51,7 +51,7 @@ class KmeansPlusBayesianOptimization:
             session=sess,
             temperatures_dict=temperatures_dict,
             seed=seed,
-            threshold_kind="probability",
+            threshold_kind="entropy",
             mixing_lambda=mixing_lambda,
             run_id=run_id)
 
@@ -73,8 +73,8 @@ class KmeansPlusBayesianOptimization:
         #                                                           weight_bound_max=2.0,
         #                                                           use_these_thresholds=good_thresholds,
         #                                                           use_these_weights=None)
-        thrs_optimization_result = bayesian_optimizer.optimize(init_points=50,
-                                                               n_iter=100,
+        thrs_optimization_result = bayesian_optimizer.optimize(init_points=10,
+                                                               n_iter=5,
                                                                xi=xi,
                                                                weight_bound_min=-2.0,
                                                                weight_bound_max=2.0,
@@ -89,7 +89,7 @@ class KmeansPlusBayesianOptimization:
         #                                                            weight_bound_max=2.0,
         #                                                            use_these_thresholds=None,
         #                                                            use_these_weights=None)
-        print("X")
+        return thrs_optimization_result
 
     @staticmethod
     def optimize_ensemble(list_of_networks, list_of_routing_data, mixing_lambda, xi, seed, run_id, iteration):

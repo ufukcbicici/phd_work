@@ -182,6 +182,20 @@ class BayesianThresholdOptimizer:
             results_dict["test"]["final_score"]))
         return results_dict
 
+    def get_thresholding_results_for_args_and_indices(self, kwargs, indices):
+        # Convert Bayesian Optimization space sample into usable thresholds
+        thresholds = self.decode_threshold_parameters(kwargs) if self.fixedThresholds is None else self.fixedThresholds
+        weights = self.decode_weight_parameters(kwargs) if self.fixedWeights is None else self.fixedWeights
+        results = self.get_thresholding_results(
+            threshold_optimizer=self.thresholdOptimizer,
+            routing_data=self.routingData,
+            indices=indices,
+            thresholds_dict=thresholds,
+            routing_weights_array=weights,
+            temperatures_dict=self.temperaturesDict,
+            mixing_lambda=self.mixingLambda)
+        return results
+
     def loss_function(self, **kwargs):
         results_dict = self.get_thresholding_results_for_args(kwargs)
         self.listOfResults.append(results_dict)
@@ -278,5 +292,8 @@ class BayesianThresholdOptimizer:
             acq="ei",
             xi=xi
         )
+        best_params = optimizer.max["params"]
+        all_indices = np.arange(self.routingData.labelList.shape[0])
+        best_results = self.get_thresholding_results_for_args_and_indices(kwargs=best_params, indices=all_indices)
         self.write_to_db(xi=xi, timestamp=timestamp)
-        print("X")
+        return best_results
