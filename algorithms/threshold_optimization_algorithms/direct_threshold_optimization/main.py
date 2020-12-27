@@ -249,24 +249,8 @@ def beam_search_ensembles(max_ensemble_size, beam_size):
     print("X")
 
 
-def multi_bayesian_optimization(trial_count):
-    # list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
-    #                        2036,
-    #                        1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
-    #                        2051,
-    #                        1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
-    #                        1693,
-    #                        2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
-    #                        1842,
-    #                        2048]
-    list_of_network_ids = [1731, 1826, 2013, 1788, 1700]
-    network_name = "USPS_CIGN"
-    iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
-                         11741, 11800])
-    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
-                    "pre_branch_feature", "indices_tensor", "original_samples"]
-    lambdas = [1.0]
-    xis = [0.0]
+def multi_bayesian_optimization(network_name, trial_count, iterations,
+                                list_of_network_ids, output_names, lambdas, xis):
     list_of_networks, list_of_routing_data = prepare_ensemble_data(network_name=network_name,
                                                                    iterations=iterations,
                                                                    network_ids=list_of_network_ids,
@@ -313,12 +297,13 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
             bo_results_dict[network_id][threshold_id] = result_dict
     # Check if all ground truth labels are the same
     labels_arr = []
-    for dict_ in bo_results_dict.values():
-        labels_arr.append(dict_["gtLabels"])
+    for d1 in bo_results_dict.values():
+        for d2 in d1.values():
+            labels_arr.append(d2["gt_labels"])
     labels_matrix = np.stack(labels_arr, axis=-1)
-    equality_matrix = labels_matrix == labels_matrix[:, 0]
-    ground_truth_labels = labels_matrix[:, 0]
+    equality_matrix = labels_matrix == labels_matrix[:, 0][:, np.newaxis]
     assert np.all(equality_matrix)
+    ground_truth_labels = labels_matrix[:, 0]
     # Create ensembles out of all possible results
     used_combinations_set = set()
     for iteration_id in range(max_search_count):
@@ -348,13 +333,41 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
 
 
 def main():
+    # list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
+    #                        2036,
+    #                        1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
+    #                        2051,
+    #                        1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
+    #                        1693,
+    #                        2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
+    #                        1842,
+    #                        2048]
+    list_of_network_ids = [1731, 1826, 2013, 1788, 1700]
+    network_name = "USPS_CIGN"
+    iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
+                         11741, 11800])
+    output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
+                    "pre_branch_feature", "indices_tensor", "original_samples"]
+    lambdas = [1.0]
+    xis = [0.0]
+
     # compare_gpu_implementation()
     # train_basic_q_learning()
     # train_direct_threshold_optimizer()
     # train_ensemble_threshold_optimizer()
     # pick_best_ensembles(ensemble_size=2)
     # beam_search_ensembles(max_ensemble_size=10, beam_size=65)
-    multi_bayesian_optimization(trial_count=5)
+    # multi_bayesian_optimization(network_name=network_name,
+    #                             list_of_network_ids=list_of_network_ids,
+    #                             trial_count=5,
+    #                             iterations=iterations,
+    #                             lambdas=lambdas,
+    #                             xis=xis,
+    #                             output_names=output_names)
+    bayesian_ensembling(list_of_network_ids=list_of_network_ids,
+                        ensemble_size=2,
+                        max_search_count=100,
+                        single_search_size=1000)
 
 
 if __name__ == "__main__":
