@@ -282,7 +282,13 @@ def multi_bayesian_optimization(network_name, trial_count, iterations,
 
 
 def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, single_search_size):
+    run_id = DbLogger.get_run_id()
+    DbLogger.write_into_table(rows=[(run_id, "Best Ensemble Search After Bayesian Optimization:{0}".format(run_id))],
+                              table=DbLogger.runMetaData, col_count=None)
+    DbLogger.write_into_table(rows=[(run_id, 0, "Ensemble Count", ensemble_size)],
+                              table=DbLogger.runKvStore, col_count=None)
     # Read relevant Bayesian Optimization results
+
     save_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
                                     GlobalConstants.MODEL_SAVE_FOLDER)
     file_list = os.listdir(save_folder_path)
@@ -310,6 +316,7 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
         # Pick random networks (without replacement in every ensemble)
         # Pick a threshold for every network
         posteriors = []
+        activation_costs = []
         for idx in range(single_search_size):
             ensemble_ids = np.random.choice(list_of_network_ids, ensemble_size, False)
             threshold_ids = [np.random.choice(list(bo_results_dict[n_id].keys()), 1)[0] for n_id in ensemble_ids]
@@ -318,18 +325,36 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
             ensemble_code = tuple(ensemble_code.tolist())
             if ensemble_code in used_combinations_set:
                 continue
-            ensemble_posteriors = [bo_results_dict[ensemble_code[2 * j]][ensemble_code[2 * j + 1]]["finalPosteriors"]
-                                   for j in range(ensemble_size)]
+            ensemble_posteriors = []
+            ensemble_activation_costs = []
+            for j in range(ensemble_size):
+                n_id = ensemble_code[2 * j]
+                t_id = ensemble_code[2 * j + 1]
+                p_ = bo_results_dict[n_id][t_id]["final_posteriors"]
+                ensemble_posteriors.append(p_)
+                activation_cost = bo_results_dict[n_id][t_id]["final_activation_cost"]
+                ensemble_activation_costs.append(activation_cost)
             ensemble_posteriors = np.stack(ensemble_posteriors, axis=-1)
             posteriors.append(ensemble_posteriors)
+            ensemble_activation_costs = np.array(ensemble_activation_costs)
+            activation_costs.append(ensemble_activation_costs)
             used_combinations_set.add(ensemble_code)
         posteriors_tensor = np.stack(posteriors, axis=0)
         posteriors_averaged = np.mean(posteriors_tensor, axis=-1)
         predictions_matrix = np.argmax(posteriors_averaged, axis=-1)
-
-        # random_networks = np.stack(random_networks, axis=0)
-        # # Pick random thresholds
-        # for network_id
+        activation_costs_matrix = np.stack(activation_costs, axis=0)
+        activation_costs_averaged = np.mean(activation_costs_matrix, axis=-1)
+        # Do the accuracy calculation
+        comparison_matrix = predictions_matrix == ground_truth_labels[np.newaxis, :]
+        accuracies = np.mean(comparison_matrix, axis=-1)
+        best_accuracy_idx = np.argmax(accuracies)
+        best_accuracy = accuracies[best_accuracy_idx]
+        best_activation_cost = activation_costs_averaged[best_accuracy_idx]
+        DbLogger.write_into_table(rows=[(run_id, 0, "Best Accuracy", np.asscalar(best_accuracy))],
+                                  table=DbLogger.runKvStore, col_count=None)
+        DbLogger.write_into_table(rows=[(run_id, 0, "Best Activation Cost", np.asscalar(best_activation_cost))],
+                                  table=DbLogger.runKvStore, col_count=None)
+        print("X")
 
 
 def main():
