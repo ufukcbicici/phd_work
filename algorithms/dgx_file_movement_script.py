@@ -9,9 +9,9 @@ base_path = os.path.join("/cta", "users", "ucbicici", "phd_work")
 # base_path = os.path.join("D:/", "phd_work")
 results_file_path = os.path.join(base_path, "algorithms", "dgx_results.txt")
 curr_path = os.path.join(base_path, "algorithms")
-source_path = os.path.join(curr_path, "..", GlobalConstants.MODEL_SAVE_FOLDER)
+source_path = os.path.join(curr_path, "..", "saved_training_data_2")
 destination_path = os.path.join(curr_path, "..", "important_results")
-selected_files_count = 5
+selected_files_count = 50
 
 
 def move_files():
@@ -32,7 +32,7 @@ def move_files():
     folder_list = os.listdir(source_path)
     selected_folders = []
     for folder_name in folder_list:
-        includes = any(["_{0}_".format(id_) in folder_name for id_ in selected_ids])
+        includes = any(["_{0}_".format(id_) in folder_name and "test" in folder_name for id_ in selected_ids])
         if includes:
             selected_folders.append(folder_name)
             selected_folder_path = os.path.join(source_path, folder_name)

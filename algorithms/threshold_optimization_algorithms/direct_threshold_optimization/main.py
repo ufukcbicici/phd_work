@@ -9,6 +9,7 @@ from auxillary.general_utility_funcs import UtilityFuncs
 from simple_tf.cign.fast_tree import FastTreeNetwork
 from auxillary.db_logger import DbLogger
 from simple_tf.global_params import GlobalConstants
+from sklearn.model_selection import train_test_split
 
 
 def train_direct_threshold_optimizer():
@@ -265,7 +266,9 @@ def multi_bayesian_optimization(network_name, trial_count, iterations,
             mixing_lambda = param_tpl[0]
             xi = param_tpl[1]
             seed = int(np.random.uniform(low=1, high=1000000))
-            routing_data.apply_validation_test_split(test_ratio=0.1)
+            # routing_data.apply_validation_test_split(test_ratio=0.1)
+            routing_data.trainingIndices, routing_data.testIndices = \
+                train_test_split(np.arange(routing_data.labelList.shape[0]), test_size=0.1)
             best_results = KmeansPlusBayesianOptimization.optimize(cluster_count=1,
                                                                    network=network,
                                                                    routing_data=routing_data,
@@ -444,16 +447,17 @@ def bayesian_ensembling_exhaustive(list_of_network_ids, ensemble_size, single_se
 
 
 def main():
-    list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
-                           2036,
-                           1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
-                           2051,
-                           1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
-                           1693,
-                           2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
-                           1842,
-                           2048]
+    # list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
+    #                        2036,
+    #                        1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
+    #                        2051,
+    #                        1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
+    #                        1693,
+    #                        2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
+    #                        1842,
+    #                        2048]
     # list_of_network_ids = [1731, 1826, 2013, 1788, 1700]
+    list_of_network_ids = [350, 390, 421, 426, 352, 329, 295, 333]
     network_name = "USPS_CIGN"
     iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
                          11741, 11800])
@@ -468,18 +472,18 @@ def main():
     # train_ensemble_threshold_optimizer()
     # pick_best_ensembles(ensemble_size=2)
     # beam_search_ensembles(max_ensemble_size=10, beam_size=65)
-    # multi_bayesian_optimization(network_name=network_name,
-    #                             list_of_network_ids=list_of_network_ids,
-    #                             trial_count=10,
-    #                             iterations=iterations,
-    #                             lambdas=lambdas,
-    #                             xis=xis,
-    #                             output_names=output_names)
-    bayesian_ensembling(list_of_network_ids=list_of_network_ids,
-                        ensemble_size=3,
-                        max_search_count=10000,
-                        single_search_size=100)
-    # bayesian_ensembling_exhaustive(list_of_network_ids=list_of_network_ids, ensemble_size=2, single_search_size=100)
+    multi_bayesian_optimization(network_name=network_name,
+                                list_of_network_ids=list_of_network_ids,
+                                trial_count=25,
+                                iterations=iterations,
+                                lambdas=lambdas,
+                                xis=xis,
+                                output_names=output_names)
+    # bayesian_ensembling(list_of_network_ids=list_of_network_ids,
+    #                     ensemble_size=3,
+    #                     max_search_count=10000,
+    #                     single_search_size=100)
+    # bayesian_ensembling_exhaustive(list_of_network_ids=list_of_network_ids, ensemble_size=3, single_search_size=100)
 
 
 if __name__ == "__main__":

@@ -10,8 +10,8 @@ from simple_tf.usps_net.usps_baseline import UspsBaseline
 
 
 class UspsCIGN(FastTreeNetwork):
-    FC_LAYERS = [64, 32, 16]
-    DECISION_DIMS = [8, 8, 8]
+    FC_LAYERS = [32, 24, 16]
+    DECISION_DIMS = [8, 4, 4]
     SOFTMAX_DECAY_INITIAL = 10.0
     SOFTMAX_DECAY_PERIOD = 1000
     THRESHOLD_LOWER_LIMIT = 0.4
@@ -146,8 +146,8 @@ class UspsCIGN(FastTreeNetwork):
         explanation += "Mode Tracking Strategy:{0}\n".format(GlobalConstants.MODE_TRACKING_STRATEGY)
         explanation += "Mode Max Class Count:{0}\n".format(GlobalConstants.MAX_MODE_CLASSES)
         explanation += "Mode Computation Strategy:{0}\n".format(GlobalConstants.MODE_COMPUTATION_STRATEGY)
-        explanation += "Constrain Softmax Compression With Label Count:{0}\n".format(GlobalConstants.
-                                                                                     CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT)
+        explanation += "Constrain Softmax Compression With Label Count:{0}\n".\
+            format(GlobalConstants.CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT)
         explanation += "Softmax Distillation Cross Validation Count:{0}\n". \
             format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
         explanation += "Softmax Distillation Strategy:{0}\n". \

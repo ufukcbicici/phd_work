@@ -33,10 +33,10 @@ class UspsDataset(MnistDataSet):
             self.trainingSamples, self.trainingLabels, self.validationSamples, self.validationLabels = \
                 train_test_split(self.trainingSamples, self.trainingLabels, self.validationSampleCount)
         # Bootstrap sampling
-        training_indices = np.random.choice(np.arange(self.trainingSamples.shape[0]),
-                                            size=self.trainingSamples.shape[0], replace=True)
-        self.trainingSamples = self.trainingSamples[training_indices]
-        self.trainingLabels = self.trainingLabels[training_indices]
+        # training_indices = np.random.choice(np.arange(self.trainingSamples.shape[0]),
+        #                                     size=self.trainingSamples.shape[0], replace=True)
+        # self.trainingSamples = self.trainingSamples[training_indices]
+        # self.trainingLabels = self.trainingLabels[training_indices]
 
         # Experimental
         # scaler = StandardScaler()

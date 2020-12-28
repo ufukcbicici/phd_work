@@ -283,36 +283,47 @@ class DatasetLinkingAlgorithm:
     @staticmethod
     def align_datasets(list_of_datasets, link_node_index, link_feature):
         assert len(set([dataset.singleDatasetSize for dataset in list_of_datasets])) == 1
-        dicts_of_arrays = []
+        reference_dataset = list_of_datasets[0]
+        reference_features = reference_dataset.get_dict(link_feature)[link_node_index]
+        reference_feature_sums_as_hash_values = np.sum(reference_features, axis=1)
+        array_of_indices = []
+        ignored_samples_for_all_datasets = set()
         # Reverse index of features
         for dataset in list_of_datasets:
+            print("Dataset")
+            ignored_samples = set()
+            multiple_hit_count = 0
             features = dataset.get_dict(link_feature)[link_node_index]
             dataset_reverse_index = {}
             feature_sums_as_hash_values = np.sum(features, axis=1)
             for idx in range(feature_sums_as_hash_values.shape[0]):
                 feature_hash = feature_sums_as_hash_values[idx]
-                if feature_hash not in dataset_reverse_index:
-                    dataset_reverse_index[feature_hash] = []
-                dataset_reverse_index[feature_hash].append(idx)
-            assert len(dataset_reverse_index) == dataset.singleDatasetSize
-            set_of_occurences = set([len(arr) for arr in dataset_reverse_index.values()])
-            assert len(set_of_occurences) == 1
-            dicts_of_arrays.append(dataset_reverse_index)
+                iteration = idx // int(reference_dataset.singleDatasetSize)
+                if (feature_hash, iteration) in dataset_reverse_index:
+                    # assert dataset.labelList[
+                    #     dataset_reverse_index[(feature_hash, iteration)]] == dataset.labelList[idx]
+                    ignored_samples.add(feature_hash)
+                    # print("Exists!")
+                    multiple_hit_count += 1
+                else:
+                    dataset_reverse_index[(feature_hash, iteration)] = idx
+            array_of_indices.append(dataset_reverse_index)
+            print("multiple_hit_count={0}".format(multiple_hit_count))
+            ignored_samples_for_all_datasets.add(frozenset(ignored_samples))
+        assert len(ignored_samples_for_all_datasets) == 1
+        ignored_samples = list(ignored_samples_for_all_datasets)[0]
         print("X")
         # Align all other datasets according to the first one. This means i.th feature in the arrays of the first
         # dataset corresponds to the i.th feature to all other arrays of the datasets.
-        for d_id in range(1, len(list_of_datasets), 1):
-            reference_dataset = list_of_datasets[0]
-            other_index = dicts_of_arrays[d_id]
-            features = reference_dataset.get_dict(link_feature)[link_node_index]
-            feature_sums_as_hash_values = np.sum(features, axis=1)
+        for d_id in range(len(list_of_datasets)):
+            dataset_sample_index = array_of_indices[d_id]
             reloc_indices = []
-            for s_id in range(feature_sums_as_hash_values.shape[0]):
-                hash_code = feature_sums_as_hash_values[s_id]
-                iteration_index = s_id // int(reference_dataset.singleDatasetSize)
-                reloc_indices.append(other_index[hash_code][iteration_index])
-            counter = Counter(reloc_indices)
-            assert len(counter) == feature_sums_as_hash_values.shape[0]
+            for s_id in range(reference_feature_sums_as_hash_values.shape[0]):
+                hash_code = reference_feature_sums_as_hash_values[s_id]
+                if hash_code in ignored_samples:
+                    continue
+                iteration = s_id // int(reference_dataset.singleDatasetSize)
+                reloc_indices.append(dataset_sample_index[(hash_code, iteration)])
             # Realign the other dataset
             reloc_indices = np.array(reloc_indices)
             other_dataset = list_of_datasets[d_id]
@@ -324,21 +335,31 @@ class DatasetLinkingAlgorithm:
                 feature_dict = other_dataset.dictionaryOfRoutingData[feature_name]
                 for node_id in feature_dict.keys():
                     other_dataset.dictionaryOfRoutingData[feature_name][node_id] = feature_dict[node_id][reloc_indices]
+        # Sanity check for labels
+        for d_id in range(len(list_of_datasets) - 1):
+            assert np.array_equal(list_of_datasets[d_id].labelList, list_of_datasets[d_id + 1].labelList)
+        for d_id in range(len(list_of_datasets)):
+            list_of_datasets[d_id].singleDatasetSize -= len(ignored_samples)
 
 
 def main():
     # compare_gpu_implementation()
     # train_basic_q_learning()
+    # 16-12-8 networks, without Bootstrapping
+    # list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
+    #                        2036,
+    #                        1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
+    #                        2051,
+    #                        1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
+    #                        1693,
+    #                        2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
+    #                        1842,
+    #                        2048]
+    # 64-32-16 networks, with BootStrapping
+    # list_of_network_ids = [863, 836, 792, 776, 768, 748, 720, 700, 683, 681, 617, 588, 573, 569, 554, 540, 539,
+    #                        523, 516, 502, 494, 478, 456, 451, 447, 445]
 
-    list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
-                           2036,
-                           1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
-                           2051,
-                           1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
-                           1693,
-                           2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
-                           1842,
-                           2048]
+    list_of_network_ids = [350, 390, 421, 426, 352, 329, 295, 333, 319]
     network_name = "USPS_CIGN"
     output_names = ["activations", "branch_probs", "label_tensor", "posterior_probs", "branching_feature",
                     "pre_branch_feature", "indices_tensor", "original_samples"]
