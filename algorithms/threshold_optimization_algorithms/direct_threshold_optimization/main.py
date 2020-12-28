@@ -320,16 +320,18 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
         for idx in range(single_search_size):
             ensemble_ids = np.random.choice(list_of_network_ids, ensemble_size, False)
             threshold_ids = [np.random.choice(list(bo_results_dict[n_id].keys()), 1)[0] for n_id in ensemble_ids]
-            ensemble_code = np.stack([ensemble_ids, threshold_ids], axis=-1)
-            ensemble_code = np.reshape(ensemble_code, newshape=(ensemble_code.shape[0] * ensemble_code.shape[1],))
-            ensemble_code = tuple(ensemble_code.tolist())
-            if ensemble_code in used_combinations_set:
+            ensemble_id_matrix = np.stack([ensemble_ids, threshold_ids], axis=-1)
+            ensemble_code = [tuple(ensemble_id_matrix[r].tolist()) for r in range(ensemble_id_matrix.shape[0])]
+            ensemble_code = frozenset(ensemble_code)
+            # ensemble_code = np.reshape(ensemble_code, newshape=(ensemble_code.shape[0] * ensemble_code.shape[1],))
+            # ensemble_code = tuple(ensemble_code.tolist())
+            if len(ensemble_code) < ensemble_size or ensemble_code in used_combinations_set:
                 continue
             ensemble_posteriors = []
             ensemble_activation_costs = []
-            for j in range(ensemble_size):
-                n_id = ensemble_code[2 * j]
-                t_id = ensemble_code[2 * j + 1]
+            for tpl in ensemble_code:
+                n_id = tpl[0]
+                t_id = tpl[1]
                 p_ = bo_results_dict[n_id][t_id]["final_posteriors"]
                 ensemble_posteriors.append(p_)
                 activation_cost = bo_results_dict[n_id][t_id]["final_activation_cost"]
@@ -339,6 +341,8 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
             ensemble_activation_costs = np.array(ensemble_activation_costs)
             activation_costs.append(ensemble_activation_costs)
             used_combinations_set.add(ensemble_code)
+        if len(posteriors) == 0:
+            continue
         posteriors_tensor = np.stack(posteriors, axis=0)
         posteriors_averaged = np.mean(posteriors_tensor, axis=-1)
         predictions_matrix = np.argmax(posteriors_averaged, axis=-1)
@@ -350,6 +354,8 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
         best_accuracy_idx = np.argmax(accuracies)
         best_accuracy = accuracies[best_accuracy_idx]
         best_activation_cost = activation_costs_averaged[best_accuracy_idx]
+        print("Iteration:{0} Best Accuracy:{1} Best Activation Cost:{2}".format(iteration_id, best_accuracy,
+                                                                                best_activation_cost))
         DbLogger.write_into_table(rows=[(run_id, 0, "Best Accuracy", np.asscalar(best_accuracy))],
                                   table=DbLogger.runKvStore, col_count=None)
         DbLogger.write_into_table(rows=[(run_id, 0, "Best Activation Cost", np.asscalar(best_activation_cost))],
@@ -357,17 +363,97 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
         print("X")
 
 
+def bayesian_ensembling_exhaustive(list_of_network_ids, ensemble_size, single_search_size):
+    run_id = DbLogger.get_run_id()
+    DbLogger.write_into_table(rows=[(run_id, "Exhaustive Ensemble Search After Bayesian Optimization:{0}"
+                                     .format(run_id))],
+                              table=DbLogger.runMetaData, col_count=None)
+    DbLogger.write_into_table(rows=[(run_id, 0, "Ensemble Count", ensemble_size)],
+                              table=DbLogger.runKvStore, col_count=None)
+    # Read relevant Bayesian Optimization results
+
+    save_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
+                                    GlobalConstants.MODEL_SAVE_FOLDER)
+    file_list = os.listdir(save_folder_path)
+    bo_results_dict = {n_id: {} for n_id in list_of_network_ids}
+    for network_id in list_of_network_ids:
+        related_files = [file_name for file_name in file_list if "bo_net_{0}".format(network_id) in file_name]
+        for bo_result_file_name in related_files:
+            save_file_path = os.path.join(save_folder_path, bo_result_file_name)
+            result_dict = UtilityFuncs.pickle_load_from_file(path=save_file_path)
+            threshold_id = int(bo_result_file_name.split("_")[-1].split(".")[0])
+            assert threshold_id not in bo_results_dict[network_id]
+            bo_results_dict[network_id][threshold_id] = result_dict
+    # Check if all ground truth labels are the same
+    labels_arr = []
+    for d1 in bo_results_dict.values():
+        for d2 in d1.values():
+            labels_arr.append(d2["gt_labels"])
+    labels_matrix = np.stack(labels_arr, axis=-1)
+    equality_matrix = labels_matrix == labels_matrix[:, 0][:, np.newaxis]
+    assert np.all(equality_matrix)
+    ground_truth_labels = labels_matrix[:, 0]
+    # Create ensembles out of all possible results
+    used_combinations_set = set()
+    network_threshold_pairs = []
+    for n_id, d1 in bo_results_dict.items():
+        for t_id in d1.keys():
+            network_threshold_pairs.append((n_id, t_id))
+    all_combinations = UtilityFuncs.get_cartesian_product(list_of_lists=[network_threshold_pairs] * ensemble_size)
+    # valid_combinations = [comb for comb in all_combinations if len(set(comb)) == ensemble_size]
+    combination_buffer = []
+    for comb_id, combination in enumerate(all_combinations):
+        combination_buffer.append(combination)
+        if len(combination_buffer) < single_search_size:
+            continue
+        posteriors = []
+        activation_costs = []
+        for comb_ in combination_buffer:
+            ensemble_posteriors = []
+            ensemble_activation_costs = []
+            for tpl in comb_:
+                n_id = tpl[0]
+                t_id = tpl[1]
+                p_ = bo_results_dict[n_id][t_id]["final_posteriors"]
+                ensemble_posteriors.append(p_)
+                activation_cost = bo_results_dict[n_id][t_id]["final_activation_cost"]
+                ensemble_activation_costs.append(activation_cost)
+            ensemble_posteriors = np.stack(ensemble_posteriors, axis=-1)
+            posteriors.append(ensemble_posteriors)
+            ensemble_activation_costs = np.array(ensemble_activation_costs)
+            activation_costs.append(ensemble_activation_costs)
+        posteriors_tensor = np.stack(posteriors, axis=0)
+        posteriors_averaged = np.mean(posteriors_tensor, axis=-1)
+        predictions_matrix = np.argmax(posteriors_averaged, axis=-1)
+        activation_costs_matrix = np.stack(activation_costs, axis=0)
+        activation_costs_averaged = np.mean(activation_costs_matrix, axis=-1)
+        # Do the accuracy calculation
+        comparison_matrix = predictions_matrix == ground_truth_labels[np.newaxis, :]
+        accuracies = np.mean(comparison_matrix, axis=-1)
+        best_accuracy_idx = np.argmax(accuracies)
+        best_accuracy = accuracies[best_accuracy_idx]
+        best_activation_cost = activation_costs_averaged[best_accuracy_idx]
+        print("Iteration:{0} Best Accuracy:{1} Best Activation Cost:{2}".format(comb_id, best_accuracy,
+                                                                                best_activation_cost))
+        DbLogger.write_into_table(rows=[(run_id, 0, "Best Accuracy", np.asscalar(best_accuracy))],
+                                  table=DbLogger.runKvStore, col_count=None)
+        DbLogger.write_into_table(rows=[(run_id, 0, "Best Activation Cost", np.asscalar(best_activation_cost))],
+                                  table=DbLogger.runKvStore, col_count=None)
+        combination_buffer = []
+        print("X")
+
+
 def main():
-    # list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
-    #                        2036,
-    #                        1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
-    #                        2051,
-    #                        1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
-    #                        1693,
-    #                        2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
-    #                        1842,
-    #                        2048]
-    list_of_network_ids = [1731, 1826, 2013, 1788, 1700]
+    list_of_network_ids = [1731, 1826, 2013, 1788, 1700, 1995, 1892, 1974, 1973, 1992, 2022, 1699, 1737, 1759, 2054,
+                           2036,
+                           1918, 1998, 2024, 1963, 2046, 1683, 2055, 1977, 1986, 1724, 1825, 1899, 1851, 1761, 2043,
+                           2051,
+                           1962, 1860, 1850, 1792, 1957, 1912, 1734, 1893, 1835, 1921, 1844, 1905, 2039, 2038, 1947,
+                           1693,
+                           2067, 2076, 1971, 1865, 1800, 2065, 1945, 1950, 1786, 1900, 1987, 1870, 1881, 1736, 1990,
+                           1842,
+                           2048]
+    # list_of_network_ids = [1731, 1826, 2013, 1788, 1700]
     network_name = "USPS_CIGN"
     iterations = sorted([10974, 11033, 11092, 11151, 11210, 11269, 11328, 11387, 11446, 11505, 11564, 11623, 11682,
                          11741, 11800])
@@ -384,15 +470,16 @@ def main():
     # beam_search_ensembles(max_ensemble_size=10, beam_size=65)
     # multi_bayesian_optimization(network_name=network_name,
     #                             list_of_network_ids=list_of_network_ids,
-    #                             trial_count=5,
+    #                             trial_count=10,
     #                             iterations=iterations,
     #                             lambdas=lambdas,
     #                             xis=xis,
     #                             output_names=output_names)
     bayesian_ensembling(list_of_network_ids=list_of_network_ids,
-                        ensemble_size=2,
-                        max_search_count=100,
-                        single_search_size=1000)
+                        ensemble_size=3,
+                        max_search_count=10000,
+                        single_search_size=100)
+    # bayesian_ensembling_exhaustive(list_of_network_ids=list_of_network_ids, ensemble_size=2, single_search_size=100)
 
 
 if __name__ == "__main__":

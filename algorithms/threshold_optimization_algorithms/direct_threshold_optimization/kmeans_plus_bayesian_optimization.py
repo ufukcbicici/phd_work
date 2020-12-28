@@ -73,8 +73,8 @@ class KmeansPlusBayesianOptimization:
         #                                                           weight_bound_max=2.0,
         #                                                           use_these_thresholds=good_thresholds,
         #                                                           use_these_weights=None)
-        thrs_optimization_result = bayesian_optimizer.optimize(init_points=10,
-                                                               n_iter=5,
+        thrs_optimization_result = bayesian_optimizer.optimize(init_points=50,
+                                                               n_iter=100,
                                                                xi=xi,
                                                                weight_bound_min=-2.0,
                                                                weight_bound_max=2.0,
