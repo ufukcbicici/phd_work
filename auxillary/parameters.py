@@ -61,6 +61,7 @@ class DecayingParameter(Parameter):
                               epsilon_value=value_dict["epsilon_value"])
         return decaying_parameter
 
+    # Change
     def __init__(self, name, value, decay, decay_period, min_limit=0.0, epsilon_value=None):
         Parameter.__init__(self, name=name, value=value)
         self.decay = decay

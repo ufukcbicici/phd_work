@@ -8,8 +8,8 @@ from simple_tf.usps_net.usps_cign import UspsCIGN
 
 
 class UspsCIGNRandomSample(CignRandomSample):
-    FC_LAYERS = [64, 32, 16]
-    DECISION_DIMS = [16, 16, 16]
+    FC_LAYERS = [32, 24, 16]
+    DECISION_DIMS = [8, 4, 4]
 
     def __init__(self, degree_list, dataset, network_name):
         node_build_funcs = len(UspsCIGNRandomSample.FC_LAYERS) * [UspsCIGN.node_func]
@@ -33,6 +33,11 @@ class UspsCIGNRandomSample(CignRandomSample):
         explanation += "Using Effective Sample Counts:{0}\n".format(GlobalConstants.USE_EFFECTIVE_SAMPLE_COUNTS)
         explanation += "Gradient Type:{0}\n".format(GlobalConstants.GRADIENT_TYPE)
         explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
+
+        # USPS
+        explanation += "USPS FC_LAYERS:{0}\n".format(UspsCIGNRandomSample.FC_LAYERS)
+        # USPS
+
         explanation += "********Lr Settings********\n"
         explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
         explanation += "********Lr Settings********\n"

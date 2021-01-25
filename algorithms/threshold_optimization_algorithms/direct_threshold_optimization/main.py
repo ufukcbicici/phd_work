@@ -10,6 +10,7 @@ from simple_tf.cign.fast_tree import FastTreeNetwork
 from auxillary.db_logger import DbLogger
 from simple_tf.global_params import GlobalConstants
 from sklearn.model_selection import train_test_split
+from joblib import Parallel, delayed
 
 
 def train_direct_threshold_optimizer():
@@ -284,6 +285,78 @@ def multi_bayesian_optimization(network_name, trial_count, iterations,
             tf.reset_default_graph()
 
 
+def ensemble_sample_generator(bo_results_dict,
+                              list_of_network_ids,
+                              ensemble_size,
+                              max_search_count,
+                              single_search_size):
+    # Create ensembles out of all possible results
+    used_combinations_set = set()
+    for iteration_id in range(max_search_count):
+        # Pick random networks (without replacement in every ensemble)
+        # Pick a threshold for every network
+        batch_ensemble_codes = []
+        for idx in range(single_search_size):
+            ensemble_ids = np.random.choice(list_of_network_ids, ensemble_size, False)
+            threshold_ids = [np.random.choice(list(bo_results_dict[n_id].keys()), 1)[0] for n_id in ensemble_ids]
+            ensemble_id_matrix = np.stack([ensemble_ids, threshold_ids], axis=-1)
+            ensemble_code = [tuple(ensemble_id_matrix[r].tolist()) for r in range(ensemble_id_matrix.shape[0])]
+            ensemble_code = frozenset(ensemble_code)
+            # ensemble_code = np.reshape(ensemble_code, newshape=(ensemble_code.shape[0] * ensemble_code.shape[1],))
+            # ensemble_code = tuple(ensemble_code.tolist())
+            if len(ensemble_code) < ensemble_size or ensemble_code in used_combinations_set:
+                continue
+            used_combinations_set.add(ensemble_code)
+            batch_ensemble_codes.append(ensemble_code)
+        print("Generated sample batch:{0}".format(iteration_id))
+        yield iteration_id, len(used_combinations_set), batch_ensemble_codes
+
+
+def ensemble_sample_processor(run_id,
+                              sample_tuple,
+                              bo_results_dict,
+                              ground_truth_labels):
+    iteration_id, num_ensembled_tried, batch_ensemble_codes = sample_tuple[0], sample_tuple[1], sample_tuple[2]
+    print("Started processing sample batch:{0}".format(iteration_id))
+    posteriors = []
+    activation_costs = []
+    for ensemble_code in batch_ensemble_codes:
+        ensemble_posteriors = []
+        ensemble_activation_costs = []
+        for tpl in ensemble_code:
+            n_id = tpl[0]
+            t_id = tpl[1]
+            p_ = bo_results_dict[n_id][t_id]["final_posteriors"]
+            ensemble_posteriors.append(p_)
+            activation_cost = bo_results_dict[n_id][t_id]["final_activation_cost"]
+            ensemble_activation_costs.append(activation_cost)
+        ensemble_posteriors = np.stack(ensemble_posteriors, axis=-1)
+        posteriors.append(ensemble_posteriors)
+        ensemble_activation_costs = np.array(ensemble_activation_costs)
+        activation_costs.append(ensemble_activation_costs)
+    posteriors_tensor = np.stack(posteriors, axis=0)
+    posteriors_averaged = np.mean(posteriors_tensor, axis=-1)
+    predictions_matrix = np.argmax(posteriors_averaged, axis=-1)
+    activation_costs_matrix = np.stack(activation_costs, axis=0)
+    activation_costs_averaged = np.mean(activation_costs_matrix, axis=-1)
+    # Do the accuracy calculation
+    comparison_matrix = predictions_matrix == ground_truth_labels[np.newaxis, :]
+    accuracies = np.mean(comparison_matrix, axis=-1)
+    best_accuracy_idx = np.argmax(accuracies)
+    best_accuracy = accuracies[best_accuracy_idx]
+    best_activation_cost = activation_costs_averaged[best_accuracy_idx]
+    print("Iteration:{0} Best Accuracy:{1} Best Activation Cost:{2} Ensembles Tried:{3}".
+          format(iteration_id,
+                 best_accuracy,
+                 best_activation_cost,
+                 num_ensembled_tried))
+    DbLogger.write_into_table(rows=[(run_id, 0, "Best Accuracy", np.asscalar(best_accuracy))],
+                              table=DbLogger.runKvStore, col_count=None)
+    DbLogger.write_into_table(rows=[(run_id, 0, "Best Activation Cost", np.asscalar(best_activation_cost))],
+                              table=DbLogger.runKvStore, col_count=None)
+    return best_accuracy, best_activation_cost
+
+
 def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, single_search_size):
     run_id = DbLogger.get_run_id()
     DbLogger.write_into_table(rows=[(run_id, "Best Ensemble Search After Bayesian Optimization:{0}".format(run_id))],
@@ -357,13 +430,57 @@ def bayesian_ensembling(list_of_network_ids, ensemble_size, max_search_count, si
         best_accuracy_idx = np.argmax(accuracies)
         best_accuracy = accuracies[best_accuracy_idx]
         best_activation_cost = activation_costs_averaged[best_accuracy_idx]
-        print("Iteration:{0} Best Accuracy:{1} Best Activation Cost:{2}".format(iteration_id, best_accuracy,
-                                                                                best_activation_cost))
+        print("Iteration:{0} Best Accuracy:{1} Best Activation Cost:{2} Ensembles Tried:{3}".
+              format(iteration_id,
+                     best_accuracy,
+                     best_activation_cost,
+                     len(
+                         used_combinations_set)))
         DbLogger.write_into_table(rows=[(run_id, 0, "Best Accuracy", np.asscalar(best_accuracy))],
                                   table=DbLogger.runKvStore, col_count=None)
         DbLogger.write_into_table(rows=[(run_id, 0, "Best Activation Cost", np.asscalar(best_activation_cost))],
                                   table=DbLogger.runKvStore, col_count=None)
         print("X")
+
+
+def bayesian_ensembling_parallel(list_of_network_ids, ensemble_size, max_search_count, single_search_size):
+    run_id = DbLogger.get_run_id()
+    DbLogger.write_into_table(rows=[(run_id, "Best Ensemble Search After Bayesian Optimization:{0}".format(run_id))],
+                              table=DbLogger.runMetaData, col_count=None)
+    DbLogger.write_into_table(rows=[(run_id, 0, "Ensemble Count", ensemble_size)],
+                              table=DbLogger.runKvStore, col_count=None)
+    # Read relevant Bayesian Optimization results
+    save_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
+                                    GlobalConstants.MODEL_SAVE_FOLDER)
+    file_list = os.listdir(save_folder_path)
+    bo_results_dict = {n_id: {} for n_id in list_of_network_ids}
+    for network_id in list_of_network_ids:
+        related_files = [file_name for file_name in file_list if "bo_net_{0}".format(network_id) in file_name]
+        for bo_result_file_name in related_files:
+            save_file_path = os.path.join(save_folder_path, bo_result_file_name)
+            result_dict = UtilityFuncs.pickle_load_from_file(path=save_file_path)
+            threshold_id = int(bo_result_file_name.split("_")[-1].split(".")[0])
+            assert threshold_id not in bo_results_dict[network_id]
+            bo_results_dict[network_id][threshold_id] = result_dict
+    # Check if all ground truth labels are the same
+    labels_arr = []
+    for d1 in bo_results_dict.values():
+        for d2 in d1.values():
+            labels_arr.append(d2["gt_labels"])
+    labels_matrix = np.stack(labels_arr, axis=-1)
+    equality_matrix = labels_matrix == labels_matrix[:, 0][:, np.newaxis]
+    assert np.all(equality_matrix)
+    ground_truth_labels = labels_matrix[:, 0]
+    Parallel(n_jobs=4)(
+        delayed(ensemble_sample_processor)(
+            run_id=run_id, sample_tuple=sample_tuple,
+            bo_results_dict=bo_results_dict, ground_truth_labels=ground_truth_labels)
+        for sample_tuple in ensemble_sample_generator(bo_results_dict=bo_results_dict,
+                                                      list_of_network_ids=list_of_network_ids,
+                                                      ensemble_size=ensemble_size,
+                                                      max_search_count=max_search_count,
+                                                      single_search_size=single_search_size)
+    )
 
 
 def bayesian_ensembling_exhaustive(list_of_network_ids, ensemble_size, single_search_size):
@@ -472,6 +589,22 @@ def main():
     # train_ensemble_threshold_optimizer()
     # pick_best_ensembles(ensemble_size=2)
     # beam_search_ensembles(max_ensemble_size=10, beam_size=65)
+    # multi_bayesian_optimization(network_name=network_name,
+    #                             list_of_network_ids=list_of_network_ids,
+    #                             trial_count=10,
+    #                             iterations=iterations,
+    #                             lambdas=lambdas,
+    #                             xis=xis,
+    #                             output_names=output_names)
+    # bayesian_ensembling(list_of_network_ids=list_of_network_ids,
+    #                     ensemble_size=3,
+    #                     max_search_count=100000,
+    #                     single_search_size=100)
+    # bayesian_ensembling_exhaustive(list_of_network_ids=list_of_network_ids, ensemble_size=2, single_search_size=100)
+    # bayesian_ensembling_parallel(list_of_network_ids=list_of_network_ids,
+    #                              ensemble_size=3,
+    #                              max_search_count=25000,
+    #                              single_search_size=1000)
     multi_bayesian_optimization(network_name=network_name,
                                 list_of_network_ids=list_of_network_ids,
                                 trial_count=25,

@@ -31,7 +31,10 @@ class UspsCIGN(FastTreeNetwork):
         ig_feature = UspsBaseline.get_mlp_layers(net_input=net, node=node, network=network, layers=[decision_dim],
                                                  op_pre_fix="decision")
         node.hOpsList.extend([ig_feature])
-        network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature)
+        if GlobalConstants.USE_UNIFIED_BATCH_NORM:
+            network.apply_decision_with_unified_batch_norm(node=node, branching_feature=ig_feature)
+        else:
+            network.apply_decision(node=node, branching_feature=ig_feature)
 
     @staticmethod
     def node_func(network, node):
@@ -61,7 +64,7 @@ class UspsCIGN(FastTreeNetwork):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "USPS - CIGN - Bootstrap\n"
+        explanation = "USPS - CIGN - All Samples Routed\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -208,12 +211,12 @@ class UspsCIGN(FastTreeNetwork):
             node_degree = GlobalConstants.TREE_DEGREE_LIST[node.depth]
             initial_value = 1.0 / float(node_degree)
             threshold_name = self.get_variable_name(name="prob_threshold_calculator", node=node)
-            node.probThresholdCalculator = DecayingParameter(name=threshold_name,
-                                                             value=initial_value,
-                                                             decay=0.5,
-                                                             decay_period=UspsCIGN.THRESHOLD_PERIOD,
-                                                             min_limit=UspsCIGN.THRESHOLD_LOWER_LIMIT)
-            # node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
+            # node.probThresholdCalculator = DecayingParameter(name=threshold_name,
+            #                                                  value=initial_value,
+            #                                                  decay=0.5,
+            #                                                  decay_period=UspsCIGN.THRESHOLD_PERIOD,
+            #                                                  min_limit=UspsCIGN.THRESHOLD_LOWER_LIMIT)
+            node.probThresholdCalculator = FixedParameter(name=threshold_name, value=initial_value)
             # Softmax Decay
             decay_name = self.get_variable_name(name="softmax_decay", node=node)
             node.softmaxDecayCalculator = DecayingParameter(name=decay_name,

@@ -9,7 +9,7 @@ from algorithms.resnet.resnet_generator import ResnetGenerator
 
 
 class UspsBaseline(FastTreeNetwork):
-    FC_LAYERS = [512, 256, 128]
+    FC_LAYERS = [32, 24, 16]
 
     def __init__(self, dataset, network_name):
         node_build_funcs = [UspsBaseline.baseline]
@@ -63,7 +63,7 @@ class UspsBaseline(FastTreeNetwork):
         for v in tf.trainable_variables():
             total_param_count += np.prod(v.get_shape().as_list())
         # Tree
-        explanation = "USPS - Baseline - Bayesian Optimization - ReLU Fixed - Thick Baseline Best Hyperparameters\n"
+        explanation = "USPS - Baseline - Thin Baseline\n"
         # "(Lr=0.01, - Decay 1/(1 + i*0.0001) at each i. iteration)\n"
         explanation += "Using Fast Tree Version:{0}\n".format(GlobalConstants.USE_FAST_TREE_MODE)
         explanation += "Batch Size:{0}\n".format(GlobalConstants.BATCH_SIZE)
@@ -75,6 +75,11 @@ class UspsBaseline(FastTreeNetwork):
         explanation += "Probability Threshold:{0}\n".format(GlobalConstants.USE_PROBABILITY_THRESHOLD)
         explanation += "********Lr Settings********\n"
         explanation += GlobalConstants.LEARNING_RATE_CALCULATOR.get_explanation()
+
+        # USPS
+        explanation += "USPS FC_LAYERS:{0}\n".format(UspsBaseline.FC_LAYERS)
+        # USPS
+
         explanation += "********Lr Settings********\n"
         if not self.isBaseline:
             explanation += "********Decision Loss Weight Settings********\n"
