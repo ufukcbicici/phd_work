@@ -1,5 +1,8 @@
 import numpy as np
 import tensorflow as tf
+
+from algorithms.cign_activation_cost_calculator import CignActivationCostCalculator
+from algorithms.cign_reachbility_matrices_calculation import CignReachabilityMatricesCalculation
 from simple_tf.cign.fast_tree import FastTreeNetwork
 
 
@@ -9,12 +12,22 @@ class CignWithRlRouting(FastTreeNetwork):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                          dataset, network_name)
         self.actionSpaces = []
-        
+        self.networkActivationCosts = None
+        self.networkActivationCostsDict = None
+        self.reachabilityMatrices = []
+
     def build_network(self):
         # Regular CIGN stuff here
         super().build_network()
         # Reinforcement Learning things here
         self.build_action_spaces()
+        self.networkActivationCosts, self.networkActivationCostsDict = \
+            CignActivationCostCalculator.calculate_mac_cost(
+                network=self,
+                node_costs=self.nodeCosts)
+        self.reachabilityMatrices = CignReachabilityMatricesCalculation.calculate_reachibility_matrices(
+            network=self,
+            action_spaces=self.actionSpaces)
         print("X")
 
     def get_max_trajectory_length(self) -> int:
