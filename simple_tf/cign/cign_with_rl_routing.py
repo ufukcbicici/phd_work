@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
+from auxillary.constants import DatasetTypes
 from algorithms.cign_activation_cost_calculator import CignActivationCostCalculator
 from algorithms.cign_reachbility_matrices_calculation import CignReachabilityMatricesCalculation
 from simple_tf.cign.fast_tree import FastTreeNetwork
@@ -11,10 +12,13 @@ class CignWithRlRouting(FastTreeNetwork):
                  dataset, network_name):
         super().__init__(node_build_funcs, grad_func, hyperparameter_func, residue_func, summary_func, degree_list,
                          dataset, network_name)
-        self.actionSpaces = []
+        self.actionSpaces = None
         self.networkActivationCosts = None
         self.networkActivationCostsDict = None
-        self.reachabilityMatrices = []
+        self.reachabilityMatrices = None
+        self.posteriorTensors = None
+        self.rewardTensors = {}
+        self.optimalQTables = {}
 
     def build_network(self):
         # Regular CIGN stuff here
@@ -49,3 +53,12 @@ class CignWithRlRouting(FastTreeNetwork):
                 action_space.append(binary_node_selection)
             action_space = np.stack(action_space, axis=0)
             self.actionSpaces.append(action_space)
+
+    def prepare_reward_tensors(self, sess, dataset):
+        for tpl in [("validation", DatasetTypes.validation), ("test", DatasetTypes.test)]:
+            dataset_type = tpl[1]
+            leaf_node_collections, inner_node_collections = \
+                self.collect_eval_results_from_network(sess=sess, dataset=dataset, dataset_type=dataset_type,
+                                                       use_masking=False,
+                                                       leaf_node_collection_names=["branch_probs", "activations"],
+                                                       inner_node_collections_names=["posterior_probs", "label_tensor"])
