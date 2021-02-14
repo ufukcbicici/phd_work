@@ -685,7 +685,7 @@ class FastTreeNetwork(TreeNetwork):
     def get_explanation_string(self):
         explanation = ""
         explanation += "TOTAL_EPOCH_COUNT:{0}\n".format(GlobalConstants.TOTAL_EPOCH_COUNT)
-        explanation += "EPOCH_COUNT:{0}\n".format(GlobalConstants.EPOCH_COUNT)
+        explanation += "EPOCH_COUNT:{0}\n".format(GlobalConstants.EPOCH_COUNT_INVALID)
         explanation += "EPOCH_REPORT_PERIOD:{0}\n".format(GlobalConstants.EPOCH_REPORT_PERIOD)
         explanation += "BATCH_SIZE:{0}\n".format(GlobalConstants.BATCH_SIZE)
         explanation += "EVAL_BATCH_SIZE:{0}\n".format(GlobalConstants.EVAL_BATCH_SIZE)

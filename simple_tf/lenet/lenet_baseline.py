@@ -199,7 +199,7 @@ class LeNetBaseline(FastTreeNetwork):
     def set_training_parameters(self):
         # Training Parameters
         GlobalConstants.TOTAL_EPOCH_COUNT = 100
-        GlobalConstants.EPOCH_COUNT = 100
+        GlobalConstants.EPOCH_COUNT_INVALID = 100
         GlobalConstants.EPOCH_REPORT_PERIOD = 5
         GlobalConstants.BATCH_SIZE = 125
         GlobalConstants.EVAL_BATCH_SIZE = 1000

@@ -257,7 +257,7 @@ class Cifar100_Cign(FastTreeNetwork):
         #                                                                        (100000, 0.0001)])
 
         GlobalConstants.TOTAL_EPOCH_COUNT = 960
-        GlobalConstants.EPOCH_COUNT = 960
+        GlobalConstants.EPOCH_COUNT_INVALID = 960
         GlobalConstants.EPOCH_REPORT_PERIOD = 8
         GlobalConstants.BATCH_SIZE = 400
         GlobalConstants.EVAL_BATCH_SIZE = 400

@@ -76,7 +76,7 @@ class GlobalConstants:
 
     # Fashion Net Setting
     TOTAL_EPOCH_COUNT = 100
-    EPOCH_COUNT = 100
+    EPOCH_COUNT_INVALID = 100
     EPOCH_REPORT_PERIOD = 1
     BATCH_SIZE = 125
     EVAL_BATCH_SIZE = 250

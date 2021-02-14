@@ -594,7 +594,7 @@ class TreeNetwork:
         lr = self.learningRateCalculator.value
         for v, curr_value in zip(vars, vars_current_values):
             is_residue_var = "_residue_" in v.name
-            if not is_residue_var and epoch >= GlobalConstants.EPOCH_COUNT:
+            if not is_residue_var and epoch >= GlobalConstants.EPOCH_COUNT_INVALID:
                 continue
             total_grad = np.zeros(shape=v.shape)
             # is_decision_pipeline_variable = "hyperplane" in v.name or "_decision_" in v.name

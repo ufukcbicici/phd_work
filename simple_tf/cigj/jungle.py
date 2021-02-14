@@ -675,7 +675,7 @@ class Jungle(FastTreeNetwork):
         explanation += "CIGJ_USE_LOGIT_OUTPUTS_AT_LEAVES:{0}\n".format(GlobalConstants.CIGJ_USE_LOGIT_OUTPUTS_AT_LEAVES)
         explanation += "CIGJ_USE_MULTIPATH_EVALUATION:{0}\n".format(GlobalConstants.CIGJ_USE_MULTIPATH_EVALUATION)
         explanation += "TOTAL_EPOCH_COUNT:{0}\n".format(GlobalConstants.TOTAL_EPOCH_COUNT)
-        explanation += "EPOCH_COUNT:{0}\n".format(GlobalConstants.EPOCH_COUNT)
+        explanation += "EPOCH_COUNT:{0}\n".format(GlobalConstants.EPOCH_COUNT_INVALID)
         explanation += "EPOCH_REPORT_PERIOD:{0}\n".format(GlobalConstants.EPOCH_REPORT_PERIOD)
         explanation += "BATCH_SIZE:{0}\n".format(GlobalConstants.BATCH_SIZE)
         explanation += "EVAL_BATCH_SIZE:{0}\n".format(GlobalConstants.EVAL_BATCH_SIZE)

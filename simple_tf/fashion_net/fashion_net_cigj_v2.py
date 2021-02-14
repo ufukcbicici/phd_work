@@ -134,7 +134,7 @@ class FashionNetCigjV2(JungleV2):
     def set_training_parameters(self):
         # Training Parameters
         GlobalConstants.TOTAL_EPOCH_COUNT = 100
-        GlobalConstants.EPOCH_COUNT = 100
+        GlobalConstants.EPOCH_COUNT_INVALID = 100
         GlobalConstants.EPOCH_REPORT_PERIOD = 1
         GlobalConstants.EVALUATION_EPOCHS_BEFORE_ENDING = 10
         GlobalConstants.BATCH_SIZE = 125

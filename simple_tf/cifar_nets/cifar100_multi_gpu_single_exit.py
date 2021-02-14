@@ -198,7 +198,7 @@ class Cifar100_MultiGpuCignSingleLateExit(CignMultiGpuSingleLateExit):
         #                                                                        (70000, 0.001),
         #                                                                        (100000, 0.0001)])
         GlobalConstants.TOTAL_EPOCH_COUNT = 1200
-        GlobalConstants.EPOCH_COUNT = 1200
+        GlobalConstants.EPOCH_COUNT_INVALID = 1200
         GlobalConstants.EPOCH_REPORT_PERIOD = 20
         GlobalConstants.BATCH_SIZE = 500
         GlobalConstants.EVAL_BATCH_SIZE = 250
