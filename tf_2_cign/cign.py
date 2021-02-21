@@ -205,17 +205,6 @@ class Cign:
                 self.evalDict[Utilities.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
                 is_node_open = tf.greater_equal(sample_count_tensor, 0.0)
                 self.evalDict[Utilities.get_variable_name(name="is_open", node=node)] = is_node_open
-
-
-
-
-
-
-
-
-
-
-    # def build_loss(self):
-    #     # Classification loss
-    #
-
+                self.nodeInputsDict[node.index] = {"F": F_input, "H": H_input, "ig_mask": ig_mask}
+                self.labelsDict[node.index] = labels
+                self.batchIndicesDict[node.index] = batch_indices
