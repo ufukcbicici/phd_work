@@ -180,6 +180,10 @@ class Cign:
             print("Building Node {0}".format(node.index))
             self.mask_inputs(node=node)
             self.nodeBuildFuncs[node.depth](self=self, node=node)
+            if node.isLeaf:
+                print("Call loss function")
+            else:
+                pass
 
     def mask_inputs(self, node):
         if node.isRoot:
@@ -208,3 +212,6 @@ class Cign:
                 self.nodeInputsDict[node.index] = {"F": F_input, "H": H_input, "ig_mask": ig_mask}
                 self.labelsDict[node.index] = labels
                 self.batchIndicesDict[node.index] = batch_indices
+
+    def apply_decision(self, node):
+        pass
