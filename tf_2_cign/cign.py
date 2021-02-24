@@ -5,17 +5,20 @@ import tensorflow as tf
 
 from auxillary.dag_utilities import Dag
 from simple_tf.uncategorized.node import Node
+from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
 from tf_2_cign.utilities import Utilities
 
 
 class Cign:
     def __init__(self,
                  input_dims,
+                 class_count,
                  node_degrees,
                  decision_drop_probability,
                  classification_drop_probability,
                  decision_wd,
-                 classification_wd):
+                 classification_wd,
+                 bn_momentum=0.9):
         self.dagObject = Dag()
         self.nodes = {}
         self.degreeList = node_degrees
@@ -25,12 +28,14 @@ class Cign:
         self.innerNodes = []
         self.leafNodes = []
         self.isBaseline = None
+        self.classCount = class_count
         self.decisionDropProbability = decision_drop_probability
         self.classificationDropProbability = classification_drop_probability
         self.decisionWd = decision_wd
         self.classificationWd = classification_wd
+        self.bnMomentum = bn_momentum
         # Model-wise Tensorflow objects.
-        self.inputs = tf.keras.Input(shape=input_dims, name="input")
+        self.inputs = tf.keras.Input(shape=input_dims, name="inputs")
         self.labels = tf.keras.Input(shape=(), name="labels", dtype=tf.int32)
         self.batchSize = tf.keras.Input(shape=(), name="batchSize", dtype=tf.int32)
         self.batchIndices = tf.range(0, self.batchSize, 1)
@@ -41,6 +46,10 @@ class Cign:
         self.batchIndicesDict = {}
         self.nodeInputsDict = {}
         self.nodeOutputsDict = {}
+        # Routing temperatures
+        self.routingTemperatures = {"inputs": self.inputs, "labels": self.labels, "batchSize": self.batchSize}
+        # Feed dict
+        self.feedDict = {}
         # Information Gain Mask vectors
         self.igMaskVectorsDict = {}
         # Secondary Routing Mask vectors (Heuristic thresholding, Reinforcement Learning, Bayesian Optimization, etc.)
@@ -178,6 +187,10 @@ class Cign:
         # Build all operations in each node
         for node in self.topologicalSortedNodes:
             print("Building Node {0}".format(node.index))
+            if node.isLeaf is False:
+                self.routingTemperatures[node.index] = \
+                    tf.keras.Input(shape=(), name="routingTemperature_{0}".format(node.index))
+                self.feedDict["routingTemperature_{0}".format(node.index)] = self.routingTemperatures[node.index]
             self.mask_inputs(node=node)
             self.nodeBuildFuncs[node.depth](self=self, node=node)
             if node.isLeaf:
@@ -214,4 +227,19 @@ class Cign:
                 self.batchIndicesDict[node.index] = batch_indices
 
     def apply_decision(self, node):
-        pass
+        h_net = self.nodeOutputsDict[node.index]["H"]
+        ig_mask = self.nodeOutputsDict[node.index]["ig_mask"]
+        node_degree = self.degreeList[node.depth]
+
+        h_ig_net = tf.boolean_mask(h_net, ig_mask)
+        h_net_normed = MaskedBatchNormalization(momentum=self.bnMomentum)([h_net, h_ig_net])
+        activations = Cign.fc_layer(x=h_net_normed,
+                                    output_dim=node_degree,
+                                    activation=None,
+                                    node=node,
+                                    use_bias=True)
+        activations_with_temperature = activations / self.routingTemperatures[node.index]
+        p_n_given_x = tf.nn.softmax(activations_with_temperature)
+        p_c_given_x = tf.one_hot(self.labelsDict[node.index], self.classCount)
+        p_n_given_x_masked = tf.boolean_mask(p_n_given_x, ig_mask)
+        p_c_given_x_masked = tf.one_hot(p_c_given_x, ig_mask)

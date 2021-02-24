@@ -67,38 +67,38 @@ class MaskedBatchNormalization(tf.keras.layers.Layer):
         return normed_x
 
 
-if __name__ == "__main__":
-    batch_size = 125
-    dim = 128
-    momentum = 0.9
-    target_val = 5.0
-    x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
-    x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
-    mask_vector = np.random.randint(low=0, high=2, size=(batch_size,))
-
-    i_x = tf.keras.Input(shape=(dim,))
-    net = tf.keras.layers.Dense(256)(i_x)
-    masked_net = tf.boolean_mask(net, mask_vector)
-    norm_result = MaskedBatchNormalization(momentum=momentum)([net, masked_net])
-    y_hat = tf.reduce_mean(norm_result, axis=-1)
-    y_gt = target_val * tf.ones_like(y_hat)
-    reconstruction_loss = tf.keras.losses.mean_squared_error(y_gt, y_hat)
-    model = tf.keras.Model(inputs=i_x,
-                           outputs={"masked_net": masked_net,
-                                    "net": net,
-                                    "norm_result": norm_result,
-                                    "y_hat": y_hat,
-                                    "y_gt": y_gt,
-                                    "reconstruction_loss": reconstruction_loss})
-    optimizer = tf.keras.optimizers.Adam()
-    loss_tracker = tf.keras.metrics.Mean(name="total_loss")
-
-    for i in range(10000):
-        with tf.GradientTape() as tape:
-            outputs_dict = model(x1, training=True)
-            loss_tracker.update_state(values=outputs_dict["reconstruction_loss"])
-        grads = tape.gradient(outputs_dict["reconstruction_loss"], model.trainable_variables)
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
-        print("Loss:{0}".format(loss_tracker.result().numpy()))
-    results = model(x2, training=False)
-    print("x")
+# if __name__ == "__main__":
+#     batch_size = 125
+#     dim = 128
+#     momentum = 0.9
+#     target_val = 5.0
+#     x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
+#     x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
+#     mask_vector = np.random.randint(low=0, high=2, size=(batch_size,))
+#
+#     i_x = tf.keras.Input(shape=(dim,))
+#     net = tf.keras.layers.Dense(256)(i_x)
+#     masked_net = tf.boolean_mask(net, mask_vector)
+#     norm_result = MaskedBatchNormalization(momentum=momentum)([net, masked_net])
+#     y_hat = tf.reduce_mean(norm_result, axis=-1)
+#     y_gt = target_val * tf.ones_like(y_hat)
+#     reconstruction_loss = tf.keras.losses.mean_squared_error(y_gt, y_hat)
+#     model = tf.keras.Model(inputs=i_x,
+#                            outputs={"masked_net": masked_net,
+#                                     "net": net,
+#                                     "norm_result": norm_result,
+#                                     "y_hat": y_hat,
+#                                     "y_gt": y_gt,
+#                                     "reconstruction_loss": reconstruction_loss})
+#     optimizer = tf.keras.optimizers.Adam()
+#     loss_tracker = tf.keras.metrics.Mean(name="total_loss")
+#
+#     for i in range(10000):
+#         with tf.GradientTape() as tape:
+#             outputs_dict = model(x1, training=True)
+#             loss_tracker.update_state(values=outputs_dict["reconstruction_loss"])
+#         grads = tape.gradient(outputs_dict["reconstruction_loss"], model.trainable_variables)
+#         optimizer.apply_gradients(zip(grads, model.trainable_variables))
+#         print("Loss:{0}".format(loss_tracker.result().numpy()))
+#     results = model(x2, training=False)
+#     print("x")
