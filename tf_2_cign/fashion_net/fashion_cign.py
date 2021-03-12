@@ -27,11 +27,11 @@ class FashionCign(Cign):
         h_net = tf.keras.layers.Dropout(rate=self.decisionDropProbability)(h_net)
         return h_net
 
-    def root_func(self, node):
+    def root_func(self, node, f_input, h_input):
         num_of_filters = self.filterCounts[0]
         kernel_size = self.kernelSizes[0]
         # F ops
-        net = self.nodeInputsDict[node.index]["F"]
+        net = f_input
         net = Cign.conv_layer(x=net,
                               kernel_size=kernel_size,
                               num_of_filters=num_of_filters,
@@ -49,4 +49,5 @@ class FashionCign(Cign):
         # H ops
 
         # Output
-        self.nodeOutputsDict = {node.index: {"F": net, "H": h_net}}
+        self.nodeOutputsDict[node.index]["F"] = net
+        self.nodeOutputsDict[node.index]["H"] = h_net
