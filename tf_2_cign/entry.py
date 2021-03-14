@@ -4,7 +4,7 @@ from tf_2_cign.fashion_net.fashion_cign import FashionCign
 
 # Hyper-parameters
 input_dims = (28, 28, 3)
-degree_list = []
+degree_list = [2, 2]
 batch_size = 128
 epoch_count = 100
 decision_drop_probability = 0.0
@@ -17,7 +17,7 @@ filter_counts = [32, 32, 32]
 kernel_sizes = [5, 5, 1]
 hidden_layers = [128, 64]
 decision_dimensions = [128, 128]
-node_build_funcs = [FashionCign.root_func]
+node_build_funcs = [FashionCign.inner_func, FashionCign.inner_func, FashionCign.leaf_func]
 
 if __name__ == "__main__":
     fashion_mnist = FashionMnist(batch_size=batch_size)
@@ -25,13 +25,15 @@ if __name__ == "__main__":
                        node_degrees=degree_list,
                        filter_counts=filter_counts,
                        kernel_sizes=kernel_sizes,
-                       hidden_layers=kernel_sizes,
+                       hidden_layers=hidden_layers,
                        decision_drop_probability=decision_drop_probability,
                        classification_drop_probability=drop_probability,
                        decision_wd=decision_wd,
                        classification_wd=classification_wd,
                        decision_dimensions=decision_dimensions,
-                       node_build_funcs=node_build_funcs)
+                       node_build_funcs=node_build_funcs,
+                       class_count=10,
+                       information_gain_balance_coeff=1.0)
     cign.build_network()
 
 

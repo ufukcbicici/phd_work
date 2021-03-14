@@ -5,10 +5,11 @@ from tf_2_cign.utilities import Utilities
 
 class FashionCign(Cign):
     def __init__(self, input_dims, node_degrees, filter_counts, kernel_sizes, hidden_layers, decision_drop_probability,
-                 classification_drop_probability, decision_wd, classification_wd, decision_dimensions,
-                 node_build_funcs):
-        super().__init__(input_dims, node_degrees, decision_drop_probability, classification_drop_probability,
-                         decision_wd, classification_wd)
+                 classification_drop_probability, decision_wd, classification_wd, decision_dimensions, node_build_funcs,
+                 class_count, information_gain_balance_coeff):
+        super().__init__(input_dims, class_count, node_degrees, decision_drop_probability,
+                         classification_drop_probability, decision_wd, classification_wd,
+                         information_gain_balance_coeff)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers
@@ -27,20 +28,46 @@ class FashionCign(Cign):
         h_net = tf.keras.layers.Dropout(rate=self.decisionDropProbability)(h_net)
         return h_net
 
-    def root_func(self, node, f_input, h_input):
-        num_of_filters = self.filterCounts[0]
-        kernel_size = self.kernelSizes[0]
+    def conv_block(self, node, input_net, kernel_sizes, filter_counts, strides, pool_dims):
+        length_set = {len(kernel_sizes), len(filter_counts), len(strides), len(pool_dims)}
+        assert len(length_set) == 1
+        layer_count = list(length_set)[0]
+
+        net = input_net
+        for layer_id in range(layer_count):
+            kernel_size = kernel_sizes[layer_id]
+            num_of_filters = filter_counts[layer_id]
+            stride = strides[layer_id]
+            pool_size = pool_dims[layer_id]
+            net = Cign.conv_layer(x=net,
+                                  kernel_size=kernel_size,
+                                  num_of_filters=num_of_filters,
+                                  strides=stride,
+                                  node=node,
+                                  activation="relu",
+                                  use_bias=True,
+                                  padding="same")
+            net = tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding="same")(net)
+        return net
+
+    def dense_block(self, node, input_net, dims, use_dropout):
+        net = input_net
+        for layer_id, hidden_dim in enumerate(dims):
+            net = Cign.fc_layer(x=net, output_dim=hidden_dim, activation="relu", node=node)
+            if use_dropout:
+                net = tf.keras.layers.Dropout(rate=self.classificationDropProbability)(net)
+        return net
+
+    def inner_func(self, node, f_input, h_input):
+        num_of_filters = self.filterCounts[node.depth]
+        kernel_size = self.kernelSizes[node.depth]
         # F ops
-        net = f_input
-        net = Cign.conv_layer(x=net,
-                              kernel_size=kernel_size,
-                              num_of_filters=num_of_filters,
-                              strides=(1, 1),
-                              node=node,
-                              activation="relu",
-                              use_bias=True,
-                              padding="same")
-        net = tf.keras.layers.MaxPooling2D(2)(net)
+        net = self.conv_block(node=node,
+                              input_net=f_input,
+                              kernel_sizes=[kernel_size],
+                              filter_counts=[num_of_filters],
+                              strides=[(1, 1)],
+                              pool_dims=[2])
         # F ops
 
         # H ops
@@ -51,3 +78,22 @@ class FashionCign(Cign):
         # Output
         self.nodeOutputsDict[node.index]["F"] = net
         self.nodeOutputsDict[node.index]["H"] = h_net
+
+    def leaf_func(self, node, f_input, h_input):
+        num_of_filters = self.filterCounts[node.depth]
+        kernel_size = self.kernelSizes[node.depth]
+        # F ops
+        # 1 Conv layer
+        net = self.conv_block(node=node,
+                              input_net=f_input,
+                              kernel_sizes=[kernel_size],
+                              filter_counts=[num_of_filters],
+                              strides=[(1, 1)],
+                              pool_dims=[2])
+        # Dense layers
+        net = tf.keras.layers.Flatten()(net)
+        net = self.dense_block(node=node, input_net=net, dims=self.hiddenLayers, use_dropout=True)
+
+        # Output
+        self.nodeOutputsDict[node.index]["F"] = net
+        self.nodeOutputsDict[node.index]["H"] = None

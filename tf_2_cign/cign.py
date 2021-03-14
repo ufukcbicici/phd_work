@@ -2,12 +2,13 @@ from collections import deque
 from collections import Counter
 import numpy as np
 import tensorflow as tf
-
 from algorithms.info_gain import InfoGainLoss
 from auxillary.dag_utilities import Dag
 from simple_tf.uncategorized.node import Node
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
 from tf_2_cign.utilities import Utilities
+
+tf.autograph.set_verbosity(10, True)
 
 
 class Cign:
@@ -280,11 +281,14 @@ class Cign:
         self.informationGainRoutingLosses[node.index] = information_gain
         self.evalDict[Utilities.get_variable_name(name="information_gain", node=node)] = information_gain
         # Information gain based routing matrix
-        ig_routing_matrix = tf.one_hot(tf.argmax(p_n_given_x, axis=1), node_degree)
+        ig_routing_matrix = tf.one_hot(tf.argmax(p_n_given_x, axis=1), node_degree, dtype=tf.int32)
         self.evalDict[Utilities.get_variable_name(name="ig_routing_matrix_without_mask", node=node)] = ig_routing_matrix
         mask_as_matrix = tf.expand_dims(ig_mask, axis=1)
         assert "ig_mask_matrix" not in self.nodeOutputsDict[node.index]
-        self.nodeOutputsDict[node.index]["ig_mask_matrix"] = tf.logical_and(ig_routing_matrix, mask_as_matrix)
+        self.nodeOutputsDict[node.index]["ig_mask_matrix"] = \
+            tf.cast(
+                tf.logical_and(tf.cast(ig_routing_matrix, dtype=tf.bool), tf.cast(mask_as_matrix, dtype=tf.bool)),
+                dtype=tf.int32)
 
     def apply_classification_loss(self, node):
         f_net = self.nodeOutputsDict[node.index]["F"]
@@ -348,15 +352,17 @@ class Cign:
             self.evalDict["ig_combined_routing_matrix_level_{0}".format(level)] = ig_combined_routing_matrix
             self.evalDict["sc_combined_routing_matrix_pre_mask_level_{0}".format(level)] = \
                 sc_combined_routing_matrix_pre_mask
-            sc_combined_routing_matrix = tf.logical_or(sc_combined_routing_matrix_pre_mask, ig_combined_routing_matrix)
+            sc_combined_routing_matrix = tf.cast(tf.logical_or(
+                tf.cast(sc_combined_routing_matrix_pre_mask, dtype=tf.bool),
+                tf.cast(ig_combined_routing_matrix, dtype=tf.bool)), dtype=tf.int32)
             self.evalDict["sc_combined_routing_matrix_level_{0}".format(level)] = sc_combined_routing_matrix
             # Distribute the results of the secondary routing matrix into the corresponding nodes
             curr_column = 0
             for node in nodes:
                 node_child_count = len(self.dagObject.children(node=node))
                 batch_indices_vector = self.nodeOutputsDict[node.index]["batch_indices"]
-                sc_routing_matrix_for_node = sc_combined_routing_matrix[:, curr_column: curr_column+node_child_count]
-                ig_routing_matrix_for_node = ig_combined_routing_matrix[:, curr_column: curr_column+node_child_count]
+                sc_routing_matrix_for_node = sc_combined_routing_matrix[:, curr_column: curr_column + node_child_count]
+                ig_routing_matrix_for_node = ig_combined_routing_matrix[:, curr_column: curr_column + node_child_count]
                 self.evalDict["sc_routing_matrix_for_node_{0}_level_{1}".format(node.index, level)] = \
                     sc_routing_matrix_for_node
                 self.evalDict["ig_routing_matrix_for_node_{0}_level_{1}".format(node.index, level)] = \
@@ -365,6 +371,7 @@ class Cign:
                     tf.gather_nd(sc_routing_matrix_for_node, tf.expand_dims(batch_indices_vector, axis=-1))
                 self.evalDict["ig_routing_matrix_for_node_{0}_reconstruction".format(node.index)] = \
                     tf.gather_nd(ig_routing_matrix_for_node, tf.expand_dims(batch_indices_vector, axis=-1))
+                curr_column += node_child_count
 
     # def build_final_loss(self):
     #     # Calculate the weight decay loss on variables

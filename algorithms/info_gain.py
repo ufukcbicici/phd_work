@@ -1,15 +1,13 @@
 import tensorflow as tf
 
-from simple_tf.global_params import GlobalConstants
-
 
 class InfoGainLoss:
     def __init__(self):
         pass
 
     @staticmethod
-    def calculate_entropy(prob_distribution):
-        log_prob = tf.log(prob_distribution + GlobalConstants.INFO_GAIN_LOG_EPSILON)
+    def calculate_entropy(prob_distribution, eps=1e-30):
+        log_prob = tf.math.log(prob_distribution + eps)
         # is_inf = tf.is_inf(log_prob)
         # zero_tensor = tf.zeros_like(log_prob)
         # log_prob = tf.where(is_inf, x=zero_tensor, y=log_prob)
