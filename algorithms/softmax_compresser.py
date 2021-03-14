@@ -221,7 +221,7 @@ class SoftmaxCompresser:
         # Redefine the main classification loss and the regularization loss; these are dependent on the new
         # compressed hyperplanes.
         self.network.build_main_loss()
-        self.network.build_regularization_loss()
+        self.network.calculate_regularization_loss()
         # Re-calculate the gradients
         GlobalConstants.GRADIENT_TYPE = GlobalConstants.SOFTMAX_DISTILLATION_GRADIENT_TYPE
         if not GlobalConstants.USE_FAST_TREE_MODE:

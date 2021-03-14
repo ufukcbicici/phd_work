@@ -24,7 +24,8 @@ class FashionCign(Cign):
                               output_dim=decision_feature_size,
                               activation="relu",
                               node=node,
-                              use_bias=True)
+                              use_bias=True,
+                              name="fc_op_decision")
         h_net = tf.keras.layers.Dropout(rate=self.decisionDropProbability)(h_net)
         return h_net
 

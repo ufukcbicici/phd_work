@@ -65,6 +65,9 @@ class Cign:
         self.classificationLosses = {}
         # Routing Losses
         self.informationGainRoutingLosses = {}
+        # Regularization Losses
+        self.regularizationCoefficients = {}
+        self.regularizationLoss = None
         # Model
         self.model = None
 
@@ -108,7 +111,10 @@ class Cign:
                     op_id += 1
                     continue
                 break
-            node.opMacCostsDict["{0}_{1}".format(name, op_id)] = cost
+            op_name = "{0}_{1}".format(name, op_id)
+            node.opMacCostsDict[op_name] = cost
+        else:
+            op_name = ""
         # Apply operation
         net = tf.keras.layers.Conv2D(filters=num_of_filters,
                                      kernel_size=kernel_size,
@@ -116,7 +122,8 @@ class Cign:
                                      strides=strides,
                                      padding=padding,
                                      use_bias=use_bias,
-                                     name=Utilities.get_variable_name(name="ConvLayer", node=node))(x)
+                                     name=Utilities.get_variable_name(name="ConvLayer_{0}".format(op_name),
+                                                                      node=node))(x)
         return net
 
     # REVISION OK
@@ -141,13 +148,17 @@ class Cign:
                     op_id += 1
                     continue
                 break
-            node.opMacCostsDict["{0}_{1}".format(name, op_id)] = cost
+            op_name = "{0}_{1}".format(name, op_id)
+            node.opMacCostsDict[op_name] = cost
+        else:
+            op_name = ""
 
         # Apply operation
         net = tf.keras.layers.Dense(units=output_dim,
                                     activation=activation,
                                     use_bias=use_bias,
-                                    name=Utilities.get_variable_name(name="DenseLayer", node=node))(x)
+                                    name=Utilities.get_variable_name(name="DenseLayer_{0}".format(op_name),
+                                                                     node=node))(x)
         return net
 
     def build_tree(self):
@@ -205,7 +216,50 @@ class Cign:
             if level < len(self.orderedNodesPerLevel) - 1:
                 self.build_secondary_routing_matrices(level=level)
         # Build the model
+        self.build_final_model()
+
+    def is_decision_variable(self, variable):
+        if "scale" in variable.name or "shift" in variable.name or "hyperplane" in variable.name or \
+                "gamma" in variable.name or "beta" in variable.name or "decision" in variable.name:
+            return True
+        else:
+            return False
+
+    def calculate_regularization_coefficients(self, trainable_variables):
+        print("Num of trainable variables:{0}".format(len(trainable_variables)))
+        l2_loss_list = []
+        decayed_variables = []
+        non_decayed_variables = []
+        decision_variables = []
+        for v in trainable_variables:
+            is_decision_pipeline_variable = self.is_decision_variable(variable=v)
+            # assert (not is_decision_pipeline_variable)
+            loss_tensor = tf.nn.l2_loss(v)
+            # self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
+            if "bias" in v.name or "shift" in v.name or "scale" in v.name or "gamma" in v.name or "beta" in v.name:
+                # non_decayed_variables.append(v)
+                # l2_loss_list.append(0.0 * loss_tensor)
+                self.regularizationCoefficients[v.ref()] = 0.0
+            else:
+                # decayed_variables.append(v)
+                if is_decision_pipeline_variable:
+                    # decision_variables.append(v)
+                    # l2_loss_list.append(self.decisionWd * loss_tensor)
+                    self.regularizationCoefficients[v.ref()] = self.decisionWd
+                else:
+                    # l2_loss_list.append(self.classificationWd * loss_tensor)
+                    self.regularizationCoefficients[v.ref()] = self.classificationWd
+        # self.regularizationLoss = tf.add_n(l2_loss_list)
+
+    def build_final_model(self):
         # Build the final loss
+        # Temporary model for getting the list of trainable variables
+        self.model = tf.keras.Model(inputs=self.feedDict,
+                                    outputs=[self.evalDict,
+                                             self.classificationLosses,
+                                             self.informationGainRoutingLosses])
+        variables = self.model.trainable_variables
+        self.calculate_regularization_coefficients(trainable_variables=variables)
 
     def mask_inputs(self, node):
         f_input, h_input, ig_mask = None, None, None
@@ -260,6 +314,7 @@ class Cign:
                                     output_dim=node_degree,
                                     activation=None,
                                     node=node,
+                                    name="fc_op_decision",
                                     use_bias=True)
         # Routing temperatures
         self.routingTemperatures[node.index] = \
