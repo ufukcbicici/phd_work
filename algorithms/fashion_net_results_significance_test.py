@@ -7,6 +7,8 @@ fashion_net_random_routing_baseline = np.array([92.00, 91.60, 91.80, 92.02, 91.7
 fashion_net_cign_all_paths_baseline = np.array([91.88, 92.20, 91.80, 92.02, 91.77, 91.97, 92.12, 92.01, 91.92, 92.02])
 fashion_net_with_no_annealing = np.array([92.23, 92.31, 92.12, 92.29, 92.40])
 fashion_net_with_annealing = np.array([92.531, 92.522, 92.478, 92.172, 92.154])
+fashion_net_cigj_random = np.array([92.87, 92.76, 92.61, 92.54, 92.60])
+
 fashion_net_smoe_cign_v1 = 100.0 * np.array(
     [0.9296, 0.9286, 0.9297, 0.9304, 0.9293, 0.9298, 0.9299, 0.9295, 0.9297, 0.9287, 0.9292, 0.9286, 0.9288, 0.9295,
      0.928, 0.9281, 0.9271, 0.9267, 0.9291, 0.9283, 0.93, 0.9286, 0.9289, 0.9296, 0.9293, 0.9277, 0.9299, 0.9284, 0.928,
@@ -132,6 +134,8 @@ fashion_net_smoe_cign_v3 = 100.0 * np.array(
      0.9221, 0.9233, 0.9223, 0.9238, 0.922, 0.9242, 0.9226, 0.9264, 0.9271, 0.9268, 0.9265, 0.9271, 0.9266, 0.926,
      0.9265, 0.9271, 0.9272, 0.9262, 0.9264, 0.9273, 0.9263, 0.9256, 0.9264, 0.9266, 0.9263, 0.9269, 0.927])
 
+fashion_cigj_results = np.array([93.26, 93.12, 93.09, 93.04, 93.03])
+
 print(np.mean(fashion_net_thin_baseline))
 print(np.mean(fashion_net_thick_baseline))
 print(np.mean(fashion_net_random_routing_baseline))
@@ -141,6 +145,8 @@ print(np.mean(fashion_net_with_annealing))
 print(np.mean(fashion_net_smoe_cign_v1))
 print(np.mean(fashion_net_smoe_cign_v2))
 print(np.mean(fashion_net_smoe_cign_v3))
+print(np.mean(fashion_net_cigj_random))
+print(np.mean(fashion_cigj_results))
 
 data_samples = {"fashion_net_thin_baseline": fashion_net_thin_baseline,
                 "fashion_net_thick_baseline": fashion_net_thick_baseline,
@@ -150,13 +156,19 @@ data_samples = {"fashion_net_thin_baseline": fashion_net_thin_baseline,
                 "fashion_net_with_annealing": fashion_net_with_annealing,
                 "fashion_net_smoe_cign_v1": fashion_net_smoe_cign_v1,
                 "fashion_net_smoe_cign_v2": fashion_net_smoe_cign_v2,
-                "fashion_net_smoe_cign_v3": fashion_net_smoe_cign_v3}
+                "fashion_net_smoe_cign_v3": fashion_net_smoe_cign_v3,
+                "fashion_cigj_results": fashion_cigj_results,
+                "fashion_net_cigj_random": fashion_net_cigj_random}
 
-baselines = ["fashion_net_thin_baseline", "fashion_net_thick_baseline", "fashion_net_random_routing_baseline",
-             "fashion_net_cign_all_paths_baseline"]
-cigns = ["fashion_net_with_no_annealing", "fashion_net_with_annealing",
-         "fashion_net_smoe_cign_v1", "fashion_net_smoe_cign_v2", "fashion_net_smoe_cign_v3"]
+# baselines = ["fashion_net_thin_baseline", "fashion_net_thick_baseline", "fashion_net_random_routing_baseline",
+#              "fashion_net_cign_all_paths_baseline"]
+baselines = ["fashion_net_thin_baseline", "fashion_net_thick_baseline", "fashion_net_cigj_random",
+             "fashion_net_with_annealing"]
+# cigns = ["fashion_net_with_no_annealing", "fashion_net_with_annealing",
+#          "fashion_net_smoe_cign_v1", "fashion_net_smoe_cign_v2", "fashion_net_smoe_cign_v3",
+#          "fashion_cigj_results"]
 
+cigns = ["fashion_cigj_results"]
 for cign_method in cigns:
     print("**********CIGN method:{0}**********".format(cign_method))
     for baseline_method in baselines:
@@ -164,7 +176,7 @@ for cign_method in cigns:
         cign_arr = data_samples[cign_method]
         baseline_arr = data_samples[baseline_method]
         p_value, reject_null_hypothesis = BootstrapMeanComparison.compare(x=cign_arr, y=baseline_arr,
-                                                                          boostrap_count=10000)
+                                                                          boostrap_count=100000)
         print("p-value:{0} Reject H0 for equal means:{1}".format(p_value, reject_null_hypothesis))
 
 x = np.random.uniform(low=0.0, high=10.0, size=(1000,))

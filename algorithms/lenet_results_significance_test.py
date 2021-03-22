@@ -116,6 +116,9 @@ lenet_smoe_cign_v3 = 100.0 * np.array(
      0.9942, 0.9944, 0.9945, 0.9945, 0.9942, 0.9941, 0.9944, 0.9945, 0.9945, 0.9942, 0.9941, 0.9942, 0.9943, 0.9945,
      0.9937, 0.9943, 0.9942, 0.9945, 0.9942, 0.9945])
 
+lenet_cigj_random_routing = np.array([99.35, 99.25, 99.22, 99.35, 99.28])
+lenet_cigj_results = np.array([99.45, 99.39, 99.40, 99.39, 99.37])
+
 print(np.mean(lenet_thin_baseline))
 print(np.mean(lenet_thick_baseline))
 print(np.mean(lenet_cign_random_routing_baseline))
@@ -125,6 +128,8 @@ print(np.mean(lenet_with_annealing))
 print(np.mean(lenet_smoe_cign_v1))
 print(np.mean(lenet_smoe_cign_v2))
 print(np.mean(lenet_smoe_cign_v3))
+print(np.mean(lenet_cigj_random_routing))
+print(np.mean(lenet_cigj_results))
 print("X")
 
 data_samples = {"lenet_thin_baseline": lenet_thin_baseline,
@@ -135,21 +140,33 @@ data_samples = {"lenet_thin_baseline": lenet_thin_baseline,
                 "lenet_with_annealing": lenet_with_annealing,
                 "lenet_smoe_cign_v1": lenet_smoe_cign_v1,
                 "lenet_smoe_cign_v2": lenet_smoe_cign_v2,
-                "lenet_smoe_cign_v3": lenet_smoe_cign_v3}
+                "lenet_smoe_cign_v3": lenet_smoe_cign_v3,
+                "lenet_cigj_random_routing": lenet_cigj_random_routing,
+                "lenet_cigj_results": lenet_cigj_results}
 
-baselines = ["lenet_thin_baseline", "lenet_thick_baseline", "lenet_cign_random_routing_baseline",
-             "lenet_cign_all_paths"]
+baselines = ["lenet_thin_baseline", "lenet_thick_baseline", "lenet_with_annealing", "lenet_cigj_random_routing"]
 cigns = ["lenet_without_annealing", "lenet_with_annealing",
          "lenet_smoe_cign_v1", "lenet_smoe_cign_v2", "lenet_smoe_cign_v3"]
+cigjs = ["lenet_cigj_results"]
 
-for cign_method in cigns:
-    print("**********CIGN method:{0}**********".format(cign_method))
+# for cign_method in cigns:
+#     print("**********CIGN method:{0}**********".format(cign_method))
+#     for baseline_method in baselines:
+#         print("Comparing {0} vs {1}".format(cign_method, baseline_method))
+#         cign_arr = data_samples[cign_method]
+#         baseline_arr = data_samples[baseline_method]
+#         p_value, reject_null_hypothesis = BootstrapMeanComparison.compare(x=cign_arr, y=baseline_arr,
+#                                                                           boostrap_count=10000)
+#         print("p-value:{0} Reject H0 for equal means:{1}".format(p_value, reject_null_hypothesis))
+
+for cigj_method in cigjs:
+    print("**********CIGJ method:{0}**********".format(cigj_method))
     for baseline_method in baselines:
-        print("Comparing {0} vs {1}".format(cign_method, baseline_method))
-        cign_arr = data_samples[cign_method]
+        print("Comparing {0} vs {1}".format(cigj_method, baseline_method))
+        cign_arr = data_samples[cigj_method]
         baseline_arr = data_samples[baseline_method]
         p_value, reject_null_hypothesis = BootstrapMeanComparison.compare(x=cign_arr, y=baseline_arr,
-                                                                          boostrap_count=10000)
+                                                                          boostrap_count=100000)
         print("p-value:{0} Reject H0 for equal means:{1}".format(p_value, reject_null_hypothesis))
 
 # x = np.random.uniform(low=0.0, high=10.0, size=(1000,))

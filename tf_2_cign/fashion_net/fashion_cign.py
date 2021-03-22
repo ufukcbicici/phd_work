@@ -4,12 +4,24 @@ from tf_2_cign.utilities import Utilities
 
 
 class FashionCign(Cign):
-    def __init__(self, input_dims, node_degrees, filter_counts, kernel_sizes, hidden_layers, decision_drop_probability,
-                 classification_drop_probability, decision_wd, classification_wd, decision_dimensions, node_build_funcs,
-                 class_count, information_gain_balance_coeff):
+    def __init__(self,
+                 input_dims,
+                 node_degrees,
+                 filter_counts,
+                 kernel_sizes,
+                 hidden_layers,
+                 decision_drop_probability,
+                 classification_drop_probability,
+                 decision_wd,
+                 classification_wd,
+                 decision_dimensions,
+                 node_build_funcs,
+                 class_count,
+                 information_gain_balance_coeff,
+                 softmax_decay_controller):
         super().__init__(input_dims, class_count, node_degrees, decision_drop_probability,
                          classification_drop_probability, decision_wd, classification_wd,
-                         information_gain_balance_coeff)
+                         information_gain_balance_coeff, softmax_decay_controller)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers

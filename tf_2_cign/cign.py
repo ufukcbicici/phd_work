@@ -21,6 +21,7 @@ class Cign:
                  decision_wd,
                  classification_wd,
                  information_gain_balance_coeff,
+                 softmax_decay_controller,
                  bn_momentum=0.9):
         self.dagObject = Dag()
         self.nodes = {}
@@ -60,6 +61,8 @@ class Cign:
         self.evalDict = {}
         # Node builder functions
         self.nodeBuildFuncs = []
+        # Softmax decay controllers
+        self.softmaxDecayController = softmax_decay_controller
         # Classification losses
         self.classificationLossObjects = {}
         self.classificationLosses = {}
@@ -428,5 +431,10 @@ class Cign:
                     tf.gather_nd(ig_routing_matrix_for_node, tf.expand_dims(batch_indices_vector, axis=-1))
                 curr_column += node_child_count
 
-    # def build_final_loss(self):
-    #     # Calculate the weight decay loss on variables
+    # def train_step(self, x, y):
+    #     with tf.GradientTape as tape:
+
+    def train(self, dataset, epoch_count):
+        for epoch_id in range(epoch_count):
+            for train_X, train_y in dataset.trainDataTf:
+                print("X")

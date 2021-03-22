@@ -16,10 +16,10 @@ from auxillary.constants import DatasetTypes
 
 use_moe = False
 use_vanilla = False
-use_rl_routing = True
+use_rl_routing = False
 use_sampling = False
 use_random_sampling = False
-use_baseline = False
+use_baseline = True
 use_early_exit = False
 use_late_exit = False
 

@@ -9,10 +9,10 @@ from algorithms.resnet.resnet_generator import ResnetGenerator
 
 
 class LeNetBaseline(FastTreeNetwork):
-    CONV_LAYERS = [2, 15]
+    CONV_LAYERS = [20, 25]
     CONV_FILTER_SIZES = [5, 5]
     CONV_POOL_LAYERS = [True, True]
-    FC_LAYERS = [106]
+    FC_LAYERS = [50]
 
     def __init__(self, dataset, network_name):
         node_build_funcs = [LeNetBaseline.baseline]

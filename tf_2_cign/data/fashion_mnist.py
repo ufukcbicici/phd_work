@@ -8,6 +8,8 @@ class FashionMnist:
         self.trainData, self.testData = tf.keras.datasets.fashion_mnist.load_data()
         self.trainX, self.trainY = self.trainData[0], self.trainData[1]
         self.testX, self.testY = self.testData[0], self.testData[1]
+        self.trainX = np.expand_dims(self.trainX, axis=-1)
+        self.testX = np.expand_dims(self.testX, axis=-1)
         self.valX, self.valY = None, None
         self.batchSize = batch_size
         if validation_size > 0:
