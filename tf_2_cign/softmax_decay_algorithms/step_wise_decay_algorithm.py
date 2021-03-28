@@ -17,6 +17,9 @@ class StepWiseDecayAlgorithm(SoftmaxDecayAlgorithm):
                                                    decay_period=self.decayPeriod,
                                                    min_limit=self.decayMinLimit)
 
-    def update_value(self, **kwargs):
+    def update(self, **kwargs):
         iteration = kwargs["iteration"]
         self.decayingParameter.update(iteration=iteration)
+
+    def get_value(self):
+        return self.decayingParameter.value

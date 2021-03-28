@@ -435,6 +435,10 @@ class Cign:
     #     with tf.GradientTape as tape:
 
     def train(self, dataset, epoch_count):
+        iteration = 0
         for epoch_id in range(epoch_count):
             for train_X, train_y in dataset.trainDataTf:
+                self.softmaxDecayController.update(iteration=iteration+1)
+
                 print("X")
+                iteration += 1

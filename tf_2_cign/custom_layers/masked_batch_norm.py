@@ -68,6 +68,7 @@ class MaskedBatchNormalization(tf.keras.layers.Layer):
 
 
 # if __name__ == "__main__":
+#     print(tf.__version__)
 #     batch_size = 125
 #     dim = 128
 #     momentum = 0.9
