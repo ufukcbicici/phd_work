@@ -8,7 +8,7 @@ from simple_tf.uncategorized.node import Node
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
 from tf_2_cign.utilities import Utilities
 
-tf.autograph.set_verbosity(10, True)
+# tf.autograph.set_verbosity(10, True)
 
 
 class Cign:
@@ -73,6 +73,8 @@ class Cign:
         self.regularizationLoss = None
         # Model
         self.model = None
+        self.model2 = None
+        self.model3 = None
 
     def get_node_sibling_index(self, node):
         parent_nodes = self.dagObject.parents(node=node)
@@ -218,6 +220,14 @@ class Cign:
             # Build secondary routing matrices after a level's nodes being built (if not the final layer)
             if level < len(self.orderedNodesPerLevel) - 1:
                 self.build_secondary_routing_matrices(level=level)
+        # Register node outputs to the eval dict
+        for node in self.topologicalSortedNodes:
+            for output_name in self.nodeOutputsDict[node.index].keys():
+                if self.nodeOutputsDict[node.index][output_name] is None:
+                    continue
+                self.evalDict[Utilities.get_variable_name(name="node_output_{0}".format(output_name), node=node)] = \
+                    self.nodeOutputsDict[node.index][output_name]
+        self.evalDict["batch_size"] = self.batchSize
         # Build the model
         self.build_final_model()
 
@@ -261,6 +271,10 @@ class Cign:
                                     outputs=[self.evalDict,
                                              self.classificationLosses,
                                              self.informationGainRoutingLosses])
+        self.model2 = tf.keras.Model(inputs=[self.inputs, self.labels, self.routingTemperatures[0]],
+                                     outputs=self.nodeOutputsDict[0])
+        self.model3 = tf.keras.Model(inputs=self.feedDict,
+                                     outputs=self.nodeOutputsDict[0])
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
 
@@ -271,6 +285,10 @@ class Cign:
             f_input = self.inputs
             self.nodeOutputsDict[node.index]["labels"] = self.labels
             self.nodeOutputsDict[node.index]["batch_indices"] = self.batchIndices
+            self.evalDict[Utilities.get_variable_name(name="batch_indices", node=node)] = self.batchIndices
+            self.evalDict[Utilities.get_variable_name(name="parent_ig_mask", node=node)] = ig_mask
+            self.evalDict[Utilities.get_variable_name(name="parent_sc_mask", node=node)] = ig_mask
+            self.evalDict[Utilities.get_variable_name(name="sample_count", node=node)] = tf.shape(self.batchIndices)[0]
         else:
             # Obtain the mask vectors
             parent_node = self.dagObject.parents(node=node)[0]
@@ -291,10 +309,13 @@ class Cign:
                 # Information gain mask and the secondary routing mask
                 parent_ig_mask = parent_ig_mask_matrix[:, sibling_index]
                 parent_sc_mask = parent_secondary_mask_matrix[:, sibling_index]
+                self.evalDict[Utilities.get_variable_name(name="parent_ig_mask", node=node)] = parent_ig_mask
+                self.evalDict[Utilities.get_variable_name(name="parent_sc_mask", node=node)] = parent_sc_mask
                 # Mask all required data from the parent: USE SECONDARY MASK
                 ig_mask = tf.boolean_mask(parent_ig_mask, parent_sc_mask)
                 labels = tf.boolean_mask(parent_labels, parent_sc_mask)
                 batch_indices = tf.boolean_mask(parent_batch_indices, parent_sc_mask)
+                self.evalDict[Utilities.get_variable_name(name="batch_indices", node=node)] = batch_indices
                 f_input = tf.boolean_mask(parent_F, parent_sc_mask)
                 h_input = tf.boolean_mask(parent_H, parent_sc_mask)
                 # Some intermediate statistics and calculations
@@ -407,6 +428,7 @@ class Cign:
             ig_combined_routing_matrix = tf.concat(ig_matrices_with_scatter_nd, axis=-1)
             sc_combined_routing_matrix_pre_mask = self.calculate_secondary_routing_matrix(
                 input_f_tensor=input_f_tensor, input_ig_routing_matrix=ig_combined_routing_matrix)
+            self.evalDict["input_f_tensor_{0}".format(level)] = input_f_tensor
             self.evalDict["ig_combined_routing_matrix_level_{0}".format(level)] = ig_combined_routing_matrix
             self.evalDict["sc_combined_routing_matrix_pre_mask_level_{0}".format(level)] = \
                 sc_combined_routing_matrix_pre_mask
@@ -431,14 +453,130 @@ class Cign:
                     tf.gather_nd(ig_routing_matrix_for_node, tf.expand_dims(batch_indices_vector, axis=-1))
                 curr_column += node_child_count
 
-    # def train_step(self, x, y):
-    #     with tf.GradientTape as tape:
+    def calculate_total_loss(self, classification_losses, info_gain_losses):
+        # Weight decaying
+        variables = self.model.trainable_variables
+        regularization_losses = []
+        for var in variables:
+            if var.ref() in self.regularizationCoefficients:
+                lambda_coeff = self.regularizationCoefficients[var.ref()]
+                regularization_losses.append(lambda_coeff * tf.nn.l2_loss(var))
+        total_regularization_loss = tf.add_n(regularization_losses)
+        # Classification losses
+        classification_loss = tf.add_n([loss for loss in classification_losses.values()])
+        # Information Gain losses
+        info_gain_loss = tf.add_n([loss for loss in info_gain_losses.values()])
+        # Total loss
+        total_loss = total_regularization_loss + info_gain_loss + classification_loss
+        return total_loss
+
+    def get_feed_dict(self, x, y, iteration):
+        self.softmaxDecayController.update(iteration=iteration + 1)
+        temp_value = self.softmaxDecayController.get_value()
+        # Fill the feed dict.
+        feed_dict = {}
+        for input_name in self.feedDict.keys():
+            if "routingTemperature" in input_name:
+                feed_dict[input_name] = temp_value
+            elif input_name == "inputs":
+                feed_dict[input_name] = x
+            elif input_name == "labels":
+                feed_dict[input_name] = y
+            else:
+                raise NotImplementedError()
+        return feed_dict
+
+    def train_step(self, x, y, iteration):
+        # eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
+        with tf.GradientTape() as tape:
+            feed_dict = self.get_feed_dict(x=x, y=y, iteration=iteration)
+            eval_dict, classification_losses, info_gain_losses = self.model(inputs=feed_dict, training=True)
+            total_loss = self.calculate_total_loss(classification_losses=classification_losses,
+                                                   info_gain_losses=info_gain_losses)
+            self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
+        grads = tape.gradient(total_loss, self.model.trainable_variables)
+        print("X")
+
+
+        # with tf.GradientTape() as tape:
+        #     # Get softmax decay value
+        #     self.softmaxDecayController.update(iteration=iteration + 1)
+        #     temp_value = self.softmaxDecayController.get_value()
+        #     # Fill the feed dict.
+        #     feed_dict = {}
+        #     for input_name in self.feedDict.keys():
+        #         if "routingTemperature" in input_name:
+        #             feed_dict[input_name] = temp_value
+        #         elif input_name == "inputs":
+        #             feed_dict[input_name] = x
+        #         elif input_name == "labels":
+        #             feed_dict[input_name] = y
+        #         else:
+        #             raise NotImplementedError()
+        #     print("X")
+        #     eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
+        #     total_loss = self.calculate_total_loss(classification_losses=classification_losses,
+        #                                            info_gain_losses=info_gain_losses)
+        # grads = tape.gradient(total_loss, self.model.trainable_variables)
+        # print("X")
+        # self.optimizer.apply_gradients(zip(grads, self.detectorModel.trainable_variables))
 
     def train(self, dataset, epoch_count):
         iteration = 0
         for epoch_id in range(epoch_count):
             for train_X, train_y in dataset.trainDataTf:
-                self.softmaxDecayController.update(iteration=iteration+1)
-
-                print("X")
+                self.train_step(x=train_X, y=train_y, iteration=iteration)
                 iteration += 1
+
+    def unit_test_cign_routing_mechanism(self, eval_dict):
+        # Statistics of sample distribution
+        for node in self.topologicalSortedNodes:
+            key_name = Utilities.get_variable_name(name="sample_count", node=node)
+            if key_name in eval_dict:
+                print("Node{0} Sample count:{1}".format(node.index, eval_dict[key_name].numpy()))
+        # Check if boolean mask works as intended.
+        for node in self.topologicalSortedNodes:
+            assert Utilities.get_variable_name(name="parent_ig_mask", node=node) in eval_dict
+            routing_mask = eval_dict[Utilities.get_variable_name(name="parent_ig_mask", node=node)].numpy()
+            if not node.isLeaf:
+                # Assertion of ig_routing_matrix is correctly derived from routing probabilities.
+                p_n_given_x = eval_dict[Utilities.get_variable_name(name="p_n_given_x", node=node)].numpy()
+                ig_routing_matrix_without_mask = eval_dict[
+                    Utilities.get_variable_name(name="ig_routing_matrix_without_mask", node=node)].numpy()
+                ig_routing_matrix_without_mask_np = np.zeros_like(p_n_given_x,
+                                                                  dtype=ig_routing_matrix_without_mask.dtype)
+                ig_routing_matrix_without_mask_np[np.arange(ig_routing_matrix_without_mask_np.shape[0]),
+                                                  np.argmax(p_n_given_x, axis=1)] = 1
+                assert np.array_equal(ig_routing_matrix_without_mask, ig_routing_matrix_without_mask_np)
+            if not node.isRoot:
+                parent_node = self.dagObject.parents(node=node)[0]
+                node_batch_indices = eval_dict[Utilities.get_variable_name(name="batch_indices", node=node)].numpy()
+                parent_batch_indices = eval_dict[
+                    Utilities.get_variable_name(name="batch_indices", node=parent_node)].numpy()
+                node_batch_indices_np = parent_batch_indices[routing_mask.astype(np.bool)]
+                assert np.array_equal(node_batch_indices, node_batch_indices_np)
+        # Check scatter - gather operation correctness for the secondary routing matrix
+        batch_size = eval_dict["batch_size"].numpy()
+        for level in range(len(self.orderedNodesPerLevel)-1):
+            f_outputs = []
+            ig_matrices = []
+            for node in self.orderedNodesPerLevel[level]:
+                batch_indices = eval_dict[Utilities.get_variable_name(name="node_output_{0}".format("batch_indices"),
+                                                                      node=node)].numpy()
+                f_output = eval_dict[Utilities.get_variable_name(name="node_output_{0}".format("F"), node=node)].numpy()
+                ig_mask_matrix = eval_dict[Utilities.get_variable_name(name="node_output_{0}".format("ig_mask_matrix"),
+                                                                       node=node)].numpy()
+                f_output_full = np.zeros(shape=[batch_size, *f_output.shape[1:]], dtype=f_output.dtype)
+                f_output_full[batch_indices, :] = f_output
+                ig_matrix_full = np.zeros(shape=[batch_size, *ig_mask_matrix.shape[1:]], dtype=ig_mask_matrix.dtype)
+                ig_matrix_full[batch_indices, :] = ig_mask_matrix
+                f_outputs.append(f_output_full)
+                ig_matrices.append(ig_matrix_full)
+            f_outputs_np = np.concatenate(f_outputs, axis=-1)
+            ig_matrix_np = np.concatenate(ig_matrices, axis=-1)
+            f_outputs_tf = eval_dict["input_f_tensor_{0}".format(level)].numpy()
+            ig_matrix_tf = eval_dict["ig_combined_routing_matrix_level_{0}".format(level)].numpy()
+            assert np.array_equal(f_outputs_np, f_outputs_tf)
+            assert np.array_equal(ig_matrix_np, ig_matrix_tf)
+        print("X")
+
