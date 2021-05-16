@@ -8,6 +8,7 @@ from simple_tf.uncategorized.node import Node
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
 from tf_2_cign.utilities import Utilities
 
+
 # tf.autograph.set_verbosity(10, True)
 
 
@@ -271,10 +272,10 @@ class Cign:
                                     outputs=[self.evalDict,
                                              self.classificationLosses,
                                              self.informationGainRoutingLosses])
-        self.model2 = tf.keras.Model(inputs=[self.inputs, self.labels, self.routingTemperatures[0]],
-                                     outputs=self.nodeOutputsDict[0])
-        self.model3 = tf.keras.Model(inputs=self.feedDict,
-                                     outputs=self.nodeOutputsDict[0])
+        # self.model2 = tf.keras.Model(inputs=[self.inputs, self.labels, self.routingTemperatures[0]],
+        #                              outputs=self.nodeOutputsDict[0])
+        # self.model3 = tf.keras.Model(inputs=self.feedDict,
+        #                              outputs=self.nodeOutputsDict[0])
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
 
@@ -497,7 +498,6 @@ class Cign:
         grads = tape.gradient(total_loss, self.model.trainable_variables)
         print("X")
 
-
         # with tf.GradientTape() as tape:
         #     # Get softmax decay value
         #     self.softmaxDecayController.update(iteration=iteration + 1)
@@ -537,9 +537,8 @@ class Cign:
         # Check if boolean mask works as intended.
         for node in self.topologicalSortedNodes:
             assert Utilities.get_variable_name(name="parent_ig_mask", node=node) in eval_dict
-            routing_mask = eval_dict[Utilities.get_variable_name(name="parent_ig_mask", node=node)].numpy()
+            # Assertion of ig_routing_matrix is correctly derived from routing probabilities.
             if not node.isLeaf:
-                # Assertion of ig_routing_matrix is correctly derived from routing probabilities.
                 p_n_given_x = eval_dict[Utilities.get_variable_name(name="p_n_given_x", node=node)].numpy()
                 ig_routing_matrix_without_mask = eval_dict[
                     Utilities.get_variable_name(name="ig_routing_matrix_without_mask", node=node)].numpy()
@@ -548,16 +547,18 @@ class Cign:
                 ig_routing_matrix_without_mask_np[np.arange(ig_routing_matrix_without_mask_np.shape[0]),
                                                   np.argmax(p_n_given_x, axis=1)] = 1
                 assert np.array_equal(ig_routing_matrix_without_mask, ig_routing_matrix_without_mask_np)
+            # Assertion of batch_indices are correctly derived from the parent
             if not node.isRoot:
                 parent_node = self.dagObject.parents(node=node)[0]
                 node_batch_indices = eval_dict[Utilities.get_variable_name(name="batch_indices", node=node)].numpy()
                 parent_batch_indices = eval_dict[
                     Utilities.get_variable_name(name="batch_indices", node=parent_node)].numpy()
-                node_batch_indices_np = parent_batch_indices[routing_mask.astype(np.bool)]
+                sc_routing_mask = eval_dict[Utilities.get_variable_name(name="parent_sc_mask", node=node)].numpy()
+                node_batch_indices_np = parent_batch_indices[sc_routing_mask.astype(np.bool)]
                 assert np.array_equal(node_batch_indices, node_batch_indices_np)
         # Check scatter - gather operation correctness for the secondary routing matrix
         batch_size = eval_dict["batch_size"].numpy()
-        for level in range(len(self.orderedNodesPerLevel)-1):
+        for level in range(len(self.orderedNodesPerLevel) - 1):
             f_outputs = []
             ig_matrices = []
             for node in self.orderedNodesPerLevel[level]:
@@ -572,11 +573,35 @@ class Cign:
                 ig_matrix_full[batch_indices, :] = ig_mask_matrix
                 f_outputs.append(f_output_full)
                 ig_matrices.append(ig_matrix_full)
+            # Check the correctness of the scatter_nd operation
             f_outputs_np = np.concatenate(f_outputs, axis=-1)
             ig_matrix_np = np.concatenate(ig_matrices, axis=-1)
             f_outputs_tf = eval_dict["input_f_tensor_{0}".format(level)].numpy()
             ig_matrix_tf = eval_dict["ig_combined_routing_matrix_level_{0}".format(level)].numpy()
             assert np.array_equal(f_outputs_np, f_outputs_tf)
             assert np.array_equal(ig_matrix_np, ig_matrix_tf)
+            # Check the correctness of the gather_nd operation
+            sc_combined_routing_matrix = eval_dict["sc_combined_routing_matrix_level_{0}".format(level)]
+            ig_combined_routing_matrix = eval_dict["ig_combined_routing_matrix_level_{0}".format(level)]
+            curr_column = 0
+            for node in self.orderedNodesPerLevel[level]:
+                batch_indices = eval_dict[Utilities.get_variable_name(name="node_output_{0}".format("batch_indices"),
+                                                                      node=node)].numpy()
+                node_child_count = len(self.dagObject.children(node=node))
+                sc_routing_matrix_for_node = sc_combined_routing_matrix[:, curr_column: curr_column + node_child_count]
+                ig_routing_matrix_for_node = ig_combined_routing_matrix[:, curr_column: curr_column + node_child_count]
+                sc_routing_matrix_for_node_masked_np = sc_routing_matrix_for_node[batch_indices]
+                ig_routing_matrix_for_node_masked_np = ig_routing_matrix_for_node[batch_indices]
+                sc_routing_matrix_for_node_masked_tf = eval_dict[
+                    Utilities.get_variable_name(name="node_output_{0}".format("secondary_mask_matrix"),
+                                                node=node)].numpy()
+                ig_routing_matrix_for_node_masked_tf = eval_dict[
+                    Utilities.get_variable_name(name="node_output_{0}".format("ig_mask_matrix"),
+                                                node=node)].numpy()
+                ig_routing_matrix_for_node_masked_tf_2 = eval_dict[
+                    "ig_routing_matrix_for_node_{0}_reconstruction".format(node.index)]
+                assert np.array_equal(sc_routing_matrix_for_node_masked_np, sc_routing_matrix_for_node_masked_tf)
+                assert np.array_equal(ig_routing_matrix_for_node_masked_np, ig_routing_matrix_for_node_masked_tf)
+                assert np.array_equal(ig_routing_matrix_for_node_masked_np, ig_routing_matrix_for_node_masked_tf_2)
+                curr_column += node_child_count
         print("X")
-
