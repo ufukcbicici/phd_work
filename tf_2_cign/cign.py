@@ -604,4 +604,14 @@ class Cign:
                 assert np.array_equal(ig_routing_matrix_for_node_masked_np, ig_routing_matrix_for_node_masked_tf)
                 assert np.array_equal(ig_routing_matrix_for_node_masked_np, ig_routing_matrix_for_node_masked_tf_2)
                 curr_column += node_child_count
+        # Check that every row of the concatenated ig routing matrices for each level sums up to exactly 1.
+        for level in range(len(self.orderedNodesPerLevel) - 1):
+            sc_combined_routing_matrix = eval_dict["sc_combined_routing_matrix_level_{0}".format(level)]
+            ig_combined_routing_matrix = eval_dict["ig_combined_routing_matrix_level_{0}".format(level)]
+            assert len(sc_combined_routing_matrix.shape) == 2
+            assert len(ig_combined_routing_matrix.shape) == 2
+            assert sc_combined_routing_matrix.shape == batch_size
+            assert ig_combined_routing_matrix == batch_size
+            ig_rows_summed = np.sum(ig_combined_routing_matrix, axis=-1)
+            assert np.array_equal(ig_rows_summed, np.ones_like(ig_rows_summed))
         print("X")
