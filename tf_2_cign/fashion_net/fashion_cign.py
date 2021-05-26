@@ -41,28 +41,6 @@ class FashionCign(Cign):
         h_net = tf.keras.layers.Dropout(rate=self.decisionDropProbability)(h_net)
         return h_net
 
-    def conv_block(self, node, input_net, kernel_sizes, filter_counts, strides, pool_dims):
-        length_set = {len(kernel_sizes), len(filter_counts), len(strides), len(pool_dims)}
-        assert len(length_set) == 1
-        layer_count = list(length_set)[0]
-
-        net = input_net
-        for layer_id in range(layer_count):
-            kernel_size = kernel_sizes[layer_id]
-            num_of_filters = filter_counts[layer_id]
-            stride = strides[layer_id]
-            pool_size = pool_dims[layer_id]
-            net = Cign.conv_layer(x=net,
-                                  kernel_size=kernel_size,
-                                  num_of_filters=num_of_filters,
-                                  strides=stride,
-                                  node=node,
-                                  activation="relu",
-                                  use_bias=True,
-                                  padding="same")
-            net = tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding="same")(net)
-        return net
-
     def dense_block(self, node, input_net, dims, use_dropout):
         net = input_net
         for layer_id, hidden_dim in enumerate(dims):

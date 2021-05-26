@@ -28,8 +28,8 @@ decision_dimensions = [128, 128]
 node_build_funcs = [FashionCign.inner_func, FashionCign.inner_func, FashionCign.leaf_func]
 
 if __name__ == "__main__":
-    # gpus = tf.config.list_physical_devices('GPU')
-    # tf.config.experimental.set_memory_growth(gpus[0], True)
+    gpus = tf.config.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(gpus[0], True)
 
     fashion_mnist = FashionMnist(batch_size=batch_size)
     softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
@@ -37,23 +37,24 @@ if __name__ == "__main__":
                                                       decay_coefficient=softmax_decay_coefficient,
                                                       decay_period=softmax_decay_period,
                                                       decay_min_limit=softmax_decay_min_limit)
-    cign = FashionCign(input_dims=input_dims,
-                       node_degrees=degree_list,
-                       filter_counts=filter_counts,
-                       kernel_sizes=kernel_sizes,
-                       hidden_layers=hidden_layers,
-                       decision_drop_probability=decision_drop_probability,
-                       classification_drop_probability=drop_probability,
-                       decision_wd=decision_wd,
-                       classification_wd=classification_wd,
-                       decision_dimensions=decision_dimensions,
-                       node_build_funcs=node_build_funcs,
-                       class_count=10,
-                       information_gain_balance_coeff=1.0,
-                       softmax_decay_controller=softmax_decay_controller)
-    cign.build_network()
+    with tf.device("GPU"):
+        cign = FashionCign(input_dims=input_dims,
+                           node_degrees=degree_list,
+                           filter_counts=filter_counts,
+                           kernel_sizes=kernel_sizes,
+                           hidden_layers=hidden_layers,
+                           decision_drop_probability=decision_drop_probability,
+                           classification_drop_probability=drop_probability,
+                           decision_wd=decision_wd,
+                           classification_wd=classification_wd,
+                           decision_dimensions=decision_dimensions,
+                           node_build_funcs=node_build_funcs,
+                           class_count=10,
+                           information_gain_balance_coeff=1.0,
+                           softmax_decay_controller=softmax_decay_controller)
+        cign.build_network()
 
-    cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
+        cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
 
 
 

@@ -7,6 +7,7 @@ from auxillary.dag_utilities import Dag
 from simple_tf.uncategorized.node import Node
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
 from tf_2_cign.utilities import Utilities
+import time
 
 
 # tf.autograph.set_verbosity(10, True)
@@ -52,6 +53,8 @@ class Cign:
         self.nodeOutputsDict = {}
         # Routing temperatures
         self.routingTemperatures = {}
+        # Masked Batch Norm Layers
+        self.maskedBatchNormOps = {}
         # Feed dict
         self.feedDict = {"inputs": self.inputs, "labels": self.labels}
         # # Information Gain Mask Matrices
@@ -88,84 +91,6 @@ class Cign:
                                     key=lambda c_node: c_node.index))}
         sibling_index = siblings_dict[node.index]
         return sibling_index
-
-    # REVISION OK
-    @staticmethod
-    def conv_layer(x, kernel_size, num_of_filters, strides, node, activation,
-                   use_bias=True, padding="same", name="conv_op"):
-        assert len(x.get_shape().as_list()) == 4
-        assert strides[0] == strides[1]
-        # shape = [filter_size, filter_size, in_filters, out_filters]
-        num_of_input_channels = x.get_shape().as_list()[3]
-        height_of_input_map = x.get_shape().as_list()[2]
-        width_of_input_map = x.get_shape().as_list()[1]
-        height_of_filter = kernel_size
-        width_of_filter = kernel_size
-        num_of_output_channels = num_of_filters
-        convolution_stride = strides[0]
-        cost = Utilities.calculate_mac_of_computation(
-            num_of_input_channels=num_of_input_channels,
-            height_of_input_map=height_of_input_map, width_of_input_map=width_of_input_map,
-            height_of_filter=height_of_filter, width_of_filter=width_of_filter,
-            num_of_output_channels=num_of_output_channels, convolution_stride=convolution_stride
-        )
-        if node is not None:
-            node.macCost += cost
-            op_id = 0
-            while True:
-                if "{0}_{1}".format(name, op_id) in node.opMacCostsDict:
-                    op_id += 1
-                    continue
-                break
-            op_name = "{0}_{1}".format(name, op_id)
-            node.opMacCostsDict[op_name] = cost
-        else:
-            op_name = ""
-        # Apply operation
-        net = tf.keras.layers.Conv2D(filters=num_of_filters,
-                                     kernel_size=kernel_size,
-                                     activation=activation,
-                                     strides=strides,
-                                     padding=padding,
-                                     use_bias=use_bias,
-                                     name=Utilities.get_variable_name(name="ConvLayer_{0}".format(op_name),
-                                                                      node=node))(x)
-        return net
-
-    # REVISION OK
-    @staticmethod
-    def fc_layer(x, output_dim, activation, node, use_bias=True, name="fc_op"):
-        assert len(x.get_shape().as_list()) == 2
-        num_of_input_channels = x.get_shape().as_list()[1]
-        num_of_output_channels = output_dim
-        cost = Utilities.calculate_mac_of_computation(num_of_input_channels=num_of_input_channels,
-                                                      height_of_input_map=1,
-                                                      width_of_input_map=1,
-                                                      height_of_filter=1,
-                                                      width_of_filter=1,
-                                                      num_of_output_channels=num_of_output_channels,
-                                                      convolution_stride=1,
-                                                      type="fc")
-        if node is not None:
-            node.macCost += cost
-            op_id = 0
-            while True:
-                if "{0}_{1}".format(name, op_id) in node.opMacCostsDict:
-                    op_id += 1
-                    continue
-                break
-            op_name = "{0}_{1}".format(name, op_id)
-            node.opMacCostsDict[op_name] = cost
-        else:
-            op_name = ""
-
-        # Apply operation
-        net = tf.keras.layers.Dense(units=output_dim,
-                                    activation=activation,
-                                    use_bias=use_bias,
-                                    name=Utilities.get_variable_name(name="DenseLayer_{0}".format(op_name),
-                                                                     node=node))(x)
-        return net
 
     def build_tree(self):
         # Create itself
@@ -215,6 +140,11 @@ class Cign:
                 # Build information gain based routing matrices after a level's nodes being built
                 # (if not the final layer)
                 if level < len(self.orderedNodesPerLevel) - 1:
+                    # Inputs for the routing temperature and the masked batch normalization layer
+                    self.routingTemperatures[node.index] = \
+                        tf.keras.Input(shape=(), name="routingTemperature_{0}".format(node.index))
+                    self.feedDict["routingTemperature_{0}".format(node.index)] = self.routingTemperatures[node.index]
+                    self.maskedBatchNormOps[node.index] = MaskedBatchNormalization(momentum=self.bnMomentum)
                     self.apply_decision(node=node, ig_mask=ig_mask)
                 else:
                     self.apply_classification_loss(node=node)
@@ -268,10 +198,14 @@ class Cign:
     def build_final_model(self):
         # Build the final loss
         # Temporary model for getting the list of trainable variables
+        # self.model = tf.keras.Model(inputs=self.feedDict,
+        #                             outputs=[self.evalDict,
+        #                                      self.classificationLosses,
+        #                                      self.informationGainRoutingLosses])
         self.model = tf.keras.Model(inputs=self.feedDict,
-                                    outputs=[self.evalDict,
-                                             self.classificationLosses,
+                                    outputs=[self.classificationLosses,
                                              self.informationGainRoutingLosses])
+
         # self.model2 = tf.keras.Model(inputs=[self.inputs, self.labels, self.routingTemperatures[0]],
         #                              outputs=self.nodeOutputsDict[0])
         # self.model3 = tf.keras.Model(inputs=self.feedDict,
@@ -334,7 +268,7 @@ class Cign:
         node_degree = self.degreeList[node.depth]
         # Calculate routing probabilities
         h_ig_net = tf.boolean_mask(h_net, ig_mask)
-        h_net_normed = MaskedBatchNormalization(momentum=self.bnMomentum)([h_net, h_ig_net])
+        h_net_normed = self.maskedBatchNormOps[node.index]([h_net, h_ig_net])
         activations = Cign.fc_layer(x=h_net_normed,
                                     output_dim=node_degree,
                                     activation=None,
@@ -342,9 +276,6 @@ class Cign:
                                     name="fc_op_decision",
                                     use_bias=True)
         # Routing temperatures
-        self.routingTemperatures[node.index] = \
-            tf.keras.Input(shape=(), name="routingTemperature_{0}".format(node.index))
-        self.feedDict["routingTemperature_{0}".format(node.index)] = self.routingTemperatures[node.index]
         activations_with_temperature = activations / self.routingTemperatures[node.index]
         p_n_given_x = tf.nn.softmax(activations_with_temperature)
         p_c_given_x = tf.one_hot(labels, self.classCount)
@@ -490,13 +421,21 @@ class Cign:
     def train_step(self, x, y, iteration):
         # eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
         with tf.GradientTape() as tape:
+            t0 = time.time()
             feed_dict = self.get_feed_dict(x=x, y=y, iteration=iteration)
-            eval_dict, classification_losses, info_gain_losses = self.model(inputs=feed_dict, training=True)
+            t1 = time.time()
+            classification_losses, info_gain_losses = self.model(inputs=feed_dict, training=True)
+            t2 = time.time()
             total_loss = self.calculate_total_loss(classification_losses=classification_losses,
                                                    info_gain_losses=info_gain_losses)
-            self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
+            t3 = time.time()
+            # self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
+            t4 = time.time()
         grads = tape.gradient(total_loss, self.model.trainable_variables)
-        print("X")
+        t5 = time.time()
+        print("total={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
+              " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
+              format(t5-t0, t1-t0, t2-t1, t3-t2, t4-t3, t5-t4))
 
         # with tf.GradientTape() as tape:
         #     # Get softmax decay value
@@ -581,8 +520,8 @@ class Cign:
             assert np.array_equal(f_outputs_np, f_outputs_tf)
             assert np.array_equal(ig_matrix_np, ig_matrix_tf)
             # Check the correctness of the gather_nd operation
-            sc_combined_routing_matrix = eval_dict["sc_combined_routing_matrix_level_{0}".format(level)]
-            ig_combined_routing_matrix = eval_dict["ig_combined_routing_matrix_level_{0}".format(level)]
+            sc_combined_routing_matrix = eval_dict["sc_combined_routing_matrix_level_{0}".format(level)].numpy()
+            ig_combined_routing_matrix = eval_dict["ig_combined_routing_matrix_level_{0}".format(level)].numpy()
             curr_column = 0
             for node in self.orderedNodesPerLevel[level]:
                 batch_indices = eval_dict[Utilities.get_variable_name(name="node_output_{0}".format("batch_indices"),
@@ -599,19 +538,19 @@ class Cign:
                     Utilities.get_variable_name(name="node_output_{0}".format("ig_mask_matrix"),
                                                 node=node)].numpy()
                 ig_routing_matrix_for_node_masked_tf_2 = eval_dict[
-                    "ig_routing_matrix_for_node_{0}_reconstruction".format(node.index)]
+                    "ig_routing_matrix_for_node_{0}_reconstruction".format(node.index)].numpy()
                 assert np.array_equal(sc_routing_matrix_for_node_masked_np, sc_routing_matrix_for_node_masked_tf)
                 assert np.array_equal(ig_routing_matrix_for_node_masked_np, ig_routing_matrix_for_node_masked_tf)
                 assert np.array_equal(ig_routing_matrix_for_node_masked_np, ig_routing_matrix_for_node_masked_tf_2)
                 curr_column += node_child_count
         # Check that every row of the concatenated ig routing matrices for each level sums up to exactly 1.
         for level in range(len(self.orderedNodesPerLevel) - 1):
-            sc_combined_routing_matrix = eval_dict["sc_combined_routing_matrix_level_{0}".format(level)]
-            ig_combined_routing_matrix = eval_dict["ig_combined_routing_matrix_level_{0}".format(level)]
+            sc_combined_routing_matrix = eval_dict["sc_combined_routing_matrix_level_{0}".format(level)].numpy()
+            ig_combined_routing_matrix = eval_dict["ig_combined_routing_matrix_level_{0}".format(level)].numpy()
             assert len(sc_combined_routing_matrix.shape) == 2
             assert len(ig_combined_routing_matrix.shape) == 2
-            assert sc_combined_routing_matrix.shape == batch_size
-            assert ig_combined_routing_matrix == batch_size
+            assert sc_combined_routing_matrix.shape[0] == batch_size
+            assert ig_combined_routing_matrix.shape[0] == batch_size
             ig_rows_summed = np.sum(ig_combined_routing_matrix, axis=-1)
             assert np.array_equal(ig_rows_summed, np.ones_like(ig_rows_summed))
         print("X")
