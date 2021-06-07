@@ -106,11 +106,10 @@ def usps_cign_training():
     # best_hyperparameter_pairs = [(0.06, 0.00146918),
     #                              (0.06, 0.00584801),
     #                              (0.06, 0.00163591)]
-    # experiment_count_per_params = 25
-    # best_hyperparameter_pairs = experiment_count_per_params * best_hyperparameter_pairs
-    # for param_tpl in best_hyperparameter_pairs:
+    # experiment_count_per_params = 259999999999999999999999999999999999vvvvvvvvvvvvvvvvvvvvvvvvgggggggggggggggg99999999999999
+    # best_hyperparameter_pairs = experiment_count_per_params * best_hype9
     #     initial_lr = param_tpl[0]
-    #     classification_wd = param_tpl[1]
+    #     classification_wd = par0lam_tpl[1]
     #     train_func(classification_wd=classification_wd, initial_lr=initial_lr)
 
     optimizer = BayesianOptimization(

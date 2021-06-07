@@ -3,7 +3,7 @@ import tensorflow as tf
 import time
 
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
-tf.autograph.set_verbosity(10, True)
+# tf.autograph.set_verbosity(10, True)
 
 
 class WeightedBatchNormalization(tf.keras.layers.Layer):
@@ -152,8 +152,8 @@ if __name__ == "__main__":
             t0 = time.time()
             with tf.GradientTape() as tape:
                 outputs_dict = model([x1, mask_vector], training=True)
-                if (i + 1) % 100 == 0:
-                    assert np.allclose(outputs_dict["norm_result_mb"].numpy(), outputs_dict["norm_result_wb"].numpy())
+                # if (i + 1) % 100 == 0:
+                #     assert np.allclose(outputs_dict["norm_result_mb"].numpy(), outputs_dict["norm_result_wb"].numpy())
                 loss_tracker.update_state(values=outputs_dict["total_loss"])
             grads = tape.gradient(outputs_dict["total_loss"], model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))

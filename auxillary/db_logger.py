@@ -28,7 +28,7 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # TETAM 1
-    # log_db_path = "/cta/users/ucbicici/phd_work/dblogger.db"
+    log_db_path = "/cta/users/ucbicici/phd_work/dblogger.db"
 
     # TETAM 2
     # log_db_path = "/cta/users/ucbicici/phd_work/dblogger2.db"

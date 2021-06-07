@@ -8,6 +8,7 @@ from simple_tf.uncategorized.node import Node
 from tf_2_cign.cign import Cign
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
 from tf_2_cign.utilities import Utilities
+from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 import time
 
 
@@ -21,6 +22,8 @@ class CignNoMask(Cign):
         super().__init__(input_dims, class_count, node_degrees, decision_drop_probability,
                          classification_drop_probability, decision_wd, classification_wd,
                          information_gain_balance_coeff, softmax_decay_controller, bn_momentum)
+        self.weightedBatchNormOps = {}
+        self.intermediateOps = {}
 
     def build_network(self):
         self.build_tree()
@@ -37,7 +40,7 @@ class CignNoMask(Cign):
                     self.routingTemperatures[node.index] = \
                         tf.keras.Input(shape=(), name="routingTemperature_{0}".format(node.index))
                     self.feedDict["routingTemperature_{0}".format(node.index)] = self.routingTemperatures[node.index]
-                    self.maskedBatchNormOps[node.index] = MaskedBatchNormalization(momentum=self.bnMomentum)
+                    self.weightedBatchNormOps[node.index] = WeightedBatchNormalization(momentum=self.bnMomentum)
                     self.apply_decision(node=node, ig_mask=ig_mask)
                 else:
                     self.apply_classification_loss(node=node)
@@ -55,64 +58,11 @@ class CignNoMask(Cign):
         # Build the model
         self.build_final_model()
 
-    def is_decision_variable(self, variable):
-        if "scale" in variable.name or "shift" in variable.name or "hyperplane" in variable.name or \
-                "gamma" in variable.name or "beta" in variable.name or "decision" in variable.name:
-            return True
-        else:
-            return False
-
-    def calculate_regularization_coefficients(self, trainable_variables):
-        print("Num of trainable variables:{0}".format(len(trainable_variables)))
-        l2_loss_list = []
-        decayed_variables = []
-        non_decayed_variables = []
-        decision_variables = []
-        for v in trainable_variables:
-            is_decision_pipeline_variable = self.is_decision_variable(variable=v)
-            # assert (not is_decision_pipeline_variable)
-            loss_tensor = tf.nn.l2_loss(v)
-            # self.evalDict["l2_loss_{0}".format(v.name)] = loss_tensor
-            if "bias" in v.name or "shift" in v.name or "scale" in v.name or "gamma" in v.name or "beta" in v.name:
-                # non_decayed_variables.append(v)
-                # l2_loss_list.append(0.0 * loss_tensor)
-                self.regularizationCoefficients[v.ref()] = 0.0
-            else:
-                # decayed_variables.append(v)
-                if is_decision_pipeline_variable:
-                    # decision_variables.append(v)
-                    # l2_loss_list.append(self.decisionWd * loss_tensor)
-                    self.regularizationCoefficients[v.ref()] = self.decisionWd
-                else:
-                    # l2_loss_list.append(self.classificationWd * loss_tensor)
-                    self.regularizationCoefficients[v.ref()] = self.classificationWd
-        # self.regularizationLoss = tf.add_n(l2_loss_list)
-
-    def build_final_model(self):
-        # Build the final loss
-        # Temporary model for getting the list of trainable variables
-        # self.model = tf.keras.Model(inputs=self.feedDict,
-        #                             outputs=[self.evalDict,
-        #                                      self.classificationLosses,
-        #                                      self.informationGainRoutingLosses])
-        self.model = tf.keras.Model(inputs=self.feedDict,
-                                    outputs=[self.classificationLosses,
-                                             self.informationGainRoutingLosses])
-
-        # self.model2 = tf.keras.Model(inputs=[self.inputs, self.labels, self.routingTemperatures[0]],
-        #                              outputs=self.nodeOutputsDict[0])
-        # self.model3 = tf.keras.Model(inputs=self.feedDict,
-        #                              outputs=self.nodeOutputsDict[0])
-        variables = self.model.trainable_variables
-        self.calculate_regularization_coefficients(trainable_variables=variables)
-
     def mask_inputs(self, node):
         f_input, h_input, ig_mask = None, None, None
         if node.isRoot:
             ig_mask = tf.ones_like(self.labels)
             f_input = self.inputs
-            self.nodeOutputsDict[node.index]["labels"] = self.labels
-            self.nodeOutputsDict[node.index]["batch_indices"] = self.batchIndices
             self.evalDict[Utilities.get_variable_name(name="batch_indices", node=node)] = self.batchIndices
             self.evalDict[Utilities.get_variable_name(name="parent_ig_mask", node=node)] = ig_mask
             self.evalDict[Utilities.get_variable_name(name="parent_sc_mask", node=node)] = ig_mask
@@ -123,14 +73,10 @@ class CignNoMask(Cign):
             sibling_index = self.get_node_sibling_index(node=node)
             parent_ig_mask_matrix = self.nodeOutputsDict[parent_node.index]["ig_mask_matrix"]
             parent_secondary_mask_matrix = self.nodeOutputsDict[parent_node.index]["secondary_mask_matrix"]
-            parent_labels = self.nodeOutputsDict[parent_node.index]["labels"]
-            parent_batch_indices = self.nodeOutputsDict[parent_node.index]["batch_indices"]
             parent_F = self.nodeOutputsDict[parent_node.index]["F"]
             parent_H = self.nodeOutputsDict[parent_node.index]["H"]
             parent_outputs = [parent_ig_mask_matrix,
                               parent_secondary_mask_matrix,
-                              parent_labels,
-                              parent_batch_indices,
                               parent_F,
                               parent_H]
             with tf.control_dependencies(parent_outputs):
@@ -140,59 +86,64 @@ class CignNoMask(Cign):
                 self.evalDict[Utilities.get_variable_name(name="parent_ig_mask", node=node)] = parent_ig_mask
                 self.evalDict[Utilities.get_variable_name(name="parent_sc_mask", node=node)] = parent_sc_mask
                 # Mask all required data from the parent: USE SECONDARY MASK
-                ig_mask = tf.boolean_mask(parent_ig_mask, parent_sc_mask)
-                labels = tf.boolean_mask(parent_labels, parent_sc_mask)
-                batch_indices = tf.boolean_mask(parent_batch_indices, parent_sc_mask)
-                self.evalDict[Utilities.get_variable_name(name="batch_indices", node=node)] = batch_indices
-                f_input = tf.boolean_mask(parent_F, parent_sc_mask)
-                h_input = tf.boolean_mask(parent_H, parent_sc_mask)
+                ig_mask = parent_ig_mask
+                f_input = parent_F
+                h_input = parent_H
                 # Some intermediate statistics and calculations
                 sample_count_tensor = tf.reduce_sum(tf.cast(parent_sc_mask, tf.float32))
                 is_node_open = tf.greater_equal(sample_count_tensor, 0.0)
                 self.evalDict[Utilities.get_variable_name(name="sample_count", node=node)] = sample_count_tensor
                 self.evalDict[Utilities.get_variable_name(name="is_open", node=node)] = is_node_open
-                self.nodeOutputsDict[node.index]["labels"] = labels
-                self.nodeOutputsDict[node.index]["batch_indices"] = batch_indices
         return f_input, h_input, ig_mask
 
     def apply_decision(self, node, ig_mask):
         h_net = self.nodeOutputsDict[node.index]["H"]
-        labels = self.nodeOutputsDict[node.index]["labels"]
         node_degree = self.degreeList[node.depth]
-        # Calculate routing probabilities
-        h_ig_net = tf.boolean_mask(h_net, ig_mask)
-        h_net_normed = self.maskedBatchNormOps[node.index]([h_net, h_ig_net])
-        activations = Cign.fc_layer(x=h_net_normed,
-                                    output_dim=node_degree,
-                                    activation=None,
-                                    node=node,
-                                    name="fc_op_decision",
-                                    use_bias=True)
+        h_net_normed = self.weightedBatchNormOps[node.index]([net, ig_mask])
+        activation_layer = CignDenseLayer(output_dim=node_degree, activation=None,
+                                          node=node, use_bias=True, name="fc_op_decision")
+        self.intermediateOps[Utilities.get_variable_name(name="fc_op_decision", node=node)] = activation_layer
+        activations = activation_layer(h_net_normed)
         # Routing temperatures
         activations_with_temperature = activations / self.routingTemperatures[node.index]
         p_n_given_x = tf.nn.softmax(activations_with_temperature)
         p_c_given_x = tf.one_hot(labels, self.classCount)
-        p_n_given_x_masked = tf.boolean_mask(p_n_given_x, ig_mask)
-        p_c_given_x_masked = tf.boolean_mask(p_c_given_x, ig_mask)
-        self.evalDict[Utilities.get_variable_name(name="p_n_given_x", node=node)] = p_n_given_x
-        self.evalDict[Utilities.get_variable_name(name="p_c_given_x", node=node)] = p_c_given_x
-        self.evalDict[Utilities.get_variable_name(name="p_n_given_x_masked", node=node)] = p_n_given_x_masked
-        self.evalDict[Utilities.get_variable_name(name="p_c_given_x_masked", node=node)] = p_c_given_x_masked
-        # Information gain loss
+
+
+        # # Calculate routing probabilities
+        # h_ig_net = tf.boolean_mask(h_net, ig_mask)
+        # h_net_normed = self.maskedBatchNormOps[node.index]([h_net, h_ig_net])
+        # activations = Cign.fc_layer(x=h_net_normed,
+        #                             output_dim=node_degree,
+        #                             activation=None,
+        #                             node=node,
+        #                             name="fc_op_decision",
+        #                             use_bias=True)
+        # # Routing temperatures
+        # activations_with_temperature = activations / self.routingTemperatures[node.index]
+        # p_n_given_x = tf.nn.softmax(activations_with_temperature)
+        # p_c_given_x = tf.one_hot(labels, self.classCount)
+        # p_n_given_x_masked = tf.boolean_mask(p_n_given_x, ig_mask)
+        # p_c_given_x_masked = tf.boolean_mask(p_c_given_x, ig_mask)
+        # self.evalDict[Utilities.get_variable_name(name="p_n_given_x", node=node)] = p_n_given_x
+        # self.evalDict[Utilities.get_variable_name(name="p_c_given_x", node=node)] = p_c_given_x
+        # self.evalDict[Utilities.get_variable_name(name="p_n_given_x_masked", node=node)] = p_n_given_x_masked
+        # self.evalDict[Utilities.get_variable_name(name="p_c_given_x_masked", node=node)] = p_c_given_x_masked
+        # # Information gain loss
         information_gain = InfoGainLoss.get_loss(p_n_given_x_2d=p_n_given_x_masked,
                                                  p_c_given_x_2d=p_c_given_x_masked,
                                                  balance_coefficient=self.informationGainBalanceCoeff)
-        self.informationGainRoutingLosses[node.index] = information_gain
-        self.evalDict[Utilities.get_variable_name(name="information_gain", node=node)] = information_gain
-        # Information gain based routing matrix
-        ig_routing_matrix = tf.one_hot(tf.argmax(p_n_given_x, axis=1), node_degree, dtype=tf.int32)
-        self.evalDict[Utilities.get_variable_name(name="ig_routing_matrix_without_mask", node=node)] = ig_routing_matrix
-        mask_as_matrix = tf.expand_dims(ig_mask, axis=1)
-        assert "ig_mask_matrix" not in self.nodeOutputsDict[node.index]
-        self.nodeOutputsDict[node.index]["ig_mask_matrix"] = \
-            tf.cast(
-                tf.logical_and(tf.cast(ig_routing_matrix, dtype=tf.bool), tf.cast(mask_as_matrix, dtype=tf.bool)),
-                dtype=tf.int32)
+        # self.informationGainRoutingLosses[node.index] = information_gain
+        # self.evalDict[Utilities.get_variable_name(name="information_gain", node=node)] = information_gain
+        # # Information gain based routing matrix
+        # ig_routing_matrix = tf.one_hot(tf.argmax(p_n_given_x, axis=1), node_degree, dtype=tf.int32)
+        # self.evalDict[Utilities.get_variable_name(name="ig_routing_matrix_without_mask", node=node)] = ig_routing_matrix
+        # mask_as_matrix = tf.expand_dims(ig_mask, axis=1)
+        # assert "ig_mask_matrix" not in self.nodeOutputsDict[node.index]
+        # self.nodeOutputsDict[node.index]["ig_mask_matrix"] = \
+        #     tf.cast(
+        #         tf.logical_and(tf.cast(ig_routing_matrix, dtype=tf.bool), tf.cast(mask_as_matrix, dtype=tf.bool)),
+        #         dtype=tf.int32)
 
     def apply_classification_loss(self, node):
         f_net = self.nodeOutputsDict[node.index]["F"]

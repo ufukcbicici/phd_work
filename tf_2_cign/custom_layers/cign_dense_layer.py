@@ -22,11 +22,19 @@ class CignDenseLayer(tf.keras.layers.Layer):
         self.node = node
         self.opName = op_name
         self.outputDim = output_dim
-        self.layer = tf.keras.layers.Dense(units=self.outputDim,
-                                           activation=activation,
-                                           use_bias=use_bias,
-                                           name=Utilities.get_variable_name(name="DenseLayer_{0}".format(self.opName),
-                                                                            node=node))
+        if self.node is not None:
+            self.layer = tf.keras.layers.Dense(
+                units=self.outputDim,
+                activation=activation,
+                use_bias=use_bias,
+                name=Utilities.get_variable_name(name="DenseLayer_{0}".format(self.opName),
+                                                 node=node))
+        else:
+            self.layer = tf.keras.layers.Dense(
+                units=self.outputDim,
+                activation=activation,
+                use_bias=use_bias,
+                name="DenseLayer")
 
     def build(self, input_shape):
         assert len(input_shape.as_list()) == 2
@@ -40,8 +48,9 @@ class CignDenseLayer(tf.keras.layers.Layer):
                                                       num_of_output_channels=num_of_output_channels,
                                                       convolution_stride=1,
                                                       type="fc")
-        self.node.macCost += cost
-        self.node.opMacCostsDict[self.opName] = cost
+        if self.node is not None:
+            self.node.macCost += cost
+            self.node.opMacCostsDict[self.opName] = cost
 
     def call(self, inputs, **kwargs):
         net = self.layer(inputs)
