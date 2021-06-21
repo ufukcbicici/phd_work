@@ -13,7 +13,7 @@ class InfoGainLayer(tf.keras.layers.Layer):
         self.classCount = tf.constant(class_count)
 
     @tf.function
-    def call(self, *inputs, **kwargs):
+    def call(self, inputs, **kwargs):
         activations = inputs[0]
         labels = inputs[1]
         temperature = inputs[2]
@@ -75,14 +75,15 @@ if __name__ == "__main__":
         ig_layer = InfoGainLayer(class_count=classes)
         # IG with weights
         x_input = tf.keras.Input(shape=(dim,), name="x_input")
+        b_ = tf.keras.Input(shape=(), name="balance")
         t_ = tf.keras.Input(shape=(), name="temperature")
         l_ = tf.keras.Input(shape=(), name="labels", dtype=tf.int32)
         w_ = tf.keras.Input(shape=(), name="weight_vector", dtype=tf.int32)
 
         act = activation_layer(x_input)
-        ig_value = ig_layer(act, l_, t_, balance, w_)
+        ig_value = ig_layer((act, l_, t_, b_, w_))
 
-        ig_model_1 = tf.keras.Model(inputs=[x_input, t_, l_, w_], outputs={"ig_value": ig_value})
+        ig_model_1 = tf.keras.Model(inputs=[x_input, t_, l_, w_, b_], outputs={"ig_value": ig_value})
 
         # MODEL 2
         x_input_2 = tf.keras.Input(shape=(dim,), name="x_input_2")
@@ -109,7 +110,7 @@ if __name__ == "__main__":
             class_labels = np.random.randint(low=0, high=classes, size=(bs,))
 
             t0 = time.time()
-            outputs_dict1 = ig_model_1([x, temp, class_labels, mask_vector], training=True)
+            outputs_dict1 = ig_model_1([x, temp, class_labels, mask_vector, balance], training=True)
             t1 = time.time()
             outputs_dict2 = ig_model_2([x, temp, class_labels, mask_vector], training=True)
             t2 = time.time()

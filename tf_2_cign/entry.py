@@ -48,7 +48,6 @@ if __name__ == "__main__":
                            decision_wd=decision_wd,
                            classification_wd=classification_wd,
                            decision_dimensions=decision_dimensions,
-                           node_build_funcs=node_build_funcs,
                            class_count=10,
                            information_gain_balance_coeff=1.0,
                            softmax_decay_controller=softmax_decay_controller)

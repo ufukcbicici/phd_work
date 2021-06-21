@@ -152,13 +152,20 @@ if __name__ == "__main__":
             t0 = time.time()
             with tf.GradientTape() as tape:
                 outputs_dict = model([x1, mask_vector], training=True)
-                # if (i + 1) % 100 == 0:
-                #     assert np.allclose(outputs_dict["norm_result_mb"].numpy(), outputs_dict["norm_result_wb"].numpy())
+                if (i + 1) % 1000 == 0:
+                    assert np.allclose(outputs_dict["norm_result_mb"].numpy(), outputs_dict["norm_result_wb"].numpy())
+                    # Compare population means
+                    assert np.allclose(model.variables[4].numpy(), model.variables[9].numpy())
+                    # Compare population variances
+                    assert np.allclose(model.variables[5].numpy(), model.variables[10].numpy())
+                    print("All Assertions Work!!!")
+                    # assert np.allclose(model.variables[4])
                 loss_tracker.update_state(values=outputs_dict["total_loss"])
             grads = tape.gradient(outputs_dict["total_loss"], model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
             t1 = time.time()
             print("{0} Loss:{1} Time:{2}".format(i, loss_tracker.result().numpy(), t1 - t0))
+
         results = model([x1, mask_vector], training=False)
 
         print("x")
