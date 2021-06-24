@@ -10,6 +10,8 @@ from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
 from tf_2_cign.utilities import Utilities
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 from tf_2_cign.custom_layers.cign_masking_layer import CignMaskingLayer
+from tf_2_cign.custom_layers.cign_decision_layer import CignDecisionLayer
+from tf_2_cign.custom_layers.cign_classification_layer import CignClassificationLayer
 import time
 
 
@@ -26,15 +28,33 @@ class CignNoMask(Cign):
         self.weightedBatchNormOps = {}
         self.maskingLayers = {}
         self.decisionLayers = {}
+        self.leafLossLayers = {}
         self.nodeFunctions = {}
+        self.isRootDict = {}
 
     def node_build_func(self, node, f_input, h_input, ig_mask, sc_mask):
         pass
 
+    # We don't apply actual masking anymore. We can remove this layer later.
     def mask_inputs(self, node):
         self.maskingLayers[node.index] = CignMaskingLayer(network=self, node=node)
+
+        if node.isRoot:
+            sibling_index = tf.constant(0)
+            parent_ig_matrix = tf.expand_dims(tf.ones_like(self.network.labels), axis=1)
+            parent_sc_matrix = tf.expand_dims(tf.ones_like(self.network.labels), axis=1)
+            parent_F = self.network.inputs
+            parent_H = None
+        else:
+            sibling_index = tf.constant(self.network.get_node_sibling_index(node=node))
+            parent_ig_matrix = self.network.nodeOutputsDict[self.parentNode.index]["ig_mask_matrix"]
+            parent_sc_matrix = self.network.nodeOutputsDict[self.parentNode.index]["secondary_mask_matrix"]
+            parent_F = self.network.nodeOutputsDict[self.parentNode.index]["F"]
+            parent_H = self.network.nodeOutputsDict[self.parentNode.index]["H"]
+
         f_input, h_input, ig_mask, sc_mask, sample_count, is_node_open = \
-            self.maskingLayers[node.index]()
+            self.maskingLayers[node.index]([parent_F, parent_H, parent_ig_matrix, parent_sc_matrix, sibling_index])
+
         self.evalDict[Utilities.get_variable_name(name="f_input", node=node)] = f_input
         self.evalDict[Utilities.get_variable_name(name="h_input", node=node)] = h_input
         self.evalDict[Utilities.get_variable_name(name="ig_mask", node=node)] = ig_mask
@@ -43,14 +63,11 @@ class CignNoMask(Cign):
         self.evalDict[Utilities.get_variable_name(name="is_node_open", node=node)] = is_node_open
         return f_input, h_input, ig_mask, sc_mask
 
+    # Provide F and H outputs for a given node.
     def apply_node_funcs(self, node, f_input, h_input, ig_mask, sc_mask):
         node_func = \
             self.node_build_func(node=node, f_input=f_input, h_input=h_input, ig_mask=ig_mask, sc_mask=sc_mask)
         self.nodeFunctions[node.index] = node_func
-        # f_input = inputs[0]
-        # h_input = inputs[1]
-        # ig_mask = inputs[2]
-        # sc_mask = inputs[3]
         self.nodeOutputsDict[node.index]["H"] = None
         if not node.isLeaf:
             f_net, h_net, pre_branch_feature = self.nodeFunctions[node.index]([f_input, h_input, ig_mask, sc_mask])
@@ -62,12 +79,46 @@ class CignNoMask(Cign):
         self.evalDict[Utilities.get_variable_name(name="f_net", node=node)] = f_net
         self.nodeOutputsDict[node.index]["F"] = f_net
 
+    # Provide ig_mask_matrix output for a given inner node and calculate the information gain loss.
+    def apply_decision(self, node, ig_mask, h_input=None):
+        assert h_input is not None
+        self.decisionLayers[node.index] = CignDecisionLayer(network=self, node=node,
+                                                            decision_bn_momentum=self.bnMomentum)
+        labels = self.labels
+        temperature = self.routingTemperatures[node.index]
+
+        h_net_normed, ig_value, output_ig_routing_matrix = self.decisionLayers[node.index]([
+            h_input, ig_mask, labels, temperature])
+        self.informationGainRoutingLosses[node.index] = ig_value
+
+        self.evalDict[Utilities.get_variable_name(name="h_net_normed", node=node)] = h_net_normed
+        self.evalDict[Utilities.get_variable_name(name="ig_value", node=node)] = ig_value
+        self.evalDict[Utilities.get_variable_name(name="output_ig_routing_matrix",
+                                                  node=node)] = output_ig_routing_matrix
+        self.network.nodeOutputsDict[node.index]["ig_mask_matrix"] = output_ig_routing_matrix
+
+    # Calculate the cross entropy loss for this leaf node; by paying attention to the secondary mask vector.
+    def apply_classification_loss(self, node, f_input=None, sc_mask=None):
+        assert f_input is not None and sc_mask is not None
+        self.leafLossLayers[node.index] = CignClassificationLayer(network=self, node=node, class_count=self.classCount)
+
+
+        # f_net = self.nodeOutputsDict[node.index]["F"]
+        # labels = self.nodeOutputsDict[node.index]["labels"]
+        # logits = Cign.fc_layer(x=f_net, output_dim=self.classCount, activation=None, node=node, use_bias=True)
+        # cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels,
+        #                                                                            logits=logits)
+        # pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
+        # loss = tf.where(tf.math.is_nan(pre_loss), 0.0, pre_loss)
+        # self.classificationLosses[node.index] = loss
+
     def build_network(self):
         self.build_tree()
         self.isBaseline = len(self.topologicalSortedNodes) == 1
         # Build all operations in each node -> Level by level
         for level in range(len(self.orderedNodesPerLevel)):
             for node in self.orderedNodesPerLevel[level]:
+                self.isRootDict[node.index] = tf.constant(node.isRoot)
                 # Masking Layer
                 f_input, h_input, ig_mask, sc_mask = self.mask_inputs(node=node)
                 # Actions to be done in the node
@@ -76,10 +127,9 @@ class CignNoMask(Cign):
                 if level < len(self.orderedNodesPerLevel) - 1:
                     self.routingTemperatures[node.index] = \
                         tf.keras.Input(shape=(), name="routingTemperature_{0}".format(node.index))
-
-
-
-
+                    self.apply_decision(node=node, ig_mask=ig_mask, h_input=h_input)
+                else:
+                    # self.
 
                 # node_func =\
                 #     self.node_build_func(node=node, f_input=f_input, h_input=h_input, ig_mask=ig_mask, sc_mask=sc_mask)

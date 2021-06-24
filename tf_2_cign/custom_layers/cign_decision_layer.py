@@ -15,22 +15,23 @@ class CignDecisionLayer(tf.keras.layers.Layer):
         self.network = network
         self.cignNode = node
         self.nodeDegree = self.degreeList[node.depth]
+        self.infoGainLayer = InfoGainLayer(class_count=self.network.classCount)
         self.decisionBnMomentum = decision_bn_momentum
         self.decisionBatchNorm = WeightedBatchNormalization(momentum=self.decisionBnMomentum)
-        self.hNet = self.nodeOutputsDict[node.index]["H"]
         self.decisionActivationsLayer = CignDenseLayer(output_dim=self.nodeDegree, activation=None,
                                                        node=node, use_bias=True, name="fc_op_decision")
-        self.routingTemperature = self.routingTemperatures[self.cignNode.index]
-        self.infoGainLayer = InfoGainLayer(class_count=self.network.classCount)
-        self.labels = self.network.labels
         self.balanceCoeff = self.network.informationGainBalanceCoeff
 
     def call(self, inputs, **kwargs):
-        ig_mask = inputs
+        h_net = inputs[0]
+        ig_mask = inputs[1]
+        labels = inputs[2]
+        temperature = inputs[3]
+
         # Apply weighted batch norm to the h features
-        h_net_normed = self.decisionBatchNorm([self.hNet, ig_mask])
+        h_net_normed = self.decisionBatchNorm([h_net, ig_mask])
         activations = self.decisionActivationsLayer(h_net_normed)
-        ig_value = self.infoGainLayer([activations, self.labels, self.routingTemperature, self.balanceCoeff, ig_mask])
+        ig_value = self.infoGainLayer([activations, labels, temperature, self.balanceCoeff, ig_mask])
         # Information gain based routing matrix
         ig_routing_matrix = tf.one_hot(tf.argmax(activations, axis=1), self.nodeDegree, dtype=tf.int32)
         mask_as_matrix = tf.expand_dims(ig_mask, axis=1)
