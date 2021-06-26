@@ -101,16 +101,17 @@ class CignNoMask(Cign):
     def apply_classification_loss(self, node, f_input=None, sc_mask=None):
         assert f_input is not None and sc_mask is not None
         self.leafLossLayers[node.index] = CignClassificationLayer(network=self, node=node, class_count=self.classCount)
+        labels = self.labels
 
+        cross_entropy_loss_tensor, probability_vector, weighted_losses, loss = self.leafLossLayers[node.index](
+            [f_input, sc_mask, labels])
+        self.classificationLosses[node.index] = loss
 
-        # f_net = self.nodeOutputsDict[node.index]["F"]
-        # labels = self.nodeOutputsDict[node.index]["labels"]
-        # logits = Cign.fc_layer(x=f_net, output_dim=self.classCount, activation=None, node=node, use_bias=True)
-        # cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels,
-        #                                                                            logits=logits)
-        # pre_loss = tf.reduce_mean(cross_entropy_loss_tensor)
-        # loss = tf.where(tf.math.is_nan(pre_loss), 0.0, pre_loss)
-        # self.classificationLosses[node.index] = loss
+        self.evalDict[Utilities.get_variable_name(name="cross_entropy_loss_tensor", node=node)] = \
+            cross_entropy_loss_tensor
+        self.evalDict[Utilities.get_variable_name(name="probability_vector", node=node)] = probability_vector
+        self.evalDict[Utilities.get_variable_name(name="weighted_losses", node=node)] = weighted_losses
+        self.evalDict[Utilities.get_variable_name(name="loss", node=node)] = loss
 
     def build_network(self):
         self.build_tree()
