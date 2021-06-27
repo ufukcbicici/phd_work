@@ -15,7 +15,7 @@ class CignMaskingLayer(tf.keras.layers.Layer):
         if node.isRoot:
             self.siblingIndex = 0
         else:
-            self.siblingIndex = self.get_node_sibling_index(node=node)
+            self.siblingIndex = self.network.get_node_sibling_index(node=node)
 
     def call(self, inputs, **kwargs):
         f_input = inputs[0]
