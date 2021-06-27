@@ -14,7 +14,7 @@ class CignDecisionLayer(tf.keras.layers.Layer):
         super().__init__()
         self.network = network
         self.cignNode = node
-        self.nodeDegree = self.degreeList[node.depth]
+        self.nodeDegree = self.network.degreeList[node.depth]
         self.infoGainLayer = InfoGainLayer(class_count=self.network.classCount)
         self.decisionBnMomentum = decision_bn_momentum
         self.decisionBatchNorm = WeightedBatchNormalization(momentum=self.decisionBnMomentum)

@@ -30,7 +30,7 @@ class FashionCign(CignNoMask):
         self.hiddenLayers = hidden_layers
         self.decisionDimensions = decision_dimensions
 
-    def node_build_func(self, node, f_input, h_input, ig_mask, sc_mask):
+    def node_build_func(self, node):
         if not node.isLeaf:
             node_func = FashionNetInnerNodeFunc(node=node,
                                                 network=self,

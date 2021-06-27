@@ -13,6 +13,7 @@ class FashionNetLeafNodeFunc(tf.keras.layers.Layer):
         super().__init__()
         self.node = node
         self.network = network
+        # F Operations - Conv layer
         self.convLayer = CignConvLayer(kernel_size=kernel_size,
                                        num_of_filters=num_of_filters,
                                        strides=strides,
@@ -20,6 +21,8 @@ class FashionNetLeafNodeFunc(tf.keras.layers.Layer):
                                        activation=activation,
                                        use_bias=use_bias,
                                        padding=padding)
+        self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2)
+        # F Operations - Dense Layers
         self.hiddenLayerDims = hidden_layer_dims
         self.flattenLayer = tf.keras.layers.Flatten()
         self.hiddenLayers = []
@@ -42,6 +45,7 @@ class FashionNetLeafNodeFunc(tf.keras.layers.Layer):
 
         # F ops -  # 1 Conv layer
         f_net = self.convLayer(f_input)
+        f_net = self.maxPoolLayer(f_net)
 
         # F ops - Dense layers
         f_net = self.flattenLayer(f_net)

@@ -42,13 +42,14 @@ class WeightedBatchNormalization(tf.keras.layers.Layer):
                                            dtype=tf.int32,
                                            trainable=False)
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         x_ = inputs[0]
         weight_vector = inputs[1]
         is_training = kwargs["training"]
         population_count = tf.reduce_prod(tf.shape(x_)[1:-1])
         probability_vector = weight_vector / tf.reduce_sum(weight_vector)
+        probability_vector = tf.cast(probability_vector, dtype=x_.dtype)
         probability_tensor = tf.ones_like(x_)
         probability_vector_expanded = tf.identity(probability_vector)
         for idx in range(len(x_.get_shape()) - 1):

@@ -262,7 +262,7 @@ class Cign:
                 self.nodeOutputsDict[node.index]["batch_indices"] = batch_indices
         return f_input, h_input, ig_mask
 
-    def apply_decision(self, node, ig_mask, h_input=None):
+    def apply_decision(self, node, ig_mask, h_net=None):
         h_net = self.nodeOutputsDict[node.index]["H"]
         labels = self.nodeOutputsDict[node.index]["labels"]
         node_degree = self.degreeList[node.depth]
@@ -301,7 +301,7 @@ class Cign:
                 tf.logical_and(tf.cast(ig_routing_matrix, dtype=tf.bool), tf.cast(mask_as_matrix, dtype=tf.bool)),
                 dtype=tf.int32)
 
-    def apply_classification_loss(self, node, f_input=None, sc_mask=None):
+    def apply_classification_loss(self, node, f_net=None, sc_mask=None):
         f_net = self.nodeOutputsDict[node.index]["F"]
         labels = self.nodeOutputsDict[node.index]["labels"]
         logits = Cign.fc_layer(x=f_net, output_dim=self.classCount, activation=None, node=node, use_bias=True)

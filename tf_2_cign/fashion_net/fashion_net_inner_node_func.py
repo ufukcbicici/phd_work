@@ -13,6 +13,7 @@ class FashionNetInnerNodeFunc(tf.keras.layers.Layer):
         super().__init__()
         self.node = node
         self.network = network
+        # F operations - OK; checked
         self.convLayer = CignConvLayer(kernel_size=kernel_size,
                                        num_of_filters=num_of_filters,
                                        strides=strides,
@@ -20,6 +21,9 @@ class FashionNetInnerNodeFunc(tf.keras.layers.Layer):
                                        activation=activation,
                                        use_bias=use_bias,
                                        padding=padding)
+        self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2)
+        # H operations - OK; checked
+        self.decisionGAPLayer = tf.keras.layers.GlobalAveragePooling2D()
         self.decisionDim = decision_dim
         self.decisionDropProbability = decision_drop_probability
         self.decisionFcLayer = CignDenseLayer(output_dim=self.decisionDim,
@@ -27,7 +31,6 @@ class FashionNetInnerNodeFunc(tf.keras.layers.Layer):
                                               node=node,
                                               use_bias=True,
                                               name="fc_op_decision")
-        self.decisionGAPLayer = tf.keras.layers.GlobalAveragePooling2D()
         self.decisionDropoutLayer = tf.keras.layers.Dropout(rate=self.decisionDropProbability)
 
     def call(self, inputs, **kwargs):
@@ -38,6 +41,7 @@ class FashionNetInnerNodeFunc(tf.keras.layers.Layer):
 
         # F ops
         f_net = self.convLayer(f_input)
+        f_net = self.maxPoolLayer(f_net)
 
         # H Ops
         pre_branch_feature = f_net

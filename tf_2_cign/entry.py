@@ -25,7 +25,7 @@ filter_counts = [32, 32, 32]
 kernel_sizes = [5, 5, 1]
 hidden_layers = [128, 64]
 decision_dimensions = [128, 128]
-node_build_funcs = [FashionCign.inner_func, FashionCign.inner_func, FashionCign.leaf_func]
+# node_build_funcs = [FashionCign.inner_func, FashionCign.inner_func, FashionCign.leaf_func]
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -52,9 +52,9 @@ if __name__ == "__main__":
                            information_gain_balance_coeff=1.0,
                            softmax_decay_controller=softmax_decay_controller)
         cign.build_network()
-
-        cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
-
-
+        #
+        # cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
+        #
+        #
 
 
