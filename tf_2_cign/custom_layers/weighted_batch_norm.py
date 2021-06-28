@@ -104,8 +104,15 @@ if __name__ == "__main__":
         dim = 128
         momentum = 0.9
         target_val = 5.0
-        x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, 32, 32, dim))
-        x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, 32, 32, dim))
+        # CNN Output
+        # x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, 32, 32, dim))
+        # x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, 32, 32, dim))
+        # i_x = tf.keras.Input(shape=(32, 32, dim))
+        # Dense Output
+        x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
+        x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
+        i_x = tf.keras.Input(shape=(dim))
+
         mask_vector = np.random.randint(low=0, high=2, size=(batch_size,))
 
         mb_norm = MaskedBatchNormalization(momentum=momentum)
@@ -113,22 +120,26 @@ if __name__ == "__main__":
 
         # func_str = tf.autograph.to_code(wb_norm.call.python_function)
 
-        i_x = tf.keras.Input(shape=(32, 32, dim))
+
         mask_vector_tf = tf.keras.Input(shape=())
-        # net = tf.keras.layers.Dense(256)(i_x)
-        net = tf.keras.layers.Conv2D(filters=64,
-                                     kernel_size=3,
-                                     activation=tf.nn.relu,
-                                     strides=1,
-                                     padding="same",
-                                     use_bias=True,
-                                     name="conv")(i_x)
+        net = tf.keras.layers.Dense(256)(i_x)
+        # net = tf.keras.layers.Conv2D(filters=64,
+        #                              kernel_size=3,
+        #                              activation=tf.nn.relu,
+        #                              strides=1,
+        #                              padding="same",
+        #                              use_bias=True,
+        #                              name="conv")(i_x)
         masked_net = tf.boolean_mask(net, mask_vector_tf)
         norm_result_mb = mb_norm([net, masked_net])
         norm_result_wb = wb_norm([net, mask_vector_tf])
 
-        mb_dense = tf.keras.layers.Flatten()(norm_result_mb)
-        wb_dense = tf.keras.layers.Flatten()(norm_result_wb)
+        if len(norm_result_wb.shape) > 2:
+            mb_dense = tf.keras.layers.Flatten()(norm_result_mb)
+            wb_dense = tf.keras.layers.Flatten()(norm_result_wb)
+        else:
+            mb_dense = norm_result_mb
+            wb_dense = norm_result_wb
 
         y_hat_mb = tf.reduce_mean(mb_dense, axis=-1)
         y_hat_wb = tf.reduce_mean(wb_dense, axis=-1)
@@ -153,7 +164,7 @@ if __name__ == "__main__":
             t0 = time.time()
             with tf.GradientTape() as tape:
                 outputs_dict = model([x1, mask_vector], training=True)
-                if (i + 1) % 1000 == 0:
+                if (i + 1) % 9500 == 0:
                     assert np.allclose(outputs_dict["norm_result_mb"].numpy(), outputs_dict["norm_result_wb"].numpy())
                     # Compare population means
                     assert np.allclose(model.variables[4].numpy(), model.variables[9].numpy())

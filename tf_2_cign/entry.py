@@ -52,8 +52,7 @@ if __name__ == "__main__":
                            information_gain_balance_coeff=1.0,
                            softmax_decay_controller=softmax_decay_controller)
         cign.build_network()
-        #
-        # cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
+        cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
         #
         #
 

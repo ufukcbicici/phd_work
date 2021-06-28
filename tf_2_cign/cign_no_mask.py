@@ -197,3 +197,28 @@ class CignNoMask(Cign):
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
 
+    def train_step(self, x, y, iteration):
+        # eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
+        with tf.GradientTape() as tape:
+            t0 = time.time()
+            feed_dict = self.get_feed_dict(x=x, y=y, iteration=iteration)
+            t1 = time.time()
+            eval_dict, classification_losses, info_gain_losses = self.model(inputs=feed_dict, training=True)
+            t2 = time.time()
+            total_loss = self.calculate_total_loss(classification_losses=classification_losses,
+                                                   info_gain_losses=info_gain_losses)
+            t3 = time.time()
+            # self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
+            t4 = time.time()
+        grads = tape.gradient(total_loss, self.model.trainable_variables)
+        t5 = time.time()
+        print("total={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
+              " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
+              format(t5-t0, t1-t0, t2-t1, t3-t2, t4-t3, t5-t4))
+
+    def train(self, dataset, epoch_count):
+        iteration = 0
+        for epoch_id in range(epoch_count):
+            for train_X, train_y in dataset.trainDataTf:
+                self.train_step(x=train_X, y=train_y, iteration=iteration)
+                iteration += 1
