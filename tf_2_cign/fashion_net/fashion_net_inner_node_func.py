@@ -21,7 +21,7 @@ class FashionNetInnerNodeFunc(tf.keras.layers.Layer):
                                        activation=activation,
                                        use_bias=use_bias,
                                        padding=padding)
-        self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2)
+        self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
         # H operations - OK; checked
         self.decisionGAPLayer = tf.keras.layers.GlobalAveragePooling2D()
         self.decisionDim = decision_dim

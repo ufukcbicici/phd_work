@@ -23,10 +23,10 @@ import time
 class CignNoMask(Cign):
     def __init__(self, input_dims, class_count, node_degrees, decision_drop_probability,
                  classification_drop_probability, decision_wd, classification_wd, information_gain_balance_coeff,
-                 softmax_decay_controller, bn_momentum=0.9):
+                 softmax_decay_controller, learning_rate_schedule, bn_momentum=0.9):
         super().__init__(input_dims, class_count, node_degrees, decision_drop_probability,
                          classification_drop_probability, decision_wd, classification_wd,
-                         information_gain_balance_coeff, softmax_decay_controller, bn_momentum)
+                         information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule, bn_momentum)
         self.weightedBatchNormOps = {}
         self.maskingLayers = {}
         self.decisionLayers = {}
@@ -35,8 +35,10 @@ class CignNoMask(Cign):
         self.isRootDict = {}
         self.igMasksDict = {}
         self.scMasksDict = {}
+        self.igActivationsDict = {}
         self.scRoutingPreparationLayers = []
         self.scRoutingCalculationLayers = []
+        self.optimizer = None
 
     def node_build_func(self, node):
         pass
@@ -96,9 +98,12 @@ class CignNoMask(Cign):
         labels = self.labels
         temperature = self.routingTemperatures[node.index]
 
-        h_net_normed, ig_value, output_ig_routing_matrix = self.decisionLayers[node.index]([h_net, ig_mask,
-                                                                                            labels, temperature])
+        h_net_normed, ig_value, output_ig_routing_matrix, ig_activations = self.decisionLayers[node.index](
+            [h_net, ig_mask,
+             labels,
+             temperature])
         self.informationGainRoutingLosses[node.index] = ig_value
+        self.igActivationsDict[node.index] = ig_activations
 
         self.evalDict[Utilities.get_variable_name(name="h_net_normed", node=node)] = h_net_normed
         self.evalDict[Utilities.get_variable_name(name="ig_value", node=node)] = ig_value
@@ -183,6 +188,11 @@ class CignNoMask(Cign):
                     continue
                 self.evalDict[Utilities.get_variable_name(name="node_output_{0}".format(output_name), node=node)] = \
                     self.nodeOutputsDict[node.index][output_name]
+                self.evalDict[Utilities.get_variable_name(name="ig_mask_vector", node=node)] = self.igMasksDict[
+                    node.index]
+                self.evalDict[Utilities.get_variable_name(name="sc_mask_vector", node=node)] = self.scMasksDict[
+                    node.index]
+
         self.evalDict["batch_size"] = self.batchSize
         # Build the model
         self.build_final_model()
@@ -197,6 +207,23 @@ class CignNoMask(Cign):
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
 
+    def calculate_total_loss(self, classification_losses, info_gain_losses):
+        # Weight decaying
+        variables = self.model.trainable_variables
+        regularization_losses = []
+        for var in variables:
+            if var.ref() in self.regularizationCoefficients:
+                lambda_coeff = self.regularizationCoefficients[var.ref()]
+                regularization_losses.append(lambda_coeff * tf.nn.l2_loss(var))
+        total_regularization_loss = tf.add_n(regularization_losses)
+        # Classification losses
+        classification_loss = tf.add_n([loss for loss in classification_losses.values()])
+        # Information Gain losses
+        info_gain_loss = tf.add_n([loss for loss in info_gain_losses.values()])
+        # Total loss
+        total_loss = total_regularization_loss + info_gain_loss + classification_loss
+        return total_loss, total_regularization_loss, info_gain_loss, classification_loss
+
     def train_step(self, x, y, iteration):
         # eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
         with tf.GradientTape() as tape:
@@ -205,20 +232,62 @@ class CignNoMask(Cign):
             t1 = time.time()
             eval_dict, classification_losses, info_gain_losses = self.model(inputs=feed_dict, training=True)
             t2 = time.time()
-            total_loss = self.calculate_total_loss(classification_losses=classification_losses,
-                                                   info_gain_losses=info_gain_losses)
+            total_loss, total_regularization_loss, info_gain_loss, classification_loss = self.calculate_total_loss(
+                classification_losses=classification_losses,
+                info_gain_losses=info_gain_losses)
             t3 = time.time()
-            # self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
+            self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
             t4 = time.time()
         grads = tape.gradient(total_loss, self.model.trainable_variables)
         t5 = time.time()
         print("total={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
               " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
-              format(t5-t0, t1-t0, t2-t1, t3-t2, t4-t3, t5-t4))
+              format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
 
     def train(self, dataset, epoch_count):
+        boundaries = [tpl[0] for tpl in self.learningRateSchedule.schedule]
+        values = [self.learningRateSchedule.initialValue]
+        values.extend([tpl[1] for tpl in self.learningRateSchedule.schedule])
+        learning_rate_scheduler_tf = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
+            boundaries=boundaries, values=values)
+        self.optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
+
         iteration = 0
         for epoch_id in range(epoch_count):
             for train_X, train_y in dataset.trainDataTf:
                 self.train_step(x=train_X, y=train_y, iteration=iteration)
                 iteration += 1
+
+    def unit_test_cign_routing_mechanism(self, eval_dict):
+        # Statistics of sample distribution
+        for node in self.topologicalSortedNodes:
+            key_name = Utilities.get_variable_name(name="sample_count", node=node)
+            if key_name in eval_dict:
+                print("Node{0} Sample count:{1}".format(node.index, eval_dict[key_name].numpy()))
+
+        # Assert that all mask vectors sum up to unity at each row in the leaf layer.
+        ig_masks = []
+        for node in self.orderedNodesPerLevel[-1]:
+            ig_masks.append(eval_dict[Utilities.get_variable_name(name="ig_mask_vector", node=node)])
+        ig_matrix = np.stack(ig_masks, axis=1)
+        row_sums = np.sum(ig_matrix, axis=1)
+        assert np.array_equal(row_sums, np.ones_like(row_sums))
+
+        # Assert that all ig routing masks of the child nodes; when concatenated are equal to the parent's ig routing
+        # matrix.
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            ig_matrix = eval_dict[Utilities.get_variable_name(name="node_output_{0}".format("ig_mask_matrix"),
+                                                              node=node)]
+            child_nodes = self.dagObject.children(node=node)
+            ig_masks_of_children = [] * len(child_nodes)
+            for child_node in child_nodes:
+                sibling_index = self.get_node_sibling_index(node=child_node)
+                ig_masks_of_children[sibling_index] = eval_dict[Utilities.get_variable_name(name="ig_mask_vector",
+                                                                                            node=child_node)]
+            ig_matrix_constructed = np.stack(ig_masks_of_children, axis=1)
+            assert np.array_equal(ig_matrix, ig_matrix_constructed)
+
+
+

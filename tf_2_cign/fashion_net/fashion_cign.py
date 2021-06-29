@@ -21,10 +21,11 @@ class FashionCign(CignNoMask):
                  decision_dimensions,
                  class_count,
                  information_gain_balance_coeff,
-                 softmax_decay_controller):
+                 softmax_decay_controller,
+                 learning_rate_schedule):
         super().__init__(input_dims, class_count, node_degrees, decision_drop_probability,
                          classification_drop_probability, decision_wd, classification_wd,
-                         information_gain_balance_coeff, softmax_decay_controller)
+                         information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers

@@ -24,6 +24,7 @@ class Cign:
                  classification_wd,
                  information_gain_balance_coeff,
                  softmax_decay_controller,
+                 learning_rate_schedule,
                  bn_momentum=0.9):
         self.dagObject = Dag()
         self.nodes = {}
@@ -41,6 +42,7 @@ class Cign:
         self.decisionWd = decision_wd
         self.classificationWd = classification_wd
         self.bnMomentum = bn_momentum
+        self.learningRateSchedule = learning_rate_schedule
         # Model-wise Tensorflow objects.
         self.inputs = tf.keras.Input(shape=input_dims, name="inputs")
         self.labels = tf.keras.Input(shape=(), name="labels", dtype=tf.int32)

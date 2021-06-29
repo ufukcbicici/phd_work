@@ -38,4 +38,4 @@ class CignDecisionLayer(tf.keras.layers.Layer):
         output_ig_routing_matrix = tf.cast(
             tf.logical_and(tf.cast(ig_routing_matrix, dtype=tf.bool), tf.cast(mask_as_matrix, dtype=tf.bool)),
             dtype=tf.int32)
-        return h_net_normed, ig_value, output_ig_routing_matrix
+        return h_net_normed, ig_value, output_ig_routing_matrix, activations

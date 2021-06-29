@@ -1,4 +1,6 @@
 import tensorflow as tf
+
+from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cign import Cign
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign import FashionCign
@@ -26,6 +28,12 @@ kernel_sizes = [5, 5, 1]
 hidden_layers = [128, 64]
 decision_dimensions = [128, 128]
 # node_build_funcs = [FashionCign.inner_func, FashionCign.inner_func, FashionCign.leaf_func]
+initial_lr = 0.01
+learning_rate_calculator = DiscreteParameter(name="lr_calculator",
+                                             value=initial_lr,
+                                             schedule=[(15000, 0.005),
+                                                       (30000, 0.0025),
+                                                       (40000, 0.00025)])
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -50,10 +58,9 @@ if __name__ == "__main__":
                            decision_dimensions=decision_dimensions,
                            class_count=10,
                            information_gain_balance_coeff=1.0,
-                           softmax_decay_controller=softmax_decay_controller)
+                           softmax_decay_controller=softmax_decay_controller,
+                           learning_rate_schedule=learning_rate_calculator)
         cign.build_network()
         cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
         #
         #
-
-
