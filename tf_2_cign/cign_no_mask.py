@@ -21,12 +21,33 @@ import time
 
 
 class CignNoMask(Cign):
-    def __init__(self, input_dims, class_count, node_degrees, decision_drop_probability,
-                 classification_drop_probability, decision_wd, classification_wd, information_gain_balance_coeff,
-                 softmax_decay_controller, learning_rate_schedule, bn_momentum=0.9):
-        super().__init__(input_dims, class_count, node_degrees, decision_drop_probability,
-                         classification_drop_probability, decision_wd, classification_wd,
-                         information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule, bn_momentum)
+    def __init__(self,
+                 batch_size,
+                 input_dims,
+                 class_count,
+                 node_degrees,
+                 decision_drop_probability,
+                 classification_drop_probability,
+                 decision_wd,
+                 classification_wd,
+                 information_gain_balance_coeff,
+                 softmax_decay_controller,
+                 learning_rate_schedule,
+                 decision_loss_coeff,
+                 bn_momentum=0.9):
+        super().__init__(batch_size,
+                         input_dims,
+                         class_count,
+                         node_degrees,
+                         decision_drop_probability,
+                         classification_drop_probability,
+                         decision_wd,
+                         classification_wd,
+                         information_gain_balance_coeff,
+                         softmax_decay_controller,
+                         learning_rate_schedule,
+                         decision_loss_coeff,
+                         bn_momentum)
         self.weightedBatchNormOps = {}
         self.maskingLayers = {}
         self.decisionLayers = {}
@@ -219,7 +240,7 @@ class CignNoMask(Cign):
         # Classification losses
         classification_loss = tf.add_n([loss for loss in classification_losses.values()])
         # Information Gain losses
-        info_gain_loss = tf.add_n([loss for loss in info_gain_losses.values()])
+        info_gain_loss = self.decisionLossCoeff * tf.add_n([loss for loss in info_gain_losses.values()])
         # Total loss
         total_loss = total_regularization_loss + info_gain_loss + classification_loss
         return total_loss, total_regularization_loss, info_gain_loss, classification_loss
@@ -236,7 +257,7 @@ class CignNoMask(Cign):
                 classification_losses=classification_losses,
                 info_gain_losses=info_gain_losses)
             t3 = time.time()
-            self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
+            # self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
             t4 = time.time()
         grads = tape.gradient(total_loss, self.model.trainable_variables)
         t5 = time.time()
@@ -281,7 +302,7 @@ class CignNoMask(Cign):
             ig_matrix = eval_dict[Utilities.get_variable_name(name="node_output_{0}".format("ig_mask_matrix"),
                                                               node=node)]
             child_nodes = self.dagObject.children(node=node)
-            ig_masks_of_children = [] * len(child_nodes)
+            ig_masks_of_children = [None] * len(child_nodes)
             for child_node in child_nodes:
                 sibling_index = self.get_node_sibling_index(node=child_node)
                 ig_masks_of_children[sibling_index] = eval_dict[Utilities.get_variable_name(name="ig_mask_vector",
@@ -289,5 +310,98 @@ class CignNoMask(Cign):
             ig_matrix_constructed = np.stack(ig_masks_of_children, axis=1)
             assert np.array_equal(ig_matrix, ig_matrix_constructed)
 
+        print("All assertions are correct")
+
+    def get_explanation_string(self):
+        explanation = ""
+        total_param_count = 0
+        for v in self.model.trainable_variables:
+            total_param_count += np.prod(v.get_shape().as_list())
+
+        explanation += "Total Param Count:{0}\n".format(total_param_count)
+        explanation += "Batch Size:{0}\n".format(self.batchSize)
+        explanation += "Tree Degree:{0}\n".format(self.degreeList)
+        explanation += "********Lr Settings********\n"
+        explanation += self.learningRateSchedule.get_explanation()
+        explanation += "********Lr Settings********\n"
+        explanation += "Decision Loss Coeff:{0}\n".format(self.decisionLossCoeff)
+        explanation += "Batch Norm Decay:{0}\n".format(self.bnMomentum)
+        explanation += "Param Count:{0}\n".format(total_param_count)
+        explanation += "Classification Wd:{0}\n".format(self.classificationWd)
+        explanation += "Decision Wd:{0}\n".format(self.decisionWd)
+        return explanation
 
 
+
+        # explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
+        # explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
+        # explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
+        # explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
+        # explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.SOFTMAX_TEST_TEMPERATURE)
+        # explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
+        # # for node in network.topologicalSortedNodes:
+        # #     if node.isLeaf:
+        # #         continue
+        # #     explanation += "Node {0} Info Gain Balance Coefficient:{1}\n".format(node.index,
+        # #                                                                          node.infoGainBalanceCoefficient)
+        # explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
+        # explanation += "Adaptive Weight Decay:{0}\n".format(GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY)
+        # if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
+        #     explanation += "********Reparametrized Noise Settings********\n"
+        #     explanation += "Noise Coefficient Initial Value:{0}\n".format(self.noiseCoefficientCalculator.value)
+        #     explanation += "Noise Coefficient Decay Step:{0}\n".format(self.noiseCoefficientCalculator.decayPeriod)
+        #     explanation += "Noise Coefficient Decay Ratio:{0}\n".format(self.noiseCoefficientCalculator.decay)
+        #     explanation += "********Reparametrized Noise Settings********\n"
+        # explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
+        # explanation += "Use Decision Augmentation:{0}\n".format(GlobalConstants.USE_DECISION_AUGMENTATION)
+        # if GlobalConstants.USE_DROPOUT_FOR_DECISION:
+        #     explanation += "********Decision Dropout Schedule********\n"
+        #     explanation += "Iteration:{0} Probability:{1}\n".format(0, GlobalConstants.DROPOUT_INITIAL_PROB)
+        #     for tpl in GlobalConstants.DROPOUT_SCHEDULE:
+        #         explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
+        #     explanation += "********Decision Dropout Schedule********\n"
+        # explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
+        # explanation += "Classification Dropout Probability:{0}\n".format(
+        #     GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
+        # explanation += "Decision Dropout Probability:{0}\n".format(self.decisionDropoutKeepProbCalculator.value)
+        # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
+        #     for node in self.topologicalSortedNodes:
+        #         if node.isLeaf:
+        #             continue
+        #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
+        #         explanation += node.probThresholdCalculator.get_explanation()
+        #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
+        # explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
+        # explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
+        # explanation += "Mode Percentile:{0}\n".format(GlobalConstants.PERCENTILE_THRESHOLD)
+        # explanation += "Mode Tracking Strategy:{0}\n".format(GlobalConstants.MODE_TRACKING_STRATEGY)
+        # explanation += "Mode Max Class Count:{0}\n".format(GlobalConstants.MAX_MODE_CLASSES)
+        # explanation += "Mode Computation Strategy:{0}\n".format(GlobalConstants.MODE_COMPUTATION_STRATEGY)
+        # explanation += "Constrain Softmax Compression With Label Count:{0}\n".format(GlobalConstants.
+        #                                                                              CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT)
+        # explanation += "Softmax Distillation Cross Validation Count:{0}\n". \
+        #     format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
+        # explanation += "Softmax Distillation Strategy:{0}\n". \
+        #     format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
+        # explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
+        #                                                        GlobalConstants.FASHION_F_NUM_FILTERS_1)
+        # explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
+        #                                                        GlobalConstants.FASHION_F_NUM_FILTERS_2)
+        # explanation += "F Conv3:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_3_SIZE,
+        #                                                        GlobalConstants.FASHION_F_NUM_FILTERS_3)
+        # explanation += "F FC1:{0} Units\n".format(GlobalConstants.FASHION_F_FC_1)
+        # explanation += "F FC2:{0} Units\n".format(GlobalConstants.FASHION_F_FC_2)
+        # explanation += "F Residue FC:{0} Units\n".format(GlobalConstants.FASHION_F_RESIDUE)
+        # explanation += "Residue Hidden Layer Count:{0}\n".format(GlobalConstants.FASHION_F_RESIDUE_LAYER_COUNT)
+        # explanation += "Residue Use Dropout:{0}\n".format(GlobalConstants.FASHION_F_RESIDUE_USE_DROPOUT)
+        # explanation += "H Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
+        #                                                        GlobalConstants.FASHION_H_NUM_FILTERS_1)
+        # explanation += "H Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
+        #                                                        GlobalConstants.FASHION_H_NUM_FILTERS_2)
+        # explanation += "FASHION_NO_H_FROM_F_UNITS_1:{0} Units\n".format(GlobalConstants.FASHION_NO_H_FROM_F_UNITS_1)
+        # explanation += "FASHION_NO_H_FROM_F_UNITS_2:{0} Units\n".format(GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2)
+        # explanation += "Use Class Weighting:{0}\n".format(GlobalConstants.USE_CLASS_WEIGHTING)
+        # explanation += "Class Weight Running Average:{0}\n".format(GlobalConstants.CLASS_WEIGHT_RUNNING_AVERAGE)
+        # explanation += "Zero Label Count Epsilon:{0}\n".format(GlobalConstants.LABEL_EPSILON)
+        # explanation += "TRAINING PARAMETERS:\n"
+        # explanation += super().get_explanation_string()

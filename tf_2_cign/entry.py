@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cign import Cign
 from tf_2_cign.data.fashion_mnist import FashionMnist
@@ -46,7 +47,8 @@ if __name__ == "__main__":
                                                       decay_period=softmax_decay_period,
                                                       decay_min_limit=softmax_decay_min_limit)
     with tf.device("GPU"):
-        cign = FashionCign(input_dims=input_dims,
+        cign = FashionCign(batch_size=batch_size,
+                           input_dims=input_dims,
                            node_degrees=degree_list,
                            filter_counts=filter_counts,
                            kernel_sizes=kernel_sizes,
@@ -57,9 +59,14 @@ if __name__ == "__main__":
                            classification_wd=classification_wd,
                            decision_dimensions=decision_dimensions,
                            class_count=10,
-                           information_gain_balance_coeff=1.0,
+                           information_gain_balance_coeff=5.0,
                            softmax_decay_controller=softmax_decay_controller,
-                           learning_rate_schedule=learning_rate_calculator)
+                           learning_rate_schedule=learning_rate_calculator,
+                           decision_loss_coeff=1.0)
+        experiment_id = DbLogger.get_run_id()
+        explanation = cign.get_explanation_string()
+        series_id = 0
+
         cign.build_network()
         cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
         #

@@ -19,7 +19,10 @@ class InfoGainLayer(tf.keras.layers.Layer):
         temperature = inputs[2]
         balance_coefficient = inputs[3]
         weight_vector = inputs[4]
-        probability_vector = tf.cast(weight_vector / tf.reduce_sum(weight_vector), dtype=activations.dtype)
+        # probability_vector = tf.cast(weight_vector / tf.reduce_sum(weight_vector), dtype=activations.dtype)
+        sample_count = tf.reduce_sum(weight_vector)
+        probability_vector = tf.math.divide_no_nan(tf.cast(weight_vector, dtype=activations.dtype),
+                                                   tf.cast(sample_count, dtype=activations.dtype))
 
         batch_size = tf.shape(activations)[0]
         node_degree = tf.shape(activations)[1]

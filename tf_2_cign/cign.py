@@ -15,6 +15,7 @@ import time
 
 class Cign:
     def __init__(self,
+                 batch_size,
                  input_dims,
                  class_count,
                  node_degrees,
@@ -25,6 +26,7 @@ class Cign:
                  information_gain_balance_coeff,
                  softmax_decay_controller,
                  learning_rate_schedule,
+                 decision_loss_coeff,
                  bn_momentum=0.9):
         self.dagObject = Dag()
         self.nodes = {}
@@ -36,6 +38,7 @@ class Cign:
         self.leafNodes = []
         self.isBaseline = None
         self.informationGainBalanceCoeff = information_gain_balance_coeff
+        self.decisionLossCoeff = decision_loss_coeff
         self.classCount = class_count
         self.decisionDropProbability = decision_drop_probability
         self.classificationDropProbability = classification_drop_probability
@@ -46,7 +49,7 @@ class Cign:
         # Model-wise Tensorflow objects.
         self.inputs = tf.keras.Input(shape=input_dims, name="inputs")
         self.labels = tf.keras.Input(shape=(), name="labels", dtype=tf.int32)
-        self.batchSize = tf.shape(self.inputs)[0]
+        self.batchSize = batch_size  # tf.shape(self.inputs)[0]
         self.batchIndices = tf.range(0, self.batchSize, 1)
         # Hyper-parameters
         # Node input-outputs
@@ -437,7 +440,7 @@ class Cign:
         t5 = time.time()
         print("total={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
               " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
-              format(t5-t0, t1-t0, t2-t1, t3-t2, t4-t3, t5-t4))
+              format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
 
         # with tf.GradientTape() as tape:
         #     # Get softmax decay value

@@ -3,6 +3,8 @@ import tensorflow as tf
 import time
 
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
+
+
 # tf.autograph.set_verbosity(10, True)
 
 
@@ -48,8 +50,11 @@ class WeightedBatchNormalization(tf.keras.layers.Layer):
         weight_vector = inputs[1]
         is_training = kwargs["training"]
         population_count = tf.reduce_prod(tf.shape(x_)[1:-1])
-        probability_vector = weight_vector / tf.reduce_sum(weight_vector)
-        probability_vector = tf.cast(probability_vector, dtype=x_.dtype)
+        sample_count = tf.reduce_sum(weight_vector)
+        probability_vector = tf.math.divide_no_nan(tf.cast(weight_vector, dtype=x_.dtype),
+                                                   tf.cast(sample_count, dtype=x_.dtype))
+        # probability_vector = weight_vector / tf.reduce_sum(weight_vector)
+        # probability_vector = tf.cast(probability_vector, dtype=x_.dtype)
         probability_tensor = tf.ones_like(x_)
         probability_vector_expanded = tf.identity(probability_vector)
         for idx in range(len(x_.get_shape()) - 1):
@@ -105,13 +110,13 @@ if __name__ == "__main__":
         momentum = 0.9
         target_val = 5.0
         # CNN Output
-        # x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, 32, 32, dim))
-        # x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, 32, 32, dim))
-        # i_x = tf.keras.Input(shape=(32, 32, dim))
+        x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, 32, 32, dim))
+        x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, 32, 32, dim))
+        i_x = tf.keras.Input(shape=(32, 32, dim))
         # Dense Output
-        x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
-        x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
-        i_x = tf.keras.Input(shape=(dim))
+        # x1 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
+        # x2 = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, dim))
+        # i_x = tf.keras.Input(shape=(dim))
 
         mask_vector = np.random.randint(low=0, high=2, size=(batch_size,))
 
@@ -120,16 +125,20 @@ if __name__ == "__main__":
 
         # func_str = tf.autograph.to_code(wb_norm.call.python_function)
 
-
         mask_vector_tf = tf.keras.Input(shape=())
-        net = tf.keras.layers.Dense(256)(i_x)
-        # net = tf.keras.layers.Conv2D(filters=64,
-        #                              kernel_size=3,
-        #                              activation=tf.nn.relu,
-        #                              strides=1,
-        #                              padding="same",
-        #                              use_bias=True,
-        #                              name="conv")(i_x)
+
+        # CNN Output
+        net = tf.keras.layers.Conv2D(filters=64,
+                                     kernel_size=3,
+                                     activation=tf.nn.relu,
+                                     strides=1,
+                                     padding="same",
+                                     use_bias=True,
+                                     name="conv")(i_x)
+        # Dense Output
+        # net = tf.keras.layers.Dense(256)(i_x)
+
+
         masked_net = tf.boolean_mask(net, mask_vector_tf)
         norm_result_mb = mb_norm([net, masked_net])
         norm_result_wb = wb_norm([net, mask_vector_tf])
