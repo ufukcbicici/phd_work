@@ -329,60 +329,13 @@ class CignNoMask(Cign):
         explanation += "Param Count:{0}\n".format(total_param_count)
         explanation += "Classification Wd:{0}\n".format(self.classificationWd)
         explanation += "Decision Wd:{0}\n".format(self.decisionWd)
+        explanation += "Information Gain Balance Coefficient:{0}\n".format(self.informationGainBalanceCoeff)
+        explanation += "Use Decision Dropout:{0}\n".format(self.decisionDropProbability)
+        explanation += "Use Classification Dropout:{0}\n".format(self.classificationDropProbability)
         return explanation
 
 
 
-        # explanation += "Softmax Decay Initial:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_INITIAL)
-        # explanation += "Softmax Decay Coefficient:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_COEFFICIENT)
-        # explanation += "Softmax Decay Period:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_PERIOD)
-        # explanation += "Softmax Min Limit:{0}\n".format(GlobalConstants.SOFTMAX_DECAY_MIN_LIMIT)
-        # explanation += "Softmax Test Temperature:{0}\n".format(GlobalConstants.SOFTMAX_TEST_TEMPERATURE)
-        # explanation += "Reparametrized Noise:{0}\n".format(GlobalConstants.USE_REPARAMETRIZATION_TRICK)
-        # # for node in network.topologicalSortedNodes:
-        # #     if node.isLeaf:
-        # #         continue
-        # #     explanation += "Node {0} Info Gain Balance Coefficient:{1}\n".format(node.index,
-        # #                                                                          node.infoGainBalanceCoefficient)
-        # explanation += "Info Gain Balance Coefficient:{0}\n".format(GlobalConstants.INFO_GAIN_BALANCE_COEFFICIENT)
-        # explanation += "Adaptive Weight Decay:{0}\n".format(GlobalConstants.USE_ADAPTIVE_WEIGHT_DECAY)
-        # if GlobalConstants.USE_REPARAMETRIZATION_TRICK:
-        #     explanation += "********Reparametrized Noise Settings********\n"
-        #     explanation += "Noise Coefficient Initial Value:{0}\n".format(self.noiseCoefficientCalculator.value)
-        #     explanation += "Noise Coefficient Decay Step:{0}\n".format(self.noiseCoefficientCalculator.decayPeriod)
-        #     explanation += "Noise Coefficient Decay Ratio:{0}\n".format(self.noiseCoefficientCalculator.decay)
-        #     explanation += "********Reparametrized Noise Settings********\n"
-        # explanation += "Use Decision Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_DECISION)
-        # explanation += "Use Decision Augmentation:{0}\n".format(GlobalConstants.USE_DECISION_AUGMENTATION)
-        # if GlobalConstants.USE_DROPOUT_FOR_DECISION:
-        #     explanation += "********Decision Dropout Schedule********\n"
-        #     explanation += "Iteration:{0} Probability:{1}\n".format(0, GlobalConstants.DROPOUT_INITIAL_PROB)
-        #     for tpl in GlobalConstants.DROPOUT_SCHEDULE:
-        #         explanation += "Iteration:{0} Probability:{1}\n".format(tpl[0], tpl[1])
-        #     explanation += "********Decision Dropout Schedule********\n"
-        # explanation += "Use Classification Dropout:{0}\n".format(GlobalConstants.USE_DROPOUT_FOR_CLASSIFICATION)
-        # explanation += "Classification Dropout Probability:{0}\n".format(
-        #     GlobalConstants.CLASSIFICATION_DROPOUT_KEEP_PROB)
-        # explanation += "Decision Dropout Probability:{0}\n".format(self.decisionDropoutKeepProbCalculator.value)
-        # if GlobalConstants.USE_PROBABILITY_THRESHOLD:
-        #     for node in self.topologicalSortedNodes:
-        #         if node.isLeaf:
-        #             continue
-        #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-        #         explanation += node.probThresholdCalculator.get_explanation()
-        #         explanation += "********Node{0} Probability Threshold Settings********\n".format(node.index)
-        # explanation += "Use Softmax Compression:{0}\n".format(GlobalConstants.USE_SOFTMAX_DISTILLATION)
-        # explanation += "Waiting Epochs for Softmax Compression:{0}\n".format(GlobalConstants.MODE_WAIT_EPOCHS)
-        # explanation += "Mode Percentile:{0}\n".format(GlobalConstants.PERCENTILE_THRESHOLD)
-        # explanation += "Mode Tracking Strategy:{0}\n".format(GlobalConstants.MODE_TRACKING_STRATEGY)
-        # explanation += "Mode Max Class Count:{0}\n".format(GlobalConstants.MAX_MODE_CLASSES)
-        # explanation += "Mode Computation Strategy:{0}\n".format(GlobalConstants.MODE_COMPUTATION_STRATEGY)
-        # explanation += "Constrain Softmax Compression With Label Count:{0}\n".format(GlobalConstants.
-        #                                                                              CONSTRAIN_WITH_COMPRESSION_LABEL_COUNT)
-        # explanation += "Softmax Distillation Cross Validation Count:{0}\n". \
-        #     format(GlobalConstants.SOFTMAX_DISTILLATION_CROSS_VALIDATION_COUNT)
-        # explanation += "Softmax Distillation Strategy:{0}\n". \
-        #     format(GlobalConstants.SOFTMAX_COMPRESSION_STRATEGY)
         # explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
         #                                                        GlobalConstants.FASHION_F_NUM_FILTERS_1)
         # explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
