@@ -24,6 +24,7 @@ class CignClassificationLayer(tf.keras.layers.Layer):
         labels = inputs[2]
 
         logits = self.lossLayer(f_net)
+        posteriors = tf.nn.softmax(logits)
         cross_entropy_loss_tensor = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
 
         # Convert sc_mask to weight vector
@@ -37,4 +38,4 @@ class CignClassificationLayer(tf.keras.layers.Layer):
         weighted_losses = probability_vector * cross_entropy_loss_tensor
         loss = tf.reduce_sum(weighted_losses)
 
-        return cross_entropy_loss_tensor, probability_vector, weighted_losses, loss
+        return cross_entropy_loss_tensor, probability_vector, weighted_losses, loss, posteriors

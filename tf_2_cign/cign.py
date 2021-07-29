@@ -49,7 +49,8 @@ class Cign:
         # Model-wise Tensorflow objects.
         self.inputs = tf.keras.Input(shape=input_dims, name="inputs")
         self.labels = tf.keras.Input(shape=(), name="labels", dtype=tf.int32)
-        self.batchSize = batch_size  # tf.shape(self.inputs)[0]
+        self.batchSizeNonTensor = batch_size
+        self.batchSize = tf.shape(self.inputs)[0]
         self.batchIndices = tf.range(0, self.batchSize, 1)
         # Hyper-parameters
         # Node input-outputs
@@ -203,13 +204,13 @@ class Cign:
     def build_final_model(self):
         # Build the final loss
         # Temporary model for getting the list of trainable variables
-        # self.model = tf.keras.Model(inputs=self.feedDict,
-        #                             outputs=[self.evalDict,
-        #                                      self.classificationLosses,
-        #                                      self.informationGainRoutingLosses])
         self.model = tf.keras.Model(inputs=self.feedDict,
-                                    outputs=[self.classificationLosses,
+                                    outputs=[self.evalDict,
+                                             self.classificationLosses,
                                              self.informationGainRoutingLosses])
+        # self.model = tf.keras.Model(inputs=self.feedDict,
+        #                             outputs=[self.classificationLosses,
+        #                                      self.informationGainRoutingLosses])
 
         # self.model2 = tf.keras.Model(inputs=[self.inputs, self.labels, self.routingTemperatures[0]],
         #                              outputs=self.nodeOutputsDict[0])
@@ -407,9 +408,12 @@ class Cign:
         total_loss = total_regularization_loss + info_gain_loss + classification_loss
         return total_loss
 
-    def get_feed_dict(self, x, y, iteration):
-        self.softmaxDecayController.update(iteration=iteration + 1)
-        temp_value = self.softmaxDecayController.get_value()
+    def get_feed_dict(self, x, y, iteration, is_training):
+        if is_training:
+            self.softmaxDecayController.update(iteration=iteration + 1)
+            temp_value = self.softmaxDecayController.get_value()
+        else:
+            temp_value = 1.0
         # Fill the feed dict.
         feed_dict = {}
         for input_name in self.feedDict.keys():
@@ -427,14 +431,14 @@ class Cign:
         # eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
         with tf.GradientTape() as tape:
             t0 = time.time()
-            feed_dict = self.get_feed_dict(x=x, y=y, iteration=iteration)
+            feed_dict = self.get_feed_dict(x=x, y=y, iteration=iteration, is_training=True)
             t1 = time.time()
-            classification_losses, info_gain_losses = self.model(inputs=feed_dict, training=True)
+            eval_dict, classification_losses, info_gain_losses = self.model(inputs=feed_dict, training=True)
             t2 = time.time()
             total_loss = self.calculate_total_loss(classification_losses=classification_losses,
                                                    info_gain_losses=info_gain_losses)
             t3 = time.time()
-            # self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
+            self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
             t4 = time.time()
         grads = tape.gradient(total_loss, self.model.trainable_variables)
         t5 = time.time()

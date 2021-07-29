@@ -57,9 +57,13 @@ class CignNoMask(Cign):
         self.igMasksDict = {}
         self.scMasksDict = {}
         self.igActivationsDict = {}
+        self.posteriorsDict = {}
         self.scRoutingPreparationLayers = []
         self.scRoutingCalculationLayers = []
         self.optimizer = None
+        self.totalLossTracker = None
+        self.classificationLossTrackers = None
+        self.igLossTrackers = None
 
     def node_build_func(self, node):
         pass
@@ -138,9 +142,11 @@ class CignNoMask(Cign):
         self.leafLossLayers[node.index] = CignClassificationLayer(network=self, node=node, class_count=self.classCount)
         labels = self.labels
 
-        cross_entropy_loss_tensor, probability_vector, weighted_losses, loss = self.leafLossLayers[node.index](
-            [f_net, sc_mask, labels])
+        cross_entropy_loss_tensor, probability_vector, weighted_losses, loss, posteriors = \
+            self.leafLossLayers[node.index](
+                [f_net, sc_mask, labels])
         self.classificationLosses[node.index] = loss
+        self.posteriorsDict[node.index] = posteriors
 
         self.evalDict[Utilities.get_variable_name(name="cross_entropy_loss_tensor", node=node)] = \
             cross_entropy_loss_tensor
@@ -224,7 +230,10 @@ class CignNoMask(Cign):
         self.model = tf.keras.Model(inputs=self.feedDict,
                                     outputs=[self.evalDict,
                                              self.classificationLosses,
-                                             self.informationGainRoutingLosses])
+                                             self.informationGainRoutingLosses,
+                                             self.posteriorsDict,
+                                             self.scMasksDict,
+                                             self.igMasksDict])
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
 
@@ -245,25 +254,46 @@ class CignNoMask(Cign):
         total_loss = total_regularization_loss + info_gain_loss + classification_loss
         return total_loss, total_regularization_loss, info_gain_loss, classification_loss
 
-    def train_step(self, x, y, iteration):
-        # eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
-        with tf.GradientTape() as tape:
-            t0 = time.time()
-            feed_dict = self.get_feed_dict(x=x, y=y, iteration=iteration)
-            t1 = time.time()
-            eval_dict, classification_losses, info_gain_losses = self.model(inputs=feed_dict, training=True)
-            t2 = time.time()
-            total_loss, total_regularization_loss, info_gain_loss, classification_loss = self.calculate_total_loss(
-                classification_losses=classification_losses,
-                info_gain_losses=info_gain_losses)
-            t3 = time.time()
-            # self.unit_test_cign_routing_mechanism(eval_dict=eval_dict)
-            t4 = time.time()
-        grads = tape.gradient(total_loss, self.model.trainable_variables)
-        t5 = time.time()
-        print("total={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
-              " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
-              format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
+    # def train_step(self, x, y, iteration):
+    #     # eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
+    #     with tf.GradientTape() as tape:
+    #         t0 = time.time()
+    #         feed_dict = self.get_feed_dict(x=x, y=y, iteration=iteration, is_training=True)
+    #         t1 = time.time()
+    #         eval_dict, classification_losses, info_gain_losses,\
+    #             posteriors_dict, sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=True)
+    #         t2 = time.time()
+    #         total_loss, total_regularization_loss, info_gain_loss, classification_loss = self.calculate_total_loss(
+    #             classification_losses=classification_losses,
+    #             info_gain_losses=info_gain_losses)
+    #     t3 = time.time()
+    #     # self.unit_test_cign_routing_mechanism(
+    #     #     eval_dict=eval_dict,
+    #     #     tape=tape,
+    #     #     classification_loss=classification_loss,
+    #     #     info_gain_loss=info_gain_loss)
+    #     t4 = time.time()
+    #     # Apply grads
+    #     grads = tape.gradient(total_loss, self.model.trainable_variables)
+    #     self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+    #     t5 = time.time()
+    #     # Track losses
+    #     self.totalLossTracker.update_state(total_loss)
+    #     self.classificationLossTracker.update_state(classification_losses)
+    #     for node_id in info_gain_losses:
+    #         self.igLossTrackers[node_id].update_state(self.decisionLossCoeff * info_gain_losses[node_id])
+    #     # print("total={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
+    #     #       " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
+    #     #       format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
+    #
+    #     print("************************************")
+    #     print("Iteration {0}".format(iteration))
+    #     iteration_time = t5 - t0
+    #     print("Total Loss:{0} Classification Loss:{1} Iteration Time:{2}".format(
+    #         total_loss.numpy(), classification_loss.numpy(), iteration_time))
+    #     for node_id in info_gain_losses:
+    #         print("Node{0} IG Loss:{1}".format(node_id, self.igLossTrackers[node_id].numpy()))
+    #     print("************************************")
 
     def train(self, dataset, epoch_count):
         boundaries = [tpl[0] for tpl in self.learningRateSchedule.schedule]
@@ -273,13 +303,103 @@ class CignNoMask(Cign):
             boundaries=boundaries, values=values)
         self.optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
 
+        # Build Trackers
+        self.totalLossTracker = tf.keras.metrics.Mean(name="totalLossTracker")
+        # self.classificationLossTracker = tf.keras.metrics.Mean(name="classificationLossTracker")
+        self.classificationLossTrackers = \
+            {node.index: tf.keras.metrics.Mean(name="classificationLossTracker_Node{0}".format(node.index))
+             for node in self.topologicalSortedNodes if node.isLeaf is True}
+        self.igLossTrackers = {node.index: tf.keras.metrics.Mean(name="igLossTracker_Node{0}".format(node.index))
+                               for node in self.topologicalSortedNodes if node.isLeaf is False}
+        # Build Trackers
+
         iteration = 0
         for epoch_id in range(epoch_count):
-            for train_X, train_y in dataset.trainDataTf:
-                self.train_step(x=train_X, y=train_y, iteration=iteration)
-                iteration += 1
+            # Reset Trackers
+            self.totalLossTracker.reset_states()
+            for node_id in self.classificationLossTrackers:
+                self.classificationLossTrackers[node_id].reset_states()
+            for node_id in self.igLossTrackers:
+                self.igLossTrackers[node_id].reset_states()
+            # Reset Trackers
 
-    def unit_test_cign_routing_mechanism(self, eval_dict):
+            for train_X, train_y in dataset.trainDataTf:
+                with tf.GradientTape() as tape:
+                    t0 = time.time()
+                    feed_dict = self.get_feed_dict(x=train_X, y=train_y, iteration=iteration, is_training=True)
+                    t1 = time.time()
+
+                    eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
+                    sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=True)
+
+                    # classification_losses, info_gain_losses, posteriors_dict, \
+                    #     sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=True)
+
+                    t2 = time.time()
+                    total_loss, total_regularization_loss, info_gain_loss, classification_loss = \
+                        self.calculate_total_loss(
+                            classification_losses=classification_losses,
+                            info_gain_losses=info_gain_losses)
+                t3 = time.time()
+                # self.unit_test_cign_routing_mechanism(
+                #     eval_dict=eval_dict,
+                #     tape=tape,
+                #     classification_loss=classification_loss,
+                #     info_gain_loss=info_gain_loss)
+                t4 = time.time()
+                # Apply grads
+                grads = tape.gradient(total_loss, self.model.trainable_variables)
+                self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+                t5 = time.time()
+                # Track losses
+                self.totalLossTracker.update_state(total_loss)
+                for node_id in classification_losses:
+                    self.classificationLossTrackers[node_id].update_state(classification_losses[node_id])
+                for node_id in info_gain_losses:
+                    self.igLossTrackers[node_id].update_state(self.decisionLossCoeff * info_gain_losses[node_id])
+
+                # Print outputs
+                print("************************************")
+                print("Iteration {0}".format(iteration))
+                print("total Time={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
+                      " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
+                      format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
+                print("Total Loss:{0}".format(self.totalLossTracker.result().numpy()))
+                classification_str = "Classification Losses: "
+                for node_id in classification_losses:
+                    classification_str += "Node_{0}:{1} ".format(
+                        node_id,
+                        self.classificationLossTrackers[node_id].result().numpy())
+                ig_str = "IG Losses: "
+                for node_id in info_gain_losses:
+                    ig_str += "Node_{0}:{1} ".format(
+                        node_id,
+                        self.igLossTrackers[node_id].result().numpy())
+                sample_counts_str = ""
+                for node in self.topologicalSortedNodes:
+                    sample_counts_str += "Node {0}:{1} ".format(
+                        node.index, eval_dict[Utilities.get_variable_name(name="sample_count", node=node)])
+                print(sample_counts_str)
+                print(classification_str)
+                print(ig_str)
+                print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
+                print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
+                print("************************************")
+                iteration += 1
+                # Print outputs
+
+    def eval(self, dataset):
+        y_true = []
+        y_pred = []
+        for train_X, train_y in dataset:
+            feed_dict = self.get_feed_dict(x=train_X, y=train_y, iteration=-1, is_training=False)
+            eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
+            sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=False)
+
+    def unit_test_cign_routing_mechanism(self, eval_dict, **kwargs):
+        tape = kwargs["tape"]
+        classification_loss = kwargs["classification_loss"]
+        info_gain_loss = kwargs["info_gain_loss"]
         # Statistics of sample distribution
         for node in self.topologicalSortedNodes:
             key_name = Utilities.get_variable_name(name="sample_count", node=node)
@@ -310,6 +430,13 @@ class CignNoMask(Cign):
             ig_matrix_constructed = np.stack(ig_masks_of_children, axis=1)
             assert np.array_equal(ig_matrix, ig_matrix_constructed)
 
+        # Assert that decision variables do not receive gradients from classification loss.
+        classification_grads = tape.gradient(classification_loss, self.model.trainable_variables)
+        for var_idx, var in enumerate(self.model.trainable_variables):
+            if self.is_decision_variable(variable=var):
+                assert classification_grads[var_idx] is None
+            else:
+                assert classification_grads[var_idx] is not None
         print("All assertions are correct")
 
     def get_explanation_string(self):
@@ -319,7 +446,7 @@ class CignNoMask(Cign):
             total_param_count += np.prod(v.get_shape().as_list())
 
         explanation += "Total Param Count:{0}\n".format(total_param_count)
-        explanation += "Batch Size:{0}\n".format(self.batchSize)
+        explanation += "Batch Size:{0}\n".format(self.batchSizeNonTensor)
         explanation += "Tree Degree:{0}\n".format(self.degreeList)
         explanation += "********Lr Settings********\n"
         explanation += self.learningRateSchedule.get_explanation()
@@ -333,28 +460,3 @@ class CignNoMask(Cign):
         explanation += "Use Decision Dropout:{0}\n".format(self.decisionDropProbability)
         explanation += "Use Classification Dropout:{0}\n".format(self.classificationDropProbability)
         return explanation
-
-
-
-        # explanation += "F Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_1_SIZE,
-        #                                                        GlobalConstants.FASHION_F_NUM_FILTERS_1)
-        # explanation += "F Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_2_SIZE,
-        #                                                        GlobalConstants.FASHION_F_NUM_FILTERS_2)
-        # explanation += "F Conv3:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_FILTERS_3_SIZE,
-        #                                                        GlobalConstants.FASHION_F_NUM_FILTERS_3)
-        # explanation += "F FC1:{0} Units\n".format(GlobalConstants.FASHION_F_FC_1)
-        # explanation += "F FC2:{0} Units\n".format(GlobalConstants.FASHION_F_FC_2)
-        # explanation += "F Residue FC:{0} Units\n".format(GlobalConstants.FASHION_F_RESIDUE)
-        # explanation += "Residue Hidden Layer Count:{0}\n".format(GlobalConstants.FASHION_F_RESIDUE_LAYER_COUNT)
-        # explanation += "Residue Use Dropout:{0}\n".format(GlobalConstants.FASHION_F_RESIDUE_USE_DROPOUT)
-        # explanation += "H Conv1:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_1_SIZE,
-        #                                                        GlobalConstants.FASHION_H_NUM_FILTERS_1)
-        # explanation += "H Conv2:{0}x{0}, {1} Filters\n".format(GlobalConstants.FASHION_H_FILTERS_2_SIZE,
-        #                                                        GlobalConstants.FASHION_H_NUM_FILTERS_2)
-        # explanation += "FASHION_NO_H_FROM_F_UNITS_1:{0} Units\n".format(GlobalConstants.FASHION_NO_H_FROM_F_UNITS_1)
-        # explanation += "FASHION_NO_H_FROM_F_UNITS_2:{0} Units\n".format(GlobalConstants.FASHION_NO_H_FROM_F_UNITS_2)
-        # explanation += "Use Class Weighting:{0}\n".format(GlobalConstants.USE_CLASS_WEIGHTING)
-        # explanation += "Class Weight Running Average:{0}\n".format(GlobalConstants.CLASS_WEIGHT_RUNNING_AVERAGE)
-        # explanation += "Zero Label Count Epsilon:{0}\n".format(GlobalConstants.LABEL_EPSILON)
-        # explanation += "TRAINING PARAMETERS:\n"
-        # explanation += super().get_explanation_string()
