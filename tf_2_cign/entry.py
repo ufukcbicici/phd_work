@@ -63,9 +63,8 @@ if __name__ == "__main__":
                            softmax_decay_controller=softmax_decay_controller,
                            learning_rate_schedule=learning_rate_calculator,
                            decision_loss_coeff=1.0)
-        # experiment_id = DbLogger.get_run_id()
-        # explanation = cign.get_explanation_string()
-        # series_id = 0
-
+        run_id = DbLogger.get_run_id()
         cign.build_network()
-        cign.train(dataset=fashion_mnist, epoch_count=epoch_count)
+        explanation = cign.get_explanation_string()
+        DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
+        cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count)

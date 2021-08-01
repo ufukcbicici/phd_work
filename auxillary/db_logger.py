@@ -225,7 +225,7 @@ class DbLogger:
         print("Exit log_into_leaf_table")
 
     @staticmethod
-    def write_into_table(rows, table, col_count):
+    def write_into_table(rows, table, col_count=None):
         print("Enter write_into_table")
         DbLogger.lock.acquire()
         rows_as_tuple = tuple(rows)

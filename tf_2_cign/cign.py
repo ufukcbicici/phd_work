@@ -27,7 +27,8 @@ class Cign:
                  softmax_decay_controller,
                  learning_rate_schedule,
                  decision_loss_coeff,
-                 bn_momentum=0.9):
+                 bn_momentum=0.9,
+                 train_eval_period=1):
         self.dagObject = Dag()
         self.nodes = {}
         self.degreeList = node_degrees
@@ -37,6 +38,7 @@ class Cign:
         self.innerNodes = []
         self.leafNodes = []
         self.isBaseline = None
+        self.trainEvalPeriod = train_eval_period
         self.informationGainBalanceCoeff = information_gain_balance_coeff
         self.decisionLossCoeff = decision_loss_coeff
         self.classCount = class_count
@@ -469,7 +471,7 @@ class Cign:
         # print("X")
         # self.optimizer.apply_gradients(zip(grads, self.detectorModel.trainable_variables))
 
-    def train(self, dataset, epoch_count):
+    def train(self, run_id, dataset, epoch_count):
         iteration = 0
         for epoch_id in range(epoch_count):
             for train_X, train_y in dataset.trainDataTf:

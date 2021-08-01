@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 from algorithms.info_gain import InfoGainLoss
 from auxillary.dag_utilities import Dag
+from auxillary.db_logger import DbLogger
 from simple_tf.uncategorized.node import Node
 from tf_2_cign.cign import Cign
 from tf_2_cign.custom_layers.cign_secondary_routing_preparation_layer import CignScRoutingPrepLayer
@@ -14,6 +15,7 @@ from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 from tf_2_cign.custom_layers.cign_masking_layer import CignMaskingLayer
 from tf_2_cign.custom_layers.cign_decision_layer import CignDecisionLayer
 from tf_2_cign.custom_layers.cign_classification_layer import CignClassificationLayer
+from collections import Counter
 import time
 
 
@@ -295,7 +297,61 @@ class CignNoMask(Cign):
     #         print("Node{0} IG Loss:{1}".format(node_id, self.igLossTrackers[node_id].numpy()))
     #     print("************************************")
 
-    def train(self, dataset, epoch_count):
+    def print_train_step_info(self, iteration, time_intervals, eval_dict, classification_losses, info_gain_losses):
+        t0 = time_intervals[0]
+        t1 = time_intervals[1]
+        t2 = time_intervals[2]
+        t3 = time_intervals[3]
+        t4 = time_intervals[4]
+        t5 = time_intervals[5]
+        # Print outputs
+        print("************************************")
+        print("Iteration {0}".format(iteration))
+        print("total Time={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
+              " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
+              format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
+        print("Total Loss:{0}".format(self.totalLossTracker.result().numpy()))
+        classification_str = "Classification Losses: "
+        for node_id in classification_losses:
+            classification_str += "Node_{0}:{1} ".format(
+                node_id,
+                self.classificationLossTrackers[node_id].result().numpy())
+        ig_str = "IG Losses: "
+        for node_id in info_gain_losses:
+            ig_str += "Node_{0}:{1} ".format(
+                node_id,
+                self.igLossTrackers[node_id].result().numpy())
+        sample_counts_str = ""
+        for node in self.topologicalSortedNodes:
+            sample_counts_str += "Node {0}:{1} ".format(
+                node.index, eval_dict[Utilities.get_variable_name(name="sample_count", node=node)])
+        print(sample_counts_str)
+        print(classification_str)
+        print(ig_str)
+        print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
+        print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
+        print("************************************")
+
+    def save_log_data(self, run_id, iteration, info_gain_losses, classification_losses, eval_dict):
+        # Record ig and classification losses and sample counts into the kv store.
+        kv_rows = []
+        for node_id in info_gain_losses:
+            key_ = "IG Node_{0}".format(node_id)
+            val_ = np.asscalar(self.igLossTrackers[node_id].result().numpy())
+            kv_rows.append((run_id, iteration, key_, val_))
+
+        for node in self.topologicalSortedNodes:
+            key_ = "Sample Count Node_{0}".format(node.index)
+            val_ = np.asscalar(eval_dict[Utilities.get_variable_name(name="sample_count", node=node)].numpy())
+            kv_rows.append((run_id, iteration, key_, val_))
+
+        for node_id in classification_losses:
+            key_ = "Classification Node_{0}".format(node_id)
+            val_ = np.asscalar(self.classificationLossTrackers[node_id].result().numpy())
+            kv_rows.append((run_id, iteration, key_, val_))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
+
+    def train(self, run_id, dataset, epoch_count):
         boundaries = [tpl[0] for tpl in self.learningRateSchedule.schedule]
         values = [self.learningRateSchedule.initialValue]
         values.extend([tpl[1] for tpl in self.learningRateSchedule.schedule])
@@ -322,7 +378,9 @@ class CignNoMask(Cign):
             for node_id in self.igLossTrackers:
                 self.igLossTrackers[node_id].reset_states()
             # Reset Trackers
+            times_list = []
 
+            # Train for one loop
             for train_X, train_y in dataset.trainDataTf:
                 with tf.GradientTape() as tape:
                     t0 = time.time()
@@ -357,44 +415,85 @@ class CignNoMask(Cign):
                     self.classificationLossTrackers[node_id].update_state(classification_losses[node_id])
                 for node_id in info_gain_losses:
                     self.igLossTrackers[node_id].update_state(self.decisionLossCoeff * info_gain_losses[node_id])
+                times_list.append(t5 - t0)
 
-                # Print outputs
-                print("************************************")
-                print("Iteration {0}".format(iteration))
-                print("total Time={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
-                      " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
-                      format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
-                print("Total Loss:{0}".format(self.totalLossTracker.result().numpy()))
-                classification_str = "Classification Losses: "
-                for node_id in classification_losses:
-                    classification_str += "Node_{0}:{1} ".format(
-                        node_id,
-                        self.classificationLossTrackers[node_id].result().numpy())
-                ig_str = "IG Losses: "
-                for node_id in info_gain_losses:
-                    ig_str += "Node_{0}:{1} ".format(
-                        node_id,
-                        self.igLossTrackers[node_id].result().numpy())
-                sample_counts_str = ""
-                for node in self.topologicalSortedNodes:
-                    sample_counts_str += "Node {0}:{1} ".format(
-                        node.index, eval_dict[Utilities.get_variable_name(name="sample_count", node=node)])
-                print(sample_counts_str)
-                print(classification_str)
-                print(ig_str)
-                print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
-                print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
-                print("************************************")
+                self.print_train_step_info(
+                    iteration=iteration,
+                    classification_losses=classification_losses,
+                    info_gain_losses=info_gain_losses,
+                    time_intervals=[t0, t1, t2, t3, t4, t5],
+                    eval_dict=eval_dict)
                 iteration += 1
                 # Print outputs
 
-    def eval(self, dataset):
+            self.save_log_data(run_id=run_id,
+                               iteration=iteration,
+                               info_gain_losses=info_gain_losses,
+                               classification_losses=classification_losses,
+                               eval_dict=eval_dict)
+
+            # Eval on training, validation and test sets
+            if epoch_id >= epoch_count - 10 or epoch_id % self.trainEvalPeriod == 0:
+                training_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                              dataset=dataset.trainDataTf, dataset_type="train")
+                validation_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                                dataset=dataset.validationDataTf, dataset_type="validation")
+                test_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                          dataset=dataset.testDataTf, dataset_type="test")
+                print("Train Accuracy:{0}".format(training_accuracy))
+                print("Validation Accuracy:{0}".format(validation_accuracy))
+                print("Test Accuracy:{0}".format(test_accuracy))
+                mean_time_passed = np.mean(np.array(times_list))
+                DbLogger.write_into_table(
+                    rows=[(run_id, iteration, epoch_id, training_accuracy,
+                           validation_accuracy, test_accuracy,
+                           mean_time_passed, 0.0, "XXX")], table=DbLogger.logsTable)
+
+    def eval(self, run_id, iteration, dataset, dataset_type):
+        if dataset is None:
+            return 0.0
         y_true = []
         y_pred = []
-        for train_X, train_y in dataset:
-            feed_dict = self.get_feed_dict(x=train_X, y=train_y, iteration=-1, is_training=False)
+
+        leaf_distributions = {node.index: [] for node in self.leafNodes}
+        for X, y in dataset:
+            feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False)
             eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
             sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=False)
+
+            leaf_weights = []
+            posteriors = []
+            for leaf_node in self.leafNodes:
+                sc_mask = sc_masks_dict[leaf_node.index]
+                posterior = posteriors_dict[leaf_node.index]
+                leaf_weights.append(np.expand_dims(sc_mask, axis=-1))
+                posteriors.append(posterior)
+                y_leaf = y.numpy()[sc_mask.numpy().astype(np.bool)]
+                leaf_distributions[leaf_node.index].extend(y_leaf)
+            leaf_weights = np.stack(leaf_weights, axis=-1)
+            posteriors = np.stack(posteriors, axis=-1)
+
+            weighted_posteriors = leaf_weights * posteriors
+            posteriors_mixture = np.sum(weighted_posteriors, axis=-1)
+            y_pred_batch = np.argmax(posteriors_mixture, axis=-1)
+            y_pred.append(y_pred_batch)
+            y_true.append(y.numpy())
+        y_true = np.concatenate(y_true)
+        y_pred = np.concatenate(y_pred)
+        truth_vector = y_true == y_pred
+        accuracy = np.mean(truth_vector.astype(np.float))
+
+        # Print sample distribution
+        kv_rows = []
+        for leaf_node in self.leafNodes:
+            c = Counter(leaf_distributions[leaf_node.index])
+            str_ = "{0} Node {1} Sample Distribution:{2}".format(dataset_type, leaf_node.index, c)
+            print(str_)
+            kv_rows.append((run_id, iteration,
+                            "{0} Node {1} Sample Distribution".format(dataset_type, leaf_node.index),
+                            "{0}".format(c)))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
+        return accuracy
 
     def unit_test_cign_routing_mechanism(self, eval_dict, **kwargs):
         tape = kwargs["tape"]
@@ -445,7 +544,6 @@ class CignNoMask(Cign):
         for v in self.model.trainable_variables:
             total_param_count += np.prod(v.get_shape().as_list())
 
-        explanation += "Total Param Count:{0}\n".format(total_param_count)
         explanation += "Batch Size:{0}\n".format(self.batchSizeNonTensor)
         explanation += "Tree Degree:{0}\n".format(self.degreeList)
         explanation += "********Lr Settings********\n"
@@ -457,6 +555,6 @@ class CignNoMask(Cign):
         explanation += "Classification Wd:{0}\n".format(self.classificationWd)
         explanation += "Decision Wd:{0}\n".format(self.decisionWd)
         explanation += "Information Gain Balance Coefficient:{0}\n".format(self.informationGainBalanceCoeff)
-        explanation += "Use Decision Dropout:{0}\n".format(self.decisionDropProbability)
-        explanation += "Use Classification Dropout:{0}\n".format(self.classificationDropProbability)
+        explanation += "Decision Dropout:{0}\n".format(self.decisionDropProbability)
+        explanation += "Classification Dropout:{0}\n".format(self.classificationDropProbability)
         return explanation

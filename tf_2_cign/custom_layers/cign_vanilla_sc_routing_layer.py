@@ -15,6 +15,7 @@ class CignVanillaScRoutingLayer(tf.keras.layers.Layer):
         self.network = network
         # sself.level = level
 
+    @tf.function
     def call(self, inputs, **kwargs):
         input_f_tensor = inputs[0]
         input_ig_routing_matrix = inputs[1]

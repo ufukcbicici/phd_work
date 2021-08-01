@@ -22,6 +22,7 @@ class CignDecisionLayer(tf.keras.layers.Layer):
                                                        node=node, use_bias=True, name="fc_op_decision")
         self.balanceCoeff = self.network.informationGainBalanceCoeff
 
+    @tf.function
     def call(self, inputs, **kwargs):
         h_net = inputs[0]
         ig_mask = inputs[1]

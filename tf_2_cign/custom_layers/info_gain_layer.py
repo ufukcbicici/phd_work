@@ -12,7 +12,7 @@ class InfoGainLayer(tf.keras.layers.Layer):
         super().__init__()
         self.classCount = tf.constant(class_count)
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         activations = inputs[0]
         labels = inputs[1]

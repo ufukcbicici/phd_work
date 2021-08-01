@@ -28,6 +28,8 @@ class FashionMnist:
         self.testDataTf = tf.data.Dataset.from_tensor_slices((self.testX, self.testY)).batch(self.batchSize)
         if self.valX is not None:
             self.validationDataTf = tf.data.Dataset.from_tensor_slices((self.valX, self.valY)).batch(self.batchSize)
+        else:
+            self.validationDataTf = None
         self.trainDataTf = tf.data.Dataset.from_tensor_slices((self.trainX, self.trainY)).\
             shuffle(5000).batch(self.batchSize)
         # dataset_validation = tf.data.Dataset.from_tensor_slices((test_x, test_y)).batch(config["BATCH_SIZE"])
