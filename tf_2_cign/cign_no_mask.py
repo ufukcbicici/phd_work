@@ -223,10 +223,8 @@ class CignNoMask(Cign):
                     node.index]
 
         self.evalDict["batch_size"] = self.batchSize
-        # Build the model
-        self.build_final_model()
 
-    def build_final_model(self):
+    def build_tf_model(self):
         # Build the final loss
         # Temporary model for getting the list of trainable variables
         self.model = tf.keras.Model(inputs=self.feedDict,
@@ -238,6 +236,11 @@ class CignNoMask(Cign):
                                              self.igMasksDict])
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
+
+    def init(self):
+        self.build_network()
+        # Build the model
+        self.build_tf_model()
 
     def calculate_total_loss(self, classification_losses, info_gain_losses):
         # Weight decaying

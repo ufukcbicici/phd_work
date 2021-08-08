@@ -168,7 +168,7 @@ class Cign:
                     self.nodeOutputsDict[node.index][output_name]
         self.evalDict["batch_size"] = self.batchSize
         # Build the model
-        self.build_final_model()
+        self.build_tf_model()
 
     def is_decision_variable(self, variable):
         if "scale" in variable.name or "shift" in variable.name or "hyperplane" in variable.name or \
@@ -203,7 +203,7 @@ class Cign:
                     self.regularizationCoefficients[v.ref()] = self.classificationWd
         # self.regularizationLoss = tf.add_n(l2_loss_list)
 
-    def build_final_model(self):
+    def build_tf_model(self):
         # Build the final loss
         # Temporary model for getting the list of trainable variables
         self.model = tf.keras.Model(inputs=self.feedDict,

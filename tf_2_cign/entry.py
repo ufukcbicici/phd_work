@@ -7,6 +7,7 @@ from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign import FashionCign
 
 # Hyper-parameters
+from tf_2_cign.fashion_net.fashion_cign_rl import FashionCignRl
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
 
 input_dims = (28, 28, 1)
@@ -36,6 +37,10 @@ learning_rate_calculator = DiscreteParameter(name="lr_calculator",
                                                        (30000, 0.0025),
                                                        (40000, 0.00025)])
 
+# Reinforcement learning routing parameters
+valid_action_reward = 1.0
+invalid_action_penalty = -1000.0
+
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
@@ -47,24 +52,47 @@ if __name__ == "__main__":
                                                       decay_period=softmax_decay_period,
                                                       decay_min_limit=softmax_decay_min_limit)
     with tf.device("GPU"):
-        cign = FashionCign(batch_size=batch_size,
-                           input_dims=input_dims,
-                           node_degrees=degree_list,
-                           filter_counts=filter_counts,
-                           kernel_sizes=kernel_sizes,
-                           hidden_layers=hidden_layers,
-                           decision_drop_probability=decision_drop_probability,
-                           classification_drop_probability=drop_probability,
-                           decision_wd=decision_wd,
-                           classification_wd=classification_wd,
-                           decision_dimensions=decision_dimensions,
-                           class_count=10,
-                           information_gain_balance_coeff=1.0,
-                           softmax_decay_controller=softmax_decay_controller,
-                           learning_rate_schedule=learning_rate_calculator,
-                           decision_loss_coeff=1.0)
+        # cign = FashionCign(batch_size=batch_size,
+        #                    input_dims=input_dims,
+        #                    node_degrees=degree_list,
+        #                    filter_counts=filter_counts,
+        #                    kernel_sizes=kernel_sizes,
+        #                    hidden_layers=hidden_layers,
+        #                    decision_drop_probability=decision_drop_probability,
+        #                    classification_drop_probability=drop_probability,
+        #                    decision_wd=decision_wd,
+        #                    classification_wd=classification_wd,
+        #                    decision_dimensions=decision_dimensions,
+        #                    class_count=10,
+        #                    information_gain_balance_coeff=1.0,
+        #                    softmax_decay_controller=softmax_decay_controller,
+        #                    learning_rate_schedule=learning_rate_calculator,
+        #                    decision_loss_coeff=1.0)
+
+        cign = FashionCignRl(valid_action_reward=valid_action_reward,
+                             invalid_action_penalty=invalid_action_penalty,
+                             include_ig_in_reward_calculations=True,
+                             batch_size=batch_size,
+                             input_dims=input_dims,
+                             node_degrees=degree_list,
+                             filter_counts=filter_counts,
+                             kernel_sizes=kernel_sizes,
+                             hidden_layers=hidden_layers,
+                             decision_drop_probability=decision_drop_probability,
+                             classification_drop_probability=drop_probability,
+                             decision_wd=decision_wd,
+                             classification_wd=classification_wd,
+                             decision_dimensions=decision_dimensions,
+                             class_count=10,
+                             information_gain_balance_coeff=1.0,
+                             softmax_decay_controller=softmax_decay_controller,
+                             learning_rate_schedule=learning_rate_calculator,
+                             decision_loss_coeff=1.0)
+
         run_id = DbLogger.get_run_id()
-        cign.build_network()
+        cign.init()
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
+
+        cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf)
         cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count)
