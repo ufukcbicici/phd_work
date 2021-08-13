@@ -38,8 +38,9 @@ learning_rate_calculator = DiscreteParameter(name="lr_calculator",
                                                        (40000, 0.00025)])
 
 # Reinforcement learning routing parameters
-valid_action_reward = 1.0
-invalid_action_penalty = -1000.0
+valid_prediction_reward = 1.0
+invalid_prediction_penalty = 0.0
+lambda_mac_cost = 0.1
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -69,9 +70,10 @@ if __name__ == "__main__":
         #                    learning_rate_schedule=learning_rate_calculator,
         #                    decision_loss_coeff=1.0)
 
-        cign = FashionCignRl(valid_action_reward=valid_action_reward,
-                             invalid_action_penalty=invalid_action_penalty,
+        cign = FashionCignRl(valid_prediction_reward=valid_prediction_reward,
+                             invalid_prediction_penalty=invalid_prediction_penalty,
                              include_ig_in_reward_calculations=True,
+                             lambda_mac_cost=lambda_mac_cost,
                              batch_size=batch_size,
                              input_dims=input_dims,
                              node_degrees=degree_list,
@@ -94,5 +96,5 @@ if __name__ == "__main__":
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
-        cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf)
+        cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf, batch_size=batch_size)
         cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count)

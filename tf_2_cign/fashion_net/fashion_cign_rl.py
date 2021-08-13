@@ -10,9 +10,10 @@ from tf_2_cign.utilities import Utilities
 
 class FashionCignRl(CignRlRouting):
     def __init__(self,
-                 valid_action_reward,
-                 invalid_action_penalty,
+                 valid_prediction_reward,
+                 invalid_prediction_penalty,
                  include_ig_in_reward_calculations,
+                 lambda_mac_cost,
                  batch_size,
                  input_dims,
                  node_degrees,
@@ -29,9 +30,10 @@ class FashionCignRl(CignRlRouting):
                  softmax_decay_controller,
                  learning_rate_schedule,
                  decision_loss_coeff):
-        super().__init__(valid_action_reward,
-                         invalid_action_penalty,
+        super().__init__(valid_prediction_reward,
+                         invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
+                         lambda_mac_cost,
                          batch_size,
                          input_dims,
                          class_count,
