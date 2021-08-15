@@ -156,10 +156,11 @@ class CignNoMask(Cign):
         self.evalDict[Utilities.get_variable_name(name="weighted_losses", node=node)] = weighted_losses
         self.evalDict[Utilities.get_variable_name(name="loss", node=node)] = loss
 
-    def calculate_secondary_routing_matrix(self, input_f_tensor, input_ig_routing_matrix):
+    def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
         sc_routing_calculation_layer = CignVanillaScRoutingLayer(network=self)
         self.scRoutingCalculationLayers.append(sc_routing_calculation_layer)
-        return sc_routing_calculation_layer
+        secondary_routing_matrix = sc_routing_calculation_layer([input_f_tensor, input_ig_routing_matrix])
+        return secondary_routing_matrix
 
     def build_secondary_routing_matrices(self, level):
         level_nodes = self.orderedNodesPerLevel[level]
@@ -169,10 +170,10 @@ class CignNoMask(Cign):
         input_prep_layer = CignScRoutingPrepLayer(network=self, level=level)
         self.scRoutingPreparationLayers.append(input_prep_layer)
         input_f_tensor, input_ig_routing_matrix = input_prep_layer([f_outputs, ig_matrices, sc_masks])
-        sc_routing_calculation_layer = self.calculate_secondary_routing_matrix(
+        secondary_routing_matrix = self.calculate_secondary_routing_matrix(
+            level=level,
             input_f_tensor=input_f_tensor,
             input_ig_routing_matrix=input_ig_routing_matrix)
-        secondary_routing_matrix = sc_routing_calculation_layer([input_f_tensor, input_ig_routing_matrix])
         # Distribute the results of the secondary routing matrix into the corresponding nodes
         curr_column = 0
         for node in level_nodes:

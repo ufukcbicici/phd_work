@@ -330,7 +330,7 @@ class Cign:
         batch_indices_outputs = [self.nodeOutputsDict[node.index]["batch_indices"] for node in nodes]
         return x_outputs, h_outputs, ig_outputs, label_outputs, batch_indices_outputs
 
-    def calculate_secondary_routing_matrix(self, input_f_tensor, input_ig_routing_matrix):
+    def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
         secondary_routing_matrix = tf.identity(input_ig_routing_matrix)
         return secondary_routing_matrix
 
@@ -367,7 +367,9 @@ class Cign:
             input_f_tensor = tf.concat(f_outputs_with_scatter_nd, axis=-1)
             ig_combined_routing_matrix = tf.concat(ig_matrices_with_scatter_nd, axis=-1)
             sc_combined_routing_matrix_pre_mask = self.calculate_secondary_routing_matrix(
-                input_f_tensor=input_f_tensor, input_ig_routing_matrix=ig_combined_routing_matrix)
+                level=level,
+                input_f_tensor=input_f_tensor,
+                input_ig_routing_matrix=ig_combined_routing_matrix)
             self.evalDict["input_f_tensor_{0}".format(level)] = input_f_tensor
             self.evalDict["ig_combined_routing_matrix_level_{0}".format(level)] = ig_combined_routing_matrix
             self.evalDict["sc_combined_routing_matrix_pre_mask_level_{0}".format(level)] = \

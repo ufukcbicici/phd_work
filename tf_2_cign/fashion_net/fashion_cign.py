@@ -1,10 +1,6 @@
-from tf_2_cign.cign import Cign
-import tensorflow as tf
-
 from tf_2_cign.cign_no_mask import CignNoMask
-from tf_2_cign.fashion_net.fashion_net_inner_node_func import FashionNetInnerNodeFunc
-from tf_2_cign.fashion_net.fashion_net_leaf_node_func import FashionNetLeafNodeFunc
-from tf_2_cign.utilities import Utilities
+from tf_2_cign.custom_layers.fashion_net_layers.fashion_net_inner_node_func import FashionNetInnerNodeFunc
+from tf_2_cign.custom_layers.fashion_net_layers.fashion_net_leaf_node_func import FashionNetLeafNodeFunc
 
 
 class FashionCign(CignNoMask):

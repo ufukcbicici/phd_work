@@ -1,23 +1,9 @@
-from collections import deque
 from collections import Counter
+
 import numpy as np
 import tensorflow as tf
-from algorithms.info_gain import InfoGainLoss
-from auxillary.dag_utilities import Dag
-from auxillary.db_logger import DbLogger
-from simple_tf.uncategorized.node import Node
-from tf_2_cign.cign import Cign
+
 from tf_2_cign.cign_no_mask import CignNoMask
-from tf_2_cign.custom_layers.cign_secondary_routing_preparation_layer import CignScRoutingPrepLayer
-from tf_2_cign.custom_layers.cign_vanilla_sc_routing_layer import CignVanillaScRoutingLayer
-from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
-from tf_2_cign.utilities import Utilities
-from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
-from tf_2_cign.custom_layers.cign_masking_layer import CignMaskingLayer
-from tf_2_cign.custom_layers.cign_decision_layer import CignDecisionLayer
-from tf_2_cign.custom_layers.cign_classification_layer import CignClassificationLayer
-from collections import Counter
-import time
 
 
 class CignRlRouting(CignNoMask):
@@ -41,6 +27,7 @@ class CignRlRouting(CignNoMask):
         # self.optimalQtables = []
         # self.regressionTargets = []
         self.includeIgInRewardCalculations = include_ig_in_reward_calculations
+        self.qNets = []
 
     # OK
     def get_max_trajectory_length(self) -> int:

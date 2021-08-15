@@ -41,6 +41,21 @@ learning_rate_calculator = DiscreteParameter(name="lr_calculator",
 valid_prediction_reward = 1.0
 invalid_prediction_penalty = 0.0
 lambda_mac_cost = 0.1
+q_net_params = [
+    {
+        "Conv_Filter": 1,
+        "Conv_Strides": (1, 1),
+        "Conv_Feature_Maps": 32,
+        "Hidden_Layers": [32]
+    },
+    {
+        "Conv_Filter": 1,
+        "Conv_Strides": (1, 1),
+        "Conv_Feature_Maps": 32,
+        "Hidden_Layers": [64]
+    }
+]
+warm_up_iteration_count = 12000
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -74,6 +89,7 @@ if __name__ == "__main__":
                              invalid_prediction_penalty=invalid_prediction_penalty,
                              include_ig_in_reward_calculations=True,
                              lambda_mac_cost=lambda_mac_cost,
+                             q_net_params=q_net_params,
                              batch_size=batch_size,
                              input_dims=input_dims,
                              node_degrees=degree_list,
@@ -89,7 +105,8 @@ if __name__ == "__main__":
                              information_gain_balance_coeff=1.0,
                              softmax_decay_controller=softmax_decay_controller,
                              learning_rate_schedule=learning_rate_calculator,
-                             decision_loss_coeff=1.0)
+                             decision_loss_coeff=1.0,
+                             warm_up_iteration_count=warm_up_iteration_count)
 
         run_id = DbLogger.get_run_id()
         cign.init()
