@@ -23,6 +23,7 @@ class CignWithRlRouting(FastTreeNetwork):
         self.dictOfIgMaskVectors = {}
         self.dictOfRlMaskVectors = {}
 
+
     def build_network(self):
         # Regular CIGN stuff here
         super().build_network()

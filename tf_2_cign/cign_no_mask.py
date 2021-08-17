@@ -56,8 +56,8 @@ class CignNoMask(Cign):
         self.leafLossLayers = {}
         self.nodeFunctions = {}
         self.isRootDict = {}
-        self.igMasksDict = {}
-        self.scMasksDict = {}
+        self.igMaskInputsDict = {}
+        self.scMaskInputsDict = {}
         self.igActivationsDict = {}
         self.posteriorsDict = {}
         self.scRoutingPreparationLayers = []
@@ -90,8 +90,8 @@ class CignNoMask(Cign):
         f_net, h_net, ig_mask, sc_mask, sample_count, is_node_open = \
             self.maskingLayers[node.index]([parent_F, parent_H, parent_ig_matrix, parent_sc_matrix])
 
-        self.igMasksDict[node.index] = ig_mask
-        self.scMasksDict[node.index] = sc_mask
+        self.igMaskInputsDict[node.index] = ig_mask
+        self.scMaskInputsDict[node.index] = sc_mask
 
         self.evalDict[Utilities.get_variable_name(name="f_net", node=node)] = f_net
         self.evalDict[Utilities.get_variable_name(name="h_net", node=node)] = h_net
@@ -126,7 +126,8 @@ class CignNoMask(Cign):
         temperature = self.routingTemperatures[node.index]
 
         h_net_normed, ig_value, output_ig_routing_matrix, ig_activations = self.decisionLayers[node.index](
-            [h_net, ig_mask,
+            [h_net,
+             ig_mask,
              labels,
              temperature])
         self.informationGainRoutingLosses[node.index] = ig_value
@@ -166,7 +167,7 @@ class CignNoMask(Cign):
         level_nodes = self.orderedNodesPerLevel[level]
         f_outputs = [self.nodeOutputsDict[node.index]["F"] for node in level_nodes]
         ig_matrices = [self.nodeOutputsDict[node.index]["ig_mask_matrix"] for node in level_nodes]
-        sc_masks = [self.scMasksDict[node.index] for node in level_nodes]
+        sc_masks = [self.scMaskInputsDict[node.index] for node in level_nodes]
         input_prep_layer = CignScRoutingPrepLayer(network=self, level=level)
         self.scRoutingPreparationLayers.append(input_prep_layer)
         input_f_tensor, input_ig_routing_matrix = input_prep_layer([f_outputs, ig_matrices, sc_masks])
@@ -218,9 +219,9 @@ class CignNoMask(Cign):
                     continue
                 self.evalDict[Utilities.get_variable_name(name="node_output_{0}".format(output_name), node=node)] = \
                     self.nodeOutputsDict[node.index][output_name]
-                self.evalDict[Utilities.get_variable_name(name="ig_mask_vector", node=node)] = self.igMasksDict[
+                self.evalDict[Utilities.get_variable_name(name="ig_mask_vector", node=node)] = self.igMaskInputsDict[
                     node.index]
-                self.evalDict[Utilities.get_variable_name(name="sc_mask_vector", node=node)] = self.scMasksDict[
+                self.evalDict[Utilities.get_variable_name(name="sc_mask_vector", node=node)] = self.scMaskInputsDict[
                     node.index]
 
         self.evalDict["batch_size"] = self.batchSize
@@ -233,8 +234,8 @@ class CignNoMask(Cign):
                                              self.classificationLosses,
                                              self.informationGainRoutingLosses,
                                              self.posteriorsDict,
-                                             self.scMasksDict,
-                                             self.igMasksDict])
+                                             self.scMaskInputsDict,
+                                             self.igMaskInputsDict])
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
 

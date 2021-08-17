@@ -33,6 +33,7 @@ class FashionCignRl(CignRlRouting):
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
                          lambda_mac_cost,
+                         warm_up_iteration_count,
                          batch_size,
                          input_dims,
                          class_count,
@@ -50,7 +51,6 @@ class FashionCignRl(CignRlRouting):
         self.hiddenLayers = hidden_layers
         self.decisionDimensions = decision_dimensions
         self.qNetParams = q_net_params
-        self.warmUpIterationCount = warm_up_iteration_count
 
     def node_build_func(self, node):
         if not node.isLeaf:
@@ -86,7 +86,7 @@ class FashionCignRl(CignRlRouting):
         explanation += "decisionDimensions:{0}\n".format(self.decisionDimensions)
         # RL Parameters
         explanation += "Q Net Parameters\n"
-        for level, q_net_params in enumerate(self.qNets):
+        for level, q_net_params in enumerate(self.qNetParams):
             explanation += "Level:{0}\n".format(level)
             explanation += "Level:{0} Q Net Kernel Size:{1}\n".format(level, q_net_params["Conv_Filter"])
             explanation += "Level:{0} Q Net Kernel Strides:{1}\n".format(level, q_net_params["Conv_Strides"])
@@ -96,7 +96,7 @@ class FashionCignRl(CignRlRouting):
         return explanation
 
     def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
-        assert len(self.qNets) == level
+        assert len(self.scRoutingCalculationLayers) == level
         node = self.orderedNodesPerLevel[level][-1]
         q_net_params = self.qNetParams[level]
         action_space = self.actionSpaces[level]
@@ -104,7 +104,7 @@ class FashionCignRl(CignRlRouting):
                                            node=node,
                                            network=self,
                                            kernel_size=q_net_params["Conv_Filter"],
-                                           num_of_filters=q_net_params["Conv_Filter"],
+                                           num_of_filters=q_net_params["Conv_Feature_Maps"],
                                            strides=q_net_params["Conv_Strides"],
                                            activation="relu",
                                            hidden_layer_dims=q_net_params["Hidden_Layers"],
@@ -112,6 +112,7 @@ class FashionCignRl(CignRlRouting):
                                            rl_dropout_prob=self.classificationDropProbability)
         self.scRoutingCalculationLayers.append(q_net_layer)
         q_table_predicted, secondary_routing_matrix = q_net_layer([input_f_tensor, input_ig_routing_matrix])
+        self.qTablesPredicted.append(q_table_predicted)
         return secondary_routing_matrix
 
         # q_predicted = q_net(input_f_tensor)

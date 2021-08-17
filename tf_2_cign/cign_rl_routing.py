@@ -4,18 +4,42 @@ import numpy as np
 import tensorflow as tf
 
 from tf_2_cign.cign_no_mask import CignNoMask
+from tf_2_cign.utilities import Utilities
 
 
 class CignRlRouting(CignNoMask):
-    def __init__(self, valid_prediction_reward, invalid_prediction_penalty, include_ig_in_reward_calculations,
+    def __init__(self,
+                 valid_prediction_reward,
+                 invalid_prediction_penalty,
+                 include_ig_in_reward_calculations,
                  lambda_mac_cost,
-                 batch_size, input_dims, class_count, node_degrees, decision_drop_probability,
-                 classification_drop_probability, decision_wd, classification_wd, information_gain_balance_coeff,
-                 softmax_decay_controller, learning_rate_schedule, decision_loss_coeff, bn_momentum=0.9):
-        super().__init__(batch_size, input_dims, class_count, node_degrees, decision_drop_probability,
-                         classification_drop_probability, decision_wd, classification_wd,
-                         information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule,
-                         decision_loss_coeff, bn_momentum)
+                 warm_up_iteration_count,
+                 batch_size,
+                 input_dims,
+                 class_count,
+                 node_degrees,
+                 decision_drop_probability,
+                 classification_drop_probability,
+                 decision_wd,
+                 classification_wd,
+                 information_gain_balance_coeff,
+                 softmax_decay_controller,
+                 learning_rate_schedule,
+                 decision_loss_coeff,
+                 bn_momentum=0.9):
+        super().__init__(batch_size,
+                         input_dims,
+                         class_count,
+                         node_degrees,
+                         decision_drop_probability,
+                         classification_drop_probability,
+                         decision_wd,
+                         classification_wd,
+                         information_gain_balance_coeff,
+                         softmax_decay_controller,
+                         learning_rate_schedule,
+                         decision_loss_coeff,
+                         bn_momentum)
         self.validPredictionReward = valid_prediction_reward
         self.invalidPredictionPenalty = invalid_prediction_penalty
         self.lambdaMacCost = lambda_mac_cost
@@ -24,10 +48,11 @@ class CignRlRouting(CignNoMask):
         self.baseEvaluationCost = None
         self.networkActivationCosts = []
         self.networkActivationCostsDict = {}
+        self.warmUpIterationCount = warm_up_iteration_count
         # self.optimalQtables = []
         # self.regressionTargets = []
         self.includeIgInRewardCalculations = include_ig_in_reward_calculations
-        self.qNets = []
+        self.qTablesPredicted = []
 
     # OK
     def get_max_trajectory_length(self) -> int:
@@ -235,7 +260,7 @@ class CignRlRouting(CignNoMask):
             regression_targets = []
             feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False)
             eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
-            sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=False)
+            sc_masks_dict, ig_masks_dict, q_tables_predicted = self.model(inputs=feed_dict, training=False)
             ig_paths_matrix = self.get_ig_paths(ig_masks_dict=ig_masks_dict)
             true_labels = y.numpy()
             sample_count = true_labels.shape[0]
@@ -352,7 +377,8 @@ class CignRlRouting(CignNoMask):
             X_.append(X.numpy())
             y_.append(y.numpy())
             feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False)
-            eval_dict, classification_losses, info_gain_losses, posteriors_dict, sc_masks_dict, ig_masks_dict = \
+            eval_dict, classification_losses, info_gain_losses, posteriors_dict, sc_masks_dict, ig_masks_dict,\
+                q_tables_predicted = \
                 self.model(inputs=feed_dict, training=False)
             for node in self.topologicalSortedNodes:
                 ig_masks[node.index].append(ig_masks_dict[node.index].numpy())
@@ -395,12 +421,61 @@ class CignRlRouting(CignNoMask):
 
         return q_learning_dataset
 
-    def init(self):
-        self.build_network()
-
+    def build_network(self):
+        self.build_tree()
         # Init RL operations
         self.build_action_spaces()
         self.build_reachability_matrices()
+        self.isBaseline = len(self.topologicalSortedNodes) == 1
+        # Build all operations in each node -> Level by level
+        for level in range(len(self.orderedNodesPerLevel)):
+            for node in self.orderedNodesPerLevel[level]:
+                print("Building Node:{0}".format(node.index))
+                self.isRootDict[node.index] = tf.constant(node.isRoot)
+                # Masking Layer
+                f_net, h_net, ig_mask, sc_mask = self.mask_inputs(node=node)
+                # Actions to be done in the node
+                f_net, h_net = \
+                    self.apply_node_funcs(node=node, f_net=f_net, h_net=h_net, ig_mask=ig_mask, sc_mask=sc_mask)
+                # Decision Layer for inner nodes
+                if level < len(self.orderedNodesPerLevel) - 1:
+                    self.routingTemperatures[node.index] = \
+                        tf.keras.Input(shape=(), name="routingTemperature_{0}".format(node.index))
+                    self.feedDict["routingTemperature_{0}".format(node.index)] = self.routingTemperatures[node.index]
+                    self.apply_decision(node=node, ig_mask=ig_mask, h_net=h_net)
+                else:
+                    self.apply_classification_loss(node=node,
+                                                   f_net=f_net,
+                                                   sc_mask=sc_mask)
+            # Build secondary routing matrices after a level's nodes being built (if not the final layer)
+            if level < len(self.orderedNodesPerLevel) - 1:
+                self.build_secondary_routing_matrices(level=level)
+
+        # Register node outputs to the eval dict
+        for node in self.topologicalSortedNodes:
+            for output_name in self.nodeOutputsDict[node.index].keys():
+                if self.nodeOutputsDict[node.index][output_name] is None:
+                    continue
+                self.evalDict[Utilities.get_variable_name(name="node_output_{0}".format(output_name), node=node)] = \
+                    self.nodeOutputsDict[node.index][output_name]
+                self.evalDict[Utilities.get_variable_name(name="ig_mask_vector", node=node)] = self.igMaskInputsDict[
+                    node.index]
+                self.evalDict[Utilities.get_variable_name(name="sc_mask_vector", node=node)] = self.scMaskInputsDict[
+                    node.index]
+
+        self.evalDict["batch_size"] = self.batchSize
         self.get_evaluation_costs()
 
-        self.build_tf_model()
+    def build_tf_model(self):
+        # Build the final loss
+        # Temporary model for getting the list of trainable variables
+        self.model = tf.keras.Model(inputs=self.feedDict,
+                                    outputs=[self.evalDict,
+                                             self.classificationLosses,
+                                             self.informationGainRoutingLosses,
+                                             self.posteriorsDict,
+                                             self.scMaskInputsDict,
+                                             self.igMaskInputsDict,
+                                             self.qTablesPredicted])
+        variables = self.model.trainable_variables
+        self.calculate_regularization_coefficients(trainable_variables=variables)

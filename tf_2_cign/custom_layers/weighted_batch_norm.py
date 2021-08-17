@@ -3,13 +3,14 @@ import tensorflow as tf
 import time
 
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
+from tf_2_cign.utilities import Utilities
 
 
 # tf.autograph.set_verbosity(10, True)
 
 
 class WeightedBatchNormalization(tf.keras.layers.Layer):
-    def __init__(self, momentum):
+    def __init__(self, momentum, node=None):
         super().__init__()
         self.gamma = None
         self.beta = None
@@ -17,29 +18,38 @@ class WeightedBatchNormalization(tf.keras.layers.Layer):
         self.popVar = None
         self.timesCalled = None
         self.momentum = momentum
+        self.node = node
 
     def build(self, input_shape):
         # assert len(input_shape) == 2
         # param_dims = [shp[-1] for shp in input_shape]
         # assert len(set(param_dims)) == 1
         input_dim = input_shape[0].as_list()[-1]
-        self.gamma = self.add_weight(name="gamma",
+
+        self.gamma = self.add_weight(name=
+                                     "wb_gamma" if self.node is None
+                                     else Utilities.get_variable_name(name="wb_gamma", node=self.node),
                                      shape=input_dim,
                                      initializer=tf.keras.initializers.Constant(value=1.0),
                                      trainable=True)
-        self.beta = self.add_weight(name="beta",
+        self.beta = self.add_weight(name="wb_beta" if self.node is None
+                                    else Utilities.get_variable_name(name="wb_beta", node=self.node),
                                     shape=input_dim,
                                     initializer=tf.keras.initializers.Constant(value=0.0),
                                     trainable=True)
-        self.popMean = self.add_weight(name="popMean",
+        self.popMean = self.add_weight(name="popMean" if self.node is None
+                                       else Utilities.get_variable_name(name="popMean", node=self.node),
                                        shape=input_dim,
                                        initializer=tf.keras.initializers.Constant(value=0.0),
                                        trainable=False)
-        self.popVar = self.add_weight(name="popVar",
+        self.popVar = self.add_weight(name="popVar" if self.node is None
+                                      else Utilities.get_variable_name(name="popVar", node=self.node),
                                       shape=input_dim,
                                       initializer=tf.keras.initializers.Constant(value=1.0),
                                       trainable=False)
-        self.timesCalled = self.add_weight(name="timesCalled", shape=(),
+        self.timesCalled = self.add_weight(name="timesCalled" if self.node is None
+                                           else Utilities.get_variable_name(name="timesCalled", node=self.node),
+                                           shape=(),
                                            initializer=tf.keras.initializers.Constant(value=0),
                                            dtype=tf.int32,
                                            trainable=False)
@@ -137,7 +147,6 @@ if __name__ == "__main__":
                                      name="conv")(i_x)
         # Dense Output
         # net = tf.keras.layers.Dense(256)(i_x)
-
 
         masked_net = tf.boolean_mask(net, mask_vector_tf)
         norm_result_mb = mb_norm([net, masked_net])

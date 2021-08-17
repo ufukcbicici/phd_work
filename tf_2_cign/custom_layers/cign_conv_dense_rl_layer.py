@@ -26,7 +26,8 @@ class CignConvDenseRlLayer(tf.keras.layers.Layer):
                                        node=node,
                                        activation=activation,
                                        use_bias=use_bias,
-                                       padding=padding)
+                                       padding=padding,
+                                       name="q_net_conv_layer")
         self.globalAveragingPoolLayer = tf.keras.layers.GlobalAveragePooling2D()
         # F Operations - Dense Layers
         self.hiddenLayerDims = hidden_layer_dims
@@ -34,11 +35,12 @@ class CignConvDenseRlLayer(tf.keras.layers.Layer):
         self.hiddenLayers = []
         self.dropoutLayers = []
         self.rlDropoutProb = rl_dropout_prob
-        for hidden_layer_dim in self.hiddenLayerDims:
+        for layer_id, hidden_layer_dim in enumerate(self.hiddenLayerDims):
             fc_layer = CignDenseLayer(output_dim=hidden_layer_dim,
                                       activation="relu",
                                       node=node,
-                                      use_bias=True)
+                                      use_bias=True,
+                                      name="q_net_fc_layer_{0}".format(layer_id))
             self.hiddenLayers.append(fc_layer)
             dropout_layer = tf.keras.layers.Dropout(rate=self.rlDropoutProb)
             self.dropoutLayers.append(dropout_layer)
@@ -46,7 +48,8 @@ class CignConvDenseRlLayer(tf.keras.layers.Layer):
         self.qNetLayer = CignDenseLayer(output_dim=self.qNetworkDim,
                                         activation=None,
                                         node=node,
-                                        use_bias=True)
+                                        use_bias=True,
+                                        name="q_net_q_table_layer")
 
     # @tf.function
     def call(self, inputs, **kwargs):
@@ -68,5 +71,10 @@ class CignConvDenseRlLayer(tf.keras.layers.Layer):
 
         # Predicted action distributions
         predicted_actions = tf.argmax(q_table_predicted, axis=-1)
-        secondary_routing_matrix = self.actionSpaces[self.level][predicted_actions]
+        # secondary_routing_matrix = self.actionSpaces[self.level][predicted_actions]
+        secondary_routing_matrix = tf.gather_nd(self.actionSpaces[self.level],
+                                                tf.expand_dims(predicted_actions, axis=-1))
+        secondary_routing_matrix = tf.cast(
+            tf.logical_or(tf.cast(secondary_routing_matrix, dtype=tf.bool),
+                          tf.cast(input_ig_routing_matrix, dtype=tf.bool)), dtype=tf.int32)
         return q_table_predicted, secondary_routing_matrix
