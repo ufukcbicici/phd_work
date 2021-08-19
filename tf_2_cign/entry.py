@@ -55,7 +55,8 @@ q_net_params = [
         "Hidden_Layers": [64]
     }
 ]
-warm_up_iteration_count = 12000
+warm_up_period = 25
+rl_cign_iteration_period = 10
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -106,12 +107,13 @@ if __name__ == "__main__":
                              softmax_decay_controller=softmax_decay_controller,
                              learning_rate_schedule=learning_rate_calculator,
                              decision_loss_coeff=1.0,
-                             warm_up_iteration_count=warm_up_iteration_count)
+                             warm_up_period=warm_up_period,
+                             cign_rl_train_period=rl_cign_iteration_period)
 
         run_id = DbLogger.get_run_id()
         cign.init()
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
-        cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf, batch_size=batch_size)
+        # cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf, batch_size=batch_size)
         cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count)

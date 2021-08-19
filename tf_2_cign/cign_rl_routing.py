@@ -2,6 +2,7 @@ from collections import Counter
 
 import numpy as np
 import tensorflow as tf
+import time
 
 from tf_2_cign.cign_no_mask import CignNoMask
 from tf_2_cign.utilities import Utilities
@@ -13,7 +14,8 @@ class CignRlRouting(CignNoMask):
                  invalid_prediction_penalty,
                  include_ig_in_reward_calculations,
                  lambda_mac_cost,
-                 warm_up_iteration_count,
+                 warm_up_period,
+                 cign_rl_train_period,
                  batch_size,
                  input_dims,
                  class_count,
@@ -48,11 +50,16 @@ class CignRlRouting(CignNoMask):
         self.baseEvaluationCost = None
         self.networkActivationCosts = []
         self.networkActivationCostsDict = {}
-        self.warmUpIterationCount = warm_up_iteration_count
+        self.warmUpPeriod = warm_up_period
+        self.cignRlTrainPeriod = cign_rl_train_period
         # self.optimalQtables = []
         # self.regressionTargets = []
         self.includeIgInRewardCalculations = include_ig_in_reward_calculations
         self.qTablesPredicted = []
+        self.qNetOptimizer = None
+        self.qNetTrackers = []
+        self.warmUpPeriodInput = tf.keras.Input(shape=(), name="warm_up_period", dtype=tf.bool)
+        self.feedDict["warm_up_period"] = self.warmUpPeriodInput
 
     # OK
     def get_max_trajectory_length(self) -> int:
@@ -112,11 +119,22 @@ class CignRlRouting(CignNoMask):
 
     # OK
     def get_evaluation_costs(self):
+        # Q_Net costs
+        q_net_costs = {"node_{0}_{1}".format(node.index, k): v for node in self.topologicalSortedNodes
+                       for k, v in node.opMacCostsDict.items() if "q_net" in k}
+        total_q_net_cost = sum(q_net_costs.values())
+        node_costs = {}
+        for node in self.topologicalSortedNodes:
+            cost = 0.0
+            for k in node.opMacCostsDict.keys():
+                if "q_net" not in k:
+                    cost += node.opMacCostsDict[k]
+            node_costs[node.index] = cost
         path_costs = []
         for node in self.leafNodes:
             leaf_ancestors = self.dagObject.ancestors(node=node)
             leaf_ancestors.append(node)
-            path_costs.append(sum([ancestor.macCost for ancestor in leaf_ancestors]))
+            path_costs.append(sum([node_costs[ancestor.index] for ancestor in leaf_ancestors]))
         self.baseEvaluationCost = np.mean(np.array(path_costs))
         self.networkActivationCosts = []
         self.networkActivationCostsDict = {}
@@ -130,7 +148,7 @@ class CignRlRouting(CignNoMask):
                 leaf_ancestors.append(curr_node)
                 for ancestor in leaf_ancestors:
                     processed_nodes_set.add(ancestor.index)
-            total_cost = sum([self.nodes[n_idx].macCost for n_idx in processed_nodes_set])
+            total_cost = sum([node_costs[n_idx] for n_idx in processed_nodes_set])
             self.networkActivationCosts.append(total_cost)
             self.networkActivationCostsDict[tuple(self.actionSpaces[-1][action_id])] = \
                 (total_cost / self.baseEvaluationCost) - 1.0
@@ -258,7 +276,7 @@ class CignRlRouting(CignNoMask):
         for X, y in dataset:
             optimal_q_tables = []
             regression_targets = []
-            feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False)
+            feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
             eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
             sc_masks_dict, ig_masks_dict, q_tables_predicted = self.model(inputs=feed_dict, training=False)
             ig_paths_matrix = self.get_ig_paths(ig_masks_dict=ig_masks_dict)
@@ -376,9 +394,9 @@ class CignRlRouting(CignNoMask):
         for X, y in dataset:
             X_.append(X.numpy())
             y_.append(y.numpy())
-            feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False)
-            eval_dict, classification_losses, info_gain_losses, posteriors_dict, sc_masks_dict, ig_masks_dict,\
-                q_tables_predicted = \
+            feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
+            eval_dict, classification_losses, info_gain_losses, posteriors_dict, sc_masks_dict, ig_masks_dict, \
+            q_tables_predicted = \
                 self.model(inputs=feed_dict, training=False)
             for node in self.topologicalSortedNodes:
                 ig_masks[node.index].append(ig_masks_dict[node.index].numpy())
@@ -421,49 +439,38 @@ class CignRlRouting(CignNoMask):
 
         return q_learning_dataset
 
+    def get_q_net_layer(self, level):
+        pass
+
+    def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
+        assert len(self.scRoutingCalculationLayers) == level
+
+        q_net_input_f_tensor = tf.keras.Input(shape=input_f_tensor.shape[1:],
+                                              name="input_f_tensor_q_net_level_{0}".format(level),
+                                              dtype=input_f_tensor.dtype)
+        q_net_input_ig_routing_matrix = tf.keras.Input(shape=input_ig_routing_matrix.shape[1:],
+                                                       name="input_ig_routing_matrix_q_net_level_{0}".format(level),
+                                                       dtype=input_ig_routing_matrix.dtype)
+        q_net_warm_up_period = tf.keras.Input(shape=(),
+                                              name="warm_up_period_{0}".format(level),
+                                              dtype=self.warmUpPeriodInput.dtype)
+
+        q_net_layer = self.get_q_net_layer(level=level)
+        q_table_predicted, secondary_routing_matrix = \
+            q_net_layer([q_net_input_f_tensor, q_net_input_ig_routing_matrix, q_net_warm_up_period])
+        q_net = tf.keras.Model(inputs=[q_net_input_f_tensor, q_net_input_ig_routing_matrix, q_net_warm_up_period],
+                               outputs=[q_table_predicted, secondary_routing_matrix])
+
+        q_table_predicted_cign_output, secondary_routing_matrix_cign_output = q_net(
+            inputs=[input_f_tensor, input_ig_routing_matrix, self.warmUpPeriodInput])
+        self.qTablesPredicted.append(q_table_predicted_cign_output)
+        self.scRoutingCalculationLayers.append(q_net)
+        return secondary_routing_matrix_cign_output
+
     def build_network(self):
-        self.build_tree()
-        # Init RL operations
         self.build_action_spaces()
         self.build_reachability_matrices()
-        self.isBaseline = len(self.topologicalSortedNodes) == 1
-        # Build all operations in each node -> Level by level
-        for level in range(len(self.orderedNodesPerLevel)):
-            for node in self.orderedNodesPerLevel[level]:
-                print("Building Node:{0}".format(node.index))
-                self.isRootDict[node.index] = tf.constant(node.isRoot)
-                # Masking Layer
-                f_net, h_net, ig_mask, sc_mask = self.mask_inputs(node=node)
-                # Actions to be done in the node
-                f_net, h_net = \
-                    self.apply_node_funcs(node=node, f_net=f_net, h_net=h_net, ig_mask=ig_mask, sc_mask=sc_mask)
-                # Decision Layer for inner nodes
-                if level < len(self.orderedNodesPerLevel) - 1:
-                    self.routingTemperatures[node.index] = \
-                        tf.keras.Input(shape=(), name="routingTemperature_{0}".format(node.index))
-                    self.feedDict["routingTemperature_{0}".format(node.index)] = self.routingTemperatures[node.index]
-                    self.apply_decision(node=node, ig_mask=ig_mask, h_net=h_net)
-                else:
-                    self.apply_classification_loss(node=node,
-                                                   f_net=f_net,
-                                                   sc_mask=sc_mask)
-            # Build secondary routing matrices after a level's nodes being built (if not the final layer)
-            if level < len(self.orderedNodesPerLevel) - 1:
-                self.build_secondary_routing_matrices(level=level)
-
-        # Register node outputs to the eval dict
-        for node in self.topologicalSortedNodes:
-            for output_name in self.nodeOutputsDict[node.index].keys():
-                if self.nodeOutputsDict[node.index][output_name] is None:
-                    continue
-                self.evalDict[Utilities.get_variable_name(name="node_output_{0}".format(output_name), node=node)] = \
-                    self.nodeOutputsDict[node.index][output_name]
-                self.evalDict[Utilities.get_variable_name(name="ig_mask_vector", node=node)] = self.igMaskInputsDict[
-                    node.index]
-                self.evalDict[Utilities.get_variable_name(name="sc_mask_vector", node=node)] = self.scMaskInputsDict[
-                    node.index]
-
-        self.evalDict["batch_size"] = self.batchSize
+        super().build_network()
         self.get_evaluation_costs()
 
     def build_tf_model(self):
@@ -479,3 +486,125 @@ class CignRlRouting(CignNoMask):
                                              self.qTablesPredicted])
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
+
+    def build_trackers(self):
+        super().build_trackers()
+        self.qNetTrackers = [tf.keras.metrics.Mean(name="q_net_loss_tracker_{0}".format(idx))
+                             for idx, _ in enumerate(self.qTablesPredicted)]
+
+    def reset_trackers(self):
+        super().reset_trackers()
+        for layer_id in range(len(self.qNetTrackers)):
+            self.qNetTrackers[layer_id].reset_states()
+
+    def get_feed_dict(self, x, y, iteration, is_training, **kwargs):
+        feed_dict = super().get_feed_dict(x=x, y=y, iteration=iteration, is_training=is_training)
+        assert "warm_up_period" in kwargs
+        feed_dict["warm_up_period"] = kwargs["warm_up_period"]
+        return feed_dict
+
+    def train_cign_body_one_epoch(self,
+                                  dataset,
+                                  cign_main_body_variables,
+                                  run_id,
+                                  iteration,
+                                  is_in_warm_up_period):
+        self.reset_trackers()
+        times_list = []
+        # Train for one loop the main CIGN
+        for train_X, train_y in dataset.trainDataTf:
+            with tf.GradientTape() as tape:
+                t0 = time.time()
+                feed_dict = self.get_feed_dict(x=train_X, y=train_y, iteration=iteration, is_training=True,
+                                               warm_up_period=is_in_warm_up_period)
+                t1 = time.time()
+                eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
+                sc_masks_dict, ig_masks_dict, q_tables_predicted = self.model(inputs=feed_dict, training=True)
+                t2 = time.time()
+                total_loss, total_regularization_loss, info_gain_loss, classification_loss = \
+                    self.calculate_total_loss(
+                        classification_losses=classification_losses,
+                        info_gain_losses=info_gain_losses)
+            t3 = time.time()
+
+            t4 = time.time()
+            # Apply grads, only to main CIGN variables
+            grads = tape.gradient(total_loss, cign_main_body_variables)
+            self.optimizer.apply_gradients(zip(grads, cign_main_body_variables))
+            t5 = time.time()
+            # Track losses
+            self.track_losses(total_loss=total_loss, classification_losses=classification_losses,
+                              info_gain_losses=info_gain_losses)
+            times_list.append(t5 - t0)
+
+            self.print_train_step_info(
+                iteration=iteration,
+                classification_losses=classification_losses,
+                info_gain_losses=info_gain_losses,
+                time_intervals=[t0, t1, t2, t3, t4, t5],
+                eval_dict=eval_dict)
+            iteration += 1
+            # Print outputs
+
+        self.save_log_data(run_id=run_id,
+                           iteration=iteration,
+                           info_gain_losses=info_gain_losses,
+                           classification_losses=classification_losses,
+                           eval_dict=eval_dict)
+
+        return iteration, times_list
+
+    def train_q_nets(self, dataset):
+        print("Training Q-Nets")
+        # Prepare the Q-Learning dataset
+        q_learning_dataset = \
+            self.calculate_optimal_q_values(dataset=dataset.validationDataTf,
+                                            batch_size=self.batchSizeNonTensor)
+        pass
+
+    def train(self, run_id, dataset, epoch_count):
+        is_in_warm_up_period = True
+        self.optimizer = self.get_sgd_optimizer()
+        self.build_trackers()
+
+        # Group main body CIGN variables and Q Net variables.
+        q_net_variables = [v for v in self.model.trainable_variables if "q_net" in v.name]
+        q_net_var_set = set([v.name for v in q_net_variables])
+        cign_main_body_variables = [v for v in self.model.trainable_variables if v.name not in q_net_var_set]
+
+        epochs_after_warm_up = 0
+        iteration = 0
+        for epoch_id in range(epoch_count):
+            iteration, times_list = self.train_cign_body_one_epoch(dataset=dataset,
+                                                                   cign_main_body_variables=cign_main_body_variables,
+                                                                   run_id=run_id,
+                                                                   iteration=iteration,
+                                                                   is_in_warm_up_period=is_in_warm_up_period)
+            if epoch_id >= self.warmUpPeriod:
+                # Run Q-Net learning for the first time.
+                if is_in_warm_up_period:
+                    is_in_warm_up_period = False
+                    self.train_q_nets(dataset=dataset)
+                    self.measure_performance(dataset=dataset,
+                                             run_id=run_id,
+                                             iteration=iteration,
+                                             epoch_id=epoch_id,
+                                             times_list=times_list)
+                else:
+                    is_performance_measured = False
+                    if (epochs_after_warm_up + 1) % self.cignRlTrainPeriod == 0:
+                        self.train_q_nets(dataset=dataset)
+                        self.measure_performance(dataset=dataset,
+                                                 run_id=run_id,
+                                                 iteration=iteration,
+                                                 epoch_id=epoch_id,
+                                                 times_list=times_list)
+                        is_performance_measured = True
+                    if (epoch_id >= epoch_count - 10 or epoch_id % self.trainEvalPeriod == 0) \
+                            and is_performance_measured is False:
+                        self.measure_performance(dataset=dataset,
+                                                 run_id=run_id,
+                                                 iteration=iteration,
+                                                 epoch_id=epoch_id,
+                                                 times_list=times_list)
+                epochs_after_warm_up += 1

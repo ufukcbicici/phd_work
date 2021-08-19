@@ -186,7 +186,6 @@ class CignNoMask(Cign):
             curr_column += node_child_count
 
     def build_network(self):
-        self.build_tree()
         self.isBaseline = len(self.topologicalSortedNodes) == 1
         # Build all operations in each node -> Level by level
         for level in range(len(self.orderedNodesPerLevel)):
@@ -240,8 +239,8 @@ class CignNoMask(Cign):
         self.calculate_regularization_coefficients(trainable_variables=variables)
 
     def init(self):
+        self.build_tree()
         self.build_network()
-        # Build the model
         self.build_tf_model()
 
     def calculate_total_loss(self, classification_losses, info_gain_losses):
@@ -260,47 +259,6 @@ class CignNoMask(Cign):
         # Total loss
         total_loss = total_regularization_loss + info_gain_loss + classification_loss
         return total_loss, total_regularization_loss, info_gain_loss, classification_loss
-
-    # def train_step(self, x, y, iteration):
-    #     # eval_dict, classification_losses, info_gain_losses = self.model(inputs=self.feedDict, training=True)
-    #     with tf.GradientTape() as tape:
-    #         t0 = time.time()
-    #         feed_dict = self.get_feed_dict(x=x, y=y, iteration=iteration, is_training=True)
-    #         t1 = time.time()
-    #         eval_dict, classification_losses, info_gain_losses,\
-    #             posteriors_dict, sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=True)
-    #         t2 = time.time()
-    #         total_loss, total_regularization_loss, info_gain_loss, classification_loss = self.calculate_total_loss(
-    #             classification_losses=classification_losses,
-    #             info_gain_losses=info_gain_losses)
-    #     t3 = time.time()
-    #     # self.unit_test_cign_routing_mechanism(
-    #     #     eval_dict=eval_dict,
-    #     #     tape=tape,
-    #     #     classification_loss=classification_loss,
-    #     #     info_gain_loss=info_gain_loss)
-    #     t4 = time.time()
-    #     # Apply grads
-    #     grads = tape.gradient(total_loss, self.model.trainable_variables)
-    #     self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-    #     t5 = time.time()
-    #     # Track losses
-    #     self.totalLossTracker.update_state(total_loss)
-    #     self.classificationLossTracker.update_state(classification_losses)
-    #     for node_id in info_gain_losses:
-    #         self.igLossTrackers[node_id].update_state(self.decisionLossCoeff * info_gain_losses[node_id])
-    #     # print("total={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
-    #     #       " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
-    #     #       format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
-    #
-    #     print("************************************")
-    #     print("Iteration {0}".format(iteration))
-    #     iteration_time = t5 - t0
-    #     print("Total Loss:{0} Classification Loss:{1} Iteration Time:{2}".format(
-    #         total_loss.numpy(), classification_loss.numpy(), iteration_time))
-    #     for node_id in info_gain_losses:
-    #         print("Node{0} IG Loss:{1}".format(node_id, self.igLossTrackers[node_id].numpy()))
-    #     print("************************************")
 
     def print_train_step_info(self, iteration, time_intervals, eval_dict, classification_losses, info_gain_losses):
         t0 = time_intervals[0]
@@ -356,15 +314,7 @@ class CignNoMask(Cign):
             kv_rows.append((run_id, iteration, key_, val_))
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
 
-    def train(self, run_id, dataset, epoch_count):
-        boundaries = [tpl[0] for tpl in self.learningRateSchedule.schedule]
-        values = [self.learningRateSchedule.initialValue]
-        values.extend([tpl[1] for tpl in self.learningRateSchedule.schedule])
-        learning_rate_scheduler_tf = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
-            boundaries=boundaries, values=values)
-        self.optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
-
-        # Build Trackers
+    def build_trackers(self):
         self.totalLossTracker = tf.keras.metrics.Mean(name="totalLossTracker")
         # self.classificationLossTracker = tf.keras.metrics.Mean(name="classificationLossTracker")
         self.classificationLossTrackers = \
@@ -372,17 +322,53 @@ class CignNoMask(Cign):
              for node in self.topologicalSortedNodes if node.isLeaf is True}
         self.igLossTrackers = {node.index: tf.keras.metrics.Mean(name="igLossTracker_Node{0}".format(node.index))
                                for node in self.topologicalSortedNodes if node.isLeaf is False}
-        # Build Trackers
+
+    def reset_trackers(self):
+        self.totalLossTracker.reset_states()
+        for node_id in self.classificationLossTrackers:
+            self.classificationLossTrackers[node_id].reset_states()
+        for node_id in self.igLossTrackers:
+            self.igLossTrackers[node_id].reset_states()
+
+    def track_losses(self, total_loss, classification_losses, info_gain_losses):
+        self.totalLossTracker.update_state(total_loss)
+        for node_id in classification_losses:
+            self.classificationLossTrackers[node_id].update_state(classification_losses[node_id])
+        for node_id in info_gain_losses:
+            self.igLossTrackers[node_id].update_state(self.decisionLossCoeff * info_gain_losses[node_id])
+
+    def get_sgd_optimizer(self):
+        boundaries = [tpl[0] for tpl in self.learningRateSchedule.schedule]
+        values = [self.learningRateSchedule.initialValue]
+        values.extend([tpl[1] for tpl in self.learningRateSchedule.schedule])
+        learning_rate_scheduler_tf = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
+            boundaries=boundaries, values=values)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
+        return optimizer
+
+    def measure_performance(self, dataset, run_id, iteration, epoch_id, times_list):
+        training_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                      dataset=dataset.trainDataTf, dataset_type="train")
+        validation_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                        dataset=dataset.validationDataTf, dataset_type="validation")
+        test_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                  dataset=dataset.testDataTf, dataset_type="test")
+        print("Train Accuracy:{0}".format(training_accuracy))
+        print("Validation Accuracy:{0}".format(validation_accuracy))
+        print("Test Accuracy:{0}".format(test_accuracy))
+        mean_time_passed = np.mean(np.array(times_list))
+        DbLogger.write_into_table(
+            rows=[(run_id, iteration, epoch_id, training_accuracy,
+                   validation_accuracy, test_accuracy,
+                   mean_time_passed, 0.0, "XXX")], table=DbLogger.logsTable)
+
+    def train(self, run_id, dataset, epoch_count):
+        self.optimizer = self.get_sgd_optimizer()
+        self.build_trackers()
 
         iteration = 0
         for epoch_id in range(epoch_count):
-            # Reset Trackers
-            self.totalLossTracker.reset_states()
-            for node_id in self.classificationLossTrackers:
-                self.classificationLossTrackers[node_id].reset_states()
-            for node_id in self.igLossTrackers:
-                self.igLossTrackers[node_id].reset_states()
-            # Reset Trackers
+            self.reset_trackers()
             times_list = []
 
             # Train for one loop
@@ -415,11 +401,8 @@ class CignNoMask(Cign):
                 self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
                 t5 = time.time()
                 # Track losses
-                self.totalLossTracker.update_state(total_loss)
-                for node_id in classification_losses:
-                    self.classificationLossTrackers[node_id].update_state(classification_losses[node_id])
-                for node_id in info_gain_losses:
-                    self.igLossTrackers[node_id].update_state(self.decisionLossCoeff * info_gain_losses[node_id])
+                self.track_losses(total_loss=total_loss, classification_losses=classification_losses,
+                                  info_gain_losses=info_gain_losses)
                 times_list.append(t5 - t0)
 
                 self.print_train_step_info(
@@ -439,20 +422,11 @@ class CignNoMask(Cign):
 
             # Eval on training, validation and test sets
             if epoch_id >= epoch_count - 10 or epoch_id % self.trainEvalPeriod == 0:
-                training_accuracy = self.eval(run_id=run_id, iteration=iteration,
-                                              dataset=dataset.trainDataTf, dataset_type="train")
-                validation_accuracy = self.eval(run_id=run_id, iteration=iteration,
-                                                dataset=dataset.validationDataTf, dataset_type="validation")
-                test_accuracy = self.eval(run_id=run_id, iteration=iteration,
-                                          dataset=dataset.testDataTf, dataset_type="test")
-                print("Train Accuracy:{0}".format(training_accuracy))
-                print("Validation Accuracy:{0}".format(validation_accuracy))
-                print("Test Accuracy:{0}".format(test_accuracy))
-                mean_time_passed = np.mean(np.array(times_list))
-                DbLogger.write_into_table(
-                    rows=[(run_id, iteration, epoch_id, training_accuracy,
-                           validation_accuracy, test_accuracy,
-                           mean_time_passed, 0.0, "XXX")], table=DbLogger.logsTable)
+                self.measure_performance(dataset=dataset,
+                                         run_id=run_id,
+                                         iteration=iteration,
+                                         epoch_id=epoch_id,
+                                         times_list=times_list)
 
     def eval(self, run_id, iteration, dataset, dataset_type):
         if dataset is None:

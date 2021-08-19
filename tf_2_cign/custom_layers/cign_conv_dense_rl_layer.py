@@ -55,6 +55,7 @@ class CignConvDenseRlLayer(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         input_f_tensor = inputs[0]
         input_ig_routing_matrix = inputs[1]
+        is_warm_up_period = inputs[2]
 
         # Apply a single conv layer first.
         q_net = self.convLayer(input_f_tensor)
@@ -74,7 +75,14 @@ class CignConvDenseRlLayer(tf.keras.layers.Layer):
         # secondary_routing_matrix = self.actionSpaces[self.level][predicted_actions]
         secondary_routing_matrix = tf.gather_nd(self.actionSpaces[self.level],
                                                 tf.expand_dims(predicted_actions, axis=-1))
-        secondary_routing_matrix = tf.cast(
+        secondary_routing_matrix_logical_or_ig = tf.cast(
             tf.logical_or(tf.cast(secondary_routing_matrix, dtype=tf.bool),
                           tf.cast(input_ig_routing_matrix, dtype=tf.bool)), dtype=tf.int32)
-        return q_table_predicted, secondary_routing_matrix
+
+        secondary_routing_matrix_warm_up = tf.ones_like(secondary_routing_matrix_logical_or_ig)
+
+        secondary_routing_matrix_final = tf.where(tf.cast(is_warm_up_period, tf.int32) > 0,
+                                                  secondary_routing_matrix_warm_up,
+                                                  secondary_routing_matrix_logical_or_ig)
+
+        return q_table_predicted, secondary_routing_matrix_final

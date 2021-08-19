@@ -412,7 +412,7 @@ class Cign:
         total_loss = total_regularization_loss + info_gain_loss + classification_loss
         return total_loss
 
-    def get_feed_dict(self, x, y, iteration, is_training):
+    def get_feed_dict(self, x, y, iteration, is_training, **kwargs):
         if is_training:
             self.softmaxDecayController.update(iteration=iteration + 1)
             temp_value = self.softmaxDecayController.get_value()
@@ -427,8 +427,6 @@ class Cign:
                 feed_dict[input_name] = x
             elif input_name == "labels":
                 feed_dict[input_name] = y
-            else:
-                raise NotImplementedError()
         return feed_dict
 
     def train_step(self, x, y, iteration):

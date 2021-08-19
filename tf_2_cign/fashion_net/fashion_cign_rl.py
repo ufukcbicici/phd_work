@@ -12,7 +12,8 @@ class FashionCignRl(CignRlRouting):
                  include_ig_in_reward_calculations,
                  lambda_mac_cost,
                  q_net_params,
-                 warm_up_iteration_count,
+                 warm_up_period,
+                 cign_rl_train_period,
                  batch_size,
                  input_dims,
                  node_degrees,
@@ -33,7 +34,8 @@ class FashionCignRl(CignRlRouting):
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
                          lambda_mac_cost,
-                         warm_up_iteration_count,
+                         warm_up_period,
+                         cign_rl_train_period,
                          batch_size,
                          input_dims,
                          class_count,
@@ -92,11 +94,10 @@ class FashionCignRl(CignRlRouting):
             explanation += "Level:{0} Q Net Kernel Strides:{1}\n".format(level, q_net_params["Conv_Strides"])
             explanation += "Level:{0} Q Net Feature Maps:{1}\n".format(level, q_net_params["Conv_Feature_Maps"])
             explanation += "Level:{0} Q Net Hidden Layers:{1}\n".format(level, q_net_params["Hidden_Layers"])
-        explanation += "warmUpIterationCount:{0}\n".format(self.warmUpIterationCount)
+        explanation += "train_period:{0}\n".format(self.cignRlTrainPeriod)
         return explanation
 
-    def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
-        assert len(self.scRoutingCalculationLayers) == level
+    def get_q_net_layer(self, level):
         node = self.orderedNodesPerLevel[level][-1]
         q_net_params = self.qNetParams[level]
         action_space = self.actionSpaces[level]
@@ -110,12 +111,4 @@ class FashionCignRl(CignRlRouting):
                                            hidden_layer_dims=q_net_params["Hidden_Layers"],
                                            q_network_dim=action_space.shape[0],
                                            rl_dropout_prob=self.classificationDropProbability)
-        self.scRoutingCalculationLayers.append(q_net_layer)
-        q_table_predicted, secondary_routing_matrix = q_net_layer([input_f_tensor, input_ig_routing_matrix])
-        self.qTablesPredicted.append(q_table_predicted)
-        return secondary_routing_matrix
-
-        # q_predicted = q_net(input_f_tensor)
-        # sc_routing_calculation_layer = CignVanillaScRoutingLayer(network=self)
-        # self.scRoutingCalculationLayers.append(sc_routing_calculation_layer)
-        # return sc_routing_calculation_layer
+        return q_net_layer
