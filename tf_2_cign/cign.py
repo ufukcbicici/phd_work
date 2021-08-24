@@ -13,7 +13,7 @@ import time
 # tf.autograph.set_verbosity(10, True)
 
 
-class Cign:
+class Cign(object):
     def __init__(self,
                  batch_size,
                  input_dims,

@@ -3,12 +3,19 @@ from collections import Counter
 import numpy as np
 import tensorflow as tf
 import time
+import pickle
+import os
+import shutil
 
 from tf_2_cign.cign_no_mask import CignNoMask
+from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
 from tf_2_cign.utilities import Utilities
 
 
 class CignRlRouting(CignNoMask):
+
+    infeasible_action_penalty = -1000000.0
+
     def __init__(self,
                  valid_prediction_reward,
                  invalid_prediction_penalty,
@@ -55,11 +62,47 @@ class CignRlRouting(CignNoMask):
         # self.optimalQtables = []
         # self.regressionTargets = []
         self.includeIgInRewardCalculations = include_ig_in_reward_calculations
+        self.qNets = []
         self.qTablesPredicted = []
+        self.actionsPredicted = []
         self.qNetOptimizer = None
         self.qNetTrackers = []
         self.warmUpPeriodInput = tf.keras.Input(shape=(), name="warm_up_period", dtype=tf.bool)
         self.feedDict["warm_up_period"] = self.warmUpPeriodInput
+
+    @staticmethod
+    def save_model(run_id, model):
+        assert isinstance(model, CignRlRouting)
+        root_path = os.path.dirname(__file__)
+        model_path = os.path.join(root_path, "..", "saved_models", "model_{0}".format(run_id))
+        # if os.path.isdir(root_path):
+        #     shutil.rmtree(root_path)
+        os.mkdir(model_path)
+        with open(model_path, "wb") as f:
+            pickle.dump(model, f)
+        # Save keras models
+        cign_model_path = os.path.join(model_path, "cign_model")
+        os.mkdir(cign_model_path)
+        model.model.save(cign_model_path)
+        for level, q_net in enumerate(model.qNets):
+            qnet_model_path = os.path.join(model_path, "cign_model", "q_net_{0}".format(level))
+            os.mkdir(qnet_model_path)
+            q_net.save(qnet_model_path)
+
+    @staticmethod
+    def load_model(run_id):
+        root_path = os.path.dirname(__file__)
+        model_path = os.path.join(root_path, "..", "saved_models", "model_{0}".format(run_id))
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
+        # Load keras models
+        cign_model_path = os.path.join(model_path, "cign_model")
+        model.model = tf.keras.models.load_model(cign_model_path)
+        for level in range(model.depth):
+            qnet_model_path = os.path.join(model_path, "cign_model", "q_net_{0}".format(level))
+            q_net = tf.keras.models.load_model(qnet_model_path)
+            model.qNets.append(q_net)
+        return model
 
     # OK
     def get_max_trajectory_length(self) -> int:
@@ -266,20 +309,47 @@ class CignRlRouting(CignNoMask):
         optimal_q_tables.reverse()
         return regression_targets, optimal_q_tables
 
+    def run_model(self, **kwargs):
+        X = kwargs["X"]
+        y = kwargs["y"]
+        iteration = kwargs["iteration"]
+        is_training = kwargs["is_training"]
+        warm_up_period = kwargs["warm_up_period"]
+        feed_dict = self.get_feed_dict(x=X, y=y, iteration=iteration, is_training=is_training,
+                                       warm_up_period=warm_up_period)
+
+        eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
+        sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict\
+            = self.model(inputs=feed_dict, training=True)
+        model_output = {
+            "eval_dict": eval_dict,
+            "classification_losses": classification_losses,
+            "info_gain_losses": info_gain_losses,
+            "posteriors_dict": posteriors_dict,
+            "sc_masks_dict": sc_masks_dict,
+            "ig_masks_dict": ig_masks_dict,
+            "q_tables_predicted": q_tables_predicted,
+            "node_outputs_dict": node_outputs_dict
+        }
+        return model_output
+
     def calculate_optimal_q_values(self, dataset, batch_size):
         # Step 1: Evaluate all samples and get the class predictions (posterior probabilities)
         # From there, we are going to calculate what kind of node combinations lead to correct predictions.
         X_list = []
+        x_features_list = []
+        for t in range(self.get_max_trajectory_length()):
+            x_features_list.append([])
+            for idx in range(len(self.orderedNodesPerLevel[t])):
+                x_features_list[t].append([])
         y_list = [[] for t in range(self.get_max_trajectory_length() - 1, -1, -1)]
         q_tables = [[] for t in range(self.get_max_trajectory_length() - 1, -1, -1)]
 
         for X, y in dataset:
             optimal_q_tables = []
             regression_targets = []
-            feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
-            eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
-            sc_masks_dict, ig_masks_dict, q_tables_predicted = self.model(inputs=feed_dict, training=False)
-            ig_paths_matrix = self.get_ig_paths(ig_masks_dict=ig_masks_dict)
+            model_output = self.run_model(X=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
+            ig_paths_matrix = self.get_ig_paths(ig_masks_dict=model_output["ig_masks_dict"])
             true_labels = y.numpy()
             sample_count = true_labels.shape[0]
             # Build the optimal Q tables from the final level, recursively up to the top.
@@ -293,14 +363,14 @@ class CignRlRouting(CignNoMask):
                 if t == self.get_max_trajectory_length() - 1:
                     posteriors_tensor = []
                     for leaf_node in self.leafNodes:
-                        posteriors_tensor.append(posteriors_dict[leaf_node.index].numpy())
+                        posteriors_tensor.append(model_output["posteriors_dict"][leaf_node.index].numpy())
                     posteriors_tensor = np.stack(posteriors_tensor, axis=-1)
 
                     # Assert that posteriors are placed correctly.
                     min_leaf_index = min([node.index for node in self.leafNodes])
                     for leaf_node in self.leafNodes:
                         assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
-                                              posteriors_dict[leaf_node.index].numpy())
+                                              model_output["posteriors_dict"][leaf_node.index].numpy())
 
                     # Combine posteriors with respect to the action tuple.
                     prediction_correctness_vec_list = []
@@ -362,12 +432,24 @@ class CignRlRouting(CignNoMask):
                 y_list[idx].append(regression_targets[idx])
             for idx in range(len(optimal_q_tables)):
                 q_tables[idx].append(optimal_q_tables[idx])
+            # Intermediate features
+            for t in range(self.get_max_trajectory_length()):
+                level_nodes = self.orderedNodesPerLevel[t]
+                for idx, node in enumerate(level_nodes):
+                    x_output = model_output["node_outputs_dict"][node.index]["F"]
+                    x_features_list[t][idx].append(x_output)
 
         X_list = np.concatenate(X_list, axis=0)
         for idx in range(len(y_list)):
             y_list[idx] = np.concatenate(y_list[idx], axis=0)
         for idx in range(len(q_tables)):
             q_tables[idx] = np.concatenate(q_tables[idx], axis=0)
+
+        # Concatenate intermediate features
+        for t in range(self.get_max_trajectory_length()):
+            level_nodes = self.orderedNodesPerLevel[t]
+            for idx, node in enumerate(level_nodes):
+                x_features_list[t][idx] = np.concatenate(x_features_list[t][idx], axis=0)
 
         y_list.reverse()
         q_tables.reverse()
@@ -387,6 +469,11 @@ class CignRlRouting(CignNoMask):
 
         # Collect all data from the network first, the obtain optimal q tables later.
         X_ = []
+        x_features_list_all = []
+        for t in range(self.get_max_trajectory_length()):
+            x_features_list_all.append([])
+            for idx in range(len(self.orderedNodesPerLevel[t])):
+                x_features_list_all[t].append([])
         y_ = []
         ig_masks = {node.index: [] for node in self.topologicalSortedNodes}
         posteriors = {node.index: [] for node in self.leafNodes}
@@ -394,14 +481,17 @@ class CignRlRouting(CignNoMask):
         for X, y in dataset:
             X_.append(X.numpy())
             y_.append(y.numpy())
-            feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
-            eval_dict, classification_losses, info_gain_losses, posteriors_dict, sc_masks_dict, ig_masks_dict, \
-            q_tables_predicted = \
-                self.model(inputs=feed_dict, training=False)
+            model_output = self.run_model(X=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
             for node in self.topologicalSortedNodes:
-                ig_masks[node.index].append(ig_masks_dict[node.index].numpy())
+                ig_masks[node.index].append(model_output["ig_masks_dict"][node.index].numpy())
                 if node.isLeaf:
-                    posteriors[node.index].append(posteriors_dict[node.index].numpy())
+                    posteriors[node.index].append(model_output["posteriors_dict"][node.index].numpy())
+            # Intermediate features
+            for t in range(self.get_max_trajectory_length()):
+                level_nodes = self.orderedNodesPerLevel[t]
+                for idx, node in enumerate(level_nodes):
+                    x_output = model_output["node_outputs_dict"][node.index]["F"]
+                    x_features_list_all[t][idx].append(x_output)
 
         X_ = np.concatenate(X_, axis=0)
         y_ = np.concatenate(y_, axis=0)
@@ -409,6 +499,11 @@ class CignRlRouting(CignNoMask):
             ig_masks[node.index] = np.concatenate(ig_masks[node.index], axis=0)
             if node.isLeaf:
                 posteriors[node.index] = np.concatenate(posteriors[node.index], axis=0)
+        # Concatenate intermediate features
+        for t in range(self.get_max_trajectory_length()):
+            level_nodes = self.orderedNodesPerLevel[t]
+            for idx, node in enumerate(level_nodes):
+                x_features_list_all[t][idx] = np.concatenate(x_features_list_all[t][idx], axis=0)
 
         regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y_,
                                                                  posteriors_dict=posteriors,
@@ -419,21 +514,51 @@ class CignRlRouting(CignNoMask):
         for idx in range(len(regs)):
             assert np.array_equal(regs[idx], y_list[idx])
             assert np.array_equal(q_s[idx], q_tables[idx])
-        q_learning_dataset = tf.data.Dataset.from_tensor_slices((X_, *regs)).batch(batch_size)
+
+        x_features_linearized = []
+        for arr in x_features_list_all:
+            for x_feat in arr:
+                x_features_linearized.append(x_feat)
+        q_learning_dataset = tf.data.Dataset.from_tensor_slices((X_, *regs, *x_features_linearized)).batch(batch_size)
+
+        for t in range(self.get_max_trajectory_length()):
+            level_nodes = self.orderedNodesPerLevel[t]
+            for idx, node in enumerate(level_nodes):
+                assert np.array_equal(x_features_list[t][idx], x_features_list_all[t][idx])
 
         # This is checking for if the Tensorflow data generator works as intended.
         X_data = []
         y_data = [[] for _ in range(len(regs))]
-        for x_batch, y_1, y_2 in q_learning_dataset:
+        x_feat_data = []
+        for t in range(self.get_max_trajectory_length()):
+            x_feat_data.append([])
+            for idx in range(len(self.orderedNodesPerLevel[t])):
+                x_feat_data[t].append([])
+
+        for tpl in q_learning_dataset:
+            # x_batch, y_1, y_2, x_intermediate_features in q_learning_dataset:
+            x_batch = tpl[0]
+            y_1 = tpl[1]
+            y_2 = tpl[2]
             X_data.append(x_batch)
             y_data[0].append(y_1)
             y_data[1].append(y_2)
+            x_feat_idx = 0
+            for t in range(self.get_max_trajectory_length()):
+                for idx in range(len(self.orderedNodesPerLevel[t])):
+                    x_feat_data[t][idx].append(tpl[3 + x_feat_idx])
+                    x_feat_idx += 1
 
         X_data = np.concatenate(X_data, axis=0)
         assert np.array_equal(X_, X_data)
         for idx in range(len(y_data)):
             y_data[idx] = np.concatenate(y_data[idx], axis=0)
             assert np.array_equal(y_data[idx], regs[idx])
+
+        for t in range(self.get_max_trajectory_length()):
+            for idx in range(len(self.orderedNodesPerLevel[t])):
+                x_feat_data[t][idx] = np.concatenate(x_feat_data[t][idx], axis=0)
+                assert np.array_equal(x_feat_data[t][idx], x_features_list_all[t][idx])
 
         print("X")
 
@@ -445,26 +570,31 @@ class CignRlRouting(CignNoMask):
     def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
         assert len(self.scRoutingCalculationLayers) == level
 
+        # This code piece creates the corresponding Q-Net for the current layer, indicated by the variable "level".
+        # The Q-Net always takes the aggregated F outputs of the current layer's nodes (sparsified by the sc masks)
+        # and outputs raw Q-table predictions. This has been implemented as a separate tf.keras.Model,
+        # since they will be used in isolation during the iterative training of the CIGN-RL scheme.
         q_net_input_f_tensor = tf.keras.Input(shape=input_f_tensor.shape[1:],
                                               name="input_f_tensor_q_net_level_{0}".format(level),
                                               dtype=input_f_tensor.dtype)
-        q_net_input_ig_routing_matrix = tf.keras.Input(shape=input_ig_routing_matrix.shape[1:],
-                                                       name="input_ig_routing_matrix_q_net_level_{0}".format(level),
-                                                       dtype=input_ig_routing_matrix.dtype)
-        q_net_warm_up_period = tf.keras.Input(shape=(),
-                                              name="warm_up_period_{0}".format(level),
-                                              dtype=self.warmUpPeriodInput.dtype)
-
         q_net_layer = self.get_q_net_layer(level=level)
-        q_table_predicted, secondary_routing_matrix = \
-            q_net_layer([q_net_input_f_tensor, q_net_input_ig_routing_matrix, q_net_warm_up_period])
-        q_net = tf.keras.Model(inputs=[q_net_input_f_tensor, q_net_input_ig_routing_matrix, q_net_warm_up_period],
-                               outputs=[q_table_predicted, secondary_routing_matrix])
+        q_table_predicted = q_net_layer(q_net_input_f_tensor)
+        q_net = tf.keras.Model(inputs=q_net_input_f_tensor,  outputs=q_table_predicted)
+        q_table_predicted_cign_output = q_net(inputs=input_f_tensor)
 
-        q_table_predicted_cign_output, secondary_routing_matrix_cign_output = q_net(
-            inputs=[input_f_tensor, input_ig_routing_matrix, self.warmUpPeriodInput])
+        self.qNets.append(q_net)
         self.qTablesPredicted.append(q_table_predicted_cign_output)
-        self.scRoutingCalculationLayers.append(q_net)
+
+        # Now, we are going to calculate the routing matrix (sc matrix) by using the Q-table predictions of the Q-Net,
+        # by utilizing the Bellman equation.
+        node = self.orderedNodesPerLevel[level][-1]
+        routing_calculation_layer = CignRlRoutingLayer(level=level, node=node, network=self)
+        past_actions = tf.zeros_like(tf.argmax(q_table_predicted_cign_output, axis=-1)) \
+            if level == 0 else self.actionsPredicted[level - 1]
+        predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
+            [q_table_predicted_cign_output, input_ig_routing_matrix, self.warmUpPeriodInput, past_actions])
+        self.actionsPredicted.append(predicted_actions)
+        self.scRoutingCalculationLayers.append(routing_calculation_layer)
         return secondary_routing_matrix_cign_output
 
     def build_network(self):
@@ -476,6 +606,14 @@ class CignRlRouting(CignNoMask):
     def build_tf_model(self):
         # Build the final loss
         # Temporary model for getting the list of trainable variables
+        temp_output_dict = {}
+        for node_id, _d in self.nodeOutputsDict.items():
+            temp_output_dict[node_id] = {}
+            for k, v in _d.items():
+                if v is None:
+                    continue
+                temp_output_dict[node_id][k] = v
+        self.nodeOutputsDict = temp_output_dict
         self.model = tf.keras.Model(inputs=self.feedDict,
                                     outputs=[self.evalDict,
                                              self.classificationLosses,
@@ -483,7 +621,8 @@ class CignRlRouting(CignNoMask):
                                              self.posteriorsDict,
                                              self.scMaskInputsDict,
                                              self.igMaskInputsDict,
-                                             self.qTablesPredicted])
+                                             self.qTablesPredicted,
+                                             self.nodeOutputsDict])
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
 
@@ -515,16 +654,18 @@ class CignRlRouting(CignNoMask):
         for train_X, train_y in dataset.trainDataTf:
             with tf.GradientTape() as tape:
                 t0 = time.time()
-                feed_dict = self.get_feed_dict(x=train_X, y=train_y, iteration=iteration, is_training=True,
-                                               warm_up_period=is_in_warm_up_period)
                 t1 = time.time()
-                eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
-                sc_masks_dict, ig_masks_dict, q_tables_predicted = self.model(inputs=feed_dict, training=True)
+                model_output = self.run_model(
+                    X=train_X,
+                    y=train_y,
+                    iteration=iteration,
+                    is_training=True,
+                    warm_up_period=is_in_warm_up_period)
                 t2 = time.time()
                 total_loss, total_regularization_loss, info_gain_loss, classification_loss = \
                     self.calculate_total_loss(
-                        classification_losses=classification_losses,
-                        info_gain_losses=info_gain_losses)
+                        classification_losses=model_output["classification_losses"],
+                        info_gain_losses=model_output["info_gain_losses"])
             t3 = time.time()
 
             t4 = time.time()
@@ -533,24 +674,24 @@ class CignRlRouting(CignNoMask):
             self.optimizer.apply_gradients(zip(grads, cign_main_body_variables))
             t5 = time.time()
             # Track losses
-            self.track_losses(total_loss=total_loss, classification_losses=classification_losses,
-                              info_gain_losses=info_gain_losses)
+            self.track_losses(total_loss=total_loss, classification_losses=model_output["classification_losses"],
+                              info_gain_losses=model_output["info_gain_losses"])
             times_list.append(t5 - t0)
 
             self.print_train_step_info(
                 iteration=iteration,
-                classification_losses=classification_losses,
-                info_gain_losses=info_gain_losses,
+                classification_losses=model_output["classification_losses"],
+                info_gain_losses=model_output["info_gain_losses"],
                 time_intervals=[t0, t1, t2, t3, t4, t5],
-                eval_dict=eval_dict)
+                eval_dict=model_output["eval_dict"])
             iteration += 1
             # Print outputs
 
         self.save_log_data(run_id=run_id,
                            iteration=iteration,
-                           info_gain_losses=info_gain_losses,
-                           classification_losses=classification_losses,
-                           eval_dict=eval_dict)
+                           info_gain_losses=model_output["info_gain_losses"],
+                           classification_losses=model_output["classification_losses"],
+                           eval_dict=model_output["eval_dict"])
 
         return iteration, times_list
 
@@ -608,3 +749,24 @@ class CignRlRouting(CignNoMask):
                                                  epoch_id=epoch_id,
                                                  times_list=times_list)
                 epochs_after_warm_up += 1
+
+    def cign_test_saved_model(self, run_id, dataset):
+        CignRlRouting.save_model(run_id=run_id, model=self)
+        model_loaded = CignRlRouting.load_model(run_id=run_id)
+
+        for train_X, train_y in dataset.trainDataTf:
+            model_output_original = self.run_model(
+                X=train_X,
+                y=train_y,
+                iteration=0,
+                is_training=True,
+                warm_up_period=False)
+
+            model_output_original = model_loaded.run_model(
+                X=train_X,
+                y=train_y,
+                iteration=0,
+                is_training=True,
+                warm_up_period=False)
+
+            print("X")

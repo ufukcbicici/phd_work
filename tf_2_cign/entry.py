@@ -62,7 +62,7 @@ if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
-    fashion_mnist = FashionMnist(batch_size=batch_size)
+    fashion_mnist = FashionMnist(batch_size=batch_size, validation_size=5000)
     softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
                                                       initial_value=softmax_decay_initial,
                                                       decay_coefficient=softmax_decay_coefficient,

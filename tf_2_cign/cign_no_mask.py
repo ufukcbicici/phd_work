@@ -362,6 +362,9 @@ class CignNoMask(Cign):
                    validation_accuracy, test_accuracy,
                    mean_time_passed, 0.0, "XXX")], table=DbLogger.logsTable)
 
+    def run_model(self, **kwargs):
+        print("X")
+
     def train(self, run_id, dataset, epoch_count):
         self.optimizer = self.get_sgd_optimizer()
         self.build_trackers()

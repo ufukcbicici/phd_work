@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tf_2_cign.cign_rl_routing import CignRlRouting
-from tf_2_cign.custom_layers.cign_conv_dense_rl_layer import CignConvDenseRlLayer
+from tf_2_cign.custom_layers.cign_conv_dense_q_net import CignConvDenseQNet
 from tf_2_cign.custom_layers.fashion_net_layers.fashion_net_inner_node_func import FashionNetInnerNodeFunc
 from tf_2_cign.custom_layers.fashion_net_layers.fashion_net_leaf_node_func import FashionNetLeafNodeFunc
 
@@ -101,14 +101,14 @@ class FashionCignRl(CignRlRouting):
         node = self.orderedNodesPerLevel[level][-1]
         q_net_params = self.qNetParams[level]
         action_space = self.actionSpaces[level]
-        q_net_layer = CignConvDenseRlLayer(level=level,
-                                           node=node,
-                                           network=self,
-                                           kernel_size=q_net_params["Conv_Filter"],
-                                           num_of_filters=q_net_params["Conv_Feature_Maps"],
-                                           strides=q_net_params["Conv_Strides"],
-                                           activation="relu",
-                                           hidden_layer_dims=q_net_params["Hidden_Layers"],
-                                           q_network_dim=action_space.shape[0],
-                                           rl_dropout_prob=self.classificationDropProbability)
+        q_net_layer = CignConvDenseQNet(level=level,
+                                        node=node,
+                                        network=self,
+                                        kernel_size=q_net_params["Conv_Filter"],
+                                        num_of_filters=q_net_params["Conv_Feature_Maps"],
+                                        strides=q_net_params["Conv_Strides"],
+                                        activation="relu",
+                                        hidden_layer_dims=q_net_params["Hidden_Layers"],
+                                        q_network_dim=action_space.shape[0],
+                                        rl_dropout_prob=self.classificationDropProbability)
         return q_net_layer

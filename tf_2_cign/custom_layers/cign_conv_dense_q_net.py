@@ -3,10 +3,11 @@ import tensorflow as tf
 
 from tf_2_cign.custom_layers.cign_conv_layer import CignConvLayer
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
+from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
 from tf_2_cign.utilities import Utilities
 
 
-class CignConvDenseRlLayer(tf.keras.layers.Layer):
+class CignConvDenseQNet(tf.keras.layers.Layer):
     def __init__(self, level,
                  node, network, kernel_size, num_of_filters, strides, activation,
                  hidden_layer_dims,
@@ -53,9 +54,10 @@ class CignConvDenseRlLayer(tf.keras.layers.Layer):
 
     # @tf.function
     def call(self, inputs, **kwargs):
-        input_f_tensor = inputs[0]
-        input_ig_routing_matrix = inputs[1]
-        is_warm_up_period = inputs[2]
+        input_f_tensor = inputs
+        # input_ig_routing_matrix = inputs[1]
+        # is_warm_up_period = inputs[2]
+        # past_actions = inputs[3]
 
         # Apply a single conv layer first.
         q_net = self.convLayer(input_f_tensor)
@@ -69,20 +71,4 @@ class CignConvDenseRlLayer(tf.keras.layers.Layer):
 
         # Output q predictions
         q_table_predicted = self.qNetLayer(q_net)
-
-        # Predicted action distributions
-        predicted_actions = tf.argmax(q_table_predicted, axis=-1)
-        # secondary_routing_matrix = self.actionSpaces[self.level][predicted_actions]
-        secondary_routing_matrix = tf.gather_nd(self.actionSpaces[self.level],
-                                                tf.expand_dims(predicted_actions, axis=-1))
-        secondary_routing_matrix_logical_or_ig = tf.cast(
-            tf.logical_or(tf.cast(secondary_routing_matrix, dtype=tf.bool),
-                          tf.cast(input_ig_routing_matrix, dtype=tf.bool)), dtype=tf.int32)
-
-        secondary_routing_matrix_warm_up = tf.ones_like(secondary_routing_matrix_logical_or_ig)
-
-        secondary_routing_matrix_final = tf.where(tf.cast(is_warm_up_period, tf.int32) > 0,
-                                                  secondary_routing_matrix_warm_up,
-                                                  secondary_routing_matrix_logical_or_ig)
-
-        return q_table_predicted, secondary_routing_matrix_final
+        return q_table_predicted

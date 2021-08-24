@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-class FashionMnist:
+class FashionMnist(object):
     def __init__(self, batch_size, validation_size=2000, validation_source="test"):
         self.trainData, self.testData = tf.keras.datasets.fashion_mnist.load_data()
         self.trainX, self.trainY = self.trainData[0], self.trainData[1]
