@@ -70,39 +70,40 @@ class CignRlRouting(CignNoMask):
         self.warmUpPeriodInput = tf.keras.Input(shape=(), name="warm_up_period", dtype=tf.bool)
         self.feedDict["warm_up_period"] = self.warmUpPeriodInput
 
-    @staticmethod
-    def save_model(run_id, model):
-        assert isinstance(model, CignRlRouting)
+    def save_model(self, run_id):
         root_path = os.path.dirname(__file__)
         model_path = os.path.join(root_path, "..", "saved_models", "model_{0}".format(run_id))
+        os.mkdir(model_path)
         # if os.path.isdir(root_path):
         #     shutil.rmtree(root_path)
-        os.mkdir(model_path)
-        with open(model_path, "wb") as f:
-            pickle.dump(model, f)
+
+        # with open(os.path.join(model_path, "pickle_model.sav"), "wb") as f:
+        #     pickle.dump(model, f)
         # Save keras models
         cign_model_path = os.path.join(model_path, "cign_model")
         os.mkdir(cign_model_path)
-        model.model.save(cign_model_path)
-        for level, q_net in enumerate(model.qNets):
-            qnet_model_path = os.path.join(model_path, "cign_model", "q_net_{0}".format(level))
-            os.mkdir(qnet_model_path)
-            q_net.save(qnet_model_path)
+        cign_model_vars_path = os.path.join(cign_model_path, "variables")
+        os.mkdir(cign_model_vars_path)
+        self.model.save_weights(cign_model_vars_path)
 
-    @staticmethod
-    def load_model(run_id):
+        for level, q_net in enumerate(self.qNets):
+            qnet_model_path = os.path.join(model_path, "q_net_{0}".format(level))
+            os.mkdir(qnet_model_path)
+            qnet_model_vars_path = os.path.join(qnet_model_path, "variables")
+            os.mkdir(qnet_model_vars_path)
+            q_net.save_weights(qnet_model_vars_path)
+
+    def load_model(self, run_id):
         root_path = os.path.dirname(__file__)
         model_path = os.path.join(root_path, "..", "saved_models", "model_{0}".format(run_id))
-        with open(model_path, "rb") as f:
-            model = pickle.load(f)
+        # with open(model_path, "rb") as f:
+        #     model = pickle.load(f)
         # Load keras models
-        cign_model_path = os.path.join(model_path, "cign_model")
-        model.model = tf.keras.models.load_model(cign_model_path)
-        for level in range(model.depth):
-            qnet_model_path = os.path.join(model_path, "cign_model", "q_net_{0}".format(level))
-            q_net = tf.keras.models.load_model(qnet_model_path)
-            model.qNets.append(q_net)
-        return model
+        cign_model_path = os.path.join(model_path, "cign_model", "variables")
+        self.model.load_weights(cign_model_path)
+        for level in range(self.networkDepth):
+            qnet_model_path = os.path.join(model_path, "q_net_{0}".format(level), "variables")
+            self.qNets[level].load_weights(qnet_model_path)
 
     # OK
     def get_max_trajectory_length(self) -> int:
@@ -703,6 +704,14 @@ class CignRlRouting(CignNoMask):
                                             batch_size=self.batchSizeNonTensor)
         pass
 
+    def check_q_net_vars(self):
+        var_dict = {v.ref(): v.numpy() for v in self.model.variables}
+        for level in range(self.networkDepth):
+            q_net = self.qNets[level]
+            for q_net_var in q_net.variables:
+                assert q_net_var.ref() in var_dict
+                assert np.array_equal(q_net_var.numpy(), var_dict[q_net_var.ref()].numpy())
+
     def train(self, run_id, dataset, epoch_count):
         is_in_warm_up_period = True
         self.optimizer = self.get_sgd_optimizer()
@@ -721,6 +730,7 @@ class CignRlRouting(CignNoMask):
                                                                    run_id=run_id,
                                                                    iteration=iteration,
                                                                    is_in_warm_up_period=is_in_warm_up_period)
+            self.check_q_net_vars()
             if epoch_id >= self.warmUpPeriod:
                 # Run Q-Net learning for the first time.
                 if is_in_warm_up_period:
@@ -749,24 +759,3 @@ class CignRlRouting(CignNoMask):
                                                  epoch_id=epoch_id,
                                                  times_list=times_list)
                 epochs_after_warm_up += 1
-
-    def cign_test_saved_model(self, run_id, dataset):
-        CignRlRouting.save_model(run_id=run_id, model=self)
-        model_loaded = CignRlRouting.load_model(run_id=run_id)
-
-        for train_X, train_y in dataset.trainDataTf:
-            model_output_original = self.run_model(
-                X=train_X,
-                y=train_y,
-                iteration=0,
-                is_training=True,
-                warm_up_period=False)
-
-            model_output_original = model_loaded.run_model(
-                X=train_X,
-                y=train_y,
-                iteration=0,
-                is_training=True,
-                warm_up_period=False)
-
-            print("X")
