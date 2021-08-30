@@ -122,7 +122,7 @@ if __name__ == "__main__":
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
-        # cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=1)
+        cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=5)
         cign.save_model(run_id=run_id)
 
         cign2.init()

@@ -710,7 +710,7 @@ class CignRlRouting(CignNoMask):
             q_net = self.qNets[level]
             for q_net_var in q_net.variables:
                 assert q_net_var.ref() in var_dict
-                assert np.array_equal(q_net_var.numpy(), var_dict[q_net_var.ref()].numpy())
+                assert np.array_equal(q_net_var.numpy(), var_dict[q_net_var.ref()])
 
     def train(self, run_id, dataset, epoch_count):
         is_in_warm_up_period = True
