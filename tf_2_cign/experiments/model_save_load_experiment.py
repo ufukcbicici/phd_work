@@ -5,6 +5,7 @@ from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cign import Cign
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign import FashionCign
+from tf_2_cign.utilities import Utilities
 
 # Hyper-parameters
 from tf_2_cign.fashion_net.fashion_cign_rl import FashionCignRl
@@ -122,7 +123,7 @@ if __name__ == "__main__":
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
-        cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=5)
+        cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count)
         cign.save_model(run_id=run_id)
 
         cign2.init()
@@ -143,26 +144,7 @@ if __name__ == "__main__":
                 is_training=True,
                 warm_up_period=False)
 
-            print("X")
+            are_outputs_equal = Utilities.compare_model_outputs(output_1=model_output_1, output_2=model_output_2)
+            assert are_outputs_equal
 
-
-        # def cign_test_saved_model(self, run_id, dataset):
-        #     self.save_model(run_id=run_id, model=self)
-        #     model_loaded = CignRlRouting.load_model(run_id=run_id)
-        #
-        #     for train_X, train_y in dataset.trainDataTf:
-        #         model_output_original = self.run_model(
-        #             X=train_X,
-        #             y=train_y,
-        #             iteration=0,
-        #             is_training=True,
-        #             warm_up_period=False)
-        #
-        #         model_output_original = model_loaded.run_model(
-        #             X=train_X,
-        #             y=train_y,
-        #             iteration=0,
-        #             is_training=True,
-        #             warm_up_period=False)
-        #
-        #         print("X")
+        print("Test Passed!")

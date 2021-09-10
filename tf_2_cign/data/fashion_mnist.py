@@ -1,10 +1,13 @@
 import tensorflow as tf
 import numpy as np
 from sklearn.model_selection import train_test_split
+import pickle
+from tf_2_cign.utilities import Utilities
 
 
 class FashionMnist(object):
     def __init__(self, batch_size, validation_size=2000, validation_source="test"):
+        np.random.seed(67)
         self.trainData, self.testData = tf.keras.datasets.fashion_mnist.load_data()
         self.trainX, self.trainY = self.trainData[0], self.trainData[1]
         self.testX, self.testY = self.testData[0], self.testData[1]
@@ -34,3 +37,16 @@ class FashionMnist(object):
             shuffle(5000).batch(self.batchSize)
         # dataset_validation = tf.data.Dataset.from_tensor_slices((test_x, test_y)).batch(config["BATCH_SIZE"])
         # dataset_test = tf.data.Dataset.from_tensor_slices((test_x, test_y)).batch(config["BATCH_SIZE"])
+
+        # with pickle("test_data.sav")
+        # Utilities.pickle_save_to_file(path="test_data.sav", file_content=[self.testX, self.testY])
+        # Utilities.pickle_save_to_file(path="validation_data.sav", file_content=[self.valX, self.valY])
+
+        # testX_loaded, testY_loaded = Utilities.pickle_load_from_file(path="test_data.sav")
+        # valX_loaded, valY_loaded = Utilities.pickle_load_from_file(path="validation_data.sav")
+        # assert np.array_equal(self.testX, testX_loaded)
+        # assert np.array_equal(self.testY, testY_loaded)
+        # assert np.array_equal(self.valX, valX_loaded)
+        # assert np.array_equal(self.valY, valY_loaded)
+
+

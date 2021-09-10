@@ -1,3 +1,8 @@
+import numpy as np
+import tensorflow as tf
+import pickle
+
+
 class Utilities:
     def __init__(self):
         pass
@@ -63,3 +68,76 @@ class Utilities:
     @staticmethod
     def get_variable_name(name, node, prefix=""):
         return "{0}Node{1}_{2}".format(prefix, node.index, name)
+
+    @staticmethod
+    def compare_model_list_outputs(l_1, l_2):
+        assert len(l_1) == len(l_2)
+        for arr_1, arr_2 in zip(l_1, l_1):
+            assert isinstance(arr_1, tf.Tensor)
+            assert isinstance(arr_2, tf.Tensor)
+            is_equal = np.array_equal(arr_1.numpy(), arr_2.numpy())
+            if not is_equal:
+                return False
+        return True
+
+    @staticmethod
+    def compare_model_dictionary_outputs(d_1, d_2):
+        for k_1 in d_1.keys():
+            assert k_1 in d_2
+            v_1 = d_1[k_1]
+            v_2 = d_2[k_1]
+            if isinstance(v_1, dict):
+                assert isinstance(v_2, dict)
+                is_equal = Utilities.compare_model_dictionary_outputs(d_1=v_1, d_2=v_2)
+                if not is_equal:
+                    return False
+            elif isinstance(v_1, list):
+                assert isinstance(v_2, list)
+                is_equal = Utilities.compare_model_list_outputs(l_1=v_1, l_2=v_2)
+                if not is_equal:
+                    return False
+            elif isinstance(v_1, tf.Tensor):
+                assert isinstance(v_2, tf.Tensor)
+                is_equal = np.array_equal(v_1.numpy(), v_2.numpy())
+                if not is_equal:
+                    return False
+            else:
+                raise NotImplementedError()
+        return True
+
+    @staticmethod
+    def compare_model_outputs(output_1, output_2):
+        assert isinstance(output_1, dict)
+        assert isinstance(output_2, dict)
+        assert len(output_1) == len(output_2)
+
+        for _key in output_1.keys():
+            assert _key in output_2
+            v_1 = output_1[_key]
+            v_2 = output_2[_key]
+            assert (isinstance(v_1, dict) and isinstance(v_2, dict)) or \
+                   (isinstance(v_1, list) and isinstance(v_2, list))
+            if isinstance(v_1, dict):
+                is_equal = Utilities.compare_model_dictionary_outputs(d_1=v_1, d_2=v_2)
+                if not is_equal:
+                    return False
+            elif isinstance(v_2, list):
+                is_equal = Utilities.compare_model_list_outputs(l_1=v_1, l_2=v_2)
+                if not is_equal:
+                    return False
+            else:
+                raise NotImplementedError()
+        return True
+
+    @staticmethod
+    def pickle_save_to_file(path, file_content):
+        f = open(path, "wb")
+        pickle.dump(file_content, f)
+        f.close()
+
+    @staticmethod
+    def pickle_load_from_file(path):
+        f = open(path, "rb")
+        content = pickle.load(f)
+        f.close()
+        return content

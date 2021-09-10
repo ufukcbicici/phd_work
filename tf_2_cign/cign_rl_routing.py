@@ -13,7 +13,6 @@ from tf_2_cign.utilities import Utilities
 
 
 class CignRlRouting(CignNoMask):
-
     infeasible_action_penalty = -1000000.0
 
     def __init__(self,
@@ -315,13 +314,16 @@ class CignRlRouting(CignNoMask):
         y = kwargs["y"]
         iteration = kwargs["iteration"]
         is_training = kwargs["is_training"]
-        warm_up_period = kwargs["warm_up_period"]
+        if "warm_up_period" in kwargs:
+            warm_up_period = kwargs["warm_up_period"]
+        else:
+            warm_up_period = False
         feed_dict = self.get_feed_dict(x=X, y=y, iteration=iteration, is_training=is_training,
                                        warm_up_period=warm_up_period)
 
         eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
-        sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict\
-            = self.model(inputs=feed_dict, training=True)
+        sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict \
+            = self.model(inputs=feed_dict, training=is_training)
         model_output = {
             "eval_dict": eval_dict,
             "classification_losses": classification_losses,
@@ -334,139 +336,139 @@ class CignRlRouting(CignNoMask):
         }
         return model_output
 
-    def calculate_optimal_q_values(self, dataset, batch_size):
+    def calculate_optimal_q_values(self, dataset, batch_size, shuffle_data):
         # Step 1: Evaluate all samples and get the class predictions (posterior probabilities)
         # From there, we are going to calculate what kind of node combinations lead to correct predictions.
-        X_list = []
-        x_features_list = []
-        for t in range(self.get_max_trajectory_length()):
-            x_features_list.append([])
-            for idx in range(len(self.orderedNodesPerLevel[t])):
-                x_features_list[t].append([])
-        y_list = [[] for t in range(self.get_max_trajectory_length() - 1, -1, -1)]
-        q_tables = [[] for t in range(self.get_max_trajectory_length() - 1, -1, -1)]
-
-        for X, y in dataset:
-            optimal_q_tables = []
-            regression_targets = []
-            model_output = self.run_model(X=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
-            ig_paths_matrix = self.get_ig_paths(ig_masks_dict=model_output["ig_masks_dict"])
-            true_labels = y.numpy()
-            sample_count = true_labels.shape[0]
-            # Build the optimal Q tables from the final level, recursively up to the top.
-            for t in range(self.get_max_trajectory_length() - 1, -1, -1):
-                action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
-                action_count_t = self.actionSpaces[t].shape[0]
-                optimal_q_table = np.zeros(shape=(sample_count, action_count_t_minus_one, action_count_t),
-                                           dtype=np.float32)
-
-                # If in the last layer, take into account the prediction accuracies.
-                if t == self.get_max_trajectory_length() - 1:
-                    posteriors_tensor = []
-                    for leaf_node in self.leafNodes:
-                        posteriors_tensor.append(model_output["posteriors_dict"][leaf_node.index].numpy())
-                    posteriors_tensor = np.stack(posteriors_tensor, axis=-1)
-
-                    # Assert that posteriors are placed correctly.
-                    min_leaf_index = min([node.index for node in self.leafNodes])
-                    for leaf_node in self.leafNodes:
-                        assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
-                                              model_output["posteriors_dict"][leaf_node.index].numpy())
-
-                    # Combine posteriors with respect to the action tuple.
-                    prediction_correctness_vec_list = []
-                    calculation_cost_vec_list = []
-                    min_leaf_id = min([node.index for node in self.leafNodes])
-                    ig_indices = ig_paths_matrix[:, -1] - min_leaf_id
-                    for action_id in range(self.actionSpaces[t].shape[0]):
-                        routing_decision = self.actionSpaces[t][action_id, :]
-                        routing_matrix = np.repeat(routing_decision[np.newaxis, :], axis=0,
-                                                   repeats=y.shape[0])
-                        if self.includeIgInRewardCalculations:
-                            # Set Information Gain routed leaf nodes to 1. They are always evaluated.
-                            routing_matrix[np.arange(true_labels.shape[0]), ig_indices] = 1
-                        weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
-                        routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
-                        weighted_posteriors = posteriors_tensor * routing_matrix_weighted[:, np.newaxis, :]
-                        final_posteriors = np.sum(weighted_posteriors, axis=2)
-                        predicted_labels = np.argmax(final_posteriors, axis=1)
-                        validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
-                        prediction_correctness_vec_list.append(validity_of_predictions_vec)
-                        # Get the calculation costs
-                        computation_overload_vector = np.apply_along_axis(
-                            lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
-                            arr=routing_matrix)
-                        calculation_cost_vec_list.append(computation_overload_vector)
-                    prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
-                    prediction_correctness_tensor = np.repeat(
-                        np.expand_dims(prediction_correctness_matrix, axis=1), axis=1,
-                        repeats=action_count_t_minus_one)
-                    computation_overload_matrix = np.stack(calculation_cost_vec_list, axis=1)
-                    computation_overload_tensor = np.repeat(
-                        np.expand_dims(computation_overload_matrix, axis=1), axis=1,
-                        repeats=action_count_t_minus_one)
-                    # Add to the rewards tensor
-                    optimal_q_table += (prediction_correctness_tensor == 1
-                                        ).astype(np.float32) * self.validPredictionReward
-                    optimal_q_table += (prediction_correctness_tensor == 0
-                                        ).astype(np.float32) * self.invalidPredictionPenalty
-                    optimal_q_table -= self.lambdaMacCost * computation_overload_tensor
-                    for idx in range(optimal_q_table.shape[1] - 1):
-                        assert np.array_equal(optimal_q_table[:, idx, :], optimal_q_table[:, idx + 1, :])
-                    regression_targets.append(optimal_q_table[:, 0, :].copy())
-                else:
-                    q_table_next = optimal_q_tables[-1].copy()
-                    q_table_next = np.max(q_table_next, axis=-1)
-                    regression_targets.append(q_table_next)
-                    optimal_q_table = np.expand_dims(q_table_next, axis=1)
-                    optimal_q_table = np.repeat(optimal_q_table, axis=1, repeats=action_count_t_minus_one)
-
-                reachability_matrix = self.reachabilityMatrices[t].copy().astype(np.float32)
-                reachability_matrix = np.repeat(np.expand_dims(reachability_matrix, axis=0), axis=0,
-                                                repeats=optimal_q_table.shape[0])
-                assert optimal_q_table.shape == reachability_matrix.shape
-                optimal_q_table[reachability_matrix == 0] = -np.inf
-                optimal_q_tables.append(optimal_q_table)
-
-            X_list.append(X.numpy())
-            for idx in range(len(regression_targets)):
-                y_list[idx].append(regression_targets[idx])
-            for idx in range(len(optimal_q_tables)):
-                q_tables[idx].append(optimal_q_tables[idx])
-            # Intermediate features
-            for t in range(self.get_max_trajectory_length()):
-                level_nodes = self.orderedNodesPerLevel[t]
-                for idx, node in enumerate(level_nodes):
-                    x_output = model_output["node_outputs_dict"][node.index]["F"]
-                    x_features_list[t][idx].append(x_output)
-
-        X_list = np.concatenate(X_list, axis=0)
-        for idx in range(len(y_list)):
-            y_list[idx] = np.concatenate(y_list[idx], axis=0)
-        for idx in range(len(q_tables)):
-            q_tables[idx] = np.concatenate(q_tables[idx], axis=0)
-
-        # Concatenate intermediate features
-        for t in range(self.get_max_trajectory_length()):
-            level_nodes = self.orderedNodesPerLevel[t]
-            for idx, node in enumerate(level_nodes):
-                x_features_list[t][idx] = np.concatenate(x_features_list[t][idx], axis=0)
-
-        y_list.reverse()
-        q_tables.reverse()
-
-        # Assertions
-        for t in range(0, self.get_max_trajectory_length()):
-            action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
-            y_ = y_list[t]
-            y_ = np.expand_dims(y_, axis=1)
-            y_ = np.repeat(y_, axis=1, repeats=action_count_t_minus_one)
-            reachability_matrix = self.reachabilityMatrices[t].copy().astype(np.float32)
-            reachability_matrix = np.repeat(np.expand_dims(reachability_matrix, axis=0), axis=0,
-                                            repeats=y_.shape[0])
-            assert y_.shape == reachability_matrix.shape
-            y_[reachability_matrix == 0] = -np.inf
-            assert np.array_equal(y_, q_tables[t])
+        # X_list = []
+        # x_features_list = []
+        # for t in range(self.get_max_trajectory_length()):
+        #     x_features_list.append([])
+        #     for idx in range(len(self.orderedNodesPerLevel[t])):
+        #         x_features_list[t].append([])
+        # y_list = [[] for t in range(self.get_max_trajectory_length() - 1, -1, -1)]
+        # q_tables = [[] for t in range(self.get_max_trajectory_length() - 1, -1, -1)]
+        #
+        # for X, y in dataset:
+        #     optimal_q_tables = []
+        #     regression_targets = []
+        #     model_output = self.run_model(X=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
+        #     ig_paths_matrix = self.get_ig_paths(ig_masks_dict=model_output["ig_masks_dict"])
+        #     true_labels = y.numpy()
+        #     sample_count = true_labels.shape[0]
+        #     # Build the optimal Q tables from the final level, recursively up to the top.
+        #     for t in range(self.get_max_trajectory_length() - 1, -1, -1):
+        #         action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+        #         action_count_t = self.actionSpaces[t].shape[0]
+        #         optimal_q_table = np.zeros(shape=(sample_count, action_count_t_minus_one, action_count_t),
+        #                                    dtype=np.float32)
+        #
+        #         # If in the last layer, take into account the prediction accuracies.
+        #         if t == self.get_max_trajectory_length() - 1:
+        #             posteriors_tensor = []
+        #             for leaf_node in self.leafNodes:
+        #                 posteriors_tensor.append(model_output["posteriors_dict"][leaf_node.index].numpy())
+        #             posteriors_tensor = np.stack(posteriors_tensor, axis=-1)
+        #
+        #             # Assert that posteriors are placed correctly.
+        #             min_leaf_index = min([node.index for node in self.leafNodes])
+        #             for leaf_node in self.leafNodes:
+        #                 assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
+        #                                       model_output["posteriors_dict"][leaf_node.index].numpy())
+        #
+        #             # Combine posteriors with respect to the action tuple.
+        #             prediction_correctness_vec_list = []
+        #             calculation_cost_vec_list = []
+        #             min_leaf_id = min([node.index for node in self.leafNodes])
+        #             ig_indices = ig_paths_matrix[:, -1] - min_leaf_id
+        #             for action_id in range(self.actionSpaces[t].shape[0]):
+        #                 routing_decision = self.actionSpaces[t][action_id, :]
+        #                 routing_matrix = np.repeat(routing_decision[np.newaxis, :], axis=0,
+        #                                            repeats=y.shape[0])
+        #                 if self.includeIgInRewardCalculations:
+        #                     # Set Information Gain routed leaf nodes to 1. They are always evaluated.
+        #                     routing_matrix[np.arange(true_labels.shape[0]), ig_indices] = 1
+        #                 weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
+        #                 routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
+        #                 weighted_posteriors = posteriors_tensor * routing_matrix_weighted[:, np.newaxis, :]
+        #                 final_posteriors = np.sum(weighted_posteriors, axis=2)
+        #                 predicted_labels = np.argmax(final_posteriors, axis=1)
+        #                 validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+        #                 prediction_correctness_vec_list.append(validity_of_predictions_vec)
+        #                 # Get the calculation costs
+        #                 computation_overload_vector = np.apply_along_axis(
+        #                     lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
+        #                     arr=routing_matrix)
+        #                 calculation_cost_vec_list.append(computation_overload_vector)
+        #             prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
+        #             prediction_correctness_tensor = np.repeat(
+        #                 np.expand_dims(prediction_correctness_matrix, axis=1), axis=1,
+        #                 repeats=action_count_t_minus_one)
+        #             computation_overload_matrix = np.stack(calculation_cost_vec_list, axis=1)
+        #             computation_overload_tensor = np.repeat(
+        #                 np.expand_dims(computation_overload_matrix, axis=1), axis=1,
+        #                 repeats=action_count_t_minus_one)
+        #             # Add to the rewards tensor
+        #             optimal_q_table += (prediction_correctness_tensor == 1
+        #                                 ).astype(np.float32) * self.validPredictionReward
+        #             optimal_q_table += (prediction_correctness_tensor == 0
+        #                                 ).astype(np.float32) * self.invalidPredictionPenalty
+        #             optimal_q_table -= self.lambdaMacCost * computation_overload_tensor
+        #             for idx in range(optimal_q_table.shape[1] - 1):
+        #                 assert np.array_equal(optimal_q_table[:, idx, :], optimal_q_table[:, idx + 1, :])
+        #             regression_targets.append(optimal_q_table[:, 0, :].copy())
+        #         else:
+        #             q_table_next = optimal_q_tables[-1].copy()
+        #             q_table_next = np.max(q_table_next, axis=-1)
+        #             regression_targets.append(q_table_next)
+        #             optimal_q_table = np.expand_dims(q_table_next, axis=1)
+        #             optimal_q_table = np.repeat(optimal_q_table, axis=1, repeats=action_count_t_minus_one)
+        #
+        #         reachability_matrix = self.reachabilityMatrices[t].copy().astype(np.float32)
+        #         reachability_matrix = np.repeat(np.expand_dims(reachability_matrix, axis=0), axis=0,
+        #                                         repeats=optimal_q_table.shape[0])
+        #         assert optimal_q_table.shape == reachability_matrix.shape
+        #         optimal_q_table[reachability_matrix == 0] = -np.inf
+        #         optimal_q_tables.append(optimal_q_table)
+        #
+        #     X_list.append(X.numpy())
+        #     for idx in range(len(regression_targets)):
+        #         y_list[idx].append(regression_targets[idx])
+        #     for idx in range(len(optimal_q_tables)):
+        #         q_tables[idx].append(optimal_q_tables[idx])
+        #     # Intermediate features
+        #     for t in range(self.get_max_trajectory_length()):
+        #         level_nodes = self.orderedNodesPerLevel[t]
+        #         for idx, node in enumerate(level_nodes):
+        #             x_output = model_output["node_outputs_dict"][node.index]["F"]
+        #             x_features_list[t][idx].append(x_output)
+        #
+        # X_list = np.concatenate(X_list, axis=0)
+        # for idx in range(len(y_list)):
+        #     y_list[idx] = np.concatenate(y_list[idx], axis=0)
+        # for idx in range(len(q_tables)):
+        #     q_tables[idx] = np.concatenate(q_tables[idx], axis=0)
+        #
+        # # Concatenate intermediate features
+        # for t in range(self.get_max_trajectory_length()):
+        #     level_nodes = self.orderedNodesPerLevel[t]
+        #     for idx, node in enumerate(level_nodes):
+        #         x_features_list[t][idx] = np.concatenate(x_features_list[t][idx], axis=0)
+        #
+        # y_list.reverse()
+        # q_tables.reverse()
+        #
+        # # Assertions
+        # for t in range(0, self.get_max_trajectory_length()):
+        #     action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+        #     y_ = y_list[t]
+        #     y_ = np.expand_dims(y_, axis=1)
+        #     y_ = np.repeat(y_, axis=1, repeats=action_count_t_minus_one)
+        #     reachability_matrix = self.reachabilityMatrices[t].copy().astype(np.float32)
+        #     reachability_matrix = np.repeat(np.expand_dims(reachability_matrix, axis=0), axis=0,
+        #                                     repeats=y_.shape[0])
+        #     assert y_.shape == reachability_matrix.shape
+        #     y_[reachability_matrix == 0] = -np.inf
+        #     assert np.array_equal(y_, q_tables[t])
 
         # Collect all data from the network first, the obtain optimal q tables later.
         X_ = []
@@ -510,58 +512,62 @@ class CignRlRouting(CignNoMask):
                                                                  posteriors_dict=posteriors,
                                                                  ig_masks_dict=ig_masks)
 
-        assert len(regs) == len(y_list)
-        assert len(q_s) == len(q_tables)
-        for idx in range(len(regs)):
-            assert np.array_equal(regs[idx], y_list[idx])
-            assert np.array_equal(q_s[idx], q_tables[idx])
+        # assert len(regs) == len(y_list)
+        # assert len(q_s) == len(q_tables)
+        # for idx in range(len(regs)):
+        #     assert np.array_equal(regs[idx], y_list[idx])
+        #     assert np.array_equal(q_s[idx], q_tables[idx])
+        #
+        # for t in range(self.get_max_trajectory_length()):
+        #     level_nodes = self.orderedNodesPerLevel[t]
+        #     for idx, node in enumerate(level_nodes):
+        #         assert np.array_equal(x_features_list[t][idx], x_features_list_all[t][idx])
 
         x_features_linearized = []
         for arr in x_features_list_all:
             for x_feat in arr:
                 x_features_linearized.append(x_feat)
-        q_learning_dataset = tf.data.Dataset.from_tensor_slices((X_, *regs, *x_features_linearized)).batch(batch_size)
+        if shuffle_data:
+            q_learning_dataset = tf.data.Dataset.from_tensor_slices(
+                (X_, *regs, *x_features_linearized)).shuffle(5000).batch(batch_size)
+        else:
+            q_learning_dataset = tf.data.Dataset.from_tensor_slices(
+                (X_, *regs, *x_features_linearized)).batch(batch_size)
 
-        for t in range(self.get_max_trajectory_length()):
-            level_nodes = self.orderedNodesPerLevel[t]
-            for idx, node in enumerate(level_nodes):
-                assert np.array_equal(x_features_list[t][idx], x_features_list_all[t][idx])
 
         # This is checking for if the Tensorflow data generator works as intended.
-        X_data = []
-        y_data = [[] for _ in range(len(regs))]
-        x_feat_data = []
-        for t in range(self.get_max_trajectory_length()):
-            x_feat_data.append([])
-            for idx in range(len(self.orderedNodesPerLevel[t])):
-                x_feat_data[t].append([])
-
-        for tpl in q_learning_dataset:
-            # x_batch, y_1, y_2, x_intermediate_features in q_learning_dataset:
-            x_batch = tpl[0]
-            y_1 = tpl[1]
-            y_2 = tpl[2]
-            X_data.append(x_batch)
-            y_data[0].append(y_1)
-            y_data[1].append(y_2)
-            x_feat_idx = 0
-            for t in range(self.get_max_trajectory_length()):
-                for idx in range(len(self.orderedNodesPerLevel[t])):
-                    x_feat_data[t][idx].append(tpl[3 + x_feat_idx])
-                    x_feat_idx += 1
-
-        X_data = np.concatenate(X_data, axis=0)
-        assert np.array_equal(X_, X_data)
-        for idx in range(len(y_data)):
-            y_data[idx] = np.concatenate(y_data[idx], axis=0)
-            assert np.array_equal(y_data[idx], regs[idx])
-
-        for t in range(self.get_max_trajectory_length()):
-            for idx in range(len(self.orderedNodesPerLevel[t])):
-                x_feat_data[t][idx] = np.concatenate(x_feat_data[t][idx], axis=0)
-                assert np.array_equal(x_feat_data[t][idx], x_features_list_all[t][idx])
-
-        print("X")
+        # X_data = []
+        # y_data = [[] for _ in range(len(regs))]
+        # x_feat_data = []
+        # for t in range(self.get_max_trajectory_length()):
+        #     x_feat_data.append([])
+        #     for idx in range(len(self.orderedNodesPerLevel[t])):
+        #         x_feat_data[t].append([])
+        #
+        # for tpl in q_learning_dataset:
+        #     # x_batch, y_1, y_2, x_intermediate_features in q_learning_dataset:
+        #     x_batch = tpl[0]
+        #     y_1 = tpl[1]
+        #     y_2 = tpl[2]
+        #     X_data.append(x_batch)
+        #     y_data[0].append(y_1)
+        #     y_data[1].append(y_2)
+        #     x_feat_idx = 0
+        #     for t in range(self.get_max_trajectory_length()):
+        #         for idx in range(len(self.orderedNodesPerLevel[t])):
+        #             x_feat_data[t][idx].append(tpl[3 + x_feat_idx])
+        #             x_feat_idx += 1
+        #
+        # X_data = np.concatenate(X_data, axis=0)
+        # assert np.array_equal(X_, X_data)
+        # for idx in range(len(y_data)):
+        #     y_data[idx] = np.concatenate(y_data[idx], axis=0)
+        #     assert np.array_equal(y_data[idx], regs[idx])
+        #
+        # for t in range(self.get_max_trajectory_length()):
+        #     for idx in range(len(self.orderedNodesPerLevel[t])):
+        #         x_feat_data[t][idx] = np.concatenate(x_feat_data[t][idx], axis=0)
+        #         assert np.array_equal(x_feat_data[t][idx], x_features_list_all[t][idx])
 
         return q_learning_dataset
 
@@ -580,7 +586,7 @@ class CignRlRouting(CignNoMask):
                                               dtype=input_f_tensor.dtype)
         q_net_layer = self.get_q_net_layer(level=level)
         q_table_predicted = q_net_layer(q_net_input_f_tensor)
-        q_net = tf.keras.Model(inputs=q_net_input_f_tensor,  outputs=q_table_predicted)
+        q_net = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=q_table_predicted)
         q_table_predicted_cign_output = q_net(inputs=input_f_tensor)
 
         self.qNets.append(q_net)
@@ -696,13 +702,181 @@ class CignRlRouting(CignNoMask):
 
         return iteration, times_list
 
-    def train_q_nets(self, dataset):
+    def calculate_q_net_loss(self, q_net, mse_loss, q_truth, q_pred):
+        # Mse Loss
+        mse = mse_loss(q_truth, q_pred)
+        # Weight decaying
+        variables = q_net.trainable_variables
+        regularization_losses = []
+        for var in variables:
+            if var.ref() in self.regularizationCoefficients:
+                lambda_coeff = self.regularizationCoefficients[var.ref()]
+                regularization_losses.append(lambda_coeff * tf.nn.l2_loss(var))
+        total_regularization_loss = tf.add_n(regularization_losses)
+        # Total loss
+        total_loss = total_regularization_loss + mse
+        return total_loss, total_regularization_loss, mse
+
+    def get_q_learning_batch(self, tpl):
+        q_regression_targets = []
+        x_feat_data = {}
+        # Read original data batch, Q-table regression targets and intermediate features for Q-learning.
+        x_batch = tpl[0]
+        for t in range(self.get_max_trajectory_length()):
+            q_regression_targets.append(tpl[t + 1])
+        x_feat_idx = 0
+        for t in range(self.get_max_trajectory_length()):
+            for node in self.orderedNodesPerLevel[t]:
+                x_feat_data[node.index] = tpl[1 + self.get_max_trajectory_length() + x_feat_idx]
+                x_feat_idx += 1
+        return q_regression_targets, x_feat_data, x_batch.shape[0]
+
+    def get_q_learning_input(self, x_feat_data, route_matrix, batch_size, curr_level):
+        level_nodes = self.orderedNodesPerLevel[curr_level]
+        routing_prep_layer = self.scRoutingPreparationLayers[curr_level]
+        ig_matrices = [
+            tf.zeros(shape=(batch_size, self.nodeOutputsDict[node.index]["ig_mask_matrix"].shape[1]),
+                     dtype=self.nodeOutputsDict[node.index]["ig_mask_matrix"].dtype)
+            for node in level_nodes]
+        sc_masks = [tf.identity(route_matrix[:, col_id]) for col_id in range(route_matrix.shape[1])]
+        f_outputs = [x_feat_data[node.index] for node in level_nodes]
+        input_f_tensor, input_ig_routing_matrix = routing_prep_layer([f_outputs, ig_matrices, sc_masks])
+        # Check if input tensor is correctly built.
+        last_axis_dim = int(input_f_tensor.shape[-1] / len(level_nodes))
+        for idx in range(len(level_nodes)):
+            input_x = input_f_tensor.numpy()[..., idx * last_axis_dim:(idx + 1) * last_axis_dim]
+            axes = tuple([j + 1 for j in range(len(input_x.shape) - 1)])
+            axes_sum = np.sum(input_x, axis=axes)
+            sparse_vec = np.logical_not(axes_sum == 0).astype(np.int32)
+            assert np.array_equal(sparse_vec, sc_masks[idx].numpy())
+        return input_f_tensor, input_ig_routing_matrix
+
+    def eval_q_tables(self, q_tables):
+        last_actions = np.zeros(shape=(q_tables[0].shape[0], ), dtype=np.int32)
+        for curr_level in range(self.get_max_trajectory_length()):
+            q_table = q_tables[curr_level].numpy()
+            q_table = q_table[np.arange(q_table.shape[0]), last_actions]
+            feasibility_matrix = self.reachabilityMatrices[curr_level][last_actions]
+            penalty_matrix = np.where(feasibility_matrix.astype(np.bool),
+                                      0.0,
+                                      CignRlRoutingLayer.infeasible_action_penalty)
+            q_table_with_penalties = penalty_matrix + q_table
+            last_actions = np.argmax(q_table_with_penalties, axis=-1)
+            best_q_values = np.max(q_table_with_penalties, axis=-1)
+        accuracy = np.sum(best_q_values > 0.0) / best_q_values.shape[0]
+        print("Accuracy={0}".format(accuracy))
+
+    def eval_q_nets(self, dataset):
+        q_truth_tables = []
+        q_predicted_tables = []
+        for curr_level in range(self.get_max_trajectory_length()):
+            q_net = self.qNets[curr_level]
+            mse_loss = tf.keras.losses.MeanSquaredError()
+            mse_loss_tracker = tf.keras.metrics.Mean(name="mse_loss_tracker")
+            level_nodes = self.orderedNodesPerLevel[curr_level]
+            previous_action_space = np.ones(shape=(1, 1), dtype=np.int32) \
+                if curr_level == 0 else self.actionSpaces[curr_level - 1]
+
+            q_truth = []
+            q_predicted = []
+            actions = []
+            for action_id in range(previous_action_space.shape[0]):
+                q_truth_action = []
+                q_predicted_action = []
+                for tpl in dataset:
+                    q_regression_targets, x_feat_data, batch_size = self.get_q_learning_batch(tpl=tpl)
+                    a_t_minus_one = action_id * np.ones(shape=(batch_size,), dtype=np.int32)
+                    route_matrix = tf.constant(previous_action_space[a_t_minus_one])
+                    # Prepare the Q-Net input
+                    input_f_tensor, input_ig_routing_matrix = \
+                        self.get_q_learning_input(x_feat_data=x_feat_data,
+                                                  route_matrix=route_matrix,
+                                                  batch_size=batch_size,
+                                                  curr_level=curr_level)
+                    q_regression_predicted = q_net(inputs=input_f_tensor, training=False)
+                    q_truth_action.append(q_regression_targets[curr_level])
+                    q_predicted_action.append(q_regression_predicted)
+                    actions.append(a_t_minus_one)
+                q_truth_action = tf.concat(q_truth_action, axis=0)
+                q_predicted_action = tf.concat(q_predicted_action, axis=0)
+                q_truth.append(q_truth_action)
+                q_predicted.append(q_predicted_action)
+
+            q_truth = tf.stack(q_truth, axis=1)
+            q_predicted = tf.stack(q_predicted, axis=1)
+            mse = mse_loss(q_truth, q_predicted)
+            print("Level:{0} Mse={1}".format(curr_level, mse.numpy()))
+            q_truth_tables.append(q_truth)
+            q_predicted_tables.append(q_predicted)
+
+            # q_truth.append(q_truth_action)
+            # q_predicted.append(q_predicted_action)
+
+            # q_truth = tf.concat(q_truth, axis=0)
+            # q_predicted = tf.concat(q_predicted, axis=0)
+            # actions = np.concatenate(actions, axis=0)
+            # mse = mse_loss(q_truth, q_predicted)
+            # print("Level:{0} Mse={1}".format(curr_level, mse.numpy()))
+
+        print("X")
+        self.eval_q_tables(q_tables=q_truth_tables)
+
+    def train_q_nets(self, dataset, q_net_epoch_count):
         print("Training Q-Nets")
         # Prepare the Q-Learning dataset
-        q_learning_dataset = \
+        q_learning_dataset_val = \
             self.calculate_optimal_q_values(dataset=dataset.validationDataTf,
-                                            batch_size=self.batchSizeNonTensor)
-        pass
+                                            batch_size=self.batchSizeNonTensor,
+                                            shuffle_data=True)
+        q_learning_dataset_train = \
+            self.calculate_optimal_q_values(dataset=dataset.trainDataTf,
+                                            batch_size=self.batchSizeNonTensor,
+                                            shuffle_data=False)
+        q_learning_dataset_test = \
+            self.calculate_optimal_q_values(dataset=dataset.testDataTf,
+                                            batch_size=self.batchSizeNonTensor,
+                                            shuffle_data=False)
+
+        # Training happens here; level by level.
+        for curr_level in range(self.get_max_trajectory_length()):
+            q_net = self.qNets[curr_level]
+            mse_loss = tf.keras.losses.MeanSquaredError()
+            mse_loss_tracker = tf.keras.metrics.Mean(name="mse_loss_tracker")
+            # Adam Optimizer
+            q_net_optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            level_nodes = self.orderedNodesPerLevel[curr_level]
+            previous_action_space = np.ones(shape=(1, 1), dtype=np.int32) \
+                if curr_level == 0 else self.actionSpaces[curr_level - 1]
+            for epoch_id in range(q_net_epoch_count):
+                mse_loss_tracker.reset_states()
+                # Iterate over the dataset.
+                for tpl in q_learning_dataset_val:
+                    q_regression_targets, x_feat_data, batch_size = self.get_q_learning_batch(tpl=tpl)
+                    with tf.GradientTape() as tape:
+                        # Sample previous actions
+                        a_t_minus_one = np.random.randint(low=0, high=previous_action_space.shape[0],
+                                                          size=(batch_size,))
+                        route_matrix = tf.constant(previous_action_space[a_t_minus_one])
+                        # Prepare the Q-Net input
+                        input_f_tensor, input_ig_routing_matrix = \
+                            self.get_q_learning_input(x_feat_data=x_feat_data,
+                                                      route_matrix=route_matrix,
+                                                      batch_size=batch_size,
+                                                      curr_level=curr_level)
+                        # Calculate the MSE
+                        q_regression_predicted = q_net(inputs=input_f_tensor, training=True)
+                        total_loss, total_regularization_loss, mse = self.calculate_q_net_loss(
+                            q_net=q_net,
+                            mse_loss=mse_loss,
+                            q_truth=q_regression_targets[curr_level],
+                            q_pred=q_regression_predicted)
+                    # Apply grads, to the Q-Net grads
+                    grads = tape.gradient(total_loss, q_net.trainable_variables)
+                    q_net_optimizer.apply_gradients(zip(grads, q_net.trainable_variables))
+                    mse_loss_tracker.update_state(total_loss)
+                    print("Level:{0} Epoch:{1} Total Loss:{2}".format(curr_level,
+                                                                      epoch_id,
+                                                                      mse_loss_tracker.result().numpy()))
 
     def check_q_net_vars(self):
         var_dict = {v.ref(): v.numpy() for v in self.model.variables}
@@ -712,7 +886,8 @@ class CignRlRouting(CignNoMask):
                 assert q_net_var.ref() in var_dict
                 assert np.array_equal(q_net_var.numpy(), var_dict[q_net_var.ref()])
 
-    def train(self, run_id, dataset, epoch_count):
+    def train(self, run_id, dataset, epoch_count, **kwargs):
+        q_net_epoch_count = kwargs["q_net_epoch_count"]
         is_in_warm_up_period = True
         self.optimizer = self.get_sgd_optimizer()
         self.build_trackers()
@@ -734,8 +909,9 @@ class CignRlRouting(CignNoMask):
             if epoch_id >= self.warmUpPeriod:
                 # Run Q-Net learning for the first time.
                 if is_in_warm_up_period:
+                    self.save_model(run_id=run_id)
                     is_in_warm_up_period = False
-                    self.train_q_nets(dataset=dataset)
+                    self.train_q_nets(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
                     self.measure_performance(dataset=dataset,
                                              run_id=run_id,
                                              iteration=iteration,
@@ -744,7 +920,7 @@ class CignRlRouting(CignNoMask):
                 else:
                     is_performance_measured = False
                     if (epochs_after_warm_up + 1) % self.cignRlTrainPeriod == 0:
-                        self.train_q_nets(dataset=dataset)
+                        self.train_q_nets(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
                         self.measure_performance(dataset=dataset,
                                                  run_id=run_id,
                                                  iteration=iteration,

@@ -33,7 +33,7 @@ class FashionNetInnerNodeFunc(tf.keras.layers.Layer):
                                               name="fc_op_decision")
         self.decisionDropoutLayer = tf.keras.layers.Dropout(rate=self.decisionDropProbability)
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         f_input = inputs[0]
         h_input = inputs[1]

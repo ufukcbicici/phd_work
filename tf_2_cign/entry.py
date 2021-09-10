@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+import numpy as np
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cign import Cign
@@ -14,8 +14,8 @@ input_dims = (28, 28, 1)
 degree_list = [2, 2]
 batch_size = 125
 epoch_count = 100
-decision_drop_probability = 0.0
-drop_probability = 0.0
+decision_drop_probability = 0.5
+drop_probability = 0.5
 classification_wd = 0.0
 decision_wd = 0.0
 softmax_decay_initial = 25.0
@@ -40,7 +40,7 @@ learning_rate_calculator = DiscreteParameter(name="lr_calculator",
 # Reinforcement learning routing parameters
 valid_prediction_reward = 1.0
 invalid_prediction_penalty = 0.0
-lambda_mac_cost = 0.1
+lambda_mac_cost = 0.5
 q_net_params = [
     {
         "Conv_Filter": 1,
@@ -116,4 +116,33 @@ if __name__ == "__main__":
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
         # cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf, batch_size=batch_size)
-        cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count)
+        # cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count)
+
+        # cign.load_model(run_id=2687)
+        cign.load_model(run_id=2766)
+        cign.measure_performance(dataset=fashion_mnist, run_id=run_id, iteration=0, epoch_id=0, times_list=[])
+        # cign.train_q_nets(dataset=fashion_mnist, q_net_epoch_count=250)
+        # cign.measure_performance(dataset=fashion_mnist, run_id=run_id, iteration=0, epoch_id=0, times_list=[])
+        # cign.save_model(run_id=run_id)
+
+        # cign.load_model(run_id=2723)
+        #
+        q_learning_dataset_val = \
+            cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf,
+                                            batch_size=cign.batchSizeNonTensor, shuffle_data=False)
+        q_learning_dataset_train = \
+            cign.calculate_optimal_q_values(dataset=fashion_mnist.trainDataTf,
+                                            batch_size=cign.batchSizeNonTensor, shuffle_data=False)
+        q_learning_dataset_test = \
+            cign.calculate_optimal_q_values(dataset=fashion_mnist.testDataTf,
+                                            batch_size=cign.batchSizeNonTensor, shuffle_data=False)
+
+        cign.eval_q_nets(dataset=q_learning_dataset_val)
+        cign.eval_q_nets(dataset=q_learning_dataset_test)
+        cign.eval_q_nets(dataset=q_learning_dataset_train)
+
+
+        # cign.train_q_nets(dataset=fashion_mnist, q_net_epoch_count=100)
+        # cign.measure_performance(dataset=fashion_mnist, run_id=run_id, iteration=0, epoch_id=0, times_list=[])
+        # cign.save_model(run_id=run_id)
+        # cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count, q_net_epoch_count=100)

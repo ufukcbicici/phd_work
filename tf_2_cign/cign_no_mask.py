@@ -363,7 +363,25 @@ class CignNoMask(Cign):
                    mean_time_passed, 0.0, "XXX")], table=DbLogger.logsTable)
 
     def run_model(self, **kwargs):
-        print("X")
+        X = kwargs["X"]
+        y = kwargs["y"]
+        iteration = kwargs["iteration"]
+        is_training = kwargs["is_training"]
+        feed_dict = self.get_feed_dict(x=X, y=y, iteration=iteration, is_training=is_training)
+
+        eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
+        sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=is_training)
+
+        model_output = {
+            "eval_dict": eval_dict,
+            "classification_losses": classification_losses,
+            "info_gain_losses": info_gain_losses,
+            "posteriors_dict": posteriors_dict,
+            "sc_masks_dict": sc_masks_dict,
+            "ig_masks_dict": ig_masks_dict
+        }
+
+        return model_output
 
     def train(self, run_id, dataset, epoch_count):
         self.optimizer = self.get_sgd_optimizer()
@@ -378,23 +396,21 @@ class CignNoMask(Cign):
             for train_X, train_y in dataset.trainDataTf:
                 with tf.GradientTape() as tape:
                     t0 = time.time()
-                    feed_dict = self.get_feed_dict(x=train_X, y=train_y, iteration=iteration, is_training=True)
                     t1 = time.time()
-
-                    eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
-                    sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=True)
-
-                    # classification_losses, info_gain_losses, posteriors_dict, \
-                    #     sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=True)
+                    model_output = self.run_model(
+                        X=train_X,
+                        y=train_y,
+                        iteration=iteration,
+                        is_training=True)
 
                     t2 = time.time()
                     total_loss, total_regularization_loss, info_gain_loss, classification_loss = \
                         self.calculate_total_loss(
-                            classification_losses=classification_losses,
-                            info_gain_losses=info_gain_losses)
+                            classification_losses=model_output["classification_losses"],
+                            info_gain_losses=model_output["info_gain_losses"])
                 t3 = time.time()
                 # self.unit_test_cign_routing_mechanism(
-                #     eval_dict=eval_dict,
+                #     eval_dict=model_output["eval_dict"],
                 #     tape=tape,
                 #     classification_loss=classification_loss,
                 #     info_gain_loss=info_gain_loss)
@@ -404,24 +420,24 @@ class CignNoMask(Cign):
                 self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
                 t5 = time.time()
                 # Track losses
-                self.track_losses(total_loss=total_loss, classification_losses=classification_losses,
-                                  info_gain_losses=info_gain_losses)
+                self.track_losses(total_loss=total_loss, classification_losses=model_output["classification_losses"],
+                                  info_gain_losses=model_output["info_gain_losses"])
                 times_list.append(t5 - t0)
 
                 self.print_train_step_info(
                     iteration=iteration,
-                    classification_losses=classification_losses,
-                    info_gain_losses=info_gain_losses,
+                    classification_losses=model_output["classification_losses"],
+                    info_gain_losses=model_output["info_gain_losses"],
                     time_intervals=[t0, t1, t2, t3, t4, t5],
-                    eval_dict=eval_dict)
+                    eval_dict=model_output["eval_dict"])
                 iteration += 1
                 # Print outputs
 
             self.save_log_data(run_id=run_id,
                                iteration=iteration,
-                               info_gain_losses=info_gain_losses,
-                               classification_losses=classification_losses,
-                               eval_dict=eval_dict)
+                               info_gain_losses=model_output["info_gain_losses"],
+                               classification_losses=model_output["classification_losses"],
+                               eval_dict=model_output["eval_dict"])
 
             # Eval on training, validation and test sets
             if epoch_id >= epoch_count - 10 or epoch_id % self.trainEvalPeriod == 0:
@@ -439,15 +455,17 @@ class CignNoMask(Cign):
 
         leaf_distributions = {node.index: [] for node in self.leafNodes}
         for X, y in dataset:
-            feed_dict = self.get_feed_dict(x=X, y=y, iteration=-1, is_training=False)
-            eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
-            sc_masks_dict, ig_masks_dict = self.model(inputs=feed_dict, training=False)
+            model_output = self.run_model(
+                X=X,
+                y=y,
+                iteration=-1,
+                is_training=False)
 
             leaf_weights = []
             posteriors = []
             for leaf_node in self.leafNodes:
-                sc_mask = sc_masks_dict[leaf_node.index]
-                posterior = posteriors_dict[leaf_node.index]
+                sc_mask = model_output["sc_masks_dict"][leaf_node.index]
+                posterior = model_output["posteriors_dict"][leaf_node.index]
                 leaf_weights.append(np.expand_dims(sc_mask, axis=-1))
                 posteriors.append(posterior)
                 y_leaf = y.numpy()[sc_mask.numpy().astype(np.bool)]
