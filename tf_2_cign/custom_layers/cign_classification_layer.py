@@ -12,11 +12,13 @@ from tf_2_cign.utilities import Utilities
 class CignClassificationLayer(tf.keras.layers.Layer):
     def __init__(self, network, node, class_count):
         super().__init__()
-        self.network = network
-        self.cignNode = node
-        self.classCount = class_count
-        self.lossLayer = CignDenseLayer(output_dim=self.classCount, activation=None, node=node, use_bias=True,
-                                        name="loss_layer")
+        with tf.name_scope("Node_{0}".format(node.index)):
+            with tf.name_scope("classification_layer"):
+                self.network = network
+                self.cignNode = node
+                self.classCount = class_count
+                self.lossLayer = CignDenseLayer(output_dim=self.classCount, activation=None, node=node, use_bias=True,
+                                                name="loss_layer")
 
     def call(self, inputs, **kwargs):
         f_net = inputs[0]

@@ -15,42 +15,44 @@ class CignConvDenseQNet(tf.keras.layers.Layer):
                  rl_dropout_prob,
                  use_bias=True, padding="same"):
         super().__init__()
-        self.level = level
-        self.node = node
-        self.network = network
-        self.actionSpaces = [tf.constant(self.network.actionSpaces[idx])
-                             for idx in range(len(self.network.actionSpaces))]
-        # F Operations - Conv layer
-        self.convLayer = CignConvLayer(kernel_size=kernel_size,
-                                       num_of_filters=num_of_filters,
-                                       strides=strides,
-                                       node=node,
-                                       activation=activation,
-                                       use_bias=use_bias,
-                                       padding=padding,
-                                       name="q_net_conv_layer")
-        self.globalAveragingPoolLayer = tf.keras.layers.GlobalAveragePooling2D()
-        # F Operations - Dense Layers
-        self.hiddenLayerDims = hidden_layer_dims
-        self.flattenLayer = tf.keras.layers.Flatten()
-        self.hiddenLayers = []
-        self.dropoutLayers = []
-        self.rlDropoutProb = rl_dropout_prob
-        for layer_id, hidden_layer_dim in enumerate(self.hiddenLayerDims):
-            fc_layer = CignDenseLayer(output_dim=hidden_layer_dim,
-                                      activation="relu",
-                                      node=node,
-                                      use_bias=True,
-                                      name="q_net_fc_layer_{0}".format(layer_id))
-            self.hiddenLayers.append(fc_layer)
-            dropout_layer = tf.keras.layers.Dropout(rate=self.rlDropoutProb)
-            self.dropoutLayers.append(dropout_layer)
-        self.qNetworkDim = q_network_dim
-        self.qNetLayer = CignDenseLayer(output_dim=self.qNetworkDim,
-                                        activation=None,
-                                        node=node,
-                                        use_bias=True,
-                                        name="q_net_q_table_layer")
+        with tf.name_scope("Node_{0}".format(node.index)):
+            with tf.name_scope("q_net"):
+                self.level = level
+                self.node = node
+                self.network = network
+                self.actionSpaces = [tf.constant(self.network.actionSpaces[idx])
+                                     for idx in range(len(self.network.actionSpaces))]
+                # F Operations - Conv layer
+                self.convLayer = CignConvLayer(kernel_size=kernel_size,
+                                               num_of_filters=num_of_filters,
+                                               strides=strides,
+                                               node=node,
+                                               activation=activation,
+                                               use_bias=use_bias,
+                                               padding=padding,
+                                               name="q_net_conv_layer")
+                self.globalAveragingPoolLayer = tf.keras.layers.GlobalAveragePooling2D()
+                # F Operations - Dense Layers
+                self.hiddenLayerDims = hidden_layer_dims
+                self.flattenLayer = tf.keras.layers.Flatten()
+                self.hiddenLayers = []
+                self.dropoutLayers = []
+                self.rlDropoutProb = rl_dropout_prob
+                for layer_id, hidden_layer_dim in enumerate(self.hiddenLayerDims):
+                    fc_layer = CignDenseLayer(output_dim=hidden_layer_dim,
+                                              activation="relu",
+                                              node=node,
+                                              use_bias=True,
+                                              name="q_net_fc_layer_{0}".format(layer_id))
+                    self.hiddenLayers.append(fc_layer)
+                    dropout_layer = tf.keras.layers.Dropout(rate=self.rlDropoutProb)
+                    self.dropoutLayers.append(dropout_layer)
+                self.qNetworkDim = q_network_dim
+                self.qNetLayer = CignDenseLayer(output_dim=self.qNetworkDim,
+                                                activation=None,
+                                                node=node,
+                                                use_bias=True,
+                                                name="q_net_q_table_layer")
 
     # @tf.function
     def call(self, inputs, **kwargs):

@@ -1,11 +1,12 @@
 import tensorflow as tf
 from tf_2_cign.cign_rl_routing import CignRlRouting
+from tf_2_cign.cign_rl_routing_with_iterative_training import CignRlRoutingWithIterativeTraining
 from tf_2_cign.custom_layers.cign_conv_dense_q_net import CignConvDenseQNet
 from tf_2_cign.custom_layers.fashion_net_layers.fashion_net_inner_node_func import FashionNetInnerNodeFunc
 from tf_2_cign.custom_layers.fashion_net_layers.fashion_net_leaf_node_func import FashionNetLeafNodeFunc
 
 
-class FashionCignRl(CignRlRouting):
+class FashionCignRl(CignRlRoutingWithIterativeTraining):
     def __init__(self,
                  valid_prediction_reward,
                  invalid_prediction_penalty,

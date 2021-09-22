@@ -12,15 +12,17 @@ from tf_2_cign.utilities import Utilities
 class CignDecisionLayer(tf.keras.layers.Layer):
     def __init__(self, network, node, decision_bn_momentum):
         super().__init__()
-        self.network = network
-        self.cignNode = node
-        self.nodeDegree = self.network.degreeList[node.depth]
-        self.infoGainLayer = InfoGainLayer(class_count=self.network.classCount)
-        self.decisionBnMomentum = decision_bn_momentum
-        self.decisionBatchNorm = WeightedBatchNormalization(momentum=self.decisionBnMomentum, node=node)
-        self.decisionActivationsLayer = CignDenseLayer(output_dim=self.nodeDegree, activation=None,
-                                                       node=node, use_bias=True, name="fc_op_decision")
-        self.balanceCoeff = self.network.informationGainBalanceCoeff
+        with tf.name_scope("Node_{0}".format(node.index)):
+            with tf.name_scope("decision_layer"):
+                self.network = network
+                self.cignNode = node
+                self.nodeDegree = self.network.degreeList[node.depth]
+                self.infoGainLayer = InfoGainLayer(class_count=self.network.classCount)
+                self.decisionBnMomentum = decision_bn_momentum
+                self.decisionBatchNorm = WeightedBatchNormalization(momentum=self.decisionBnMomentum, node=node)
+                self.decisionActivationsLayer = CignDenseLayer(output_dim=self.nodeDegree, activation=None,
+                                                               node=node, use_bias=True, name="fc_op_decision")
+                self.balanceCoeff = self.network.informationGainBalanceCoeff
 
     # @tf.function
     def call(self, inputs, **kwargs):

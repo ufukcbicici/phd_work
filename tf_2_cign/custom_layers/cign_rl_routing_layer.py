@@ -9,11 +9,12 @@ from tf_2_cign.utilities import Utilities
 class CignRlRoutingLayer(tf.keras.layers.Layer):
     infeasible_action_penalty = -1000000.0
 
-    def __init__(self, level, node, network):
+    def __init__(self, level, node, network, use_ig_in_actions):
         super().__init__()
         self.level = level
         self.node = node
         self.network = network
+        self.useIgInActions = use_ig_in_actions
         self.actionSpaces = [tf.constant(self.network.actionSpaces[idx])
                              for idx in range(len(self.network.actionSpaces))]
         self.reachabilityMatrices = [tf.constant(self.network.reachabilityMatrices[idx])
@@ -41,6 +42,12 @@ class CignRlRoutingLayer(tf.keras.layers.Layer):
         secondary_routing_matrix_logical_or_ig = tf.cast(
             tf.logical_or(tf.cast(secondary_routing_matrix, dtype=tf.bool),
                           tf.cast(input_ig_routing_matrix, dtype=tf.bool)), dtype=tf.int32)
+
+        # Actions are updated with the inclusion of information gain.
+        if self.useIgInActions:
+            basis_matrix = secondary_routing_matrix_logical_or_ig * \
+                           tf.expand_dims(self.network.actionSpacesReverse[self.level], axis=0)
+            predicted_actions = tf.reduce_sum(basis_matrix, axis=-1) - 1
 
         secondary_routing_matrix_warm_up = tf.ones_like(secondary_routing_matrix_logical_or_ig)
 

@@ -7,6 +7,7 @@ import pickle
 import os
 import shutil
 
+from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_no_mask import CignNoMask
 from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
 from tf_2_cign.utilities import Utilities
@@ -52,6 +53,7 @@ class CignRlRouting(CignNoMask):
         self.invalidPredictionPenalty = invalid_prediction_penalty
         self.lambdaMacCost = lambda_mac_cost
         self.actionSpaces = []
+        self.actionSpacesReverse = []
         self.reachabilityMatrices = []
         self.baseEvaluationCost = None
         self.networkActivationCosts = []
@@ -124,6 +126,12 @@ class CignRlRouting(CignNoMask):
                 action_space.append(binary_node_selection)
             action_space = np.stack(action_space, axis=0)
             self.actionSpaces.append(action_space)
+            # Reverse map
+            binary_basis = []
+            for a_id in range(action_space.shape[1]):
+                binary_basis.append(2 ** a_id)
+            binary_basis.reverse()
+            self.actionSpacesReverse.append(tf.constant(binary_basis))
 
     # OK
     def build_reachability_matrices(self):
@@ -534,7 +542,6 @@ class CignRlRouting(CignNoMask):
             q_learning_dataset = tf.data.Dataset.from_tensor_slices(
                 (X_, *regs, *x_features_linearized)).batch(batch_size)
 
-
         # This is checking for if the Tensorflow data generator works as intended.
         # X_data = []
         # y_data = [[] for _ in range(len(regs))]
@@ -595,7 +602,7 @@ class CignRlRouting(CignNoMask):
         # Now, we are going to calculate the routing matrix (sc matrix) by using the Q-table predictions of the Q-Net,
         # by utilizing the Bellman equation.
         node = self.orderedNodesPerLevel[level][-1]
-        routing_calculation_layer = CignRlRoutingLayer(level=level, node=node, network=self)
+        routing_calculation_layer = CignRlRoutingLayer(level=level, node=node, network=self, use_ig_in_actions=True)
         past_actions = tf.zeros_like(tf.argmax(q_table_predicted_cign_output, axis=-1)) \
             if level == 0 else self.actionsPredicted[level - 1]
         predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
@@ -752,7 +759,7 @@ class CignRlRouting(CignNoMask):
         return input_f_tensor, input_ig_routing_matrix
 
     def eval_q_tables(self, q_tables):
-        last_actions = np.zeros(shape=(q_tables[0].shape[0], ), dtype=np.int32)
+        last_actions = np.zeros(shape=(q_tables[0].shape[0],), dtype=np.int32)
         for curr_level in range(self.get_max_trajectory_length()):
             q_table = q_tables[curr_level].numpy()
             q_table = q_table[np.arange(q_table.shape[0]), last_actions]
@@ -762,9 +769,10 @@ class CignRlRouting(CignNoMask):
                                       CignRlRoutingLayer.infeasible_action_penalty)
             q_table_with_penalties = penalty_matrix + q_table
             last_actions = np.argmax(q_table_with_penalties, axis=-1)
-            best_q_values = np.max(q_table_with_penalties, axis=-1)
-        accuracy = np.sum(best_q_values > 0.0) / best_q_values.shape[0]
-        print("Accuracy={0}".format(accuracy))
+            # best_q_values = np.max(q_table_with_penalties, axis=-1)
+        # accuracy = np.sum(best_q_values > 0.0) / best_q_values.shape[0]
+        # print("Accuracy={0}".format(accuracy))
+        return q_table_with_penalties, q_table
 
     def eval_q_nets(self, dataset):
         q_truth_tables = []
@@ -808,18 +816,28 @@ class CignRlRouting(CignNoMask):
             print("Level:{0} Mse={1}".format(curr_level, mse.numpy()))
             q_truth_tables.append(q_truth)
             q_predicted_tables.append(q_predicted)
+        last_q_table_truth, last_q_table_no_penalties_truth = self.eval_q_tables(q_tables=q_truth_tables)
+        last_q_table_predicted, last_q_table_no_penalties_predicted = self.eval_q_tables(q_tables=q_predicted_tables)
+        # Record ground truth labels
+        ground_truth_labels = []
+        for idx in range(last_q_table_no_penalties_truth.shape[0]):
+            q_row = last_q_table_no_penalties_truth[idx]
+            correctness = q_row > 0.0
+            correct_labels = set(np.nonzero(correctness)[0])
+            ground_truth_labels.append(correct_labels)
 
-            # q_truth.append(q_truth_action)
-            # q_predicted.append(q_predicted_action)
-
-            # q_truth = tf.concat(q_truth, axis=0)
-            # q_predicted = tf.concat(q_predicted, axis=0)
-            # actions = np.concatenate(actions, axis=0)
-            # mse = mse_loss(q_truth, q_predicted)
-            # print("Level:{0} Mse={1}".format(curr_level, mse.numpy()))
-
-        print("X")
-        self.eval_q_tables(q_tables=q_truth_tables)
+        correct_count = 0
+        y_pred = []
+        for idx in range(last_q_table_predicted.shape[0]):
+            selected_index = np.argmax(last_q_table_predicted[idx])
+            if selected_index in ground_truth_labels[idx]:
+                correct_count += 1
+                y_pred.append(True)
+            else:
+                y_pred.append(False)
+        accuracy = correct_count / last_q_table_predicted.shape[0]
+        print("Accuracy:{0}".format(accuracy))
+        return q_predicted_tables, last_q_table_no_penalties_predicted, y_pred
 
     def train_q_nets(self, dataset, q_net_epoch_count):
         print("Training Q-Nets")
@@ -935,3 +953,64 @@ class CignRlRouting(CignNoMask):
                                                  epoch_id=epoch_id,
                                                  times_list=times_list)
                 epochs_after_warm_up += 1
+
+    def eval_verbose(self, run_id, iteration, dataset, dataset_type):
+        if dataset is None:
+            return 0.0
+        y_true = []
+        y_pred = []
+
+        q_tables_predicted = []
+        for _ in range(self.get_max_trajectory_length()):
+            q_tables_predicted.append([])
+
+        leaf_distributions = {node.index: [] for node in self.leafNodes}
+        counter = 0
+        for X, y in dataset:
+            model_output = self.run_model(
+                X=X,
+                y=y,
+                iteration=-1,
+                is_training=False)
+
+            for idx, arr in enumerate(model_output["q_tables_predicted"]):
+                q_tables_predicted[idx].append(arr)
+
+            leaf_weights = []
+            posteriors = []
+            for leaf_node in self.leafNodes:
+                sc_mask = model_output["sc_masks_dict"][leaf_node.index]
+                posterior = model_output["posteriors_dict"][leaf_node.index]
+                leaf_weights.append(np.expand_dims(sc_mask, axis=-1))
+                posteriors.append(posterior)
+                y_leaf = y.numpy()[sc_mask.numpy().astype(np.bool)]
+                leaf_distributions[leaf_node.index].extend(y_leaf)
+            leaf_weights = np.stack(leaf_weights, axis=-1)
+            posteriors = np.stack(posteriors, axis=-1)
+
+            weighted_posteriors = leaf_weights * posteriors
+            posteriors_mixture = np.sum(weighted_posteriors, axis=-1)
+            y_pred_batch = np.argmax(posteriors_mixture, axis=-1)
+            y_pred.append(y_pred_batch)
+            y_true.append(y.numpy())
+            counter += 1
+        y_true = np.concatenate(y_true)
+        y_pred = np.concatenate(y_pred)
+        truth_vector = y_true == y_pred
+        accuracy = np.mean(truth_vector.astype(np.float))
+
+        # Print sample distribution
+        kv_rows = []
+        for leaf_node in self.leafNodes:
+            c = Counter(leaf_distributions[leaf_node.index])
+            str_ = "{0} Node {1} Sample Distribution:{2}".format(dataset_type, leaf_node.index, c)
+            print(str_)
+            kv_rows.append((run_id, iteration,
+                            "{0} Node {1} Sample Distribution".format(dataset_type, leaf_node.index),
+                            "{0}".format(c)))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
+
+        for idx in range(len(q_tables_predicted)):
+            q_tables_predicted[idx] = np.concatenate(q_tables_predicted[idx], axis=0)
+
+        return accuracy, q_tables_predicted, y_true, y_pred
