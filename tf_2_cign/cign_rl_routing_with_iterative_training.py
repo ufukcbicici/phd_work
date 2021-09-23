@@ -144,18 +144,17 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
             q_grads = q_tape.gradient(full_q_loss, self.model.trainable_variables)
             # Check that q_net variables do not receive zero gradients and leaf node variables
             # receive no gradients.
-            leaf_node_names = ["Node_{0}".format(node.index) for node in self.leafNodes]
+            leaf_node_names = ["Node{0}".format(node.index) for node in self.leafNodes]
             for idx, v in enumerate(self.model.trainable_variables):
-                grad_arr = main_grads[idx].numpy()
-                if "q_net" in v.name:
-                    assert not np.array_equal(grad_arr, np.zeros_like(grad_arr))
+                print(v.name)
                 leaf_names_check_arr = [node_name in v.name for node_name in leaf_node_names]
-                if any(leaf_names_check_arr):
-                    assert v is None
-
-
-
-
+                grad = q_grads[idx]
+                if "decision" in v.name or any(leaf_names_check_arr):
+                    assert (grad is None) or np.array_equal(grad.numpy(), np.zeros_like(grad.numpy()))
+                else:
+                    assert grad is not None
+                    assert not np.allclose(grad.numpy(), np.zeros_like(grad.numpy()))
+            print("X")
 
     def train(self, run_id, dataset, epoch_count, **kwargs):
         # q_net_epoch_count = kwargs["q_net_epoch_count"]
