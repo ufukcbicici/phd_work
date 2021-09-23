@@ -154,6 +154,7 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
                 else:
                     assert grad is not None
                     assert not np.allclose(grad.numpy(), np.zeros_like(grad.numpy()))
+
             print("X")
 
     def train(self, run_id, dataset, epoch_count, **kwargs):
