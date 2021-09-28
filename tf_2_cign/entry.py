@@ -13,9 +13,9 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 input_dims = (28, 28, 1)
 degree_list = [2, 2]
 batch_size = 125
-epoch_count = 100
-decision_drop_probability = 0.5
-drop_probability = 0.5
+epoch_count = 110
+decision_drop_probability = 0.0
+drop_probability = 0.0
 classification_wd = 0.0
 decision_wd = 0.0
 softmax_decay_initial = 25.0

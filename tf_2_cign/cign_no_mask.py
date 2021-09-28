@@ -260,7 +260,31 @@ class CignNoMask(Cign):
         total_loss = total_regularization_loss + info_gain_loss + classification_loss
         return total_loss, total_regularization_loss, info_gain_loss, classification_loss
 
-    def print_train_step_info(self, iteration, time_intervals, eval_dict, classification_losses, info_gain_losses):
+    def print_losses(self, **kwargs):
+        eval_dict = kwargs["eval_dict"]
+        print("Total Loss:{0}".format(self.totalLossTracker.result().numpy()))
+        classification_str = "Classification Losses: "
+        for node_id in self.classificationLossTrackers.keys():
+            classification_str += "Node_{0}:{1} ".format(
+                node_id,
+                self.classificationLossTrackers[node_id].result().numpy())
+        ig_str = "IG Losses: "
+        for node_id in self.igLossTrackers.keys():
+            ig_str += "Node_{0}:{1} ".format(
+                node_id,
+                self.igLossTrackers[node_id].result().numpy())
+        sample_counts_str = ""
+        for node in self.topologicalSortedNodes:
+            sample_counts_str += "Node {0}:{1} ".format(
+                node.index, eval_dict[Utilities.get_variable_name(name="sample_count", node=node)])
+        print(sample_counts_str)
+        print(classification_str)
+        print(ig_str)
+
+    def print_train_step_info(self, **kwargs):
+        iteration = kwargs["iteration"]
+        time_intervals = kwargs["time_intervals"]
+        eval_dict = kwargs["eval_dict"]
         t0 = time_intervals[0]
         t1 = time_intervals[1]
         t2 = time_intervals[2]
@@ -273,24 +297,7 @@ class CignNoMask(Cign):
         print("total Time={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
               " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
               format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
-        print("Total Loss:{0}".format(self.totalLossTracker.result().numpy()))
-        classification_str = "Classification Losses: "
-        for node_id in classification_losses:
-            classification_str += "Node_{0}:{1} ".format(
-                node_id,
-                self.classificationLossTrackers[node_id].result().numpy())
-        ig_str = "IG Losses: "
-        for node_id in info_gain_losses:
-            ig_str += "Node_{0}:{1} ".format(
-                node_id,
-                self.igLossTrackers[node_id].result().numpy())
-        sample_counts_str = ""
-        for node in self.topologicalSortedNodes:
-            sample_counts_str += "Node {0}:{1} ".format(
-                node.index, eval_dict[Utilities.get_variable_name(name="sample_count", node=node)])
-        print(sample_counts_str)
-        print(classification_str)
-        print(ig_str)
+        self.print_losses(eval_dict=eval_dict)
         print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
         print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
         print("************************************")
@@ -330,7 +337,11 @@ class CignNoMask(Cign):
         for node_id in self.igLossTrackers:
             self.igLossTrackers[node_id].reset_states()
 
-    def track_losses(self, total_loss, classification_losses, info_gain_losses):
+    def track_losses(self, **kwargs):
+        #  total_loss, classification_losses, info_gain_losses
+        total_loss = kwargs["total_loss"]
+        classification_losses = kwargs["classification_losses"]
+        info_gain_losses = kwargs["info_gain_losses"]
         self.totalLossTracker.update_state(total_loss)
         for node_id in classification_losses:
             self.classificationLossTrackers[node_id].update_state(classification_losses[node_id])
@@ -426,8 +437,6 @@ class CignNoMask(Cign):
 
                 self.print_train_step_info(
                     iteration=iteration,
-                    classification_losses=model_output["classification_losses"],
-                    info_gain_losses=model_output["info_gain_losses"],
                     time_intervals=[t0, t1, t2, t3, t4, t5],
                     eval_dict=model_output["eval_dict"])
                 iteration += 1
