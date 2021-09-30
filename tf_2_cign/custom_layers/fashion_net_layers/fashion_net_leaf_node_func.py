@@ -37,7 +37,7 @@ class FashionNetLeafNodeFunc(tf.keras.layers.Layer):
             dropout_layer = tf.keras.layers.Dropout(rate=self.classificationDropoutProb)
             self.dropoutLayers.append(dropout_layer)
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         f_input = inputs[0]
         h_input = inputs[1]

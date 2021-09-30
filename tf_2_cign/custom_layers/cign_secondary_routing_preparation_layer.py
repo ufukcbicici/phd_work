@@ -23,7 +23,7 @@ class CignScRoutingPrepLayer(tf.keras.layers.Layer):
     # 2) Zero out of non-activated F-outputs by corresponding secondary masks.
     # 3) Output the sparse F-outputs of the whole level as a single concatenated tensor.
     # 4) This output will be used by custom functions to generate secondary routing matrices for the next level.
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         f_outputs = inputs[0]
         ig_matrices = inputs[1]

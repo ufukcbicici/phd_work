@@ -20,7 +20,7 @@ class CignRlRoutingLayer(tf.keras.layers.Layer):
         self.reachabilityMatrices = [tf.constant(self.network.reachabilityMatrices[idx])
                                      for idx in range(len(self.network.reachabilityMatrices))]
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         q_table_predicted = inputs[0]
         input_ig_routing_matrix = inputs[1]

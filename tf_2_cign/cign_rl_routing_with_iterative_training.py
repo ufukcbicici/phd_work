@@ -70,7 +70,6 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
         iteration = kwargs["iteration"]
         time_intervals = kwargs["time_intervals"]
         eval_dict = kwargs["eval_dict"]
-        print_q_net = kwargs["print_q_net"]
         # Print outputs
         print("************************************")
         print("Iteration {0}".format(iteration))
@@ -78,12 +77,11 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
             print("{0}={1}".format(k, v))
         self.print_losses(eval_dict=eval_dict)
 
-        if print_q_net:
-            q_str = "Q-Net Losses: "
-            for idx, q_net_loss in enumerate(self.qNetTrackers):
-                q_str += "Q-Net_{0}:{1} ".format(idx, self.qNetTrackers[idx].result().numpy())
+        q_str = "Q-Net Losses: "
+        for idx, q_net_loss in enumerate(self.qNetTrackers):
+            q_str += "Q-Net_{0}:{1} ".format(idx, self.qNetTrackers[idx].result().numpy())
 
-            print(q_str)
+        print(q_str)
         print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
         print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
         print("************************************")
@@ -185,27 +183,24 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
                         is_in_warm_up_period, is_fine_tune_epoch):
         time_measurements = {}
         # ********** Loss calculation and gradients for the main loss functions. **********
-        model_output, main_grads, total_loss = self.run_main_model(X=train_X,
-                                                                   y=train_y,
-                                                                   time_measurements=time_measurements,
-                                                                   iteration=iteration,
-                                                                   is_in_warm_up_period=is_in_warm_up_period)
+        model_output, main_grads, total_loss = \
+            self.run_main_model(X=train_X,
+                                y=train_y,
+                                time_measurements=time_measurements,
+                                iteration=iteration,
+                                is_in_warm_up_period=is_in_warm_up_period)
         # ********** Loss calculation and gradients for the main loss functions. **********
-
-        # If not fine-tuning epoch, calculate RL (Q-Net) gradients as well.
-        model_output_val = None
-        q_net_losses = None
+        model_output_val, q_grads, q_net_losses = \
+            self.run_q_net_model(X=val_X,
+                                 y=val_y,
+                                 time_measurements=time_measurements,
+                                 iteration=iteration,
+                                 is_in_warm_up_period=is_in_warm_up_period)
         if not is_fine_tune_epoch:
             # ********** Loss calculation and gradients for the Q-Nets. **********
-            model_output_val, q_grads, q_net_losses = \
-                self.run_q_net_model(X=val_X,
-                                     y=val_y,
-                                     time_measurements=time_measurements,
-                                     iteration=iteration,
-                                     is_in_warm_up_period=is_in_warm_up_period)
             # Check that q_net variables do not receive zero gradients and leaf node variables
             # receive no gradients. Insert zero gradients for every None variable.
-            self.assert_gradient_validity(q_grads=q_grads, main_grads=main_grads)
+            # self.assert_gradient_validity(q_grads=q_grads, main_grads=main_grads)
             # Sum the main CIGN grads and Q-Net grads; apply Gradient Descent step.
             t9 = time.time()
             all_grads = [m_g + q_g for m_g, q_g in zip(main_grads, q_grads)]
@@ -215,6 +210,7 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
             t10 = time.time()
             time_measurements["self.optimizer.apply_gradients"] = t10 - t9
         else:
+            print("Fine Tuning!")
             t9 = time.time()
             self.optimizer.apply_gradients(zip(main_grads, self.model.trainable_variables))
             t10 = time.time()
@@ -227,8 +223,7 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
         self.print_train_step_info(
             iteration=iteration,
             time_intervals=time_measurements,
-            eval_dict=model_output["eval_dict"],
-            print_q_net=not is_fine_tune_epoch)
+            eval_dict=model_output["eval_dict"])
         return model_output, model_output_val
 
     def save_log_data(self, **kwargs):
@@ -250,36 +245,36 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
         # OK
         self.build_trackers()
 
-        epochs_after_warm_up = 0
         iteration = 0
         for epoch_id in range(epoch_count + fine_tune_epoch_count):
             is_fine_tune_epoch = epoch_id >= epoch_count
             # OK
             self.reset_trackers()
             times_list = []
-            if not is_fine_tune_epoch:
-                # Create a validation set; from which can sample batch_size number of samples; for every iteration
-                # on the training set. We are going to use these sample for training the Q-Nets.
-                assert dataset.valX is not None and dataset.valY is not None
-                dataset_size_ratio = int(dataset.trainX.shape[0] / dataset.valX.shape[0]) + 1
-                val_dataset = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).repeat(
-                    count=dataset_size_ratio).shuffle(buffer_size=5000).batch(batch_size=self.batchSizeNonTensor)
-                val_dataset_iter = iter(val_dataset)
-            else:
+            if is_fine_tune_epoch:
                 # Else, merge training set and validation set
                 full_train_X = np.concatenate([dataset.trainX, dataset.valX], axis=0)
                 full_train_y = np.concatenate([dataset.trainY, dataset.valY], axis=0)
-                full_train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
-                    shuffle(5000).batch(self.batchSizeNonTensor)
+            else:
+                full_train_X = dataset.trainX
+                full_train_y = dataset.trainY
 
+            train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
+                shuffle(5000).batch(self.batchSizeNonTensor)
+            # Create a validation set; from which can sample batch_size number of samples; for every iteration
+            # on the training set. We are going to use these sample for training the Q-Nets.
+            assert dataset.valX is not None and dataset.valY is not None
+            dataset_size_ratio = int(full_train_X.shape[0] / dataset.valX.shape[0]) + 1
+            val_dataset = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).repeat(
+                count=dataset_size_ratio).shuffle(buffer_size=5000).batch(batch_size=self.batchSizeNonTensor)
+            val_dataset_iter = iter(val_dataset)
             # Draw one minibatch from the training set. Calculate gradients with respect to the
             # main loss and information gain loss and regularization loss.
-            for train_X, train_y in dataset.trainDataTf:
+            for train_X, train_y in train_tf:
                 # Draw samples from the validation set
-                if not is_fine_tune_epoch:
-                    val_X, val_y = val_dataset_iter.__next__()
-                else:
-                    val_X, val_y = None, None
+                val_X, val_y = val_dataset_iter.__next__()
+                if is_fine_tune_epoch:
+                    print("Fine Tuning!")
                 model_output, model_output_val = self.iterate_rl_cign(train_X=train_X, train_y=train_y, val_X=val_X,
                                                                       val_y=val_y, iteration=iteration,
                                                                       is_in_warm_up_period=is_in_warm_up_period,
@@ -299,3 +294,5 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
                                      times_list=times_list)
             if epoch_id >= self.warmUpPeriod:
                 is_in_warm_up_period = False
+
+        self.save_model(run_id=run_id)

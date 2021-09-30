@@ -143,7 +143,8 @@ if __name__ == "__main__":
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
         # cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf, batch_size=batch_size)
-        cign.train(run_id=run_id, dataset=fashion_mnist, epoch_count=epoch_count)
+        cign.train(run_id=run_id, dataset=fashion_mnist,
+                   epoch_count=epoch_count, fine_tune_epoch_count=fine_tune_epoch_count)
 
         # RL Routing experiments
         # # cign.load_model(run_id=2687)

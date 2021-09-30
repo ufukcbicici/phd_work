@@ -54,7 +54,7 @@ class CignConvDenseQNet(tf.keras.layers.Layer):
                                                 use_bias=True,
                                                 name="q_net_q_table_layer")
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         input_f_tensor = inputs
         # input_ig_routing_matrix = inputs[1]
