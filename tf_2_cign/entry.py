@@ -57,6 +57,7 @@ q_net_params = [
 ]
 warm_up_period = 25
 rl_cign_iteration_period = 10
+fine_tune_epoch_count = 10
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')

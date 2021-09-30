@@ -302,7 +302,12 @@ class CignNoMask(Cign):
         print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
         print("************************************")
 
-    def save_log_data(self, run_id, iteration, info_gain_losses, classification_losses, eval_dict):
+    def save_log_data(self, **kwargs):
+        run_id = kwargs["run_id"]
+        iteration = kwargs["iteration"]
+        info_gain_losses = kwargs["info_gain_losses"]
+        classification_losses = kwargs["classification_losses"]
+        eval_dict = kwargs["eval_dict"]
         # Record ig and classification losses and sample counts into the kv store.
         kv_rows = []
         for node_id in info_gain_losses:
