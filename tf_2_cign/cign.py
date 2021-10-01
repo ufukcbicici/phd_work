@@ -1,12 +1,11 @@
 from collections import deque
-from collections import Counter
 import numpy as np
 import tensorflow as tf
 from algorithms.info_gain import InfoGainLoss
 from auxillary.dag_utilities import Dag
 from simple_tf.uncategorized.node import Node
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
-from tf_2_cign.utilities import Utilities
+from tf_2_cign.utilities.utilities import Utilities
 import time
 
 

@@ -1,8 +1,6 @@
 import tensorflow as tf
 import numpy as np
 from sklearn.model_selection import train_test_split
-import pickle
-from tf_2_cign.utilities import Utilities
 
 
 class FashionMnist(object):

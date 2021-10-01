@@ -1,12 +1,8 @@
-import numpy as np
 import tensorflow as tf
-import time
 
-from algorithms.info_gain import InfoGainLoss
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 from tf_2_cign.custom_layers.weighted_batch_norm import WeightedBatchNormalization
-from tf_2_cign.utilities import Utilities
 
 
 class CignDecisionLayer(tf.keras.layers.Layer):

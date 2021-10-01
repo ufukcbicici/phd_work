@@ -135,7 +135,8 @@ if __name__ == "__main__":
                              learning_rate_schedule=learning_rate_calculator,
                              decision_loss_coeff=1.0,
                              warm_up_period=warm_up_period,
-                             cign_rl_train_period=rl_cign_iteration_period)
+                             cign_rl_train_period=rl_cign_iteration_period,
+                             q_net_coeff=1.0)
 
         run_id = DbLogger.get_run_id()
         cign.init()
@@ -143,8 +144,10 @@ if __name__ == "__main__":
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
         # cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf, batch_size=batch_size)
-        cign.train(run_id=run_id, dataset=fashion_mnist,
-                   epoch_count=epoch_count, fine_tune_epoch_count=fine_tune_epoch_count)
+        cign.train(run_id=run_id,
+                   dataset=fashion_mnist,
+                   epoch_count=100,
+                   fine_tune_epoch_count=10)
 
         # RL Routing experiments
         # # cign.load_model(run_id=2687)

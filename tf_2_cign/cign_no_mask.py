@@ -1,17 +1,10 @@
-from collections import deque
-from collections import Counter
 import numpy as np
 import tensorflow as tf
-from algorithms.info_gain import InfoGainLoss
-from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
-from simple_tf.uncategorized.node import Node
 from tf_2_cign.cign import Cign
 from tf_2_cign.custom_layers.cign_secondary_routing_preparation_layer import CignScRoutingPrepLayer
 from tf_2_cign.custom_layers.cign_vanilla_sc_routing_layer import CignVanillaScRoutingLayer
-from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
-from tf_2_cign.utilities import Utilities
-from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
+from tf_2_cign.utilities.utilities import Utilities
 from tf_2_cign.custom_layers.cign_masking_layer import CignMaskingLayer
 from tf_2_cign.custom_layers.cign_decision_layer import CignDecisionLayer
 from tf_2_cign.custom_layers.cign_classification_layer import CignClassificationLayer
@@ -305,12 +298,10 @@ class CignNoMask(Cign):
     def save_log_data(self, **kwargs):
         run_id = kwargs["run_id"]
         iteration = kwargs["iteration"]
-        info_gain_losses = kwargs["info_gain_losses"]
-        classification_losses = kwargs["classification_losses"]
         eval_dict = kwargs["eval_dict"]
         # Record ig and classification losses and sample counts into the kv store.
         kv_rows = []
-        for node_id in info_gain_losses:
+        for node_id in self.igLossTrackers:
             key_ = "IG Node_{0}".format(node_id)
             val_ = np.asscalar(self.igLossTrackers[node_id].result().numpy())
             kv_rows.append((run_id, iteration, key_, val_))
@@ -320,7 +311,7 @@ class CignNoMask(Cign):
             val_ = np.asscalar(eval_dict[Utilities.get_variable_name(name="sample_count", node=node)].numpy())
             kv_rows.append((run_id, iteration, key_, val_))
 
-        for node_id in classification_losses:
+        for node_id in self.classificationLossTrackers:
             key_ = "Classification Node_{0}".format(node_id)
             val_ = np.asscalar(self.classificationLossTrackers[node_id].result().numpy())
             kv_rows.append((run_id, iteration, key_, val_))
@@ -360,6 +351,10 @@ class CignNoMask(Cign):
         learning_rate_scheduler_tf = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
             boundaries=boundaries, values=values)
         optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
+        return optimizer
+
+    def get_adam_optimizer(self):
+        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
         return optimizer
 
     def measure_performance(self, dataset, run_id, iteration, epoch_id, times_list):
@@ -449,8 +444,6 @@ class CignNoMask(Cign):
 
             self.save_log_data(run_id=run_id,
                                iteration=iteration,
-                               info_gain_losses=model_output["info_gain_losses"],
-                               classification_losses=model_output["classification_losses"],
                                eval_dict=model_output["eval_dict"])
 
             # Eval on training, validation and test sets
@@ -460,6 +453,25 @@ class CignNoMask(Cign):
                                          iteration=iteration,
                                          epoch_id=epoch_id,
                                          times_list=times_list)
+
+    def calculate_predictions_of_batch(self, model_output, y):
+        leaf_weights = []
+        posteriors = []
+        leaf_distributions_batch = {}
+        for leaf_node in self.leafNodes:
+            sc_mask = model_output["sc_masks_dict"][leaf_node.index]
+            posterior = model_output["posteriors_dict"][leaf_node.index]
+            leaf_weights.append(np.expand_dims(sc_mask, axis=-1))
+            posteriors.append(posterior)
+            y_leaf = y.numpy()[sc_mask.numpy().astype(np.bool)]
+            leaf_distributions_batch[leaf_node.index] = y_leaf
+        leaf_weights = np.stack(leaf_weights, axis=-1)
+        posteriors = np.stack(posteriors, axis=-1)
+
+        weighted_posteriors = leaf_weights * posteriors
+        posteriors_mixture = np.sum(weighted_posteriors, axis=-1)
+        y_pred_batch = np.argmax(posteriors_mixture, axis=-1)
+        return y_pred_batch, leaf_distributions_batch
 
     def eval(self, run_id, iteration, dataset, dataset_type):
         if dataset is None:
@@ -474,22 +486,10 @@ class CignNoMask(Cign):
                 y=y,
                 iteration=-1,
                 is_training=False)
-
-            leaf_weights = []
-            posteriors = []
+            y_pred_batch, leaf_distributions_batch = self.calculate_predictions_of_batch(
+                model_output=model_output, y=y)
             for leaf_node in self.leafNodes:
-                sc_mask = model_output["sc_masks_dict"][leaf_node.index]
-                posterior = model_output["posteriors_dict"][leaf_node.index]
-                leaf_weights.append(np.expand_dims(sc_mask, axis=-1))
-                posteriors.append(posterior)
-                y_leaf = y.numpy()[sc_mask.numpy().astype(np.bool)]
-                leaf_distributions[leaf_node.index].extend(y_leaf)
-            leaf_weights = np.stack(leaf_weights, axis=-1)
-            posteriors = np.stack(posteriors, axis=-1)
-
-            weighted_posteriors = leaf_weights * posteriors
-            posteriors_mixture = np.sum(weighted_posteriors, axis=-1)
-            y_pred_batch = np.argmax(posteriors_mixture, axis=-1)
+                leaf_distributions[leaf_node.index].extend(leaf_distributions_batch[leaf_node.index])
             y_pred.append(y_pred_batch)
             y_true.append(y.numpy())
         y_true = np.concatenate(y_true)

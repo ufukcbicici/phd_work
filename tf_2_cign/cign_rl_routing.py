@@ -3,14 +3,11 @@ from collections import Counter
 import numpy as np
 import tensorflow as tf
 import time
-import pickle
 import os
-import shutil
 
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_no_mask import CignNoMask
 from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
-from tf_2_cign.utilities import Utilities
 
 
 class CignRlRouting(CignNoMask):
@@ -703,8 +700,6 @@ class CignRlRouting(CignNoMask):
 
         self.save_log_data(run_id=run_id,
                            iteration=iteration,
-                           info_gain_losses=model_output["info_gain_losses"],
-                           classification_losses=model_output["classification_losses"],
                            eval_dict=model_output["eval_dict"])
 
         return iteration, times_list

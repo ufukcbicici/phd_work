@@ -30,7 +30,8 @@ class FashionCignRl(CignRlRoutingWithIterativeTraining):
                  information_gain_balance_coeff,
                  softmax_decay_controller,
                  learning_rate_schedule,
-                 decision_loss_coeff):
+                 decision_loss_coeff,
+                 q_net_coeff):
         super().__init__(valid_prediction_reward,
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
@@ -48,7 +49,8 @@ class FashionCignRl(CignRlRoutingWithIterativeTraining):
                          information_gain_balance_coeff,
                          softmax_decay_controller,
                          learning_rate_schedule,
-                         decision_loss_coeff)
+                         decision_loss_coeff,
+                         q_net_coeff)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers
@@ -96,6 +98,7 @@ class FashionCignRl(CignRlRoutingWithIterativeTraining):
             explanation += "Level:{0} Q Net Feature Maps:{1}\n".format(level, q_net_params["Conv_Feature_Maps"])
             explanation += "Level:{0} Q Net Hidden Layers:{1}\n".format(level, q_net_params["Hidden_Layers"])
         explanation += "train_period:{0}\n".format(self.cignRlTrainPeriod)
+        explanation += "qNetCoeff:{0}\n".format(self.qNetCoeff)
         return explanation
 
     def get_q_net_layer(self, level):

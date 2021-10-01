@@ -3,7 +3,7 @@ import tensorflow as tf
 import time
 
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
-from tf_2_cign.utilities import Utilities
+from tf_2_cign.utilities.utilities import Utilities
 
 
 # tf.autograph.set_verbosity(10, True)

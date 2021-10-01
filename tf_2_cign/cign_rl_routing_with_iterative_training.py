@@ -1,17 +1,9 @@
-from collections import Counter
-
 import numpy as np
 import tensorflow as tf
 import time
-import pickle
-import os
-import shutil
 
 from auxillary.db_logger import DbLogger
-from tf_2_cign.cign_no_mask import CignNoMask
 from tf_2_cign.cign_rl_routing import CignRlRouting
-from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
-from tf_2_cign.utilities import Utilities
 
 
 class CignRlRoutingWithIterativeTraining(CignRlRouting):
@@ -21,13 +13,14 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
                  lambda_mac_cost, warm_up_period, cign_rl_train_period, batch_size, input_dims, class_count,
                  node_degrees, decision_drop_probability, classification_drop_probability, decision_wd,
                  classification_wd, information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule,
-                 decision_loss_coeff, bn_momentum=0.9):
+                 decision_loss_coeff, q_net_coeff, bn_momentum=0.9):
         super().__init__(valid_prediction_reward, invalid_prediction_penalty, include_ig_in_reward_calculations,
                          lambda_mac_cost, warm_up_period, cign_rl_train_period, batch_size, input_dims, class_count,
                          node_degrees, decision_drop_probability, classification_drop_probability, decision_wd,
                          classification_wd, information_gain_balance_coeff, softmax_decay_controller,
                          learning_rate_schedule, decision_loss_coeff, bn_momentum)
         self.mseLoss = tf.keras.losses.MeanSquaredError()
+        self.qNetCoeff = q_net_coeff
 
     def get_regularization_loss(self, is_for_q_nets):
         variables = self.model.trainable_variables
@@ -59,6 +52,29 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
         total_loss = total_regularization_loss + info_gain_loss + classification_loss
         return total_loss, total_regularization_loss, info_gain_loss, classification_loss
 
+    def calculate_total_q_net_loss(self, model_output, y, add_regularization):
+        posteriors_val = {k: v.numpy() for k, v in model_output["posteriors_dict"].items()}
+        ig_masks_val = {k: v.numpy() for k, v in model_output["ig_masks_dict"].items()}
+        regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
+                                                                 posteriors_dict=posteriors_val,
+                                                                 ig_masks_dict=ig_masks_val)
+        # Q-Net Losses
+        q_net_predicted = model_output["q_tables_predicted"]
+        q_net_losses = []
+        for idx, tpl in enumerate(zip(regs, q_net_predicted)):
+            q_truth = tpl[0]
+            q_predicted = tpl[1]
+            q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
+            mse = self.mseLoss(q_truth_tensor, q_predicted)
+            q_net_losses.append(mse)
+        full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
+        if add_regularization:
+            q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
+            total_q_loss = full_q_loss + q_regularization_loss
+        else:
+            total_q_loss = full_q_loss
+        return total_q_loss
+
     def track_losses(self, **kwargs):
         super(CignRlRoutingWithIterativeTraining, self).track_losses(**kwargs)
         q_net_losses = kwargs["q_net_losses"]
@@ -86,17 +102,14 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
         print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
         print("************************************")
 
-    def run_main_model(self, X, y, time_measurements, iteration, is_in_warm_up_period):
+    def run_main_model(self, X, y, iteration, is_in_warm_up_period):
         with tf.GradientTape() as main_tape:
-            t0 = time.time()
             model_output = self.run_model(
                 X=X,
                 y=y,
                 iteration=iteration,
                 is_training=True,
                 warm_up_period=is_in_warm_up_period)
-            t1 = time.time()
-            time_measurements["main_loss_run_model"] = t1 - t0
             classification_losses = model_output["classification_losses"]
             info_gain_losses = model_output["info_gain_losses"]
             # Weight decaying; Q-Net variables excluded
@@ -107,12 +120,8 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
             info_gain_loss = self.decisionLossCoeff * tf.add_n([loss for loss in info_gain_losses.values()])
             # Total loss
             total_loss = total_regularization_loss + info_gain_loss + classification_loss
-        t2 = time.time()
-        time_measurements["main_loss_calculations"] = t2 - t1
         # Calculate grads with respect to the main loss
         main_grads = main_tape.gradient(total_loss, self.model.trainable_variables)
-        t3 = time.time()
-        time_measurements["main_tape.gradient"] = t3 - t2
 
         # for idx, v in enumerate(self.model.trainable_variables):
         #     if "q_net" not in v.name:
@@ -122,7 +131,7 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
 
         return model_output, main_grads, total_loss
 
-    def run_q_net_model(self, X, y, time_measurements, iteration, is_in_warm_up_period):
+    def run_q_net_model(self, X, y, iteration, is_in_warm_up_period):
         with tf.GradientTape() as q_tape:
             t4 = time.time()
             model_output_val = self.run_model(
@@ -131,16 +140,12 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
                 iteration=iteration,
                 is_training=True,
                 warm_up_period=is_in_warm_up_period)
-            t5 = time.time()
-            time_measurements["q_net_run_model"] = t5 - t4
             # Calculate target values for the Q-Nets
             posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
             ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
             regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
                                                                      posteriors_dict=posteriors_val,
                                                                      ig_masks_dict=ig_masks_val)
-            t6 = time.time()
-            time_measurements["calculate_q_tables_from_network_outputs"] = t6 - t5
             # Q-Net Losses
             q_net_predicted = model_output_val["q_tables_predicted"]
             q_net_losses = []
@@ -150,15 +155,10 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
                 q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
                 mse = self.mseLoss(q_truth_tensor, q_predicted)
                 q_net_losses.append(mse)
-            full_q_loss = tf.add_n(q_net_losses)
+            full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
             q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
             total_q_loss = full_q_loss + q_regularization_loss
-            # total_q_loss = 10.0 * total_q_loss
-            t7 = time.time()
-            time_measurements["calculate_q_tables_from_network_outputs"] = t7 - t6
         q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
-        t8 = time.time()
-        time_measurements["q_tape.gradient"] = t8 - t7
         return model_output_val, q_grads, q_net_losses
 
     def assert_gradient_validity(self, main_grads, q_grads):
@@ -182,18 +182,17 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
     def iterate_rl_cign(self, train_X, train_y, val_X, val_y, iteration,
                         is_in_warm_up_period, is_fine_tune_epoch):
         time_measurements = {}
+        t0 = time.time()
         # ********** Loss calculation and gradients for the main loss functions. **********
         model_output, main_grads, total_loss = \
             self.run_main_model(X=train_X,
                                 y=train_y,
-                                time_measurements=time_measurements,
                                 iteration=iteration,
                                 is_in_warm_up_period=is_in_warm_up_period)
         # ********** Loss calculation and gradients for the main loss functions. **********
         model_output_val, q_grads, q_net_losses = \
             self.run_q_net_model(X=val_X,
                                  y=val_y,
-                                 time_measurements=time_measurements,
                                  iteration=iteration,
                                  is_in_warm_up_period=is_in_warm_up_period)
         if not is_fine_tune_epoch:
@@ -207,14 +206,10 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
             # assert all([np.allclose(main_grads[i].numpy() + q_grads[i].numpy(), all_grads[i])
             #             for i in range(len(all_grads))])
             self.optimizer.apply_gradients(zip(all_grads, self.model.trainable_variables))
-            t10 = time.time()
-            time_measurements["self.optimizer.apply_gradients"] = t10 - t9
         else:
             print("Fine Tuning!")
-            t9 = time.time()
             self.optimizer.apply_gradients(zip(main_grads, self.model.trainable_variables))
-            t10 = time.time()
-            time_measurements["self.optimizer.apply_gradients"] = t10 - t9
+        t1 = time.time()
         # Track losses
         self.track_losses(total_loss=total_loss,
                           classification_losses=model_output["classification_losses"],
@@ -237,11 +232,82 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
             kv_rows.append((run_id, iteration, key_, val_))
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
 
+    def eval(self, run_id, iteration, dataset, dataset_type):
+        if dataset is None:
+            return 0.0
+        y_true = []
+        y_pred = []
+        leaf_distributions = {node.index: [] for node in self.leafNodes}
+        for X, y in dataset:
+            model_output = self.run_model(
+                X=X,
+                y=y,
+                iteration=-1,
+                is_training=False)
+            y_pred_batch, leaf_distributions_batch = self.calculate_predictions_of_batch(
+                model_output=model_output, y=y)
+            for leaf_node in self.leafNodes:
+                leaf_distributions[leaf_node.index].extend(leaf_distributions_batch[leaf_node.index])
+            y_pred.append(y_pred_batch)
+            y_true.append(y.numpy())
+
+
+        # if dataset is None:
+        #     return 0.0
+        # y_true = []
+        # y_pred = []
+        #
+        # leaf_distributions = {node.index: [] for node in self.leafNodes}
+        # for X, y in dataset:
+        #     model_output = self.run_model(
+        #         X=X,
+        #         y=y,
+        #         iteration=-1,
+        #         is_training=False)
+        #     y_pred_batch, leaf_distributions_batch = self.calculate_predictions_of_batch(
+        #         model_output=model_output, y=y)
+        #     for leaf_node in self.leafNodes:
+        #         leaf_distributions[leaf_node.index].extend(leaf_distributions_batch[leaf_node.index])
+        #     y_pred.append(y_pred_batch)
+        #     y_true.append(y.numpy())
+        # y_true = np.concatenate(y_true)
+        # y_pred = np.concatenate(y_pred)
+        # truth_vector = y_true == y_pred
+        # accuracy = np.mean(truth_vector.astype(np.float))
+        #
+        # # Print sample distribution
+        # kv_rows = []
+        # for leaf_node in self.leafNodes:
+        #     c = Counter(leaf_distributions[leaf_node.index])
+        #     str_ = "{0} Node {1} Sample Distribution:{2}".format(dataset_type, leaf_node.index, c)
+        #     print(str_)
+        #     kv_rows.append((run_id, iteration,
+        #                     "{0} Node {1} Sample Distribution".format(dataset_type, leaf_node.index),
+        #                     "{0}".format(c)))
+        # DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
+        # return accuracy
+
+    def measure_performance(self, dataset, run_id, iteration, epoch_id, times_list):
+        training_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                      dataset=dataset.trainDataTf, dataset_type="train")
+        validation_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                        dataset=dataset.validationDataTf, dataset_type="validation")
+        test_accuracy = self.eval(run_id=run_id, iteration=iteration,
+                                  dataset=dataset.testDataTf, dataset_type="test")
+        print("Train Accuracy:{0}".format(training_accuracy))
+        print("Validation Accuracy:{0}".format(validation_accuracy))
+        print("Test Accuracy:{0}".format(test_accuracy))
+        mean_time_passed = np.mean(np.array(times_list))
+        DbLogger.write_into_table(
+            rows=[(run_id, iteration, epoch_id, training_accuracy,
+                   validation_accuracy, test_accuracy,
+                   mean_time_passed, 0.0, "XXX")], table=DbLogger.logsTable)
+
     def train(self, run_id, dataset, epoch_count, **kwargs):
         # q_net_epoch_count = kwargs["q_net_epoch_count"]
         fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
         is_in_warm_up_period = True
-        self.optimizer = self.get_sgd_optimizer()
+        self.optimizer = self.get_adam_optimizer()
         # OK
         self.build_trackers()
 
@@ -283,8 +349,80 @@ class CignRlRoutingWithIterativeTraining(CignRlRouting):
 
             self.save_log_data(run_id=run_id,
                                iteration=iteration,
-                               info_gain_losses=model_output["info_gain_losses"],
-                               classification_losses=model_output["classification_losses"],
+                               eval_dict=model_output["eval_dict"])
+            # Evaluation
+            self.measure_performance(dataset=dataset,
+                                     run_id=run_id,
+                                     iteration=iteration,
+                                     epoch_id=epoch_id,
+                                     times_list=times_list)
+            if epoch_id >= self.warmUpPeriod:
+                is_in_warm_up_period = False
+
+        self.save_model(run_id=run_id)
+
+    def train_without_val_set(self, run_id, dataset, epoch_count, **kwargs):
+        is_in_warm_up_period = True
+        self.optimizer = self.get_sgd_optimizer()
+        # OK
+        self.build_trackers()
+
+        full_train_X = np.concatenate([dataset.trainX, dataset.valX], axis=0)
+        full_train_y = np.concatenate([dataset.trainY, dataset.valY], axis=0)
+        train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
+            shuffle(5000).batch(self.batchSizeNonTensor)
+        iteration = 0
+        for epoch_id in range(epoch_count):
+            # OK
+            self.reset_trackers()
+            times_list = []
+            for train_X, train_y in train_tf:
+                # ********** Loss calculation and gradients for the main loss functions. **********
+                t0 = time.time()
+                with tf.GradientTape() as tape:
+                    model_output = self.run_model(
+                        X=train_X,
+                        y=train_y,
+                        iteration=iteration,
+                        is_training=True,
+                        warm_up_period=is_in_warm_up_period)
+                    classification_losses = model_output["classification_losses"]
+                    info_gain_losses = model_output["info_gain_losses"]
+                    # Weight decaying
+                    variables = self.model.trainable_variables
+                    regularization_losses = []
+                    for var in variables:
+                        assert var.ref() in self.regularizationCoefficients
+                        lambda_coeff = self.regularizationCoefficients[var.ref()]
+                        regularization_losses.append(lambda_coeff * tf.nn.l2_loss(var))
+                    total_regularization_loss = tf.add_n(regularization_losses)
+                    # Classification losses
+                    classification_loss = tf.add_n([loss for loss in classification_losses.values()])
+                    # Information Gain losses
+                    info_gain_loss = self.decisionLossCoeff * tf.add_n([loss for loss in info_gain_losses.values()])
+                    # Calculate target values for the Q-Nets
+                    posteriors_val = {k: v.numpy() for k, v in model_output["posteriors_dict"].items()}
+                    ig_masks_val = {k: v.numpy() for k, v in model_output["ig_masks_dict"].items()}
+                    regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=train_y.numpy(),
+                                                                             posteriors_dict=posteriors_val,
+                                                                             ig_masks_dict=ig_masks_val)
+                    # Q-Net Losses
+                    q_net_predicted = model_output["q_tables_predicted"]
+                    q_net_losses = []
+                    for idx, tpl in enumerate(zip(regs, q_net_predicted)):
+                        q_truth = tpl[0]
+                        q_predicted = tpl[1]
+                        q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
+                        mse = self.mseLoss(q_truth_tensor, q_predicted)
+                        q_net_losses.append(mse)
+                    full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
+                    # Total loss
+                    total_loss = total_regularization_loss + info_gain_loss + classification_loss + full_q_loss
+                grads = tape.gradient(total_loss, self.model.trainable_variables)
+                self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+
+            self.save_log_data(run_id=run_id,
+                               iteration=iteration,
                                eval_dict=model_output["eval_dict"])
             # Evaluation
             self.measure_performance(dataset=dataset,

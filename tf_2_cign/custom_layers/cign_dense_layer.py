@@ -1,7 +1,6 @@
-import numpy as np
 import tensorflow as tf
 
-from tf_2_cign.utilities import Utilities
+from tf_2_cign.utilities.utilities import Utilities
 
 
 class CignDenseLayer(tf.keras.layers.Layer):

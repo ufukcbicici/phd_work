@@ -2,10 +2,8 @@ import tensorflow as tf
 
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
-from tf_2_cign.cign import Cign
 from tf_2_cign.data.fashion_mnist import FashionMnist
-from tf_2_cign.fashion_net.fashion_cign import FashionCign
-from tf_2_cign.utilities import Utilities
+from tf_2_cign.utilities.utilities import Utilities
 
 # Hyper-parameters
 from tf_2_cign.fashion_net.fashion_cign_rl import FashionCignRl

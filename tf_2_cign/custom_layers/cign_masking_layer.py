@@ -1,10 +1,4 @@
-import numpy as np
 import tensorflow as tf
-import time
-
-from algorithms.info_gain import InfoGainLoss
-from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
-from tf_2_cign.utilities import Utilities
 
 
 class CignMaskingLayer(tf.keras.layers.Layer):
