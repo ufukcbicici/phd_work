@@ -6,7 +6,7 @@ from tf_2_cign.custom_layers.fashion_net_layers.fashion_net_inner_node_func impo
 from tf_2_cign.custom_layers.fashion_net_layers.fashion_net_leaf_node_func import FashionNetLeafNodeFunc
 
 
-class FashionCignRl(CignRlRoutingWithIterativeTraining):
+class FashionCignRl(CignRlRouting):
     def __init__(self,
                  valid_prediction_reward,
                  invalid_prediction_penalty,
@@ -50,7 +50,7 @@ class FashionCignRl(CignRlRoutingWithIterativeTraining):
                          softmax_decay_controller,
                          learning_rate_schedule,
                          decision_loss_coeff,
-                         q_net_coeff)
+                         q_net_coeff=1.0)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers

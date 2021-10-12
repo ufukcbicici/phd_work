@@ -278,18 +278,12 @@ class CignNoMask(Cign):
         iteration = kwargs["iteration"]
         time_intervals = kwargs["time_intervals"]
         eval_dict = kwargs["eval_dict"]
-        t0 = time_intervals[0]
-        t1 = time_intervals[1]
-        t2 = time_intervals[2]
-        t3 = time_intervals[3]
-        t4 = time_intervals[4]
-        t5 = time_intervals[5]
+
         # Print outputs
         print("************************************")
         print("Iteration {0}".format(iteration))
-        print("total Time={0} [get_feed_dict]t1-t0={1} [self.model]t2-t1={2} [calculate_total_loss]t3-t2={3}"
-              " [unit_test_cign_routing_mechanism]t4-t3={4} [tape.gradient]t5-t4={5}".
-              format(t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4))
+        for k, v in time_intervals.items():
+            print("{0}={1}".format(k, v))
         self.print_losses(eval_dict=eval_dict)
         print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
         print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))

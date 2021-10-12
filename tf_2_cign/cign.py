@@ -413,7 +413,6 @@ class Cign(object):
 
     def get_feed_dict(self, x, y, iteration, is_training, **kwargs):
         if is_training:
-            self.softmaxDecayController.update(iteration=iteration + 1)
             temp_value = self.softmaxDecayController.get_value()
         else:
             temp_value = 1.0

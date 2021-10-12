@@ -15,7 +15,7 @@ degree_list = [2, 2]
 batch_size = 125
 epoch_count = 110
 decision_drop_probability = 0.0
-drop_probability = 0.0
+drop_probability = 0.15
 classification_wd = 0.0
 decision_wd = 0.0
 softmax_decay_initial = 25.0
@@ -57,7 +57,7 @@ q_net_params = [
 ]
 warm_up_period = 25
 rl_cign_iteration_period = 10
-fine_tune_epoch_count = 10
+fine_tune_epoch_count = 25
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -143,11 +143,20 @@ if __name__ == "__main__":
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
+        # cign.load_model(run_id=2965)
+        # cign.train_q_nets_with_full_net(dataset=fashion_mnist, q_net_epoch_count=250)
+
+
+
+
         # cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf, batch_size=batch_size)
         cign.train(run_id=run_id,
                    dataset=fashion_mnist,
                    epoch_count=100,
-                   fine_tune_epoch_count=10)
+                   q_net_epoch_count=250,
+                   fine_tune_epoch_count=25)
+
+        # cign.train_without_val_set(run_id=run_id, dataset=fashion_mnist, epoch_count=100)
 
         # RL Routing experiments
         # # cign.load_model(run_id=2687)
