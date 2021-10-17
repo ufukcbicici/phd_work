@@ -330,7 +330,7 @@ class CignRlRouting(CignNoMask):
                                        warm_up_period=warm_up_period)
 
         eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
-        sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict \
+        sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict, ig_activations_dict \
             = self.model(inputs=feed_dict, training=is_training)
         model_output = {
             "eval_dict": eval_dict,
@@ -340,7 +340,8 @@ class CignRlRouting(CignNoMask):
             "sc_masks_dict": sc_masks_dict,
             "ig_masks_dict": ig_masks_dict,
             "q_tables_predicted": q_tables_predicted,
-            "node_outputs_dict": node_outputs_dict
+            "node_outputs_dict": node_outputs_dict,
+            "ig_activations_dict": ig_activations_dict
         }
         return model_output
 
@@ -636,7 +637,8 @@ class CignRlRouting(CignNoMask):
                                              self.scMaskInputsDict,
                                              self.igMaskInputsDict,
                                              self.qTablesPredicted,
-                                             self.nodeOutputsDict])
+                                             self.nodeOutputsDict,
+                                             self.igActivationsDict])
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
 
@@ -1094,7 +1096,7 @@ class CignRlRouting(CignNoMask):
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
         return accuracy, q_loss_list
 
-    def measure_performance(self, dataset, run_id, iteration, epoch_id, times_list):
+    def measure_performance(self, dataset, run_id, iteration=-1, epoch_id=0, times_list=tuple([0])):
         training_accuracy, training_q_losses = self.eval(run_id=run_id, iteration=iteration,
                                                          dataset=dataset.trainDataTf, dataset_type="train")
         validation_accuracy, validation_q_losses = self.eval(run_id=run_id, iteration=iteration,
@@ -1243,3 +1245,14 @@ class CignRlRouting(CignNoMask):
             q_tables_predicted[idx] = np.concatenate(q_tables_predicted[idx], axis=0)
 
         return accuracy, q_tables_predicted, y_true, y_pred
+
+    def evaluate_routing_configuration(self, posteriors_tensor, routing_matrix, true_labels):
+        weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
+        routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
+        weighted_posteriors = posteriors_tensor * routing_matrix_weighted[:, np.newaxis, :]
+        final_posteriors = np.sum(weighted_posteriors, axis=2)
+        predicted_labels = np.argmax(final_posteriors, axis=1)
+        validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+        accuracy = np.mean(validity_of_predictions_vec)
+        return accuracy, validity_of_predictions_vec
+

@@ -141,3 +141,41 @@ class Utilities:
         content = pickle.load(f)
         f.close()
         return content
+
+    @staticmethod
+    def concat_to_np_array_dict(dct, key, array):
+        if key not in dct:
+            if not np.isscalar(array):
+                dct[key] = array
+            else:
+                scalar = array
+                dct[key] = np.array(scalar)
+        else:
+            if not np.isscalar(array):
+                dct[key] = np.concatenate((dct[key], array))
+            else:
+                scalar = array
+                dct[key] = np.append(dct[key], scalar)
+
+    @staticmethod
+    def concat_to_np_array_dict_v2(dct, key, array):
+        if key not in dct:
+            if not np.isscalar(array):
+                dct[key] = [array]
+            else:
+                scalar = array
+                dct[key] = np.array(scalar)
+        else:
+            if not np.isscalar(array):
+                dct[key].append(array)
+            else:
+                scalar = array
+                dct[key] = np.append(dct[key], scalar)
+
+    @staticmethod
+    def merge_dict_of_ndarrays(dict_target, dict_to_append):
+        # key_set1 = set(dict_target.keys())
+        # key_set2 = set(dict_to_append.keys())
+        # assert key_set1 == key_set2
+        for k in dict_to_append.keys():
+            Utilities.concat_to_np_array_dict(dct=dict_target, array=dict_to_append[k], key=k)
