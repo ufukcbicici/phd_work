@@ -88,7 +88,7 @@ class FashionRlBinaryRouting(CignRlBinaryRouting):
         return node_func
 
     def get_explanation_string(self):
-        explanation = "Fashion CICN with RL Routing\n"
+        explanation = "Fashion CICN with BINARY RL Routing\n"
         explanation += super().get_explanation_string()
         # Fashion CIGN parameters
         explanation += "filterCounts:{0}\n".format(self.filterCounts)

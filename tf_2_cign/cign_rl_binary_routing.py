@@ -127,11 +127,11 @@ class CignRlBinaryRouting(CignRlRouting):
 
     # We don't have actions spaces as in binary routing as defined in the original RL version.
     # This is more or less for compatibility.
-    def build_action_spaces(self):
-        max_trajectory_length = self.get_max_trajectory_length()
-        for t in range(max_trajectory_length):
-            action_space = np.array([0, 1])
-            self.actionSpaces.append(action_space)
+    # def build_action_spaces(self):
+    #     max_trajectory_length = self.get_max_trajectory_length()
+    #     for t in range(max_trajectory_length):
+    #         action_space = np.array([0, 1])
+    #         self.actionSpaces.append(action_space)
 
     # In binary routing, we don't have reachability definition. We always execute one of the two actions.
     def build_reachability_matrices(self):
@@ -167,7 +167,6 @@ class CignRlBinaryRouting(CignRlRouting):
             sc_routing_matrix = self.scRoutingMatricesDict[level - 1]
         predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
             [q_table_predicted_cign_output,
-             input_ig_routing_matrix,
              self.warmUpPeriodInput,
              ig_activations,
              sc_routing_matrix])
@@ -175,30 +174,3 @@ class CignRlBinaryRouting(CignRlRouting):
         self.scRoutingCalculationLayers.append(routing_calculation_layer)
         return secondary_routing_matrix_cign_output
 
-
-
-
-
-
-
-
-
-
-        # Now, we are going to calculate the routing matrix (sc matrix) by using the Q-table predictions of the Q-Net,
-        # by utilizing the Bellman equation.
-        # node = self.orderedNodesPerLevel[level][-1]
-        #
-        #
-        #
-        #
-        # routing_calculation_layer = CignRlRoutingLayer(level=level, node=node, network=self, use_ig_in_actions=True)
-
-
-        # routing_calculation_layer = CignRlRoutingLayer(level=level, node=node, network=self, use_ig_in_actions=True)
-        # past_actions = tf.zeros_like(tf.argmax(q_table_predicted_cign_output, axis=-1)) \
-        #     if level == 0 else self.actionsPredicted[level - 1]
-        # predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
-        #     [q_table_predicted_cign_output, input_ig_routing_matrix, self.warmUpPeriodInput, past_actions])
-        # self.actionsPredicted.append(predicted_actions)
-        # self.scRoutingCalculationLayers.append(routing_calculation_layer)
-        # return secondary_routing_matrix_cign_output

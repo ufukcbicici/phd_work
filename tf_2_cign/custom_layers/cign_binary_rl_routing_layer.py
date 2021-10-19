@@ -13,10 +13,9 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         q_table_predicted = inputs[0]
-        input_ig_routing_matrix = inputs[1]
-        is_warm_up_period = inputs[2]
-        ig_activations = inputs[3]
-        sc_routing_matrix_prev_level = inputs[4]
+        is_warm_up_period = inputs[1]
+        ig_activations = inputs[2]
+        sc_routing_matrix_prev_level = inputs[3]
         is_training = kwargs["training"]
         # q_table_predicted_cign_output, input_ig_routing_matrix, self.warmUpPeriodInput, ig_activations_array
 
