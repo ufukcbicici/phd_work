@@ -32,7 +32,9 @@ class FashionRlBinaryRouting(CignRlBinaryRouting):
                  softmax_decay_controller,
                  learning_rate_schedule,
                  decision_loss_coeff,
-                 q_net_coeff):
+                 q_net_coeff,
+                 epsilon_decay_rate,
+                 epsilon_step):
         super().__init__(valid_prediction_reward,
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
@@ -51,7 +53,10 @@ class FashionRlBinaryRouting(CignRlBinaryRouting):
                          softmax_decay_controller,
                          learning_rate_schedule,
                          decision_loss_coeff,
-                         q_net_coeff=1.0)
+                         q_net_coeff=1.0,
+                         epsilon_decay_rate=epsilon_decay_rate,
+                         epsilon_step=epsilon_step
+                         )
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers
@@ -105,7 +110,6 @@ class FashionRlBinaryRouting(CignRlBinaryRouting):
     def get_q_net_layer(self, level):
         node = self.orderedNodesPerLevel[level][-1]
         q_net_params = self.qNetParams[level]
-        action_space = self.actionSpaces[level]
         q_net_layer = CignConvDenseQNet(level=level,
                                         node=node,
                                         network=self,
@@ -114,6 +118,6 @@ class FashionRlBinaryRouting(CignRlBinaryRouting):
                                         strides=q_net_params["Conv_Strides"],
                                         activation="relu",
                                         hidden_layer_dims=q_net_params["Hidden_Layers"],
-                                        q_network_dim=action_space.shape[0],
+                                        q_network_dim=2,  # Always binary actions!!!
                                         rl_dropout_prob=self.classificationDropProbability)
         return q_net_layer

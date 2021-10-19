@@ -47,18 +47,20 @@ q_net_params = [
         "Conv_Filter": 1,
         "Conv_Strides": (1, 1),
         "Conv_Feature_Maps": 32,
-        "Hidden_Layers": [32]
+        "Hidden_Layers": [64]
     },
     {
         "Conv_Filter": 1,
         "Conv_Strides": (1, 1),
         "Conv_Feature_Maps": 32,
-        "Hidden_Layers": [64]
+        "Hidden_Layers": [32]
     }
 ]
 warm_up_period = 25
 rl_cign_iteration_period = 10
 fine_tune_epoch_count = 25
+epsilon_decay_rate = 0.75
+epsilon_step = 5000
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -96,7 +98,9 @@ if __name__ == "__main__":
                                       decision_loss_coeff=1.0,
                                       warm_up_period=warm_up_period,
                                       cign_rl_train_period=rl_cign_iteration_period,
-                                      q_net_coeff=1.0)
+                                      q_net_coeff=1.0,
+                                      epsilon_decay_rate=epsilon_decay_rate,
+                                      epsilon_step=epsilon_step)
 
         run_id = DbLogger.get_run_id()
         cign.init()

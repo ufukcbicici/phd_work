@@ -4,6 +4,8 @@ import time
 
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_rl_routing import CignRlRouting
+from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
+from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
 from tf_2_cign.utilities.profiler import Profiler
 from collections import Counter
 from tf_2_cign.utilities.utilities import Utilities
@@ -16,12 +18,18 @@ class CignRlBinaryRouting(CignRlRouting):
                  lambda_mac_cost, warm_up_period, cign_rl_train_period, batch_size, input_dims, class_count,
                  node_degrees, decision_drop_probability, classification_drop_probability, decision_wd,
                  classification_wd, information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule,
-                 decision_loss_coeff, q_net_coeff, bn_momentum=0.9):
+                 decision_loss_coeff, q_net_coeff, epsilon_decay_rate, epsilon_step, bn_momentum=0.9):
         super().__init__(valid_prediction_reward, invalid_prediction_penalty, include_ig_in_reward_calculations,
                          lambda_mac_cost, warm_up_period, cign_rl_train_period, batch_size, input_dims, class_count,
                          node_degrees, decision_drop_probability, classification_drop_probability, decision_wd,
                          classification_wd, information_gain_balance_coeff, softmax_decay_controller,
                          learning_rate_schedule, decision_loss_coeff, bn_momentum)
+        # Epsilon hyperparameter for exploration - explotation
+        self.globalStep = tf.Variable(initial_value=0, trainable=False, dtype=tf.int32)
+        self.epsilonDecayRate = epsilon_decay_rate
+        self.epsilonStep = epsilon_step
+        self.exploreExploitEpsilon = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=1.0, decay_steps=self.epsilonStep, decay_rate=self.epsilonDecayRate)
 
     def calculate_ideal_accuracy(self, dataset):
         posteriors_dict = {}
@@ -116,3 +124,81 @@ class CignRlBinaryRouting(CignRlRouting):
             routing_configurations.append(sample_routing_configurations)
         routing_configurations = np.stack(routing_configurations, axis=0)
         return routing_configurations
+
+    # We don't have actions spaces as in binary routing as defined in the original RL version.
+    # This is more or less for compatibility.
+    def build_action_spaces(self):
+        max_trajectory_length = self.get_max_trajectory_length()
+        for t in range(max_trajectory_length):
+            action_space = np.array([0, 1])
+            self.actionSpaces.append(action_space)
+
+    # In binary routing, we don't have reachability definition. We always execute one of the two actions.
+    def build_reachability_matrices(self):
+        pass
+
+    # Here, some changes are needed.
+    def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
+        assert len(self.scRoutingCalculationLayers) == level
+        # This code piece creates the corresponding Q-Net for the current layer, indicated by the variable "level".
+        # The Q-Net always takes the aggregated F outputs of the current layer's nodes (sparsified by the sc masks)
+        # and outputs raw Q-table predictions. This has been implemented as a separate tf.keras.Model,
+        # since they will be used in isolation during the iterative training of the CIGN-RL scheme.
+        q_net_input_f_tensor = tf.keras.Input(shape=input_f_tensor.shape[1:],
+                                              name="input_f_tensor_q_net_level_{0}".format(level),
+                                              dtype=input_f_tensor.dtype)
+        q_net_layer = self.get_q_net_layer(level=level)
+        q_table_predicted = q_net_layer(q_net_input_f_tensor)
+        q_net = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=q_table_predicted)
+        q_table_predicted_cign_output = q_net(inputs=input_f_tensor)
+
+        self.qNets.append(q_net)
+        self.qTablesPredicted.append(q_table_predicted_cign_output)
+
+        # Get information gain activations from the current level.
+        node = self.orderedNodesPerLevel[level][-1]
+        ig_activations = tf.stack(
+            [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
+        routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, node=node, network=self)
+        # Get secondary routing information from the previous layer also.
+        if level - 1 < 0:
+            sc_routing_matrix = tf.ones_like(input_ig_routing_matrix[:, 0])
+        else:
+            sc_routing_matrix = self.scRoutingMatricesDict[level - 1]
+        predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
+            [q_table_predicted_cign_output,
+             input_ig_routing_matrix,
+             self.warmUpPeriodInput,
+             ig_activations,
+             sc_routing_matrix])
+        self.actionsPredicted.append(predicted_actions)
+        self.scRoutingCalculationLayers.append(routing_calculation_layer)
+        return secondary_routing_matrix_cign_output
+
+
+
+
+
+
+
+
+
+
+        # Now, we are going to calculate the routing matrix (sc matrix) by using the Q-table predictions of the Q-Net,
+        # by utilizing the Bellman equation.
+        # node = self.orderedNodesPerLevel[level][-1]
+        #
+        #
+        #
+        #
+        # routing_calculation_layer = CignRlRoutingLayer(level=level, node=node, network=self, use_ig_in_actions=True)
+
+
+        # routing_calculation_layer = CignRlRoutingLayer(level=level, node=node, network=self, use_ig_in_actions=True)
+        # past_actions = tf.zeros_like(tf.argmax(q_table_predicted_cign_output, axis=-1)) \
+        #     if level == 0 else self.actionsPredicted[level - 1]
+        # predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
+        #     [q_table_predicted_cign_output, input_ig_routing_matrix, self.warmUpPeriodInput, past_actions])
+        # self.actionsPredicted.append(predicted_actions)
+        # self.scRoutingCalculationLayers.append(routing_calculation_layer)
+        # return secondary_routing_matrix_cign_output

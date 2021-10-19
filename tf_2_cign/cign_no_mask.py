@@ -53,6 +53,7 @@ class CignNoMask(Cign):
         self.scMaskInputsDict = {}
         self.igActivationsDict = {}
         self.posteriorsDict = {}
+        self.scRoutingMatricesDict = {}
         self.scRoutingPreparationLayers = []
         self.scRoutingCalculationLayers = []
         self.optimizer = None
@@ -168,6 +169,7 @@ class CignNoMask(Cign):
             level=level,
             input_f_tensor=input_f_tensor,
             input_ig_routing_matrix=input_ig_routing_matrix)
+        self.scRoutingMatricesDict[level] = secondary_routing_matrix
         # Distribute the results of the secondary routing matrix into the corresponding nodes
         curr_column = 0
         for node in level_nodes:
