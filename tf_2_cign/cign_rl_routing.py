@@ -67,8 +67,6 @@ class CignRlRouting(CignNoMask):
         self.qNetOptimizer = None
         self.qNetTrackers = []
         self.mseLoss = tf.keras.losses.MeanSquaredError()
-        self.warmUpPeriodInput = tf.keras.Input(shape=(), name="warm_up_period", dtype=tf.bool)
-        self.feedDict["warm_up_period"] = self.warmUpPeriodInput
         self.qNetCoeff = q_net_coeff
 
     def save_model(self, run_id):
@@ -227,7 +225,11 @@ class CignRlRouting(CignNoMask):
         ig_paths_matrix = np.stack(ig_paths_matrix, axis=-1)
         return ig_paths_matrix
 
-    def calculate_q_tables_from_network_outputs(self, true_labels, posteriors_dict, ig_masks_dict):
+    def calculate_q_tables_from_network_outputs(self,
+                                                true_labels,
+                                                posteriors_dict,
+                                                ig_masks_dict,
+                                                **kwargs):
         sample_count = true_labels.shape[0]
         ig_paths_matrix = self.get_ig_paths(ig_masks_dict=ig_masks_dict)
         c = Counter([tuple(ig_paths_matrix[i]) for i in range(ig_paths_matrix.shape[0])])
@@ -317,6 +319,22 @@ class CignRlRouting(CignNoMask):
         optimal_q_tables.reverse()
         return regression_targets, optimal_q_tables
 
+    def get_model_outputs_dict(self, model_output_arr):
+        # eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
+        # sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict, ig_activations_dict \
+        model_output_dict = {
+            "eval_dict": model_output_arr[0],
+            "classification_losses": model_output_arr[1],
+            "info_gain_losses": model_output_arr[2],
+            "posteriors_dict": model_output_arr[3],
+            "sc_masks_dict": model_output_arr[4],
+            "ig_masks_dict": model_output_arr[5],
+            "q_tables_predicted": model_output_arr[6],
+            "node_outputs_dict": model_output_arr[7],
+            "ig_activations_dict": model_output_arr[8]
+        }
+        return model_output_dict
+
     def run_model(self, **kwargs):
         X = kwargs["X"]
         y = kwargs["y"]
@@ -328,22 +346,24 @@ class CignRlRouting(CignNoMask):
             warm_up_period = False
         feed_dict = self.get_feed_dict(x=X, y=y, iteration=iteration, is_training=is_training,
                                        warm_up_period=warm_up_period)
+        model_output_arr = self.model(inputs=feed_dict, training=is_training)
+        model_output_dict = self.get_model_outputs_dict(model_output_arr=model_output_arr)
 
-        eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
-        sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict, ig_activations_dict \
-            = self.model(inputs=feed_dict, training=is_training)
-        model_output = {
-            "eval_dict": eval_dict,
-            "classification_losses": classification_losses,
-            "info_gain_losses": info_gain_losses,
-            "posteriors_dict": posteriors_dict,
-            "sc_masks_dict": sc_masks_dict,
-            "ig_masks_dict": ig_masks_dict,
-            "q_tables_predicted": q_tables_predicted,
-            "node_outputs_dict": node_outputs_dict,
-            "ig_activations_dict": ig_activations_dict
-        }
-        return model_output
+        # eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
+        # sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict, ig_activations_dict \
+        #     = self.model(inputs=feed_dict, training=is_training)
+        # model_output = {
+        #     "eval_dict": eval_dict,
+        #     "classification_losses": classification_losses,
+        #     "info_gain_losses": info_gain_losses,
+        #     "posteriors_dict": posteriors_dict,
+        #     "sc_masks_dict": sc_masks_dict,
+        #     "ig_masks_dict": ig_masks_dict,
+        #     "q_tables_predicted": q_tables_predicted,
+        #     "node_outputs_dict": node_outputs_dict,
+        #     "ig_activations_dict": ig_activations_dict
+        # }
+        return model_output_dict
 
     def calculate_optimal_q_values(self, dataset, batch_size, shuffle_data):
         # Step 1: Evaluate all samples and get the class predictions (posterior probabilities)
@@ -607,7 +627,10 @@ class CignRlRouting(CignNoMask):
         past_actions = tf.zeros_like(tf.argmax(q_table_predicted_cign_output, axis=-1)) \
             if level == 0 else self.actionsPredicted[level - 1]
         predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
-            [q_table_predicted_cign_output, input_ig_routing_matrix, self.warmUpPeriodInput, past_actions])
+            [q_table_predicted_cign_output,
+             input_ig_routing_matrix,
+             # self.warmUpPeriodInput,
+             past_actions])
         self.actionsPredicted.append(predicted_actions)
         self.scRoutingCalculationLayers.append(routing_calculation_layer)
         return secondary_routing_matrix_cign_output
@@ -618,9 +641,7 @@ class CignRlRouting(CignNoMask):
         super().build_network()
         self.get_evaluation_costs()
 
-    def build_tf_model(self):
-        # Build the final loss
-        # Temporary model for getting the list of trainable variables
+    def get_model_outputs_array(self):
         temp_output_dict = {}
         for node_id, _d in self.nodeOutputsDict.items():
             temp_output_dict[node_id] = {}
@@ -629,18 +650,17 @@ class CignRlRouting(CignNoMask):
                     continue
                 temp_output_dict[node_id][k] = v
         self.nodeOutputsDict = temp_output_dict
-        self.model = tf.keras.Model(inputs=self.feedDict,
-                                    outputs=[self.evalDict,
-                                             self.classificationLosses,
-                                             self.informationGainRoutingLosses,
-                                             self.posteriorsDict,
-                                             self.scMaskInputsDict,
-                                             self.igMaskInputsDict,
-                                             self.qTablesPredicted,
-                                             self.nodeOutputsDict,
-                                             self.igActivationsDict])
-        variables = self.model.trainable_variables
-        self.calculate_regularization_coefficients(trainable_variables=variables)
+
+        model_output_arr = [self.evalDict,
+                            self.classificationLosses,
+                            self.informationGainRoutingLosses,
+                            self.posteriorsDict,
+                            self.scMaskInputsDict,
+                            self.igMaskInputsDict,
+                            self.qTablesPredicted,
+                            self.nodeOutputsDict,
+                            self.igActivationsDict]
+        return model_output_arr
 
     def build_trackers(self):
         super().build_trackers()
@@ -1255,4 +1275,3 @@ class CignRlRouting(CignNoMask):
         validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
         accuracy = np.mean(validity_of_predictions_vec)
         return accuracy, validity_of_predictions_vec
-

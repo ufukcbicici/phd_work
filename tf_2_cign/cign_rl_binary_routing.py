@@ -4,6 +4,7 @@ import time
 
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_rl_routing import CignRlRouting
+from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
 from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
 from tf_2_cign.utilities.profiler import Profiler
@@ -30,6 +31,7 @@ class CignRlBinaryRouting(CignRlRouting):
         self.epsilonStep = epsilon_step
         self.exploreExploitEpsilon = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=1.0, decay_steps=self.epsilonStep, decay_rate=self.epsilonDecayRate)
+        self.actionSpaceGenerators = {}
 
     def calculate_ideal_accuracy(self, dataset):
         posteriors_dict = {}
@@ -159,18 +161,258 @@ class CignRlBinaryRouting(CignRlRouting):
         node = self.orderedNodesPerLevel[level][-1]
         ig_activations = tf.stack(
             [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
-        routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, node=node, network=self)
+        routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, network=self)
         # Get secondary routing information from the previous layer also.
         if level - 1 < 0:
-            sc_routing_matrix = tf.ones_like(input_ig_routing_matrix[:, 0])
+            sc_routing_matrix = tf.expand_dims(tf.ones_like(input_ig_routing_matrix[:, 0]), axis=-1)
         else:
             sc_routing_matrix = self.scRoutingMatricesDict[level - 1]
+        # explore_actions = tf.random.uniform(shape=[q_table_predicted.shape[0]], dtype=tf.int32,
+        #                                     minval=0, maxval=2)
         predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
             [q_table_predicted_cign_output,
-             self.warmUpPeriodInput,
+             # self.warmUpPeriodInput,
              ig_activations,
              sc_routing_matrix])
         self.actionsPredicted.append(predicted_actions)
         self.scRoutingCalculationLayers.append(routing_calculation_layer)
         return secondary_routing_matrix_cign_output
 
+    def get_model_outputs_array(self):
+        model_output_arr = super().get_model_outputs_array()
+        model_output_arr.append(self.actionsPredicted)
+        model_output_arr.append(self.scRoutingMatricesDict)
+        return model_output_arr
+
+    def get_model_outputs_dict(self, model_output_arr):
+        model_output_dict = super(CignRlBinaryRouting, self).get_model_outputs_dict(model_output_arr)
+        model_output_dict["actions_predicted"] = model_output_arr[9]
+        model_output_dict["sc_routing_matrices_dict"] = model_output_arr[10]
+        return model_output_dict
+
+    def calculate_q_tables_from_network_outputs(self,
+                                                true_labels,
+                                                posteriors_dict,
+                                                ig_masks_dict,
+                                                **kwargs):
+        actions_predicted = kwargs["actions_predicted"]
+        sc_routing_matrices_dict = kwargs["sc_routing_matrices_dict"]
+
+        # 1) Calculate the action spaces of each sample.
+        action_spaces = []
+        sc_routing_tensor_curr_level = tf.expand_dims(
+            tf.expand_dims(tf.ones_like(true_labels), axis=-1), axis=0)
+        action_spaces.append(sc_routing_tensor_curr_level)
+        for level in range(self.get_max_trajectory_length()):
+            # IG activations for the nodes in this layer.
+            ig_activations = tf.stack([ig_masks_dict[nd.index] for nd in self.orderedNodesPerLevel[level]],
+                                      axis=-1)
+            # Generate action space generator layer for the first time.
+            if level not in self.actionSpaceGenerators:
+                self.actionSpaceGenerators[level] = \
+                    CignBinaryActionSpaceGeneratorLayer(level=level, network=self)
+            # For every past action combination in the current trajectory so far,
+            # get the current layer's node configuration. If we are at t. level, there will be actions taken:
+            # A_{0:t-1} = a_0,a_1,a_2, ..., a_{t-1}
+            # There will be 2^t different paths to the level t (each action is binary).
+            actions_each_layer = [[0]]
+            actions_each_layer.extend([[0, 1] for _ in range(level)])
+            list_of_all_trajectories = Utilities.get_cartesian_product(list_of_lists=actions_each_layer)
+            sc_routing_tensor_next_level_shape = [1]
+            sc_routing_tensor_next_level_shape.extend([2 for _ in range(level + 1)])
+            sc_routing_tensor_next_level_shape.append(true_labels.shape[0])
+            sc_routing_tensor_next_level_shape.append(len(self.orderedNodesPerLevel[level + 1]))
+            sc_routing_tensor_next_level = tf.zeros(shape=sc_routing_tensor_next_level_shape,
+                                                    dtype=sc_routing_tensor_curr_level.dtype)
+            for trajectory in list_of_all_trajectories:
+                # Given the current trajectory = a_0,a_1,a_2, ..., a_{t-1}, get the configuration of the
+                # nodes in the current level, for every sample in the batch
+                current_level_routing_matrix = sc_routing_tensor_curr_level[trajectory]
+                sc_routing_matrix_action_0, sc_routing_matrix_action_1 = self.actionSpaceGenerators[level](
+                    [ig_activations, current_level_routing_matrix])
+                action_0_trajectory = []
+                action_0_trajectory.extend(trajectory)
+                action_0_trajectory.append(0)
+                sc_routing_tensor_next_level[action_0_trajectory] = sc_routing_matrix_action_0
+
+                action_1_trajectory = []
+                action_1_trajectory.extend(trajectory)
+                action_1_trajectory.append(1)
+                sc_routing_tensor_next_level[action_1_trajectory] = sc_routing_matrix_action_1
+
+            sc_routing_tensor_curr_level = sc_routing_tensor_next_level
+            action_spaces.append(sc_routing_tensor_curr_level)
+
+        # 2) Using the calculated action spaces, now calculate the optimal Q tables for each sample.
+
+
+
+
+
+            # ig_activations = inputs[0]
+            # sc_routing_matrix_prev_level = inputs[1]
+            # sc_routing_matrices = \
+            #     self.actionSpaceGenerators[level]([ig_activations, sc_routing_matrix_prev_level])
+
+        # for level in range(self.get_max_trajectory_length()):
+        #     ig_activations = tf.stack(
+        #         [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
+        #     if level == 0:
+        #         sc_routing_matrix_prev_level = tf.expand_dims(tf.ones_like(true_labels), axis=-1)
+        #     else:
+        #         sc_routing_matrix_prev_level = self.scRoutingMatricesDict[level - 1]
+        #     if level not in self.actionSpaceGenerators:
+        #         self.actionSpaceGenerators[level] = CignBinaryActionSpaceGeneratorLayer(level=level, network=self)
+        #     sc_routing_matrices = \
+        #         self.actionSpaceGenerators[level]([ig_activations, sc_routing_matrix_prev_level])
+        #     sc_routing_matrices = tf.stack(sc_routing_matrices, axis=-1)
+        #     action_spaces.append(sc_routing_matrices)
+
+        # sc_routing_matrices = self.actionSpaceGeneratorLayer([ig_activations, sc_routing_matrix_prev_level])
+        # sc_routing_matrix = tf.where(final_actions, sc_routing_matrices[1], sc_routing_matrices[0])
+        #
+        #
+        # for nd_idx, node in enumerate(self.orderedNodesPerLevel[level]):
+        # # ************ final_actions[i] == 0 ************
+        # sc_routing_matrix_action_0 = []
+        # for nd_idx in range(self.nodeCountInThisLevel):
+        #     activations_nd = ig_activations[:, :, nd_idx]
+        #     sc_routing_vector = sc_routing_matrix_prev_level[:, nd_idx]
+        #     ig_indices = tf.argmax(activations_nd, axis=-1)
+        #     ig_routing_matrix = tf.one_hot(ig_indices, activations_nd.shape[1])
+        #     rl_routing_matrix = sc_routing_vector * ig_routing_matrix
+        #     sc_routing_matrix_action_0.append(rl_routing_matrix)
+        # # ************ final_actions[i] == 0 ************
+        #
+        # # ************ final_actions[i] == 1 ************
+        # sc_routing_matrix_action_1 = []
+        # for nd_idx in range(self.nodeCountInThisLevel):
+        #     sc_routing_vector = sc_routing_matrix_prev_level[:, nd_idx]
+        #     rl_routing_matrix = tf.ones_like(sc_routing_matrix_action_0[nd_idx])
+        #     rl_routing_matrix = sc_routing_vector * rl_routing_matrix
+        #     sc_routing_matrix_action_1.append(rl_routing_matrix)
+        # # ************ final_actions[i] == 1 ************
+
+        # # Get the sc routing outputs of this level.
+        # sc_outputs = sc_routing_matrices_dict[level]
+
+        # for t in range(self.get_max_trajectory_length() - 1, -1, -1):
+
+        # sample_count = true_labels.shape[0]
+        # ig_paths_matrix = self.get_ig_paths(ig_masks_dict=ig_masks_dict)
+        # c = Counter([tuple(ig_paths_matrix[i]) for i in range(ig_paths_matrix.shape[0])])
+        # # print("Count of ig paths:{0}".format(c))
+        # regression_targets = []
+        # optimal_q_tables = []
+        #
+        # for t in range(self.get_max_trajectory_length() - 1, -1, -1):
+        #     action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
+        #     action_count_t = self.actionSpaces[t].shape[0]
+        #     optimal_q_table = np.zeros(shape=(sample_count, action_count_t_minus_one, action_count_t), dtype=np.float32)
+        #     # If in the last layer, take into account the prediction accuracies.
+        #     if t == self.get_max_trajectory_length() - 1:
+        #         posteriors_tensor = []
+        #         for leaf_node in self.leafNodes:
+        #             if not (type(posteriors_dict[leaf_node.index]) is np.ndarray):
+        #                 posteriors_tensor.append(posteriors_dict[leaf_node.index].numpy())
+        #             else:
+        #                 posteriors_tensor.append(posteriors_dict[leaf_node.index])
+        #         posteriors_tensor = np.stack(posteriors_tensor, axis=-1)
+        #
+        #         # Assert that posteriors are placed correctly.
+        #         min_leaf_index = min([node.index for node in self.leafNodes])
+        #         for leaf_node in self.leafNodes:
+        #             if not (type(posteriors_dict[leaf_node.index]) is np.ndarray):
+        #                 assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
+        #                                       posteriors_dict[leaf_node.index].numpy())
+        #             else:
+        #                 assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
+        #                                       posteriors_dict[leaf_node.index])
+        #
+        #         # Combine posteriors with respect to the action tuple.
+        #         prediction_correctness_vec_list = []
+        #         calculation_cost_vec_list = []
+        #         min_leaf_id = min([node.index for node in self.leafNodes])
+        #         ig_indices = ig_paths_matrix[:, -1] - min_leaf_id
+        #         for action_id in range(self.actionSpaces[t].shape[0]):
+        #             routing_decision = self.actionSpaces[t][action_id, :]
+        #             routing_matrix = np.repeat(routing_decision[np.newaxis, :], axis=0,
+        #                                        repeats=true_labels.shape[0])
+        #             if self.includeIgInRewardCalculations:
+        #                 # Set Information Gain routed leaf nodes to 1. They are always evaluated.
+        #                 routing_matrix[np.arange(true_labels.shape[0]), ig_indices] = 1
+        #             weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
+        #             routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
+        #             weighted_posteriors = posteriors_tensor * routing_matrix_weighted[:, np.newaxis, :]
+        #             final_posteriors = np.sum(weighted_posteriors, axis=2)
+        #             predicted_labels = np.argmax(final_posteriors, axis=1)
+        #             validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+        #             prediction_correctness_vec_list.append(validity_of_predictions_vec)
+        #             # Get the calculation costs
+        #             computation_overload_vector = np.apply_along_axis(
+        #                 lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
+        #                 arr=routing_matrix)
+        #             calculation_cost_vec_list.append(computation_overload_vector)
+        #         prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
+        #         prediction_correctness_tensor = np.repeat(
+        #             np.expand_dims(prediction_correctness_matrix, axis=1), axis=1,
+        #             repeats=action_count_t_minus_one)
+        #         computation_overload_matrix = np.stack(calculation_cost_vec_list, axis=1)
+        #         computation_overload_tensor = np.repeat(
+        #             np.expand_dims(computation_overload_matrix, axis=1), axis=1,
+        #             repeats=action_count_t_minus_one)
+        #         # Add to the rewards tensor
+        #         optimal_q_table += (prediction_correctness_tensor == 1
+        #                             ).astype(np.float32) * self.validPredictionReward
+        #         optimal_q_table += (prediction_correctness_tensor == 0
+        #                             ).astype(np.float32) * self.invalidPredictionPenalty
+        #         optimal_q_table -= self.lambdaMacCost * computation_overload_tensor
+        #         for idx in range(optimal_q_table.shape[1] - 1):
+        #             assert np.array_equal(optimal_q_table[:, idx, :], optimal_q_table[:, idx + 1, :])
+        #         regression_targets.append(optimal_q_table[:, 0, :].copy())
+        #     else:
+        #         q_table_next = optimal_q_tables[-1].copy()
+        #         q_table_next = np.max(q_table_next, axis=-1)
+        #         regression_targets.append(q_table_next)
+        #         optimal_q_table = np.expand_dims(q_table_next, axis=1)
+        #         optimal_q_table = np.repeat(optimal_q_table, axis=1, repeats=action_count_t_minus_one)
+        #     reachability_matrix = self.reachabilityMatrices[t].copy().astype(np.float32)
+        #     reachability_matrix = np.repeat(np.expand_dims(reachability_matrix, axis=0), axis=0,
+        #                                     repeats=optimal_q_table.shape[0])
+        #     assert optimal_q_table.shape == reachability_matrix.shape
+        #     optimal_q_table[reachability_matrix == 0] = -np.inf
+        #     optimal_q_tables.append(optimal_q_table)
+        #
+        # regression_targets.reverse()
+        # optimal_q_tables.reverse()
+        # return regression_targets, optimal_q_tables
+
+    # TODO: Rewrite this according to the binary routing logic.
+    def run_q_net_model(self, X, y, iteration, is_in_warm_up_period):
+        with tf.GradientTape() as q_tape:
+            model_output_val = self.run_model(
+                X=X,
+                y=y,
+                iteration=iteration,
+                is_training=True,
+                warm_up_period=is_in_warm_up_period)
+            # Calculate target values for the Q-Nets
+            posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
+            ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
+            regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
+                                                                     posteriors_dict=posteriors_val,
+                                                                     ig_masks_dict=ig_masks_val)
+            # Q-Net Losses
+            q_net_predicted = model_output_val["q_tables_predicted"]
+            q_net_losses = []
+            for idx, tpl in enumerate(zip(regs, q_net_predicted)):
+                q_truth = tpl[0]
+                q_predicted = tpl[1]
+                q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
+                mse = self.mseLoss(q_truth_tensor, q_predicted)
+                q_net_losses.append(mse)
+            full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
+            q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
+            total_q_loss = full_q_loss + q_regularization_loss
+        q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
+        return model_output_val, q_grads, q_net_losses

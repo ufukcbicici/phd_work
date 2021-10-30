@@ -9,68 +9,20 @@ from tf_2_cign.fashion_net.fashion_cign import FashionCign
 # Hyper-parameters
 from tf_2_cign.fashion_net.fashion_cign_rl import FashionCignRl
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
-
-input_dims = (28, 28, 1)
-degree_list = [2, 2]
-batch_size = 125
-epoch_count = 110
-decision_drop_probability = 0.0
-drop_probability = 0.15
-classification_wd = 0.0
-decision_wd = 0.0
-softmax_decay_initial = 25.0
-softmax_decay_coefficient = 0.9999
-softmax_decay_period = 2
-softmax_decay_min_limit = 1.0
-softmax_decay_controllers = {}
-
-# FashionNet parameters
-filter_counts = [32, 32, 32]
-kernel_sizes = [5, 5, 1]
-hidden_layers = [128, 64]
-decision_dimensions = [128, 128]
-# node_build_funcs = [FashionCign.inner_func, FashionCign.inner_func, FashionCign.leaf_func]
-initial_lr = 0.01
-learning_rate_calculator = DiscreteParameter(name="lr_calculator",
-                                             value=initial_lr,
-                                             schedule=[(15000, 0.005),
-                                                       (30000, 0.0025),
-                                                       (40000, 0.00025)])
-
-# Reinforcement learning routing parameters
-valid_prediction_reward = 1.0
-invalid_prediction_penalty = 0.0
-lambda_mac_cost = 0.5
-q_net_params = [
-    {
-        "Conv_Filter": 1,
-        "Conv_Strides": (1, 1),
-        "Conv_Feature_Maps": 32,
-        "Hidden_Layers": [32]
-    },
-    {
-        "Conv_Filter": 1,
-        "Conv_Strides": (1, 1),
-        "Conv_Feature_Maps": 32,
-        "Hidden_Layers": [64]
-    }
-]
-warm_up_period = 25
-rl_cign_iteration_period = 10
-fine_tune_epoch_count = 25
+from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
-    fashion_mnist = FashionMnist(batch_size=batch_size,
+    fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
                                  validation_size=5000,
                                  validation_source="training")
     softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
-                                                      initial_value=softmax_decay_initial,
-                                                      decay_coefficient=softmax_decay_coefficient,
-                                                      decay_period=softmax_decay_period,
-                                                      decay_min_limit=softmax_decay_min_limit)
+                                                      initial_value=FashionNetConstants.softmax_decay_initial,
+                                                      decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
+                                                      decay_period=FashionNetConstants.softmax_decay_period,
+                                                      decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
     with tf.device("GPU"):
         # cign = FashionCign(batch_size=batch_size,
         #                    input_dims=input_dims,
@@ -113,29 +65,29 @@ if __name__ == "__main__":
         #                      warm_up_period=warm_up_period,
         #                      cign_rl_train_period=rl_cign_iteration_period)
 
-        cign = FashionCignRl(valid_prediction_reward=valid_prediction_reward,
-                             invalid_prediction_penalty=invalid_prediction_penalty,
+        cign = FashionCignRl(valid_prediction_reward=FashionNetConstants.valid_prediction_reward,
+                             invalid_prediction_penalty=FashionNetConstants.invalid_prediction_penalty,
                              include_ig_in_reward_calculations=True,
-                             lambda_mac_cost=lambda_mac_cost,
-                             q_net_params=q_net_params,
-                             batch_size=batch_size,
-                             input_dims=input_dims,
-                             node_degrees=degree_list,
-                             filter_counts=filter_counts,
-                             kernel_sizes=kernel_sizes,
-                             hidden_layers=hidden_layers,
-                             decision_drop_probability=decision_drop_probability,
-                             classification_drop_probability=drop_probability,
-                             decision_wd=decision_wd,
-                             classification_wd=classification_wd,
-                             decision_dimensions=decision_dimensions,
+                             lambda_mac_cost=FashionNetConstants.lambda_mac_cost,
+                             q_net_params=FashionNetConstants.q_net_params,
+                             batch_size=FashionNetConstants.batch_size,
+                             input_dims=FashionNetConstants.input_dims,
+                             node_degrees=FashionNetConstants.degree_list,
+                             filter_counts=FashionNetConstants.filter_counts,
+                             kernel_sizes=FashionNetConstants.kernel_sizes,
+                             hidden_layers=FashionNetConstants.hidden_layers,
+                             decision_drop_probability=FashionNetConstants.decision_drop_probability,
+                             classification_drop_probability=FashionNetConstants.drop_probability,
+                             decision_wd=FashionNetConstants.decision_wd,
+                             classification_wd=FashionNetConstants.classification_wd,
+                             decision_dimensions=FashionNetConstants.decision_dimensions,
                              class_count=10,
                              information_gain_balance_coeff=1.0,
                              softmax_decay_controller=softmax_decay_controller,
-                             learning_rate_schedule=learning_rate_calculator,
+                             learning_rate_schedule=FashionNetConstants.learning_rate_calculator,
                              decision_loss_coeff=1.0,
-                             warm_up_period=warm_up_period,
-                             cign_rl_train_period=rl_cign_iteration_period,
+                             warm_up_period=FashionNetConstants.warm_up_period,
+                             cign_rl_train_period=FashionNetConstants.rl_cign_iteration_period,
                              q_net_coeff=1.0)
 
         run_id = DbLogger.get_run_id()

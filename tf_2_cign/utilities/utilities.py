@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import pickle
+import itertools
 
 
 class Utilities:
@@ -179,3 +180,8 @@ class Utilities:
         # assert key_set1 == key_set2
         for k in dict_to_append.keys():
             Utilities.concat_to_np_array_dict(dct=dict_target, array=dict_to_append[k], key=k)
+
+    @staticmethod
+    def get_cartesian_product(list_of_lists):
+        cartesian_product = list(itertools.product(*list_of_lists))
+        return cartesian_product

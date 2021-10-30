@@ -53,6 +53,7 @@ class CignNoMask(Cign):
         self.scMaskInputsDict = {}
         self.igActivationsDict = {}
         self.posteriorsDict = {}
+        self.secondaryMatricesPerLevelDict = {}
         self.scRoutingMatricesDict = {}
         self.scRoutingPreparationLayers = []
         self.scRoutingCalculationLayers = []
@@ -60,6 +61,8 @@ class CignNoMask(Cign):
         self.totalLossTracker = None
         self.classificationLossTrackers = None
         self.igLossTrackers = None
+        self.warmUpPeriodInput = tf.keras.Input(shape=(), name="warm_up_period", dtype=tf.bool)
+        self.feedDict["warm_up_period"] = self.warmUpPeriodInput
 
     def node_build_func(self, node):
         pass
@@ -169,12 +172,18 @@ class CignNoMask(Cign):
             level=level,
             input_f_tensor=input_f_tensor,
             input_ig_routing_matrix=input_ig_routing_matrix)
-        self.scRoutingMatricesDict[level] = secondary_routing_matrix
+        # Apply warm-up (all samples to every path), if enabled.
+        secondary_routing_matrix_warm_up = tf.ones_like(secondary_routing_matrix)
+        secondary_routing_matrix_final = tf.where(tf.cast(self.warmUpPeriodInput, tf.int32) > 0,
+                                                  secondary_routing_matrix_warm_up,
+                                                  secondary_routing_matrix)
+        self.scRoutingMatricesDict[level] = secondary_routing_matrix_final
+
         # Distribute the results of the secondary routing matrix into the corresponding nodes
         curr_column = 0
         for node in level_nodes:
             node_child_count = len(self.dagObject.children(node=node))
-            sc_routing_matrix_for_node = secondary_routing_matrix[:, curr_column: curr_column + node_child_count]
+            sc_routing_matrix_for_node = secondary_routing_matrix_final[:, curr_column: curr_column + node_child_count]
             self.evalDict["sc_routing_matrix_for_node_{0}_level_{1}".format(node.index, level)] = \
                 sc_routing_matrix_for_node
             self.nodeOutputsDict[node.index]["secondary_mask_matrix"] = sc_routing_matrix_for_node
@@ -220,18 +229,33 @@ class CignNoMask(Cign):
 
         self.evalDict["batch_size"] = self.batchSize
 
+    def get_model_outputs_array(self):
+        model_output_arr = [self.evalDict,
+                            self.classificationLosses,
+                            self.informationGainRoutingLosses,
+                            self.posteriorsDict,
+                            self.scMaskInputsDict,
+                            self.igMaskInputsDict]
+        return model_output_arr
+
     def build_tf_model(self):
-        # Build the final loss
-        # Temporary model for getting the list of trainable variables
-        self.model = tf.keras.Model(inputs=self.feedDict,
-                                    outputs=[self.evalDict,
-                                             self.classificationLosses,
-                                             self.informationGainRoutingLosses,
-                                             self.posteriorsDict,
-                                             self.scMaskInputsDict,
-                                             self.igMaskInputsDict])
+        model_outputs_arr = self.get_model_outputs_array()
+        self.model = tf.keras.Model(inputs=self.feedDict, outputs=model_outputs_arr)
         variables = self.model.trainable_variables
         self.calculate_regularization_coefficients(trainable_variables=variables)
+
+    # def build_tf_model(self):
+    #     # Build the final loss
+    #     # Temporary model for getting the list of trainable variables
+    #     self.model = tf.keras.Model(inputs=self.feedDict,
+    #                                 outputs=[self.evalDict,
+    #                                          self.classificationLosses,
+    #                                          self.informationGainRoutingLosses,
+    #                                          self.posteriorsDict,
+    #                                          self.scMaskInputsDict,
+    #                                          self.igMaskInputsDict])
+    #     variables = self.model.trainable_variables
+    #     self.calculate_regularization_coefficients(trainable_variables=variables)
 
     def init(self):
         self.build_tree()

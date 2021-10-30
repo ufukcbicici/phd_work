@@ -19,8 +19,8 @@ class CignRlRoutingLayer(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         q_table_predicted = inputs[0]
         input_ig_routing_matrix = inputs[1]
-        is_warm_up_period = inputs[2]
-        past_actions = inputs[3]
+        # is_warm_up_period = inputs[2]
+        past_actions = inputs[2]
 
         # Get the feasibility table
         feasibility_matrix = tf.gather_nd(self.reachabilityMatrices[self.level], tf.expand_dims(past_actions, axis=-1))
@@ -43,10 +43,4 @@ class CignRlRoutingLayer(tf.keras.layers.Layer):
             basis_matrix = secondary_routing_matrix_logical_or_ig * \
                            tf.expand_dims(self.network.actionSpacesReverse[self.level], axis=0)
             predicted_actions = tf.reduce_sum(basis_matrix, axis=-1) - 1
-
-        secondary_routing_matrix_warm_up = tf.ones_like(secondary_routing_matrix_logical_or_ig)
-
-        secondary_routing_matrix_final = tf.where(tf.cast(is_warm_up_period, tf.int32) > 0,
-                                                  secondary_routing_matrix_warm_up,
-                                                  secondary_routing_matrix_logical_or_ig)
-        return predicted_actions, secondary_routing_matrix_final
+        return predicted_actions, secondary_routing_matrix_logical_or_ig
