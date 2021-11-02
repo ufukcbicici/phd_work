@@ -16,7 +16,7 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
         q_table_predicted = inputs[0]
         # is_warm_up_period = inputs[1]
         ig_activations = inputs[1]
-        sc_routing_matrix_prev_level = inputs[2]
+        sc_routing_matrix_curr_level = inputs[2]
         is_training = kwargs["training"]
         # q_table_predicted_cign_output, input_ig_routing_matrix, self.warmUpPeriodInput, ig_activations_array
 
@@ -43,26 +43,26 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
 
         sc_mask_vectors = [self.network.scMaskInputsDict[node.index]
                            for node in self.network.orderedNodesPerLevel[self.level]]
-        sc_routing_matrix_prev_level_2 = tf.stack(sc_mask_vectors, axis=-1)
+        sc_routing_matrix_curr_level_2 = tf.stack(sc_mask_vectors, axis=-1)
 
         # Binary routing calculation algorithm:
         # If final_actions[i] == 0:
-        # We will look into sc_routing_matrix_prev_level[i, :] for the "current level".
-        # sc_routing_matrix_prev_level[i, :] contains the nodes which are activated in this level.
+        # We will look into sc_routing_matrix_curr_level[i, :] for the "current level".
+        # sc_routing_matrix_curr_level[i, :] contains the nodes which are activated in this level.
         # We will activate those nodes in the next layer such that:
         # 1) They are children of the nodes in the previous layer, which are indicated by the "1" entries in
-        # sc_routing_matrix_prev_level[i, :].
+        # sc_routing_matrix_curr_level[i, :].
         # 2) They are the children of the nodes as indicated in "1)" but only if they are picked by the information
         # driven routing distribution in their parent nodes. Meaning i is picked if for its parent node j:
         # i = argmax_k p(n_j=k|x) for the current sample.
         # If final_actions[i] == 1:
-        # We will look into sc_routing_matrix_prev_level[i, :] for the "current level".
+        # We will look into sc_routing_matrix_curr_level[i, :] for the "current level".
         # For every active node in this layer, we will activate "all" the children of that active node, in the
         # next layer.
 
         # ig_activations = tf.stack(
         #     [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
-        sc_routing_matrices = self.actionSpaceGeneratorLayer([ig_activations, sc_routing_matrix_prev_level])
+        sc_routing_matrices = self.actionSpaceGeneratorLayer([ig_activations, sc_routing_matrix_curr_level])
         sc_routing_matrix = tf.where(tf.cast(final_actions, dtype=tf.bool),
                                      sc_routing_matrices[1], sc_routing_matrices[0])
 

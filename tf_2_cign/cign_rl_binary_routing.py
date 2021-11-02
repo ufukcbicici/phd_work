@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import time
 
+from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_rl_routing import CignRlRouting
 from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
@@ -10,6 +11,7 @@ from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
 from tf_2_cign.utilities.profiler import Profiler
 from collections import Counter
 from tf_2_cign.utilities.utilities import Utilities
+from collections import deque
 
 
 class CignRlBinaryRouting(CignRlRouting):
@@ -190,22 +192,59 @@ class CignRlBinaryRouting(CignRlRouting):
         model_output_dict["sc_routing_matrices_dict"] = model_output_arr[10]
         return model_output_dict
 
-    def calculate_q_tables_from_network_outputs(self,
-                                                true_labels,
-                                                posteriors_dict,
-                                                ig_masks_dict,
-                                                **kwargs):
-        actions_predicted = kwargs["actions_predicted"]
-        sc_routing_matrices_dict = kwargs["sc_routing_matrices_dict"]
+    def calculate_next_level_configurations_manuel(self, level, ig_activations, sc_routing_matrix_curr_level):
+        batch_size = sc_routing_matrix_curr_level.shape[0]
+        assert len(self.orderedNodesPerLevel[level]) == sc_routing_matrix_curr_level.shape[1]
+        next_level_config_action_0 = []
+        next_level_config_action_1 = []
+        for sample_id in range(batch_size):
+            curr_level_config = sc_routing_matrix_curr_level[sample_id]
+            next_level_selected_nodes_acton_0 = []
+            next_level_selected_nodes_acton_1 = []
+            for node_id, node in enumerate(self.orderedNodesPerLevel[level]):
+                if curr_level_config[node_id] == 0:
+                    continue
+                child_nodes = self.dagObject.children(node=node)
+                child_nodes_sorted = sorted(child_nodes, key=lambda nd: nd.index)
+                curr_sample_ig_activations = ig_activations[sample_id, :, node_id]
+                # Action 0: Only max information gain paths.
+                arg_max_idx = tf.argmax(curr_sample_ig_activations)
+                next_level_node_selected = child_nodes_sorted[arg_max_idx]
+                next_level_selected_nodes_acton_0.append(next_level_node_selected)
+                # Action 1: Every child in the next layer will be visited.
+                next_level_selected_nodes_acton_1.extend(child_nodes_sorted)
+            # Convert selected nodes to next level configurations.
+            next_level_selected_nodes_acton_0 = set([nd.index for nd in next_level_selected_nodes_acton_0])
+            next_level_selected_nodes_acton_1 = set([nd.index for nd in next_level_selected_nodes_acton_1])
+            action_0_vec = []
+            action_1_vec = []
+            for node in self.orderedNodesPerLevel[level + 1]:
+                if node.index in next_level_selected_nodes_acton_0:
+                    action_0_vec.append(1)
+                else:
+                    action_0_vec.append(0)
+                if node.index in next_level_selected_nodes_acton_1:
+                    action_1_vec.append(1)
+                else:
+                    action_1_vec.append(0)
+            action_0_vec = np.array(action_0_vec)
+            action_1_vec = np.array(action_1_vec)
+            next_level_config_action_0.append(action_0_vec)
+            next_level_config_action_1.append(action_1_vec)
 
-        # 1) Calculate the action spaces of each sample.
+        next_level_config_action_0 = np.stack(next_level_config_action_0, axis=0)
+        next_level_config_action_1 = np.stack(next_level_config_action_1, axis=0)
+        return next_level_config_action_0, next_level_config_action_1
+
+    def calculate_sample_action_space(self, ig_activations_dict):
         action_spaces = []
+        batch_size = ig_activations_dict[0].shape[0]
         sc_routing_tensor_curr_level = tf.expand_dims(
-            tf.expand_dims(tf.ones_like(true_labels), axis=-1), axis=0)
+            tf.expand_dims(tf.ones(shape=[batch_size], dtype=tf.int32), axis=-1), axis=0)
         action_spaces.append(sc_routing_tensor_curr_level)
         for level in range(self.get_max_trajectory_length()):
             # IG activations for the nodes in this layer.
-            ig_activations = tf.stack([ig_masks_dict[nd.index] for nd in self.orderedNodesPerLevel[level]],
+            ig_activations = tf.stack([ig_activations_dict[nd.index] for nd in self.orderedNodesPerLevel[level]],
                                       axis=-1)
             # Generate action space generator layer for the first time.
             if level not in self.actionSpaceGenerators:
@@ -220,7 +259,7 @@ class CignRlBinaryRouting(CignRlRouting):
             list_of_all_trajectories = Utilities.get_cartesian_product(list_of_lists=actions_each_layer)
             sc_routing_tensor_next_level_shape = [1]
             sc_routing_tensor_next_level_shape.extend([2 for _ in range(level + 1)])
-            sc_routing_tensor_next_level_shape.append(true_labels.shape[0])
+            sc_routing_tensor_next_level_shape.append(batch_size)
             sc_routing_tensor_next_level_shape.append(len(self.orderedNodesPerLevel[level + 1]))
             sc_routing_tensor_next_level = tf.zeros(shape=sc_routing_tensor_next_level_shape,
                                                     dtype=sc_routing_tensor_curr_level.dtype)
@@ -243,16 +282,157 @@ class CignRlBinaryRouting(CignRlRouting):
             sc_routing_tensor_curr_level = sc_routing_tensor_next_level
             action_spaces.append(sc_routing_tensor_curr_level)
 
+    def calculate_sample_action_space_manuel(self, ig_activations_dict):
+        action_spaces = []
+        batch_size = ig_activations_dict[0].shape[0]
+        for level in range(self.get_max_trajectory_length() + 1):
+            shp = [1]
+            shp.extend([2 for _ in range(level)])
+            shp.append(batch_size)
+            shp.append(len(self.orderedNodesPerLevel[level]))
+            sc_routing_tensor_next_level = np.zeros(shape=shp, dtype=np.int32)
+            action_spaces.append(sc_routing_tensor_next_level)
+
+        for sample_id in range(batch_size):
+            root_action_node = {"level": 0,
+                                "action_trajectory": [0],
+                                "activated_nodes": [self.topologicalSortedNodes[0]]}
+            active_action_nodes = deque()
+            active_action_nodes.append(root_action_node)
+            processed_action_nodes = []
+            # Action tree traversal
+            while len(active_action_nodes) > 0:
+                curr_action_node = active_action_nodes.popleft()
+                curr_level = curr_action_node["level"]
+                curr_action_trajectory = curr_action_node["activated_nodes"]
+                activated_nodes = curr_action_node["activated_nodes"]
+                processed_action_nodes.append(curr_action_node)
+                if curr_level == self.get_max_trajectory_length():
+                    break
+
+                # Action 0
+                action_0_activated_nodes = []
+                for nd in activated_nodes:
+                    ig_activations = ig_activations_dict[nd.index][sample_id]
+                    arg_max_idx = tf.argmax(ig_activations)
+                    child_cign_nodes = self.dagObject.children(node=nd)
+                    child_cign_nodes = sorted(child_cign_nodes, key=lambda x: x.index)
+                    action_0_activated_nodes.append(child_cign_nodes[arg_max_idx])
+                action_0_activated_nodes = sorted(action_0_activated_nodes, key=lambda x: x.index)
+                action_0_trajectory = []
+                action_0_trajectory.extend(curr_action_trajectory)
+                action_0_trajectory.append(0)
+                new_action_0_node = {"level": curr_level + 1,
+                                     "action_trajectory": action_0_trajectory,
+                                     "activated_nodes": action_0_activated_nodes}
+                active_action_nodes.append(new_action_0_node)
+
+                # Action 1
+                action_1_activated_nodes = []
+                for nd in activated_nodes:
+                    child_cign_nodes = self.dagObject.children(node=nd)
+                    child_cign_nodes = sorted(child_cign_nodes, key=lambda x: x.index)
+                    action_1_activated_nodes.extend(child_cign_nodes)
+                action_1_activated_nodes = sorted(action_1_activated_nodes, key=lambda x: x.index)
+                action_1_trajectory = []
+                action_1_trajectory.extend(curr_action_trajectory)
+                action_1_trajectory.append(1)
+                new_action_1_node = {"level": curr_level + 1,
+                                     "action_trajectory": action_1_trajectory,
+                                     "activated_nodes": action_1_activated_nodes}
+                active_action_nodes.append(new_action_1_node)
+
+            # Dump the routing configurations into the arrays.
+            for action_obj in processed_action_nodes:
+                # root_action_node = {"level": 0,
+                #                     "action_trajectory": [0],
+                #                     "activated_nodes": [self.topologicalSortedNodes[0]]}
+                config_arr = []
+                node_ids = set([nd.index for nd in action_obj["activated_nodes"]])
+                for nd in self.orderedNodesPerLevel[action_obj["level"]]:
+                    if nd.index in node_ids:
+                        config_arr.append(1)
+                    else:
+                        config_arr.append(0)
+                config_arr = np.array(config_arr)
+                coords = []
+                coords.extend(action_obj["action_trajectory"])
+                coords.append(sample_id)
+                action_spaces[action_obj["level"]][coords] = config_arr
+
+        return action_spaces
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def calculate_q_tables_from_network_outputs(self,
+                                                true_labels,
+                                                posteriors_dict,
+                                                ig_masks_dict,
+                                                **kwargs):
+        actions_predicted = kwargs["actions_predicted"]
+        sc_routing_matrices_dict = kwargs["sc_routing_matrices_dict"]
+
+        # 1) Calculate the action spaces of each sample.
+        # action_spaces = []
+        # sc_routing_tensor_curr_level = tf.expand_dims(
+        #     tf.expand_dims(tf.ones_like(true_labels), axis=-1), axis=0)
+        # action_spaces.append(sc_routing_tensor_curr_level)
+        # for level in range(self.get_max_trajectory_length()):
+        #     # IG activations for the nodes in this layer.
+        #     ig_activations = tf.stack([ig_masks_dict[nd.index] for nd in self.orderedNodesPerLevel[level]],
+        #                               axis=-1)
+        #     # Generate action space generator layer for the first time.
+        #     if level not in self.actionSpaceGenerators:
+        #         self.actionSpaceGenerators[level] = \
+        #             CignBinaryActionSpaceGeneratorLayer(level=level, network=self)
+        #     # For every past action combination in the current trajectory so far,
+        #     # get the current layer's node configuration. If we are at t. level, there will be actions taken:
+        #     # A_{0:t-1} = a_0,a_1,a_2, ..., a_{t-1}
+        #     # There will be 2^t different paths to the level t (each action is binary).
+        #     actions_each_layer = [[0]]
+        #     actions_each_layer.extend([[0, 1] for _ in range(level)])
+        #     list_of_all_trajectories = Utilities.get_cartesian_product(list_of_lists=actions_each_layer)
+        #     sc_routing_tensor_next_level_shape = [1]
+        #     sc_routing_tensor_next_level_shape.extend([2 for _ in range(level + 1)])
+        #     sc_routing_tensor_next_level_shape.append(true_labels.shape[0])
+        #     sc_routing_tensor_next_level_shape.append(len(self.orderedNodesPerLevel[level + 1]))
+        #     sc_routing_tensor_next_level = tf.zeros(shape=sc_routing_tensor_next_level_shape,
+        #                                             dtype=sc_routing_tensor_curr_level.dtype)
+        #     for trajectory in list_of_all_trajectories:
+        #         # Given the current trajectory = a_0,a_1,a_2, ..., a_{t-1}, get the configuration of the
+        #         # nodes in the current level, for every sample in the batch
+        #         current_level_routing_matrix = sc_routing_tensor_curr_level[trajectory]
+        #         sc_routing_matrix_action_0, sc_routing_matrix_action_1 = self.actionSpaceGenerators[level](
+        #             [ig_activations, current_level_routing_matrix])
+        #         action_0_trajectory = []
+        #         action_0_trajectory.extend(trajectory)
+        #         action_0_trajectory.append(0)
+        #         sc_routing_tensor_next_level[action_0_trajectory] = sc_routing_matrix_action_0
+        #
+        #         action_1_trajectory = []
+        #         action_1_trajectory.extend(trajectory)
+        #         action_1_trajectory.append(1)
+        #         sc_routing_tensor_next_level[action_1_trajectory] = sc_routing_matrix_action_1
+        #
+        #     sc_routing_tensor_curr_level = sc_routing_tensor_next_level
+        #     action_spaces.append(sc_routing_tensor_curr_level)
+
         # 2) Using the calculated action spaces, now calculate the optimal Q tables for each sample.
 
-
-
-
-
-            # ig_activations = inputs[0]
-            # sc_routing_matrix_prev_level = inputs[1]
-            # sc_routing_matrices = \
-            #     self.actionSpaceGenerators[level]([ig_activations, sc_routing_matrix_prev_level])
+        # ig_activations = inputs[0]
+        # sc_routing_matrix_prev_level = inputs[1]
+        # sc_routing_matrices = \
+        #     self.actionSpaceGenerators[level]([ig_activations, sc_routing_matrix_prev_level])
 
         # for level in range(self.get_max_trajectory_length()):
         #     ig_activations = tf.stack(
@@ -388,31 +568,31 @@ class CignRlBinaryRouting(CignRlRouting):
         # return regression_targets, optimal_q_tables
 
     # TODO: Rewrite this according to the binary routing logic.
-    def run_q_net_model(self, X, y, iteration, is_in_warm_up_period):
-        with tf.GradientTape() as q_tape:
-            model_output_val = self.run_model(
-                X=X,
-                y=y,
-                iteration=iteration,
-                is_training=True,
-                warm_up_period=is_in_warm_up_period)
-            # Calculate target values for the Q-Nets
-            posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
-            ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
-            regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
-                                                                     posteriors_dict=posteriors_val,
-                                                                     ig_masks_dict=ig_masks_val)
-            # Q-Net Losses
-            q_net_predicted = model_output_val["q_tables_predicted"]
-            q_net_losses = []
-            for idx, tpl in enumerate(zip(regs, q_net_predicted)):
-                q_truth = tpl[0]
-                q_predicted = tpl[1]
-                q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
-                mse = self.mseLoss(q_truth_tensor, q_predicted)
-                q_net_losses.append(mse)
-            full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
-            q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
-            total_q_loss = full_q_loss + q_regularization_loss
-        q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
-        return model_output_val, q_grads, q_net_losses
+    # def run_q_net_model(self, X, y, iteration, is_in_warm_up_period):
+    #     with tf.GradientTape() as q_tape:
+    #         model_output_val = self.run_model(
+    #             X=X,
+    #             y=y,
+    #             iteration=iteration,
+    #             is_training=True,
+    #             warm_up_period=is_in_warm_up_period)
+    #         # Calculate target values for the Q-Nets
+    #         posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
+    #         ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
+    #         regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
+    #                                                                  posteriors_dict=posteriors_val,
+    #                                                                  ig_masks_dict=ig_masks_val)
+    #         # Q-Net Losses
+    #         q_net_predicted = model_output_val["q_tables_predicted"]
+    #         q_net_losses = []
+    #         for idx, tpl in enumerate(zip(regs, q_net_predicted)):
+    #             q_truth = tpl[0]
+    #             q_predicted = tpl[1]
+    #             q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
+    #             mse = self.mseLoss(q_truth_tensor, q_predicted)
+    #             q_net_losses.append(mse)
+    #         full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
+    #         q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
+    #         total_q_loss = full_q_loss + q_regularization_loss
+    #     q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
+    #     return model_output_val, q_grads, q_net_losses

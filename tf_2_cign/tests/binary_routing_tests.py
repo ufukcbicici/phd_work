@@ -1,7 +1,10 @@
 import unittest
+import numpy as np
 import tensorflow as tf
 
+
 from auxillary.db_logger import DbLogger
+from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign_binary_rl import FashionRlBinaryRouting
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
@@ -49,15 +52,50 @@ class BinaryRoutingTests(unittest.TestCase):
                                               q_net_coeff=1.0,
                                               epsilon_decay_rate=FashionNetConstants.epsilon_decay_rate,
                                               epsilon_step=FashionNetConstants.epsilon_step)
-            run_id = DbLogger.get_run_id()
+            # run_id = DbLogger.get_run_id()
             cls.cign.init()
-            explanation = cls.cign.get_explanation_string()
-            DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
+            # explanation = cls.cign.get_explanation_string()
+            # DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
+            cls.actionSpaceGeneratorLayers = []
+            for level in range(cls.cign.get_max_trajectory_length()):
+                cls.actionSpaceGeneratorLayers.append(CignBinaryActionSpaceGeneratorLayer(
+                    level=level, network=cls.cign))
 
-    def test1(self):
-        """One"""
-        print("X")
-        self.assertTrue(True)
+    def test_action_space_generator_layer(self):
+        experiment_count = 1000
+        batch_size = FashionNetConstants.batch_size
+
+        for exp_id in range(experiment_count):
+            if (exp_id + 1) % 100 == 0:
+                print("test_action_space_generator_layer Experiment:{0}".format(exp_id + 1))
+            comparisons = []
+            sc_routing_tensor_curr_level = tf.expand_dims(tf.ones(shape=[batch_size], dtype=tf.int32), axis=-1)
+            for level in range(self.cign.get_max_trajectory_length()):
+                ig_activations_list = []
+                # Generate mock information gain activations
+                for node in self.cign.orderedNodesPerLevel[level]:
+                    ig_activations = tf.random.uniform(
+                        shape=[batch_size, len(self.cign.dagObject.children(node=node))], dtype=tf.float32)
+                    ig_activations_list.append(ig_activations)
+
+                ig_activations = tf.stack(ig_activations_list, axis=-1)
+                sc_routing_matrix_gt_0, sc_routing_matrix_gt_1 = \
+                    self.cign.calculate_next_level_configurations_manuel(
+                        level=level,
+                        ig_activations=ig_activations,
+                        sc_routing_matrix_curr_level=sc_routing_tensor_curr_level)
+                sc_routing_matrix_tf_0, sc_routing_matrix_tf_1 = self.actionSpaceGeneratorLayers[level]([
+                    ig_activations, sc_routing_tensor_curr_level])
+                action_0_equal = np.array_equal(sc_routing_matrix_tf_0.numpy(), sc_routing_matrix_gt_0)
+                action_1_equal = np.array_equal(sc_routing_matrix_tf_1.numpy(), sc_routing_matrix_gt_1)
+                assert action_0_equal and action_1_equal
+                actions = tf.cast(tf.random.uniform([batch_size, 1], dtype=tf.int32, minval=0, maxval=2),
+                                  dtype=tf.bool)
+                sc_routing_tensor_curr_level = tf.where(actions, sc_routing_matrix_tf_1, sc_routing_matrix_tf_0)
+        print("Passed test_action_space_generator_layer!!!")
+
+    def test_calculate_sample_action_space(self):
+        pass
 
 
 if __name__ == '__main__':
