@@ -239,8 +239,8 @@ class CignRlBinaryRouting(CignRlRouting):
     def calculate_sample_action_space(self, ig_activations_dict):
         action_spaces = []
         batch_size = ig_activations_dict[0].shape[0]
-        sc_routing_tensor_curr_level = tf.expand_dims(
-            tf.expand_dims(tf.ones(shape=[batch_size], dtype=tf.int32), axis=-1), axis=0)
+        sc_routing_tensor_curr_level = np.expand_dims(
+            np.expand_dims(np.ones(shape=[batch_size], dtype=np.int32), axis=-1), axis=0)
         action_spaces.append(sc_routing_tensor_curr_level)
         for level in range(self.get_max_trajectory_length()):
             # IG activations for the nodes in this layer.
@@ -261,26 +261,27 @@ class CignRlBinaryRouting(CignRlRouting):
             sc_routing_tensor_next_level_shape.extend([2 for _ in range(level + 1)])
             sc_routing_tensor_next_level_shape.append(batch_size)
             sc_routing_tensor_next_level_shape.append(len(self.orderedNodesPerLevel[level + 1]))
-            sc_routing_tensor_next_level = tf.zeros(shape=sc_routing_tensor_next_level_shape,
+            sc_routing_tensor_next_level = np.zeros(shape=sc_routing_tensor_next_level_shape,
                                                     dtype=sc_routing_tensor_curr_level.dtype)
             for trajectory in list_of_all_trajectories:
                 # Given the current trajectory = a_0,a_1,a_2, ..., a_{t-1}, get the configuration of the
                 # nodes in the current level, for every sample in the batch
-                current_level_routing_matrix = sc_routing_tensor_curr_level[trajectory]
+                current_level_routing_matrix = tf.convert_to_tensor(sc_routing_tensor_curr_level[trajectory])
                 sc_routing_matrix_action_0, sc_routing_matrix_action_1 = self.actionSpaceGenerators[level](
                     [ig_activations, current_level_routing_matrix])
                 action_0_trajectory = []
                 action_0_trajectory.extend(trajectory)
                 action_0_trajectory.append(0)
-                sc_routing_tensor_next_level[action_0_trajectory] = sc_routing_matrix_action_0
+                sc_routing_tensor_next_level[tuple(action_0_trajectory)] = sc_routing_matrix_action_0.numpy()
 
                 action_1_trajectory = []
                 action_1_trajectory.extend(trajectory)
                 action_1_trajectory.append(1)
-                sc_routing_tensor_next_level[action_1_trajectory] = sc_routing_matrix_action_1
+                sc_routing_tensor_next_level[tuple(action_1_trajectory)] = sc_routing_matrix_action_1.numpy()
 
             sc_routing_tensor_curr_level = sc_routing_tensor_next_level
             action_spaces.append(sc_routing_tensor_curr_level)
+        return action_spaces
 
     def calculate_sample_action_space_manuel(self, ig_activations_dict):
         action_spaces = []
@@ -304,17 +305,17 @@ class CignRlBinaryRouting(CignRlRouting):
             while len(active_action_nodes) > 0:
                 curr_action_node = active_action_nodes.popleft()
                 curr_level = curr_action_node["level"]
-                curr_action_trajectory = curr_action_node["activated_nodes"]
+                curr_action_trajectory = curr_action_node["action_trajectory"]
                 activated_nodes = curr_action_node["activated_nodes"]
                 processed_action_nodes.append(curr_action_node)
                 if curr_level == self.get_max_trajectory_length():
-                    break
+                    continue
 
                 # Action 0
                 action_0_activated_nodes = []
                 for nd in activated_nodes:
                     ig_activations = ig_activations_dict[nd.index][sample_id]
-                    arg_max_idx = tf.argmax(ig_activations)
+                    arg_max_idx = tf.argmax(ig_activations).numpy()
                     child_cign_nodes = self.dagObject.children(node=nd)
                     child_cign_nodes = sorted(child_cign_nodes, key=lambda x: x.index)
                     action_0_activated_nodes.append(child_cign_nodes[arg_max_idx])
@@ -358,8 +359,7 @@ class CignRlBinaryRouting(CignRlRouting):
                 coords = []
                 coords.extend(action_obj["action_trajectory"])
                 coords.append(sample_id)
-                action_spaces[action_obj["level"]][coords] = config_arr
-
+                action_spaces[action_obj["level"]][tuple(coords)] = config_arr
         return action_spaces
 
 

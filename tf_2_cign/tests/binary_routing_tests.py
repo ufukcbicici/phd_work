@@ -2,7 +2,6 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
-
 from auxillary.db_logger import DbLogger
 from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
 from tf_2_cign.data.fashion_mnist import FashionMnist
@@ -61,6 +60,7 @@ class BinaryRoutingTests(unittest.TestCase):
                 cls.actionSpaceGeneratorLayers.append(CignBinaryActionSpaceGeneratorLayer(
                     level=level, network=cls.cign))
 
+    # @unittest.skip
     def test_action_space_generator_layer(self):
         experiment_count = 1000
         batch_size = FashionNetConstants.batch_size
@@ -88,15 +88,38 @@ class BinaryRoutingTests(unittest.TestCase):
                     ig_activations, sc_routing_tensor_curr_level])
                 action_0_equal = np.array_equal(sc_routing_matrix_tf_0.numpy(), sc_routing_matrix_gt_0)
                 action_1_equal = np.array_equal(sc_routing_matrix_tf_1.numpy(), sc_routing_matrix_gt_1)
-                assert action_0_equal and action_1_equal
+                self.assertTrue(action_0_equal and action_1_equal)
+                # assert action_0_equal and action_1_equal
                 actions = tf.cast(tf.random.uniform([batch_size, 1], dtype=tf.int32, minval=0, maxval=2),
                                   dtype=tf.bool)
                 sc_routing_tensor_curr_level = tf.where(actions, sc_routing_matrix_tf_1, sc_routing_matrix_tf_0)
         print("Passed test_action_space_generator_layer!!!")
 
+    # @unittest.skip
     def test_calculate_sample_action_space(self):
-        pass
+        experiment_count = 1000
+        batch_size = FashionNetConstants.batch_size
 
+        for exp_id in range(experiment_count):
+            if (exp_id + 1) % 100 == 0:
+                print("test_calculate_sample_action_space Experiment:{0}".format(exp_id + 1))
+
+            ig_activations_dict = {}
+            # Mock IG activations
+            for node in self.cign.topologicalSortedNodes:
+                if node.isLeaf:
+                    continue
+                ig_arr = tf.random.uniform(
+                    shape=[batch_size, len(self.cign.dagObject.children(node=node))], dtype=tf.float32)
+                ig_activations_dict[node.index] = ig_arr
+            action_space_manuel = self.cign.calculate_sample_action_space_manuel(
+                ig_activations_dict=ig_activations_dict)
+            action_space_auto = self.cign.calculate_sample_action_space(ig_activations_dict=ig_activations_dict)
+            self.assertTrue(len(action_space_manuel) == len(action_space_auto))
+            for level in range(len(action_space_auto)):
+                self.assertTrue(np.array_equal(action_space_manuel[level], action_space_auto[level]))
+
+        print("Passed test_calculate_sample_action_space!!!")
 
 if __name__ == '__main__':
     gpus = tf.config.list_physical_devices('GPU')
