@@ -5,6 +5,7 @@ import time
 from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_rl_routing import CignRlRouting
+from tf_2_cign.custom_layers.cign_binary_action_generator_layer import CignBinaryActionGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
 from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
@@ -34,6 +35,7 @@ class CignRlBinaryRouting(CignRlRouting):
         self.exploreExploitEpsilon = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=1.0, decay_steps=self.epsilonStep, decay_rate=self.epsilonDecayRate)
         self.actionSpaceGenerators = {}
+        self.actionCalculatorLayers = {}
 
     def calculate_ideal_accuracy(self, dataset):
         posteriors_dict = {}
@@ -141,6 +143,7 @@ class CignRlBinaryRouting(CignRlRouting):
     def build_reachability_matrices(self):
         pass
 
+    # TODO: Test this
     # Here, some changes are needed.
     def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
         assert len(self.scRoutingCalculationLayers) == level
@@ -158,6 +161,10 @@ class CignRlBinaryRouting(CignRlRouting):
 
         self.qNets.append(q_net)
         self.qTablesPredicted.append(q_table_predicted_cign_output)
+
+        # Action generator
+        # action_generator_layer = CignBinaryActionGeneratorLayer(network=self)
+        # actions, explore_exploit_vec = action_generator_layer([q_table_predicted_cign_output, self.globalStep])
 
         # Get information gain activations from the current level.
         node = self.orderedNodesPerLevel[level][-1]

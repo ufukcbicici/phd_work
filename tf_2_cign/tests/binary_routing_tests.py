@@ -3,11 +3,13 @@ import numpy as np
 import tensorflow as tf
 
 from auxillary.db_logger import DbLogger
+from tf_2_cign.custom_layers.cign_binary_action_generator_layer import CignBinaryActionGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign_binary_rl import FashionRlBinaryRouting
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
+from collections import Counter
 
 
 class BinaryRoutingTests(unittest.TestCase):
@@ -60,7 +62,7 @@ class BinaryRoutingTests(unittest.TestCase):
                 cls.actionSpaceGeneratorLayers.append(CignBinaryActionSpaceGeneratorLayer(
                     level=level, network=cls.cign))
 
-    # @unittest.skip
+    @unittest.skip
     def test_action_space_generator_layer(self):
         experiment_count = 1000
         batch_size = FashionNetConstants.batch_size
@@ -95,7 +97,7 @@ class BinaryRoutingTests(unittest.TestCase):
                 sc_routing_tensor_curr_level = tf.where(actions, sc_routing_matrix_tf_1, sc_routing_matrix_tf_0)
         print("Passed test_action_space_generator_layer!!!")
 
-    # @unittest.skip
+    @unittest.skip
     def test_calculate_sample_action_space(self):
         experiment_count = 1000
         batch_size = FashionNetConstants.batch_size
@@ -120,6 +122,82 @@ class BinaryRoutingTests(unittest.TestCase):
                 self.assertTrue(np.array_equal(action_space_manuel[level], action_space_auto[level]))
 
         print("Passed test_calculate_sample_action_space!!!")
+
+    @unittest.skip
+    def test_action_generator_layer(self):
+        experiment_count = 10
+        sample_count = 10000
+        batch_size = FashionNetConstants.batch_size
+
+        # Action generator
+        action_generator_layer = CignBinaryActionGeneratorLayer(network=self.cign)
+        for exp_id in range(experiment_count):
+            if (exp_id + 1) % 100 == 0:
+                print("test_action_generator_layer Experiment:{0}".format(exp_id + 1))
+            step_count = np.random.randint(low=0, high=50000)
+            eps_prob = self.cign.exploreExploitEpsilon(step_count)
+            action_counter = Counter()
+            final_actions_training = []
+            explore_exploit_vectors = []
+            training_exploit_actions = []
+            training_explore_actions = []
+
+            final_actions_test = []
+            final_actions_test_manuel = []
+            for sample_id in range(sample_count):
+                if (sample_id + 1) % 100 == 0:
+                    print("test_action_generator_layer Experiment:{0} Sample:{1}".format(exp_id + 1, sample_id + 1))
+                # Mock q_net output
+                q_net_output = tf.random.uniform(shape=[batch_size, 2], dtype=tf.float32,
+                                                 minval=-1.0, maxval=1.0)
+                # Measure if explore-exploit scheme works correctly by measuring exploration selection probability.
+                final_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
+                    [q_net_output, step_count],
+                    training=True)
+                res_vec = tf.where(explore_exploit_vec,
+                                   tf.convert_to_tensor(["explore"] * batch_size),
+                                   tf.convert_to_tensor(["exploit"] * batch_size))
+                action_counter.update(Counter(res_vec.numpy()))
+                # Measure if explore-exploit scheme works correctly by manually calculating training phase actions.
+                final_actions_training.append(final_actions)
+                explore_exploit_vectors.append(explore_exploit_vec)
+                training_exploit_actions.append(exploit_actions)
+                training_explore_actions.append(explore_actions)
+
+                # Measure if explore-exploit scheme works correctly by manually calculating test phase actions.
+                final_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
+                    [q_net_output, step_count],
+                    training=False)
+                final_actions_test.append(final_actions)
+                final_actions_test_manuel.append(exploit_actions)
+
+                # Measure if explore-exploit scheme works correctly by manually calculating test phase actions.
+                final_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
+                    [q_net_output, step_count],
+                    training=False)
+                final_actions_test.append(final_actions)
+                final_actions_test_manuel.append(exploit_actions)
+
+            explore_exploit_vectors = tf.concat(explore_exploit_vectors, axis=0).numpy()
+            training_exploit_actions = tf.concat(training_exploit_actions, axis=0).numpy()
+            training_explore_actions = tf.concat(training_explore_actions, axis=0).numpy()
+            final_actions_training = tf.concat(final_actions_training, axis=0).numpy()
+            final_actions_manual = []
+            for idx in range(explore_exploit_vectors.shape[0]):
+                if explore_exploit_vectors[idx]:
+                    final_actions_manual.append(training_explore_actions[idx])
+                else:
+                    final_actions_manual.append(training_exploit_actions[idx])
+            final_actions_manual = np.array(final_actions_manual)
+            self.assertTrue(np.array_equal(final_actions_training, final_actions_manual))
+
+            final_actions_test = tf.concat(final_actions_test, axis=0).numpy()
+            final_actions_test_manuel = tf.concat(final_actions_test_manuel, axis=0).numpy()
+            self.assertTrue(np.array_equal(final_actions_test, final_actions_test_manuel))
+
+            monte_carlo_prob = action_counter[b"explore"] / (action_counter[b"explore"] + action_counter[b"exploit"])
+            self.assertTrue(eps_prob * (1.0 - 0.01) <= monte_carlo_prob <= eps_prob * (1.0 + 0.01))
+
 
 if __name__ == '__main__':
     gpus = tf.config.list_physical_devices('GPU')
