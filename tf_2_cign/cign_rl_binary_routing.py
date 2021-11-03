@@ -35,7 +35,7 @@ class CignRlBinaryRouting(CignRlRouting):
         self.exploreExploitEpsilon = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=1.0, decay_steps=self.epsilonStep, decay_rate=self.epsilonDecayRate)
         self.actionSpaceGenerators = {}
-        self.actionCalculatorLayers = {}
+        self.actionCalculatorLayers = []
 
     def calculate_ideal_accuracy(self, dataset):
         posteriors_dict = {}
@@ -162,28 +162,28 @@ class CignRlBinaryRouting(CignRlRouting):
         self.qNets.append(q_net)
         self.qTablesPredicted.append(q_table_predicted_cign_output)
 
-        # Action generator
-        # action_generator_layer = CignBinaryActionGeneratorLayer(network=self)
-        # actions, explore_exploit_vec = action_generator_layer([q_table_predicted_cign_output, self.globalStep])
+        # Create the action generator layer. Get predicted actions for the next layer.
+        action_generator_layer = CignBinaryActionGeneratorLayer(network=self)
+        predicted_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
+            [q_table_predicted_cign_output, self.globalStep])
 
-        # Get information gain activations from the current level.
-        node = self.orderedNodesPerLevel[level][-1]
+        # Get information gain activations for the current level.
         ig_activations = tf.stack(
             [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
-        routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, network=self)
-        # Get secondary routing information from the previous layer also.
+
+        # Get secondary routing information for the current level (counter intuitively, it resides at "level-1".
         if level - 1 < 0:
             sc_routing_matrix = tf.expand_dims(tf.ones_like(input_ig_routing_matrix[:, 0]), axis=-1)
         else:
             sc_routing_matrix = self.scRoutingMatricesDict[level - 1]
-        # explore_actions = tf.random.uniform(shape=[q_table_predicted.shape[0]], dtype=tf.int32,
-        #                                     minval=0, maxval=2)
-        predicted_actions, secondary_routing_matrix_cign_output = routing_calculation_layer(
-            [q_table_predicted_cign_output,
-             # self.warmUpPeriodInput,
-             ig_activations,
-             sc_routing_matrix])
+
+        # Create the routing layer.
+        routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, network=self)
+        secondary_routing_matrix_cign_output = routing_calculation_layer(
+            [ig_activations, sc_routing_matrix, predicted_actions])
+
         self.actionsPredicted.append(predicted_actions)
+        self.actionCalculatorLayers.append(action_generator_layer)
         self.scRoutingCalculationLayers.append(routing_calculation_layer)
         return secondary_routing_matrix_cign_output
 

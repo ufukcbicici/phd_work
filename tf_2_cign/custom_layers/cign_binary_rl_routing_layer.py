@@ -13,33 +13,34 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
         self.actionSpaceGeneratorLayer = CignBinaryActionSpaceGeneratorLayer(level=level, network=network)
 
     def call(self, inputs, **kwargs):
-        q_table_predicted = inputs[0]
+        # q_table_predicted = inputs[0]
         # is_warm_up_period = inputs[1]
-        ig_activations = inputs[1]
-        sc_routing_matrix_curr_level = inputs[2]
-        is_training = kwargs["training"]
+        ig_activations = inputs[0]
+        sc_routing_matrix_curr_level = inputs[1]
+        actions = inputs[2]
+        # is_training = kwargs["training"]
         # q_table_predicted_cign_output, input_ig_routing_matrix, self.warmUpPeriodInput, ig_activations_array
 
-        # Pick action with epsilon greedy approach
-        probs = tf.random.uniform(shape=[tf.shape(q_table_predicted)[0]], dtype=q_table_predicted.dtype,
-                                  minval=0.0, maxval=1.0)
-        # Get epsilon
-        eps = self.network.exploreExploitEpsilon(self.network.globalStep)
-        # Determine which sample will pick exploration (eps > thresholds)
-        # which will pick exploitation (thresholds >= eps)
-        explore_exploit_vec = eps > probs
-        # Argmax indices for q_table
-        exploit_actions = tf.argmax(q_table_predicted, axis=-1)
-        # Uniformly random indies for q_table
-        explore_actions = tf.random.uniform(shape=[tf.shape(q_table_predicted)[0]], dtype=exploit_actions.dtype,
-                                            minval=0, maxval=2)
-        training_actions = tf.where(explore_exploit_vec, explore_actions, exploit_actions)
-        test_actions = exploit_actions
-        # final_actions = tf.where(is_training, training_actions, test_actions)
-        if is_training:
-            final_actions = training_actions
-        else:
-            final_actions = test_actions
+        # # Pick action with epsilon greedy approach
+        # probs = tf.random.uniform(shape=[tf.shape(q_table_predicted)[0]], dtype=q_table_predicted.dtype,
+        #                           minval=0.0, maxval=1.0)
+        # # Get epsilon
+        # eps = self.network.exploreExploitEpsilon(self.network.globalStep)
+        # # Determine which sample will pick exploration (eps > thresholds)
+        # # which will pick exploitation (thresholds >= eps)
+        # explore_exploit_vec = eps > probs
+        # # Argmax indices for q_table
+        # exploit_actions = tf.argmax(q_table_predicted, axis=-1)
+        # # Uniformly random indies for q_table
+        # explore_actions = tf.random.uniform(shape=[tf.shape(q_table_predicted)[0]], dtype=exploit_actions.dtype,
+        #                                     minval=0, maxval=2)
+        # training_actions = tf.where(explore_exploit_vec, explore_actions, exploit_actions)
+        # test_actions = exploit_actions
+        # # final_actions = tf.where(is_training, training_actions, test_actions)
+        # if is_training:
+        #     final_actions = training_actions
+        # else:
+        #     final_actions = test_actions
 
         sc_mask_vectors = [self.network.scMaskInputsDict[node.index]
                            for node in self.network.orderedNodesPerLevel[self.level]]
@@ -62,9 +63,11 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
 
         # ig_activations = tf.stack(
         #     [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
-        sc_routing_matrices = self.actionSpaceGeneratorLayer([ig_activations, sc_routing_matrix_curr_level])
-        sc_routing_matrix = tf.where(tf.cast(final_actions, dtype=tf.bool),
-                                     sc_routing_matrices[1], sc_routing_matrices[0])
+        sc_routing_next_level_matrix_action_0, sc_routing_next_level_matrix_action_1 = \
+            self.actionSpaceGeneratorLayer([ig_activations, sc_routing_matrix_curr_level])
+        sc_routing_matrix = tf.where(tf.cast(actions, dtype=tf.bool),
+                                     sc_routing_next_level_matrix_action_1,
+                                     sc_routing_next_level_matrix_action_0)
 
         # Warm up
         # sc_routing_matrix_warm_up = tf.ones_like(sc_routing_matrix)
@@ -72,4 +75,4 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
         #                                    sc_routing_matrix_warm_up,
         #                                    sc_routing_matrix)
 
-        return final_actions, sc_routing_matrix
+        return sc_routing_matrix
