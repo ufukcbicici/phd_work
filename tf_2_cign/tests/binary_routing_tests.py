@@ -5,6 +5,7 @@ import tensorflow as tf
 from auxillary.db_logger import DbLogger
 from tf_2_cign.custom_layers.cign_binary_action_generator_layer import CignBinaryActionGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
+from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign_binary_rl import FashionRlBinaryRouting
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
@@ -62,7 +63,7 @@ class BinaryRoutingTests(unittest.TestCase):
                 cls.actionSpaceGeneratorLayers.append(CignBinaryActionSpaceGeneratorLayer(
                     level=level, network=cls.cign))
 
-    @unittest.skip
+    # @unittest.skip
     def test_action_space_generator_layer(self):
         experiment_count = 1000
         batch_size = FashionNetConstants.batch_size
@@ -97,7 +98,7 @@ class BinaryRoutingTests(unittest.TestCase):
                 sc_routing_tensor_curr_level = tf.where(actions, sc_routing_matrix_tf_1, sc_routing_matrix_tf_0)
         print("Passed test_action_space_generator_layer!!!")
 
-    @unittest.skip
+    # @unittest.skip
     def test_calculate_sample_action_space(self):
         experiment_count = 1000
         batch_size = FashionNetConstants.batch_size
@@ -123,7 +124,7 @@ class BinaryRoutingTests(unittest.TestCase):
 
         print("Passed test_calculate_sample_action_space!!!")
 
-    @unittest.skip
+    # @unittest.skip
     def test_action_generator_layer(self):
         experiment_count = 10
         sample_count = 10000
@@ -135,6 +136,7 @@ class BinaryRoutingTests(unittest.TestCase):
             if (exp_id + 1) % 100 == 0:
                 print("test_action_generator_layer Experiment:{0}".format(exp_id + 1))
             step_count = np.random.randint(low=0, high=50000)
+            self.cign.globalStep.assign(value=step_count)
             eps_prob = self.cign.exploreExploitEpsilon(step_count)
             action_counter = Counter()
             final_actions_training = []
@@ -152,8 +154,7 @@ class BinaryRoutingTests(unittest.TestCase):
                                                  minval=-1.0, maxval=1.0)
                 # Measure if explore-exploit scheme works correctly by measuring exploration selection probability.
                 final_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
-                    [q_net_output, step_count],
-                    training=True)
+                    q_net_output, training=True)
                 res_vec = tf.where(explore_exploit_vec,
                                    tf.convert_to_tensor(["explore"] * batch_size),
                                    tf.convert_to_tensor(["exploit"] * batch_size))
@@ -166,15 +167,7 @@ class BinaryRoutingTests(unittest.TestCase):
 
                 # Measure if explore-exploit scheme works correctly by manually calculating test phase actions.
                 final_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
-                    [q_net_output, step_count],
-                    training=False)
-                final_actions_test.append(final_actions)
-                final_actions_test_manuel.append(exploit_actions)
-
-                # Measure if explore-exploit scheme works correctly by manually calculating test phase actions.
-                final_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
-                    [q_net_output, step_count],
-                    training=False)
+                    q_net_output, training=False)
                 final_actions_test.append(final_actions)
                 final_actions_test_manuel.append(exploit_actions)
 
@@ -197,6 +190,50 @@ class BinaryRoutingTests(unittest.TestCase):
 
             monte_carlo_prob = action_counter[b"explore"] / (action_counter[b"explore"] + action_counter[b"exploit"])
             self.assertTrue(eps_prob * (1.0 - 0.01) <= monte_carlo_prob <= eps_prob * (1.0 + 0.01))
+
+    # @unittest.skip
+    def test_binary_rl_routing_layer(self):
+        experiment_count = 1000
+        batch_size = FashionNetConstants.batch_size
+
+        for exp_id in range(experiment_count):
+            if (exp_id + 1) % 100 == 0:
+                print("test_binary_rl_routing_layer Experiment:{0}".format(exp_id + 1))
+            # Mock IG activations
+            ig_activations_dict = {}
+            for node in self.cign.topologicalSortedNodes:
+                if node.isLeaf:
+                    continue
+                ig_arr = tf.random.uniform(
+                    shape=[batch_size, len(self.cign.dagObject.children(node=node))], dtype=tf.float32)
+                ig_activations_dict[node.index] = ig_arr
+            curr_sc_routing_matrix = tf.expand_dims(tf.ones(shape=[batch_size], dtype=tf.int32), axis=-1)
+            for level in range(self.cign.get_max_trajectory_length()):
+                ig_activations = tf.stack(
+                    [ig_activations_dict[nd.index] for nd in self.cign.orderedNodesPerLevel[level]], axis=-1)
+                # Mock actions
+                predicted_actions = tf.random.uniform([batch_size, 1], dtype=tf.int32, minval=0, maxval=2)
+
+                routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, network=self.cign)
+                secondary_routing_matrix_cign_output = routing_calculation_layer(
+                    [ig_activations, curr_sc_routing_matrix, predicted_actions])
+                # Now, the manual result.
+                next_level_config_action_0, next_level_config_action_1 = \
+                    self.cign.calculate_next_level_configurations_manuel(
+                        level=level,
+                        ig_activations=ig_activations,
+                        sc_routing_matrix_curr_level=curr_sc_routing_matrix)
+                secondary_routing_matrix_cign_output_manuel = []
+                for idx in range(batch_size):
+                    if predicted_actions[idx] == 1:
+                        secondary_routing_matrix_cign_output_manuel.append(next_level_config_action_1[idx])
+                    else:
+                        secondary_routing_matrix_cign_output_manuel.append(next_level_config_action_0[idx])
+                secondary_routing_matrix_cign_output_manuel = tf.stack(secondary_routing_matrix_cign_output_manuel,
+                                                                       axis=0)
+                self.assertTrue(np.array_equal(secondary_routing_matrix_cign_output.numpy(),
+                                               secondary_routing_matrix_cign_output_manuel.numpy()))
+                curr_sc_routing_matrix = secondary_routing_matrix_cign_output
 
 
 if __name__ == '__main__':

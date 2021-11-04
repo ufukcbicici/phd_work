@@ -143,10 +143,7 @@ class CignRlBinaryRouting(CignRlRouting):
     def build_reachability_matrices(self):
         pass
 
-    # TODO: Test this
-    # Here, some changes are needed.
-    def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
-        assert len(self.scRoutingCalculationLayers) == level
+    def build_isolated_q_net_model(self, input_f_tensor, level):
         # This code piece creates the corresponding Q-Net for the current layer, indicated by the variable "level".
         # The Q-Net always takes the aggregated F outputs of the current layer's nodes (sparsified by the sc masks)
         # and outputs raw Q-table predictions. This has been implemented as a separate tf.keras.Model,
@@ -154,36 +151,41 @@ class CignRlBinaryRouting(CignRlRouting):
         q_net_input_f_tensor = tf.keras.Input(shape=input_f_tensor.shape[1:],
                                               name="input_f_tensor_q_net_level_{0}".format(level),
                                               dtype=input_f_tensor.dtype)
+        # global_step_input = tf.keras.Input(shape=(),
+        #                                    name="global_step_input_level_{0}".format(level),
+        #                                    dtype=tf.int32)
         q_net_layer = self.get_q_net_layer(level=level)
         q_table_predicted = q_net_layer(q_net_input_f_tensor)
-        q_net = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=q_table_predicted)
-        q_table_predicted_cign_output = q_net(inputs=input_f_tensor)
-
-        self.qNets.append(q_net)
-        self.qTablesPredicted.append(q_table_predicted_cign_output)
-
         # Create the action generator layer. Get predicted actions for the next layer.
         action_generator_layer = CignBinaryActionGeneratorLayer(network=self)
         predicted_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
-            [q_table_predicted_cign_output, self.globalStep])
+            q_table_predicted)
+        q_net = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=[q_table_predicted, predicted_actions])
+        return q_net
 
+    # TODO: Test this
+    # Here, some changes are needed.
+    def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
+        assert len(self.scRoutingCalculationLayers) == level
+        q_net = self.build_isolated_q_net_model(input_f_tensor=input_f_tensor, level=level)
+        # Connect the Q-Net to the rest of the network.
+        q_table_predicted, predicted_actions = q_net(inputs=input_f_tensor)
+        # Save Q-Net and its outputs.
+        self.qNets.append(q_net)
+        self.qTablesPredicted.append(q_table_predicted)
+        self.actionsPredicted.append(predicted_actions)
         # Get information gain activations for the current level.
         ig_activations = tf.stack(
             [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
-
         # Get secondary routing information for the current level (counter intuitively, it resides at "level-1".
         if level - 1 < 0:
             sc_routing_matrix = tf.expand_dims(tf.ones_like(input_ig_routing_matrix[:, 0]), axis=-1)
         else:
             sc_routing_matrix = self.scRoutingMatricesDict[level - 1]
-
         # Create the routing layer.
         routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, network=self)
         secondary_routing_matrix_cign_output = routing_calculation_layer(
             [ig_activations, sc_routing_matrix, predicted_actions])
-
-        self.actionsPredicted.append(predicted_actions)
-        self.actionCalculatorLayers.append(action_generator_layer)
         self.scRoutingCalculationLayers.append(routing_calculation_layer)
         return secondary_routing_matrix_cign_output
 
@@ -368,18 +370,6 @@ class CignRlBinaryRouting(CignRlRouting):
                 coords.append(sample_id)
                 action_spaces[action_obj["level"]][tuple(coords)] = config_arr
         return action_spaces
-
-
-
-
-
-
-
-
-
-
-
-
 
     def calculate_q_tables_from_network_outputs(self,
                                                 true_labels,
