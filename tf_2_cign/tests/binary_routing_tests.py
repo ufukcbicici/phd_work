@@ -53,7 +53,8 @@ class BinaryRoutingTests(unittest.TestCase):
                                               cign_rl_train_period=FashionNetConstants.rl_cign_iteration_period,
                                               q_net_coeff=1.0,
                                               epsilon_decay_rate=FashionNetConstants.epsilon_decay_rate,
-                                              epsilon_step=FashionNetConstants.epsilon_step)
+                                              epsilon_step=FashionNetConstants.epsilon_step,
+                                              reward_type="Zero Rewards")
             # run_id = DbLogger.get_run_id()
             cls.cign.init()
             # explanation = cls.cign.get_explanation_string()

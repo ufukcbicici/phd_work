@@ -52,16 +52,23 @@ if __name__ == "__main__":
                                       cign_rl_train_period=FashionNetConstants.rl_cign_iteration_period,
                                       q_net_coeff=1.0,
                                       epsilon_decay_rate=FashionNetConstants.epsilon_decay_rate,
-                                      epsilon_step=FashionNetConstants.epsilon_step)
+                                      epsilon_step=FashionNetConstants.epsilon_step,
+                                      reward_type="Zero Rewards")
 
         run_id = DbLogger.get_run_id()
         cign.init()
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
-        cign.load_model(run_id=2953)
-        cign.measure_performance(dataset=fashion_mnist, run_id=run_id)
-        cign.calculate_ideal_accuracy(dataset=fashion_mnist.testDataTf)
+        # cign.load_model(run_id=2953)
+        # cign.measure_performance(dataset=fashion_mnist, run_id=run_id)
+        # cign.calculate_ideal_accuracy(dataset=fashion_mnist.testDataTf)
+
+        cign.train(run_id=run_id,
+                   dataset=fashion_mnist,
+                   epoch_count=100,
+                   q_net_epoch_count=250,
+                   fine_tune_epoch_count=25)
 
         print("X")
 

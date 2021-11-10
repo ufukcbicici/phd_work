@@ -22,7 +22,7 @@ class CignRlBinaryRouting(CignRlRouting):
                  lambda_mac_cost, warm_up_period, cign_rl_train_period, batch_size, input_dims, class_count,
                  node_degrees, decision_drop_probability, classification_drop_probability, decision_wd,
                  classification_wd, information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule,
-                 decision_loss_coeff, q_net_coeff, epsilon_decay_rate, epsilon_step, bn_momentum=0.9):
+                 decision_loss_coeff, q_net_coeff, epsilon_decay_rate, epsilon_step, reward_type, bn_momentum=0.9):
         super().__init__(valid_prediction_reward, invalid_prediction_penalty, include_ig_in_reward_calculations,
                          lambda_mac_cost, warm_up_period, cign_rl_train_period, batch_size, input_dims, class_count,
                          node_degrees, decision_drop_probability, classification_drop_probability, decision_wd,
@@ -32,6 +32,7 @@ class CignRlBinaryRouting(CignRlRouting):
         self.globalStep = tf.Variable(initial_value=0, trainable=False, dtype=tf.int32)
         self.epsilonDecayRate = epsilon_decay_rate
         self.epsilonStep = epsilon_step
+        self.rewardType = reward_type
         self.exploreExploitEpsilon = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=1.0, decay_steps=self.epsilonStep, decay_rate=self.epsilonDecayRate)
         self.actionSpaceGenerators = {}
@@ -163,7 +164,6 @@ class CignRlBinaryRouting(CignRlRouting):
         q_net = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=[q_table_predicted, predicted_actions])
         return q_net
 
-    # TODO: Test this
     # Here, some changes are needed.
     def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
         assert len(self.scRoutingCalculationLayers) == level
@@ -177,7 +177,7 @@ class CignRlBinaryRouting(CignRlRouting):
         # Get information gain activations for the current level.
         ig_activations = tf.stack(
             [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
-        # Get secondary routing information for the current level (counter intuitively, it resides at "level-1".
+        # Get secondary routing information for the current level (counter intuitively, it resides at "level-1").
         if level - 1 < 0:
             sc_routing_matrix = tf.expand_dims(tf.ones_like(input_ig_routing_matrix[:, 0]), axis=-1)
         else:
@@ -371,13 +371,151 @@ class CignRlBinaryRouting(CignRlRouting):
                 action_spaces[action_obj["level"]][tuple(coords)] = config_arr
         return action_spaces
 
+    def calculate_reward_values_from_leaf_level_configurations(self,
+                                                               routing_matrix,
+                                                               posteriors_tensor,
+                                                               true_labels):
+        assert routing_matrix.shape[1] == len(self.leafNodes)
+        assert posteriors_tensor.shape[2] == len(self.leafNodes)
+        # Calculate prediction validity
+        weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
+        routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
+        weighted_posteriors = posteriors_tensor * routing_matrix_weighted[:, np.newaxis, :]
+        final_posteriors = np.sum(weighted_posteriors, axis=2)
+        predicted_labels = np.argmax(final_posteriors, axis=1)
+        validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
+        # Calculate the MAC cost
+        # Get the calculation costs
+        computation_overload_vector = np.apply_along_axis(
+            lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
+            arr=routing_matrix)
+        rewards_vec = np.zeros_like(computation_overload_vector)
+        rewards_vec += (validity_of_predictions_vec == 1).astype(np.float32) * self.validPredictionReward
+        rewards_vec += (validity_of_predictions_vec == 0).astype(np.float32) * self.invalidPredictionPenalty
+        rewards_vec -= self.lambdaMacCost * computation_overload_vector
+        return rewards_vec
+
+    # This method calculates the optimal Q-tables of a given CIGN result, including each sample's true label,
+    # predicted posteriors and for each sample the interior information gain activations.
+    # The expected result is the optimal Q-values for every possible trajectory in the CIGN.
+    # For example, for a binary, depth two CIGN the output will contain:
+    #
+    # Level 2:
+    # Q(s2=x_{00},a_2=0) <---- The utility of taking actions [0,0] for the sample x. (For notational convenience for
+    # the root node, the each trajectory starts with a trivial action 0.)
+    # Q(s2=x_{00},a_2=1) <---- The utility of taking actions [0,1] for the sample x.
+    # Q(s2=x_{01},a_2=0) <---- The utility of taking actions [1,0] for the sample x.
+    # Q(s2=x_{01},a_2=1) <---- The utility of taking actions [1,1] for the sample x.
+    #
+    # Level 1:
+    # Q(s1=x_{0},a_1=0) -> Use Bellman Optimality Equation:
+    # Without loss of generality:
+    # Q(s1=x_{0},a_1=0) = R(s_1=x_{0},a_1=0) + sum_{s_2} p(s_2|s_1=x_{0},a_1=0) * max_{a_2} Q(s2,a_2)
+    # Q(s1=x_{0},a_1=0) = R(s_1=x_{0},a_1=0) + max_{a_2} Q(s2=x_{00},a_2) (State transition is deterministic)
+    # Q(s1=x_{0},a_1=1) = R(s_1=x_{0},a_1=1) + max_{a_2} Q(s2=x_{01},a_2) (State transition is deterministic)
+    def calculate_optimal_q_tables(self, true_labels, posteriors_dict, ig_activations_dict):
+        # Calculate the action spaces of each sample.
+        action_spaces = self.calculate_sample_action_space(ig_activations_dict=ig_activations_dict)
+        # Posteriors tensor for every sample and every leaf node.
+        posteriors_tensor = []
+        for leaf_node in self.leafNodes:
+            if not (type(posteriors_dict[leaf_node.index]) is np.ndarray):
+                posteriors_tensor.append(posteriors_dict[leaf_node.index].numpy())
+            else:
+                posteriors_tensor.append(posteriors_dict[leaf_node.index])
+        posteriors_tensor = np.stack(posteriors_tensor, axis=-1)
+        # Assert that posteriors are placed correctly.
+        min_leaf_index = min([node.index for node in self.leafNodes])
+        for leaf_node in self.leafNodes:
+            if not (type(posteriors_dict[leaf_node.index]) is np.ndarray):
+                assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
+                                      posteriors_dict[leaf_node.index].numpy())
+            else:
+                assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
+                                      posteriors_dict[leaf_node.index])
+
+        # Calculate the optimal q-tables, starting from the final level.
+        optimal_q_tables = {}
+        for level in range(self.get_max_trajectory_length(), 0, -1):
+            if level < self.get_max_trajectory_length():
+                assert level + 1 in optimal_q_tables
+            # Get all possible trajectories up to this level.
+            actions_each_layer = [[0]]
+            actions_each_layer.extend([[0, 1] for _ in range(level)])
+            list_of_all_trajectories = Utilities.get_cartesian_product(list_of_lists=actions_each_layer)
+            table_shape = action_spaces[level].shape[:-1]
+            # The distribution of the dimensions:
+            # First level dimensions: The trajectory UP TO THIS level.
+            # This excludes the action to be taken in this level.
+            # (level+1).th dimension: The action to be taken in this level.
+            # The last dimension: The batch size.
+            optimal_q_table_for_level = np.zeros(shape=table_shape, dtype=np.float)
+
+            for trajectory in list_of_all_trajectories:
+                if level == self.get_max_trajectory_length():
+                    configurations_matrix_for_trajectory = action_spaces[level][tuple(trajectory)]
+                    q_vec = self.calculate_reward_values_from_leaf_level_configurations(
+                        routing_matrix=configurations_matrix_for_trajectory,
+                        posteriors_tensor=posteriors_tensor,
+                        true_labels=true_labels
+                    )
+                    optimal_q_table_for_level[tuple(trajectory)] = q_vec
+                else:
+                    # Bellman equation:
+                    # Results if we take the action 0.
+                    trajectory_a0 = []
+                    trajectory_a0.extend(trajectory)
+                    trajectory_a0.append(0)
+                    q_star_a0 = optimal_q_tables[level + 1][tuple(trajectory_a0)]
+                    # Results if we take the action 1.
+                    trajectory_a1 = []
+                    trajectory_a1.extend(trajectory)
+                    trajectory_a1.append(1)
+                    q_star_a1 = optimal_q_tables[level + 1][tuple(trajectory_a1)]
+                    q_table = np.stack([q_star_a0, q_star_a1], axis=1)
+                    q_max = np.max(q_table, axis=1)
+                    # Rewards
+                    if self.rewardType == "Zero Rewards":
+                        rewards = np.zeros_like(q_max)
+                    else:
+                        raise NotImplementedError()
+                    q_vec = rewards + q_max
+                    optimal_q_table_for_level[tuple(trajectory)] = q_vec
+            optimal_q_tables[level] = optimal_q_table_for_level
+        return optimal_q_tables
+
     def calculate_q_tables_from_network_outputs(self,
                                                 true_labels,
                                                 posteriors_dict,
                                                 ig_masks_dict,
                                                 **kwargs):
+        batch_size = true_labels.shape[0]
         actions_predicted = kwargs["actions_predicted"]
         sc_routing_matrices_dict = kwargs["sc_routing_matrices_dict"]
+        ig_activations_dict = kwargs["ig_activations_dict"]
+
+        # Calculate the action spaces of each sample.
+        action_spaces = self.calculate_sample_action_space(ig_activations_dict=ig_activations_dict)
+
+
+
+            # if t == self.get_max_trajectory_length():
+            #     print("X")
+            #
+            # else:
+            #     print("Y")
+
+        # for t in range(self.get_max_trajectory_length(), -1, -1):
+
+        # action_spaces = []
+        # batch_size = ig_activations_dict[0].shape[0]
+        # for level in range(self.get_max_trajectory_length() + 1):
+        #     shp = [1]
+        #     shp.extend([2 for _ in range(level)])
+        #     shp.append(batch_size)
+        #     shp.append(len(self.orderedNodesPerLevel[level]))
+        #     sc_routing_tensor_next_level = np.zeros(shape=shp, dtype=np.int32)
+        #     action_spaces.append(sc_routing_tensor_next_level)
 
         # 1) Calculate the action spaces of each sample.
         # action_spaces = []
@@ -593,3 +731,70 @@ class CignRlBinaryRouting(CignRlRouting):
     #         total_q_loss = full_q_loss + q_regularization_loss
     #     q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
     #     return model_output_val, q_grads, q_net_losses
+
+    def train(self, run_id, dataset, epoch_count, **kwargs):
+        q_net_epoch_count = kwargs["q_net_epoch_count"]
+        fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
+        is_in_warm_up_period = True
+        self.optimizer = self.get_sgd_optimizer()
+        self.build_trackers()
+
+        # Group main body CIGN variables and Q Net variables.
+        # q_net_variables = [v for v in self.model.trainable_variables if "q_net" in v.name]
+        # q_net_var_set = set([v.name for v in q_net_variables])
+        # cign_main_body_variables = [v for v in self.model.trainable_variables if v.name not in q_net_var_set]
+
+        epochs_after_warm_up = 0
+        iteration = 0
+        for epoch_id in range(epoch_count):
+            iteration, times_list = self.train_cign_body_one_epoch(dataset=dataset.trainDataTf,
+                                                                   run_id=run_id,
+                                                                   iteration=iteration,
+                                                                   is_in_warm_up_period=is_in_warm_up_period)
+            self.check_q_net_vars()
+            if epoch_id >= self.warmUpPeriod:
+                # Run Q-Net learning for the first time.
+                if is_in_warm_up_period:
+                    self.save_model(run_id=run_id)
+                    is_in_warm_up_period = False
+                    self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
+                    self.measure_performance(dataset=dataset,
+                                             run_id=run_id,
+                                             iteration=iteration,
+                                             epoch_id=epoch_id,
+                                             times_list=times_list)
+                else:
+                    is_performance_measured = False
+                    if (epochs_after_warm_up + 1) % self.cignRlTrainPeriod == 0:
+                        self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
+                        self.measure_performance(dataset=dataset,
+                                                 run_id=run_id,
+                                                 iteration=iteration,
+                                                 epoch_id=epoch_id,
+                                                 times_list=times_list)
+                        is_performance_measured = True
+                    if (epoch_id >= epoch_count - 10 or epoch_id % self.trainEvalPeriod == 0) \
+                            and is_performance_measured is False:
+                        self.measure_performance(dataset=dataset,
+                                                 run_id=run_id,
+                                                 iteration=iteration,
+                                                 epoch_id=epoch_id,
+                                                 times_list=times_list)
+                epochs_after_warm_up += 1
+
+        # Fine tune by merging training and validation sets
+        full_train_X = np.concatenate([dataset.trainX, dataset.valX], axis=0)
+        full_train_y = np.concatenate([dataset.trainY, dataset.valY], axis=0)
+        train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
+            shuffle(5000).batch(self.batchSizeNonTensor)
+
+        for epoch_id in range(epoch_count, epoch_count + fine_tune_epoch_count):
+            iteration, times_list = self.train_cign_body_one_epoch(dataset=train_tf,
+                                                                   run_id=run_id,
+                                                                   iteration=iteration,
+                                                                   is_in_warm_up_period=is_in_warm_up_period)
+            self.measure_performance(dataset=dataset,
+                                     run_id=run_id,
+                                     iteration=iteration,
+                                     epoch_id=epoch_id,
+                                     times_list=times_list)

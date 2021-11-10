@@ -34,7 +34,8 @@ class FashionRlBinaryRouting(CignRlBinaryRouting):
                  decision_loss_coeff,
                  q_net_coeff,
                  epsilon_decay_rate,
-                 epsilon_step):
+                 epsilon_step,
+                 reward_type):
         super().__init__(valid_prediction_reward,
                          invalid_prediction_penalty,
                          include_ig_in_reward_calculations,
@@ -55,7 +56,8 @@ class FashionRlBinaryRouting(CignRlBinaryRouting):
                          decision_loss_coeff,
                          q_net_coeff=1.0,
                          epsilon_decay_rate=epsilon_decay_rate,
-                         epsilon_step=epsilon_step
+                         epsilon_step=epsilon_step,
+                         reward_type=reward_type
                          )
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
