@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-class CignBinaryActionSpaceGeneratorLayer(tf.keras.layers.Layer):
+class CignBinaryActionResultGeneratorLayer(tf.keras.layers.Layer):
     def __init__(self, level, network):
         super().__init__()
         self.level = level

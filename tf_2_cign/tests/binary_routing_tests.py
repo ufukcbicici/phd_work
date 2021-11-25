@@ -4,7 +4,7 @@ import tensorflow as tf
 
 from auxillary.db_logger import DbLogger
 from tf_2_cign.custom_layers.cign_binary_action_generator_layer import CignBinaryActionGeneratorLayer
-from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
+from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import CignBinaryActionResultGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign_binary_rl import FashionRlBinaryRouting
@@ -59,13 +59,14 @@ class BinaryRoutingTests(unittest.TestCase):
             cls.cign.init()
             # explanation = cls.cign.get_explanation_string()
             # DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
-            cls.actionSpaceGeneratorLayers = []
+            cls.actionResultGeneratorLayers = []
             for level in range(cls.cign.get_max_trajectory_length()):
-                cls.actionSpaceGeneratorLayers.append(CignBinaryActionSpaceGeneratorLayer(
+                cls.actionResultGeneratorLayers.append(CignBinaryActionResultGeneratorLayer(
                     level=level, network=cls.cign))
 
+    # OK
     # @unittest.skip
-    def test_action_space_generator_layer(self):
+    def test_action_result_generator_layer(self):
         experiment_count = 1000
         batch_size = FashionNetConstants.batch_size
 
@@ -74,21 +75,20 @@ class BinaryRoutingTests(unittest.TestCase):
                 print("test_action_space_generator_layer Experiment:{0}".format(exp_id + 1))
             comparisons = []
             sc_routing_tensor_curr_level = tf.expand_dims(tf.ones(shape=[batch_size], dtype=tf.int32), axis=-1)
+            ig_activations_dict = self.cign.create_mock_ig_activations(batch_size=batch_size)
             for level in range(self.cign.get_max_trajectory_length()):
                 ig_activations_list = []
                 # Generate mock information gain activations
                 for node in self.cign.orderedNodesPerLevel[level]:
-                    ig_activations = tf.random.uniform(
-                        shape=[batch_size, len(self.cign.dagObject.children(node=node))], dtype=tf.float32)
+                    ig_activations = ig_activations_dict[node.index]
                     ig_activations_list.append(ig_activations)
-
                 ig_activations = tf.stack(ig_activations_list, axis=-1)
                 sc_routing_matrix_gt_0, sc_routing_matrix_gt_1 = \
-                    self.cign.calculate_next_level_configurations_manuel(
+                    self.cign.calculate_next_level_action_results_manual(
                         level=level,
                         ig_activations=ig_activations,
                         sc_routing_matrix_curr_level=sc_routing_tensor_curr_level)
-                sc_routing_matrix_tf_0, sc_routing_matrix_tf_1 = self.actionSpaceGeneratorLayers[level]([
+                sc_routing_matrix_tf_0, sc_routing_matrix_tf_1 = self.actionResultGeneratorLayers[level]([
                     ig_activations, sc_routing_tensor_curr_level])
                 action_0_equal = np.array_equal(sc_routing_matrix_tf_0.numpy(), sc_routing_matrix_gt_0)
                 action_1_equal = np.array_equal(sc_routing_matrix_tf_1.numpy(), sc_routing_matrix_gt_1)
@@ -99,6 +99,7 @@ class BinaryRoutingTests(unittest.TestCase):
                 sc_routing_tensor_curr_level = tf.where(actions, sc_routing_matrix_tf_1, sc_routing_matrix_tf_0)
         print("Passed test_action_space_generator_layer!!!")
 
+    # OK
     # @unittest.skip
     def test_calculate_sample_action_space(self):
         experiment_count = 1000
@@ -107,24 +108,17 @@ class BinaryRoutingTests(unittest.TestCase):
         for exp_id in range(experiment_count):
             if (exp_id + 1) % 100 == 0:
                 print("test_calculate_sample_action_space Experiment:{0}".format(exp_id + 1))
-
-            ig_activations_dict = {}
-            # Mock IG activations
-            for node in self.cign.topologicalSortedNodes:
-                if node.isLeaf:
-                    continue
-                ig_arr = tf.random.uniform(
-                    shape=[batch_size, len(self.cign.dagObject.children(node=node))], dtype=tf.float32)
-                ig_activations_dict[node.index] = ig_arr
-            action_space_manuel = self.cign.calculate_sample_action_space_manuel(
+            ig_activations_dict = self.cign.create_mock_ig_activations(batch_size=batch_size)
+            action_space_manual = self.cign.calculate_sample_action_results_manual(
                 ig_activations_dict=ig_activations_dict)
-            action_space_auto = self.cign.calculate_sample_action_space(ig_activations_dict=ig_activations_dict)
-            self.assertTrue(len(action_space_manuel) == len(action_space_auto))
+            action_space_auto = self.cign.calculate_sample_action_results(ig_activations_dict=ig_activations_dict)
+            self.assertTrue(len(action_space_manual) == len(action_space_auto))
             for level in range(len(action_space_auto)):
-                self.assertTrue(np.array_equal(action_space_manuel[level], action_space_auto[level]))
+                self.assertTrue(np.array_equal(action_space_manual[level], action_space_auto[level]))
 
         print("Passed test_calculate_sample_action_space!!!")
 
+    # OK
     # @unittest.skip
     def test_action_generator_layer(self):
         experiment_count = 10
@@ -201,13 +195,7 @@ class BinaryRoutingTests(unittest.TestCase):
             if (exp_id + 1) % 100 == 0:
                 print("test_binary_rl_routing_layer Experiment:{0}".format(exp_id + 1))
             # Mock IG activations
-            ig_activations_dict = {}
-            for node in self.cign.topologicalSortedNodes:
-                if node.isLeaf:
-                    continue
-                ig_arr = tf.random.uniform(
-                    shape=[batch_size, len(self.cign.dagObject.children(node=node))], dtype=tf.float32)
-                ig_activations_dict[node.index] = ig_arr
+            ig_activations_dict = self.cign.create_mock_ig_activations(batch_size=batch_size)
             curr_sc_routing_matrix = tf.expand_dims(tf.ones(shape=[batch_size], dtype=tf.int32), axis=-1)
             for level in range(self.cign.get_max_trajectory_length()):
                 ig_activations = tf.stack(
@@ -220,21 +208,52 @@ class BinaryRoutingTests(unittest.TestCase):
                     [ig_activations, curr_sc_routing_matrix, predicted_actions])
                 # Now, the manual result.
                 next_level_config_action_0, next_level_config_action_1 = \
-                    self.cign.calculate_next_level_configurations_manuel(
+                    self.cign.calculate_next_level_action_results_manual(
                         level=level,
                         ig_activations=ig_activations,
                         sc_routing_matrix_curr_level=curr_sc_routing_matrix)
-                secondary_routing_matrix_cign_output_manuel = []
+                secondary_routing_matrix_cign_output_manual = []
                 for idx in range(batch_size):
                     if predicted_actions[idx] == 1:
-                        secondary_routing_matrix_cign_output_manuel.append(next_level_config_action_1[idx])
+                        secondary_routing_matrix_cign_output_manual.append(next_level_config_action_1[idx])
                     else:
-                        secondary_routing_matrix_cign_output_manuel.append(next_level_config_action_0[idx])
-                secondary_routing_matrix_cign_output_manuel = tf.stack(secondary_routing_matrix_cign_output_manuel,
+                        secondary_routing_matrix_cign_output_manual.append(next_level_config_action_0[idx])
+                secondary_routing_matrix_cign_output_manual = tf.stack(secondary_routing_matrix_cign_output_manual,
                                                                        axis=0)
                 self.assertTrue(np.array_equal(secondary_routing_matrix_cign_output.numpy(),
-                                               secondary_routing_matrix_cign_output_manuel.numpy()))
+                                               secondary_routing_matrix_cign_output_manual.numpy()))
                 curr_sc_routing_matrix = secondary_routing_matrix_cign_output
+
+    # @unittest.skip
+    def test_calculate_optimal_q_tables(self):
+        experiment_count = 100
+        batch_size = FashionNetConstants.batch_size
+        mean_accuracy = 0.922
+        std_accuracy = 0.03
+        for experiment_id in range(experiment_count):
+            print("Experiment:{0}".format(experiment_id))
+            true_labels = np.random.randint(low=0, high=10, size=(batch_size,))
+            ig_activations_dict = self.cign.create_mock_ig_activations(batch_size=batch_size)
+            # Create mock posterior
+            posterior_arrays_dict = self.cign.create_mock_posteriors(true_labels=true_labels,
+                                                                     batch_size=batch_size,
+                                                                     mean_accuracy=mean_accuracy,
+                                                                     std_accuracy=std_accuracy)
+            optimal_q_tables_auto = self.cign.calculate_optimal_q_tables(
+                true_labels=true_labels,
+                posteriors_dict=posterior_arrays_dict,
+                ig_activations_dict=ig_activations_dict)
+            optimal_q_tables_manual = self.cign.calculate_optimal_q_tables_manual(
+                true_labels=true_labels,
+                posteriors_dict=posterior_arrays_dict,
+                ig_activations_dict=ig_activations_dict)
+
+            keys_1 = set(optimal_q_tables_auto.keys())
+            keys_2 = set(optimal_q_tables_manual.keys())
+            self.assertTrue(keys_1 == keys_2)
+            for k_ in optimal_q_tables_auto.keys():
+                self.assertTrue(np.array_equal(optimal_q_tables_auto[k_], optimal_q_tables_manual[k_]))
+        print("test_calculate_optimal_q_tables works!!!")
 
 
 if __name__ == '__main__':

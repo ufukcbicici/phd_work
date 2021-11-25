@@ -6,7 +6,7 @@ from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_rl_routing import CignRlRouting
 from tf_2_cign.custom_layers.cign_binary_action_generator_layer import CignBinaryActionGeneratorLayer
-from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
+from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import CignBinaryActionResultGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
 from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
 from tf_2_cign.utilities.profiler import Profiler
@@ -35,8 +35,18 @@ class CignRlBinaryRouting(CignRlRouting):
         self.rewardType = reward_type
         self.exploreExploitEpsilon = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=1.0, decay_steps=self.epsilonStep, decay_rate=self.epsilonDecayRate)
-        self.actionSpaceGenerators = {}
+        self.actionResultGenerators = {}
         self.actionCalculatorLayers = []
+
+    def convert_posteriors_dict_to_tensor(self, posteriors_dict):
+        posteriors_tensor = []
+        for leaf_node in self.leafNodes:
+            if not (type(posteriors_dict[leaf_node.index]) is np.ndarray):
+                posteriors_tensor.append(posteriors_dict[leaf_node.index].numpy())
+            else:
+                posteriors_tensor.append(posteriors_dict[leaf_node.index])
+        posteriors_tensor = np.stack(posteriors_tensor, axis=-1)
+        return posteriors_tensor
 
     def calculate_ideal_accuracy(self, dataset):
         posteriors_dict = {}
@@ -201,7 +211,10 @@ class CignRlBinaryRouting(CignRlRouting):
         model_output_dict["sc_routing_matrices_dict"] = model_output_arr[10]
         return model_output_dict
 
-    def calculate_next_level_configurations_manuel(self, level, ig_activations, sc_routing_matrix_curr_level):
+    # OK
+    # Next level's possible routing configurations, as the result of the activated nodes in the current layer and
+    # their information gain activations.
+    def calculate_next_level_action_results_manual(self, level, ig_activations, sc_routing_matrix_curr_level):
         batch_size = sc_routing_matrix_curr_level.shape[0]
         assert len(self.orderedNodesPerLevel[level]) == sc_routing_matrix_curr_level.shape[1]
         next_level_config_action_0 = []
@@ -245,7 +258,8 @@ class CignRlBinaryRouting(CignRlRouting):
         next_level_config_action_1 = np.stack(next_level_config_action_1, axis=0)
         return next_level_config_action_0, next_level_config_action_1
 
-    def calculate_sample_action_space(self, ig_activations_dict):
+    # OK
+    def calculate_sample_action_results(self, ig_activations_dict):
         action_spaces = []
         batch_size = ig_activations_dict[0].shape[0]
         sc_routing_tensor_curr_level = np.expand_dims(
@@ -256,9 +270,9 @@ class CignRlBinaryRouting(CignRlRouting):
             ig_activations = tf.stack([ig_activations_dict[nd.index] for nd in self.orderedNodesPerLevel[level]],
                                       axis=-1)
             # Generate action space generator layer for the first time.
-            if level not in self.actionSpaceGenerators:
-                self.actionSpaceGenerators[level] = \
-                    CignBinaryActionSpaceGeneratorLayer(level=level, network=self)
+            if level not in self.actionResultGenerators:
+                self.actionResultGenerators[level] = \
+                    CignBinaryActionResultGeneratorLayer(level=level, network=self)
             # For every past action combination in the current trajectory so far,
             # get the current layer's node configuration. If we are at t. level, there will be actions taken:
             # A_{0:t-1} = a_0,a_1,a_2, ..., a_{t-1}
@@ -276,7 +290,7 @@ class CignRlBinaryRouting(CignRlRouting):
                 # Given the current trajectory = a_0,a_1,a_2, ..., a_{t-1}, get the configuration of the
                 # nodes in the current level, for every sample in the batch
                 current_level_routing_matrix = tf.convert_to_tensor(sc_routing_tensor_curr_level[trajectory])
-                sc_routing_matrix_action_0, sc_routing_matrix_action_1 = self.actionSpaceGenerators[level](
+                sc_routing_matrix_action_0, sc_routing_matrix_action_1 = self.actionResultGenerators[level](
                     [ig_activations, current_level_routing_matrix])
                 action_0_trajectory = []
                 action_0_trajectory.extend(trajectory)
@@ -292,7 +306,12 @@ class CignRlBinaryRouting(CignRlRouting):
             action_spaces.append(sc_routing_tensor_curr_level)
         return action_spaces
 
-    def calculate_sample_action_space_manuel(self, ig_activations_dict):
+    # OK
+    # For every sample in the current minibatch, we calculate ALL possible routing configurations, for every level of
+    # the CIGN, as a function of the sample's information gain activations.
+    # The array shape for holding configurations at level t is like that:
+    # [1,2,...,2 (t times 2),batch_size, 2^t]
+    def calculate_sample_action_results_manual(self, ig_activations_dict):
         action_spaces = []
         batch_size = ig_activations_dict[0].shape[0]
         for level in range(self.get_max_trajectory_length() + 1):
@@ -395,6 +414,50 @@ class CignRlBinaryRouting(CignRlRouting):
         rewards_vec -= self.lambdaMacCost * computation_overload_vector
         return rewards_vec
 
+    def create_mock_ig_activations(self, batch_size):
+        ig_activations_dict = {}
+        # Mock IG activations
+        for node in self.topologicalSortedNodes:
+            if node.isLeaf:
+                continue
+            ig_arr = tf.random.uniform(
+                shape=[batch_size, len(self.dagObject.children(node=node))], dtype=tf.float32)
+            ig_activations_dict[node.index] = ig_arr
+        return ig_activations_dict
+
+    def create_mock_posteriors(self, true_labels, batch_size, mean_accuracy, std_accuracy):
+        class_count = np.max(true_labels) + 1
+        posterior_arrays_dict = {nd.index: [] for nd in self.leafNodes}
+        leaf_expected_accuracies = {nd.index:
+                                        max(min(np.random.normal(loc=mean_accuracy, scale=std_accuracy), 1.0), 0.0)
+                                    for nd in self.leafNodes}
+
+        for sample_id in range(batch_size):
+            y = true_labels[sample_id]
+            for leaf_node in self.leafNodes:
+                expected_accuracy = leaf_expected_accuracies[leaf_node.index]
+                weights = np.random.uniform(low=-10.0, high=10.0, size=(class_count,))
+                max_weight = np.max(weights)
+                max_index = np.argmax(weights)
+                is_sample_true = np.random.uniform(low=0.0, high=1.0) <= expected_accuracy
+                if is_sample_true:
+                    # Make the true label weight the maximum
+                    weights[y] = max_weight * np.random.uniform(low=1.0, high=3.0)
+                posterior = tf.nn.softmax(weights).numpy()
+                posterior_arrays_dict[leaf_node.index].append(posterior)
+
+        for leaf_node in self.leafNodes:
+            posterior_arrays_dict[leaf_node.index] = np.stack(posterior_arrays_dict[leaf_node.index], axis=0)
+            node_predictions = np.argmax(posterior_arrays_dict[leaf_node.index], axis=1)
+            accuracy = np.mean(true_labels == node_predictions)
+            print("Node {0} Accuracy:{1}".format(leaf_node.index, accuracy))
+        posteriors_tensor = np.stack([posterior_arrays_dict[nd.index] for nd in self.leafNodes], axis=-1)
+        final_posteriors = np.mean(posteriors_tensor, axis=-1)
+        node_predictions = np.argmax(final_posteriors, axis=1)
+        accuracy = np.mean(true_labels == node_predictions)
+        print("Final Accuracy:{0}".format(accuracy))
+        return posterior_arrays_dict
+
     # This method calculates the optimal Q-tables of a given CIGN result, including each sample's true label,
     # predicted posteriors and for each sample the interior information gain activations.
     # The expected result is the optimal Q-values for every possible trajectory in the CIGN.
@@ -415,15 +478,9 @@ class CignRlBinaryRouting(CignRlRouting):
     # Q(s1=x_{0},a_1=1) = R(s_1=x_{0},a_1=1) + max_{a_2} Q(s2=x_{01},a_2) (State transition is deterministic)
     def calculate_optimal_q_tables(self, true_labels, posteriors_dict, ig_activations_dict):
         # Calculate the action spaces of each sample.
-        action_spaces = self.calculate_sample_action_space(ig_activations_dict=ig_activations_dict)
+        action_spaces = self.calculate_sample_action_results(ig_activations_dict=ig_activations_dict)
         # Posteriors tensor for every sample and every leaf node.
-        posteriors_tensor = []
-        for leaf_node in self.leafNodes:
-            if not (type(posteriors_dict[leaf_node.index]) is np.ndarray):
-                posteriors_tensor.append(posteriors_dict[leaf_node.index].numpy())
-            else:
-                posteriors_tensor.append(posteriors_dict[leaf_node.index])
-        posteriors_tensor = np.stack(posteriors_tensor, axis=-1)
+        posteriors_tensor = self.convert_posteriors_dict_to_tensor(posteriors_dict=posteriors_dict)
         # Assert that posteriors are placed correctly.
         min_leaf_index = min([node.index for node in self.leafNodes])
         for leaf_node in self.leafNodes:
@@ -449,7 +506,7 @@ class CignRlBinaryRouting(CignRlRouting):
             # This excludes the action to be taken in this level.
             # (level+1).th dimension: The action to be taken in this level.
             # The last dimension: The batch size.
-            optimal_q_table_for_level = np.zeros(shape=table_shape, dtype=np.float)
+            optimal_q_table_for_level = np.zeros(shape=table_shape, dtype=np.float64)
 
             for trajectory in list_of_all_trajectories:
                 if level == self.get_max_trajectory_length():
@@ -484,6 +541,80 @@ class CignRlBinaryRouting(CignRlRouting):
             optimal_q_tables[level] = optimal_q_table_for_level
         return optimal_q_tables
 
+    def calculate_optimal_q_tables_manual(self, true_labels, posteriors_dict, ig_activations_dict):
+        action_spaces = self.calculate_sample_action_results_manual(ig_activations_dict=ig_activations_dict)
+        optimal_q_tables = {}
+        batch_size = true_labels.shape[0]
+        for level in range(self.get_max_trajectory_length(), 0, -1):
+            optimal_q_table = np.zeros(shape=action_spaces[level].shape[:-1], dtype=np.float64)
+            actions_each_layer = [[0]]
+            actions_each_layer.extend([[0, 1] for _ in range(level)])
+            list_of_all_trajectories = Utilities.get_cartesian_product(list_of_lists=actions_each_layer)
+            for trajectory in list_of_all_trajectories:
+                if level == self.get_max_trajectory_length():
+                    for sample_id in range(batch_size):
+                        # Root node
+                        active_nodes = [self.topologicalSortedNodes[0]]
+                        for t in range(self.get_max_trajectory_length()):
+                            next_level_nodes = []
+                            action_t_plus_1 = trajectory[t + 1]
+                            for active_node in active_nodes:
+                                child_nodes = self.dagObject.children(node=active_node)
+                                child_nodes_sorted = sorted(child_nodes, key=lambda nd: nd.index)
+                                if action_t_plus_1 == 0:
+                                    ig_ = ig_activations_dict[active_node.index][sample_id]
+                                    selected_idx = np.argmax(ig_)
+                                    next_level_nodes.append(child_nodes_sorted[selected_idx])
+                                else:
+                                    next_level_nodes.extend(child_nodes_sorted)
+                            active_nodes = next_level_nodes
+                        # Calculate the configuration cost
+                        # 1-Classification result
+                        final_probabilities = np.zeros_like(posteriors_dict[self.leafNodes[0].index][0])
+                        for leaf_node in active_nodes:
+                            final_probabilities += posteriors_dict[leaf_node.index][sample_id]
+                        final_probabilities = final_probabilities * (1.0 / len(active_nodes))
+                        y_predicted = np.argmax(final_probabilities)
+                        y_truth = true_labels[sample_id]
+                        if y_truth == y_predicted:
+                            reward = self.validPredictionReward
+                        else:
+                            reward = self.invalidPredictionPenalty
+                        # 2-MAC cost result
+                        leaf_nodes_configuration = [0] * len(self.leafNodes)
+                        min_leaf_index = min([nd.index for nd in self.leafNodes])
+                        for leaf_node in active_nodes:
+                            leaf_nodes_configuration[leaf_node.index - min_leaf_index] = 1
+                        computation_overload = self.networkActivationCostsDict[tuple(leaf_nodes_configuration)]
+                        reward -= self.lambdaMacCost * computation_overload
+                        # Save the result
+                        coords = []
+                        coords.extend(trajectory)
+                        coords.append(sample_id)
+                        optimal_q_table[tuple(coords)] = reward
+                else:
+                    for sample_id in range(batch_size):
+                        coord_0 = []
+                        coord_0.extend(trajectory)
+                        coord_0.append(0)
+                        coord_0.append(sample_id)
+                        q_0 = optimal_q_tables[level + 1][tuple(coord_0)]
+                        coord_1 = []
+                        coord_1.extend(trajectory)
+                        coord_1.append(1)
+                        coord_1.append(sample_id)
+                        q_1 = optimal_q_tables[level + 1][tuple(coord_1)]
+                        # Rewards
+                        if self.rewardType == "Zero Rewards":
+                            r_ = 0.0
+                        else:
+                            raise NotImplementedError()
+                        q_final = r_ + max([q_0, q_1])
+                        coords = [*trajectory, sample_id]
+                        optimal_q_table[tuple(coords)] = q_final
+            optimal_q_tables[level] = optimal_q_table
+        return optimal_q_tables
+
     def calculate_q_tables_from_network_outputs(self,
                                                 true_labels,
                                                 posteriors_dict,
@@ -494,249 +625,16 @@ class CignRlBinaryRouting(CignRlRouting):
         sc_routing_matrices_dict = kwargs["sc_routing_matrices_dict"]
         ig_activations_dict = kwargs["ig_activations_dict"]
 
-        # Calculate the action spaces of each sample.
-        action_spaces = self.calculate_sample_action_space(ig_activations_dict=ig_activations_dict)
-
-
-
-            # if t == self.get_max_trajectory_length():
-            #     print("X")
-            #
-            # else:
-            #     print("Y")
-
-        # for t in range(self.get_max_trajectory_length(), -1, -1):
-
-        # action_spaces = []
-        # batch_size = ig_activations_dict[0].shape[0]
-        # for level in range(self.get_max_trajectory_length() + 1):
-        #     shp = [1]
-        #     shp.extend([2 for _ in range(level)])
-        #     shp.append(batch_size)
-        #     shp.append(len(self.orderedNodesPerLevel[level]))
-        #     sc_routing_tensor_next_level = np.zeros(shape=shp, dtype=np.int32)
-        #     action_spaces.append(sc_routing_tensor_next_level)
-
-        # 1) Calculate the action spaces of each sample.
-        # action_spaces = []
-        # sc_routing_tensor_curr_level = tf.expand_dims(
-        #     tf.expand_dims(tf.ones_like(true_labels), axis=-1), axis=0)
-        # action_spaces.append(sc_routing_tensor_curr_level)
-        # for level in range(self.get_max_trajectory_length()):
-        #     # IG activations for the nodes in this layer.
-        #     ig_activations = tf.stack([ig_masks_dict[nd.index] for nd in self.orderedNodesPerLevel[level]],
-        #                               axis=-1)
-        #     # Generate action space generator layer for the first time.
-        #     if level not in self.actionSpaceGenerators:
-        #         self.actionSpaceGenerators[level] = \
-        #             CignBinaryActionSpaceGeneratorLayer(level=level, network=self)
-        #     # For every past action combination in the current trajectory so far,
-        #     # get the current layer's node configuration. If we are at t. level, there will be actions taken:
-        #     # A_{0:t-1} = a_0,a_1,a_2, ..., a_{t-1}
-        #     # There will be 2^t different paths to the level t (each action is binary).
-        #     actions_each_layer = [[0]]
-        #     actions_each_layer.extend([[0, 1] for _ in range(level)])
-        #     list_of_all_trajectories = Utilities.get_cartesian_product(list_of_lists=actions_each_layer)
-        #     sc_routing_tensor_next_level_shape = [1]
-        #     sc_routing_tensor_next_level_shape.extend([2 for _ in range(level + 1)])
-        #     sc_routing_tensor_next_level_shape.append(true_labels.shape[0])
-        #     sc_routing_tensor_next_level_shape.append(len(self.orderedNodesPerLevel[level + 1]))
-        #     sc_routing_tensor_next_level = tf.zeros(shape=sc_routing_tensor_next_level_shape,
-        #                                             dtype=sc_routing_tensor_curr_level.dtype)
-        #     for trajectory in list_of_all_trajectories:
-        #         # Given the current trajectory = a_0,a_1,a_2, ..., a_{t-1}, get the configuration of the
-        #         # nodes in the current level, for every sample in the batch
-        #         current_level_routing_matrix = sc_routing_tensor_curr_level[trajectory]
-        #         sc_routing_matrix_action_0, sc_routing_matrix_action_1 = self.actionSpaceGenerators[level](
-        #             [ig_activations, current_level_routing_matrix])
-        #         action_0_trajectory = []
-        #         action_0_trajectory.extend(trajectory)
-        #         action_0_trajectory.append(0)
-        #         sc_routing_tensor_next_level[action_0_trajectory] = sc_routing_matrix_action_0
-        #
-        #         action_1_trajectory = []
-        #         action_1_trajectory.extend(trajectory)
-        #         action_1_trajectory.append(1)
-        #         sc_routing_tensor_next_level[action_1_trajectory] = sc_routing_matrix_action_1
-        #
-        #     sc_routing_tensor_curr_level = sc_routing_tensor_next_level
-        #     action_spaces.append(sc_routing_tensor_curr_level)
-
-        # 2) Using the calculated action spaces, now calculate the optimal Q tables for each sample.
-
-        # ig_activations = inputs[0]
-        # sc_routing_matrix_prev_level = inputs[1]
-        # sc_routing_matrices = \
-        #     self.actionSpaceGenerators[level]([ig_activations, sc_routing_matrix_prev_level])
-
-        # for level in range(self.get_max_trajectory_length()):
-        #     ig_activations = tf.stack(
-        #         [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
-        #     if level == 0:
-        #         sc_routing_matrix_prev_level = tf.expand_dims(tf.ones_like(true_labels), axis=-1)
-        #     else:
-        #         sc_routing_matrix_prev_level = self.scRoutingMatricesDict[level - 1]
-        #     if level not in self.actionSpaceGenerators:
-        #         self.actionSpaceGenerators[level] = CignBinaryActionSpaceGeneratorLayer(level=level, network=self)
-        #     sc_routing_matrices = \
-        #         self.actionSpaceGenerators[level]([ig_activations, sc_routing_matrix_prev_level])
-        #     sc_routing_matrices = tf.stack(sc_routing_matrices, axis=-1)
-        #     action_spaces.append(sc_routing_matrices)
-
-        # sc_routing_matrices = self.actionSpaceGeneratorLayer([ig_activations, sc_routing_matrix_prev_level])
-        # sc_routing_matrix = tf.where(final_actions, sc_routing_matrices[1], sc_routing_matrices[0])
-        #
-        #
-        # for nd_idx, node in enumerate(self.orderedNodesPerLevel[level]):
-        # # ************ final_actions[i] == 0 ************
-        # sc_routing_matrix_action_0 = []
-        # for nd_idx in range(self.nodeCountInThisLevel):
-        #     activations_nd = ig_activations[:, :, nd_idx]
-        #     sc_routing_vector = sc_routing_matrix_prev_level[:, nd_idx]
-        #     ig_indices = tf.argmax(activations_nd, axis=-1)
-        #     ig_routing_matrix = tf.one_hot(ig_indices, activations_nd.shape[1])
-        #     rl_routing_matrix = sc_routing_vector * ig_routing_matrix
-        #     sc_routing_matrix_action_0.append(rl_routing_matrix)
-        # # ************ final_actions[i] == 0 ************
-        #
-        # # ************ final_actions[i] == 1 ************
-        # sc_routing_matrix_action_1 = []
-        # for nd_idx in range(self.nodeCountInThisLevel):
-        #     sc_routing_vector = sc_routing_matrix_prev_level[:, nd_idx]
-        #     rl_routing_matrix = tf.ones_like(sc_routing_matrix_action_0[nd_idx])
-        #     rl_routing_matrix = sc_routing_vector * rl_routing_matrix
-        #     sc_routing_matrix_action_1.append(rl_routing_matrix)
-        # # ************ final_actions[i] == 1 ************
-
-        # # Get the sc routing outputs of this level.
-        # sc_outputs = sc_routing_matrices_dict[level]
-
-        # for t in range(self.get_max_trajectory_length() - 1, -1, -1):
-
-        # sample_count = true_labels.shape[0]
-        # ig_paths_matrix = self.get_ig_paths(ig_masks_dict=ig_masks_dict)
-        # c = Counter([tuple(ig_paths_matrix[i]) for i in range(ig_paths_matrix.shape[0])])
-        # # print("Count of ig paths:{0}".format(c))
-        # regression_targets = []
-        # optimal_q_tables = []
-        #
-        # for t in range(self.get_max_trajectory_length() - 1, -1, -1):
-        #     action_count_t_minus_one = 1 if t == 0 else self.actionSpaces[t - 1].shape[0]
-        #     action_count_t = self.actionSpaces[t].shape[0]
-        #     optimal_q_table = np.zeros(shape=(sample_count, action_count_t_minus_one, action_count_t), dtype=np.float32)
-        #     # If in the last layer, take into account the prediction accuracies.
-        #     if t == self.get_max_trajectory_length() - 1:
-        #         posteriors_tensor = []
-        #         for leaf_node in self.leafNodes:
-        #             if not (type(posteriors_dict[leaf_node.index]) is np.ndarray):
-        #                 posteriors_tensor.append(posteriors_dict[leaf_node.index].numpy())
-        #             else:
-        #                 posteriors_tensor.append(posteriors_dict[leaf_node.index])
-        #         posteriors_tensor = np.stack(posteriors_tensor, axis=-1)
-        #
-        #         # Assert that posteriors are placed correctly.
-        #         min_leaf_index = min([node.index for node in self.leafNodes])
-        #         for leaf_node in self.leafNodes:
-        #             if not (type(posteriors_dict[leaf_node.index]) is np.ndarray):
-        #                 assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
-        #                                       posteriors_dict[leaf_node.index].numpy())
-        #             else:
-        #                 assert np.array_equal(posteriors_tensor[:, :, leaf_node.index - min_leaf_index],
-        #                                       posteriors_dict[leaf_node.index])
-        #
-        #         # Combine posteriors with respect to the action tuple.
-        #         prediction_correctness_vec_list = []
-        #         calculation_cost_vec_list = []
-        #         min_leaf_id = min([node.index for node in self.leafNodes])
-        #         ig_indices = ig_paths_matrix[:, -1] - min_leaf_id
-        #         for action_id in range(self.actionSpaces[t].shape[0]):
-        #             routing_decision = self.actionSpaces[t][action_id, :]
-        #             routing_matrix = np.repeat(routing_decision[np.newaxis, :], axis=0,
-        #                                        repeats=true_labels.shape[0])
-        #             if self.includeIgInRewardCalculations:
-        #                 # Set Information Gain routed leaf nodes to 1. They are always evaluated.
-        #                 routing_matrix[np.arange(true_labels.shape[0]), ig_indices] = 1
-        #             weights = np.reciprocal(np.sum(routing_matrix, axis=1).astype(np.float32))
-        #             routing_matrix_weighted = weights[:, np.newaxis] * routing_matrix
-        #             weighted_posteriors = posteriors_tensor * routing_matrix_weighted[:, np.newaxis, :]
-        #             final_posteriors = np.sum(weighted_posteriors, axis=2)
-        #             predicted_labels = np.argmax(final_posteriors, axis=1)
-        #             validity_of_predictions_vec = (predicted_labels == true_labels).astype(np.int32)
-        #             prediction_correctness_vec_list.append(validity_of_predictions_vec)
-        #             # Get the calculation costs
-        #             computation_overload_vector = np.apply_along_axis(
-        #                 lambda x: self.networkActivationCostsDict[tuple(x)], axis=1,
-        #                 arr=routing_matrix)
-        #             calculation_cost_vec_list.append(computation_overload_vector)
-        #         prediction_correctness_matrix = np.stack(prediction_correctness_vec_list, axis=1)
-        #         prediction_correctness_tensor = np.repeat(
-        #             np.expand_dims(prediction_correctness_matrix, axis=1), axis=1,
-        #             repeats=action_count_t_minus_one)
-        #         computation_overload_matrix = np.stack(calculation_cost_vec_list, axis=1)
-        #         computation_overload_tensor = np.repeat(
-        #             np.expand_dims(computation_overload_matrix, axis=1), axis=1,
-        #             repeats=action_count_t_minus_one)
-        #         # Add to the rewards tensor
-        #         optimal_q_table += (prediction_correctness_tensor == 1
-        #                             ).astype(np.float32) * self.validPredictionReward
-        #         optimal_q_table += (prediction_correctness_tensor == 0
-        #                             ).astype(np.float32) * self.invalidPredictionPenalty
-        #         optimal_q_table -= self.lambdaMacCost * computation_overload_tensor
-        #         for idx in range(optimal_q_table.shape[1] - 1):
-        #             assert np.array_equal(optimal_q_table[:, idx, :], optimal_q_table[:, idx + 1, :])
-        #         regression_targets.append(optimal_q_table[:, 0, :].copy())
-        #     else:
-        #         q_table_next = optimal_q_tables[-1].copy()
-        #         q_table_next = np.max(q_table_next, axis=-1)
-        #         regression_targets.append(q_table_next)
-        #         optimal_q_table = np.expand_dims(q_table_next, axis=1)
-        #         optimal_q_table = np.repeat(optimal_q_table, axis=1, repeats=action_count_t_minus_one)
-        #     reachability_matrix = self.reachabilityMatrices[t].copy().astype(np.float32)
-        #     reachability_matrix = np.repeat(np.expand_dims(reachability_matrix, axis=0), axis=0,
-        #                                     repeats=optimal_q_table.shape[0])
-        #     assert optimal_q_table.shape == reachability_matrix.shape
-        #     optimal_q_table[reachability_matrix == 0] = -np.inf
-        #     optimal_q_tables.append(optimal_q_table)
-        #
-        # regression_targets.reverse()
-        # optimal_q_tables.reverse()
-        # return regression_targets, optimal_q_tables
-
-    # TODO: Rewrite this according to the binary routing logic.
-    # def run_q_net_model(self, X, y, iteration, is_in_warm_up_period):
-    #     with tf.GradientTape() as q_tape:
-    #         model_output_val = self.run_model(
-    #             X=X,
-    #             y=y,
-    #             iteration=iteration,
-    #             is_training=True,
-    #             warm_up_period=is_in_warm_up_period)
-    #         # Calculate target values for the Q-Nets
-    #         posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
-    #         ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
-    #         regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
-    #                                                                  posteriors_dict=posteriors_val,
-    #                                                                  ig_masks_dict=ig_masks_val)
-    #         # Q-Net Losses
-    #         q_net_predicted = model_output_val["q_tables_predicted"]
-    #         q_net_losses = []
-    #         for idx, tpl in enumerate(zip(regs, q_net_predicted)):
-    #             q_truth = tpl[0]
-    #             q_predicted = tpl[1]
-    #             q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
-    #             mse = self.mseLoss(q_truth_tensor, q_predicted)
-    #             q_net_losses.append(mse)
-    #         full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
-    #         q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
-    #         total_q_loss = full_q_loss + q_regularization_loss
-    #     q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
-    #     return model_output_val, q_grads, q_net_losses
+        # # Calculate the action spaces of each sample.
+        # action_spaces = self.calculate_sample_action_results(ig_activations_dict=ig_activations_dict)
 
     def train(self, run_id, dataset, epoch_count, **kwargs):
         q_net_epoch_count = kwargs["q_net_epoch_count"]
         fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
         is_in_warm_up_period = True
+        # OK
         self.optimizer = self.get_sgd_optimizer()
+        # OK
         self.build_trackers()
 
         # Group main body CIGN variables and Q Net variables.
@@ -744,57 +642,57 @@ class CignRlBinaryRouting(CignRlRouting):
         # q_net_var_set = set([v.name for v in q_net_variables])
         # cign_main_body_variables = [v for v in self.model.trainable_variables if v.name not in q_net_var_set]
 
-        epochs_after_warm_up = 0
-        iteration = 0
-        for epoch_id in range(epoch_count):
-            iteration, times_list = self.train_cign_body_one_epoch(dataset=dataset.trainDataTf,
-                                                                   run_id=run_id,
-                                                                   iteration=iteration,
-                                                                   is_in_warm_up_period=is_in_warm_up_period)
-            self.check_q_net_vars()
-            if epoch_id >= self.warmUpPeriod:
-                # Run Q-Net learning for the first time.
-                if is_in_warm_up_period:
-                    self.save_model(run_id=run_id)
-                    is_in_warm_up_period = False
-                    self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
-                    self.measure_performance(dataset=dataset,
-                                             run_id=run_id,
-                                             iteration=iteration,
-                                             epoch_id=epoch_id,
-                                             times_list=times_list)
-                else:
-                    is_performance_measured = False
-                    if (epochs_after_warm_up + 1) % self.cignRlTrainPeriod == 0:
-                        self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
-                        self.measure_performance(dataset=dataset,
-                                                 run_id=run_id,
-                                                 iteration=iteration,
-                                                 epoch_id=epoch_id,
-                                                 times_list=times_list)
-                        is_performance_measured = True
-                    if (epoch_id >= epoch_count - 10 or epoch_id % self.trainEvalPeriod == 0) \
-                            and is_performance_measured is False:
-                        self.measure_performance(dataset=dataset,
-                                                 run_id=run_id,
-                                                 iteration=iteration,
-                                                 epoch_id=epoch_id,
-                                                 times_list=times_list)
-                epochs_after_warm_up += 1
-
-        # Fine tune by merging training and validation sets
-        full_train_X = np.concatenate([dataset.trainX, dataset.valX], axis=0)
-        full_train_y = np.concatenate([dataset.trainY, dataset.valY], axis=0)
-        train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
-            shuffle(5000).batch(self.batchSizeNonTensor)
-
-        for epoch_id in range(epoch_count, epoch_count + fine_tune_epoch_count):
-            iteration, times_list = self.train_cign_body_one_epoch(dataset=train_tf,
-                                                                   run_id=run_id,
-                                                                   iteration=iteration,
-                                                                   is_in_warm_up_period=is_in_warm_up_period)
-            self.measure_performance(dataset=dataset,
-                                     run_id=run_id,
-                                     iteration=iteration,
-                                     epoch_id=epoch_id,
-                                     times_list=times_list)
+        # epochs_after_warm_up = 0
+        # iteration = 0
+        # for epoch_id in range(epoch_count):
+        #     iteration, times_list = self.train_cign_body_one_epoch(dataset=dataset.trainDataTf,
+        #                                                            run_id=run_id,
+        #                                                            iteration=iteration,
+        #                                                            is_in_warm_up_period=is_in_warm_up_period)
+        #     self.check_q_net_vars()
+        #     if epoch_id >= self.warmUpPeriod:
+        #         # Run Q-Net learning for the first time.
+        #         if is_in_warm_up_period:
+        #             self.save_model(run_id=run_id)
+        #             is_in_warm_up_period = False
+        #             self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
+        #             self.measure_performance(dataset=dataset,
+        #                                      run_id=run_id,
+        #                                      iteration=iteration,
+        #                                      epoch_id=epoch_id,
+        #                                      times_list=times_list)
+        #         else:
+        #             is_performance_measured = False
+        #             if (epochs_after_warm_up + 1) % self.cignRlTrainPeriod == 0:
+        #                 self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
+        #                 self.measure_performance(dataset=dataset,
+        #                                          run_id=run_id,
+        #                                          iteration=iteration,
+        #                                          epoch_id=epoch_id,
+        #                                          times_list=times_list)
+        #                 is_performance_measured = True
+        #             if (epoch_id >= epoch_count - 10 or epoch_id % self.trainEvalPeriod == 0) \
+        #                     and is_performance_measured is False:
+        #                 self.measure_performance(dataset=dataset,
+        #                                          run_id=run_id,
+        #                                          iteration=iteration,
+        #                                          epoch_id=epoch_id,
+        #                                          times_list=times_list)
+        #         epochs_after_warm_up += 1
+        #
+        # # Fine tune by merging training and validation sets
+        # full_train_X = np.concatenate([dataset.trainX, dataset.valX], axis=0)
+        # full_train_y = np.concatenate([dataset.trainY, dataset.valY], axis=0)
+        # train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
+        #     shuffle(5000).batch(self.batchSizeNonTensor)
+        #
+        # for epoch_id in range(epoch_count, epoch_count + fine_tune_epoch_count):
+        #     iteration, times_list = self.train_cign_body_one_epoch(dataset=train_tf,
+        #                                                            run_id=run_id,
+        #                                                            iteration=iteration,
+        #                                                            is_in_warm_up_period=is_in_warm_up_period)
+        #     self.measure_performance(dataset=dataset,
+        #                              run_id=run_id,
+        #                              iteration=iteration,
+        #                              epoch_id=epoch_id,
+        #                              times_list=times_list)

@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
+from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import CignBinaryActionResultGeneratorLayer
 
 
 class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
@@ -10,7 +10,7 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
         self.level = level
         self.network = network
         self.nodeCountInThisLevel = len(self.network.orderedNodesPerLevel[level])
-        self.actionSpaceGeneratorLayer = CignBinaryActionSpaceGeneratorLayer(level=level, network=network)
+        self.actionResultGeneratorLayer = CignBinaryActionResultGeneratorLayer(level=level, network=network)
 
     def call(self, inputs, **kwargs):
         # q_table_predicted = inputs[0]
@@ -64,7 +64,7 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
         # ig_activations = tf.stack(
         #     [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
         sc_routing_next_level_matrix_action_0, sc_routing_next_level_matrix_action_1 = \
-            self.actionSpaceGeneratorLayer([ig_activations, sc_routing_matrix_curr_level])
+            self.actionResultGeneratorLayer([ig_activations, sc_routing_matrix_curr_level])
         sc_routing_matrix = tf.where(tf.cast(actions, dtype=tf.bool),
                                      sc_routing_next_level_matrix_action_1,
                                      sc_routing_next_level_matrix_action_0)

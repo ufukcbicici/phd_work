@@ -1,8 +1,9 @@
 import tensorflow as tf
 
-from tf_2_cign.custom_layers.cign_binary_action_space_generator_layer import CignBinaryActionSpaceGeneratorLayer
+from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import CignBinaryActionResultGeneratorLayer
 
 
+# OK
 class CignBinaryActionGeneratorLayer(tf.keras.layers.Layer):
 
     def __init__(self, network):
@@ -18,8 +19,8 @@ class CignBinaryActionGeneratorLayer(tf.keras.layers.Layer):
         global_step = self.network.globalStep
         # Get epsilon
         eps = self.network.exploreExploitEpsilon(global_step)
-        # Determine which sample will pick exploration (eps > thresholds)
-        # which will pick exploitation (thresholds >= eps)
+        # Determine which sample will pick exploration (eps > probs)
+        # which will pick exploitation (probs >= eps)
         explore_exploit_vec = eps > probs
         # Argmax indices for q_table
         exploit_actions = tf.argmax(q_table_predicted, axis=-1)

@@ -10,7 +10,7 @@ from tf_2_cign.utilities.utilities import Utilities
 
 
 class WeightedBatchNormalization(tf.keras.layers.Layer):
-    def __init__(self, momentum, node=None):
+    def __init__(self, momentum, node=None, name=""):
         super().__init__()
         self.gamma = None
         self.beta = None
@@ -19,6 +19,7 @@ class WeightedBatchNormalization(tf.keras.layers.Layer):
         self.timesCalled = None
         self.momentum = momentum
         self.node = node
+        self.opPrefix = name
 
     def build(self, input_shape):
         # assert len(input_shape) == 2
@@ -28,22 +29,26 @@ class WeightedBatchNormalization(tf.keras.layers.Layer):
 
         self.gamma = self.add_weight(name=
                                      "wb_gamma" if self.node is None
-                                     else Utilities.get_variable_name(name="wb_gamma", node=self.node),
+                                     else Utilities.get_variable_name(name="{0}_wb_gamma".format(self.opPrefix),
+                                                                      node=self.node),
                                      shape=input_dim,
                                      initializer=tf.keras.initializers.Constant(value=1.0),
                                      trainable=True)
         self.beta = self.add_weight(name="wb_beta" if self.node is None
-                                    else Utilities.get_variable_name(name="wb_beta", node=self.node),
+                                    else Utilities.get_variable_name(name="{0}_wb_beta".format(self.opPrefix),
+                                                                     node=self.node),
                                     shape=input_dim,
                                     initializer=tf.keras.initializers.Constant(value=0.0),
                                     trainable=True)
         self.popMean = self.add_weight(name="popMean" if self.node is None
-                                       else Utilities.get_variable_name(name="popMean", node=self.node),
+                                       else Utilities.get_variable_name(name="{0}_popMean".format(self.opPrefix),
+                                                                        node=self.node),
                                        shape=input_dim,
                                        initializer=tf.keras.initializers.Constant(value=0.0),
                                        trainable=False)
         self.popVar = self.add_weight(name="popVar" if self.node is None
-                                      else Utilities.get_variable_name(name="popVar", node=self.node),
+                                      else Utilities.get_variable_name(name="{0}_popVar".format(self.opPrefix),
+                                                                       node=self.node),
                                       shape=input_dim,
                                       initializer=tf.keras.initializers.Constant(value=1.0),
                                       trainable=False)

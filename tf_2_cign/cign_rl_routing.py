@@ -678,17 +678,20 @@ class CignRlRouting(CignNoMask):
         feed_dict["warm_up_period"] = kwargs["warm_up_period"]
         return feed_dict
 
+    # OK
     def train_cign_body_one_epoch(self,
                                   dataset,
                                   run_id,
                                   iteration,
                                   is_in_warm_up_period):
-        self.build_trackers()
+        # self.build_trackers()
+        # OK
         self.reset_trackers()
         times_list = []
         # Train for one loop the main CIGN
         for train_X, train_y in dataset:
             profiler = Profiler()
+            # OK
             model_output, main_grads, total_loss = \
                 self.run_main_model(X=train_X, y=train_y,
                                     iteration=iteration, is_in_warm_up_period=is_in_warm_up_period)
@@ -1008,6 +1011,14 @@ class CignRlRouting(CignNoMask):
         q_net_variables = [v for v in self.model.trainable_variables if "q_net" in v.name]
         q_net_var_set = set([v.name for v in q_net_variables])
 
+        # Just check
+        q_net_var_set_from_models = set()
+        for level in range(self.get_max_trajectory_length()):
+            for q_var in self.qNets[level].variables:
+                q_net_var_set_from_models.add(q_var.name)
+
+        assert q_net_var_set_from_models == q_net_var_set
+
         iteration = 0
         for epoch_id in range(q_net_epoch_count):
             for layer_id in range(len(self.qNetTrackers)):
@@ -1153,6 +1164,7 @@ class CignRlRouting(CignNoMask):
         epochs_after_warm_up = 0
         iteration = 0
         for epoch_id in range(epoch_count):
+            # OK
             iteration, times_list = self.train_cign_body_one_epoch(dataset=dataset.trainDataTf,
                                                                    run_id=run_id,
                                                                    iteration=iteration,
