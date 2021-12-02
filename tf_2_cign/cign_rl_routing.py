@@ -69,9 +69,9 @@ class CignRlRouting(CignNoMask):
         self.mseLoss = tf.keras.losses.MeanSquaredError()
         self.qNetCoeff = q_net_coeff
 
-    def save_model(self, run_id):
+    def save_model(self, run_id, epoch_id=0):
         root_path = os.path.dirname(__file__)
-        model_path = os.path.join(root_path, "..", "saved_models", "model_{0}".format(run_id))
+        model_path = os.path.join(root_path, "..", "saved_models", "model_{0}_epoch_{1}".format(run_id, epoch_id))
         os.mkdir(model_path)
         # if os.path.isdir(root_path):
         #     shutil.rmtree(root_path)
@@ -92,9 +92,9 @@ class CignRlRouting(CignNoMask):
             os.mkdir(qnet_model_vars_path)
             q_net.save_weights(qnet_model_vars_path)
 
-    def load_model(self, run_id):
+    def load_model(self, run_id, epoch_id=0):
         root_path = os.path.dirname(__file__)
-        model_path = os.path.join(root_path, "..", "saved_models", "model_{0}".format(run_id))
+        model_path = os.path.join(root_path, "..", "saved_models",  "model_{0}_epoch_{1}".format(run_id, epoch_id))
         # with open(model_path, "rb") as f:
         #     model = pickle.load(f)
         # Load keras models
@@ -319,7 +319,7 @@ class CignRlRouting(CignNoMask):
         optimal_q_tables.reverse()
         return regression_targets, optimal_q_tables
 
-    def get_model_outputs_dict(self, model_output_arr):
+    def convert_model_outputs_to_dict(self, model_output_arr):
         # eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
         # sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict, ig_activations_dict \
         model_output_dict = {
@@ -347,7 +347,7 @@ class CignRlRouting(CignNoMask):
         feed_dict = self.get_feed_dict(x=X, y=y, iteration=iteration, is_training=is_training,
                                        warm_up_period=warm_up_period)
         model_output_arr = self.model(inputs=feed_dict, training=is_training)
-        model_output_dict = self.get_model_outputs_dict(model_output_arr=model_output_arr)
+        model_output_dict = self.convert_model_outputs_to_dict(model_output_arr=model_output_arr)
 
         # eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
         # sc_masks_dict, ig_masks_dict, q_tables_predicted, node_outputs_dict, ig_activations_dict \
@@ -962,14 +962,14 @@ class CignRlRouting(CignNoMask):
 
         return model_output, main_grads, total_loss
 
-    def run_q_net_model(self, X, y, iteration, is_in_warm_up_period):
+    def run_q_net_model(self, X, y, iteration):
         with tf.GradientTape() as q_tape:
             model_output_val = self.run_model(
                 X=X,
                 y=y,
                 iteration=iteration,
                 is_training=True,
-                warm_up_period=is_in_warm_up_period)
+                warm_up_period=False)
             # Calculate target values for the Q-Nets
             posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
             ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
@@ -1027,8 +1027,7 @@ class CignRlRouting(CignNoMask):
             for X, y in train_tf:
                 model_output_val, q_grads, q_net_losses = self.run_q_net_model(X=X,
                                                                                y=y,
-                                                                               iteration=iteration,
-                                                                               is_in_warm_up_period=False)
+                                                                               iteration=iteration)
                 # Don't update non-Q-net variables
                 q_grads_zeroed = []
                 for grad, var in zip(q_grads, self.model.trainable_variables):

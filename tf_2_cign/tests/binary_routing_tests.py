@@ -232,13 +232,16 @@ class BinaryRoutingTests(unittest.TestCase):
         std_accuracy = 0.03
         for experiment_id in range(experiment_count):
             print("Experiment:{0}".format(experiment_id))
-            true_labels = np.random.randint(low=0, high=10, size=(batch_size,))
-            ig_activations_dict = self.cign.create_mock_ig_activations(batch_size=batch_size)
-            # Create mock posterior
-            posterior_arrays_dict = self.cign.create_mock_posteriors(true_labels=true_labels,
-                                                                     batch_size=batch_size,
-                                                                     mean_accuracy=mean_accuracy,
-                                                                     std_accuracy=std_accuracy)
+            true_labels, ig_activations_dict, posterior_arrays_dict, actions_predicted = self.cign. \
+                create_complete_output_mock_data(batch_size=batch_size, mean_accuracy=mean_accuracy,
+                                                 std_accuracy=std_accuracy)
+            # true_labels = np.random.randint(low=0, high=10, size=(batch_size,))
+            # ig_activations_dict = self.cign.create_mock_ig_activations(batch_size=batch_size)
+            # # Create mock posterior
+            # posterior_arrays_dict = self.cign.create_mock_posteriors(true_labels=true_labels,
+            #                                                          batch_size=batch_size,
+            #                                                          mean_accuracy=mean_accuracy,
+            #                                                          std_accuracy=std_accuracy)
             optimal_q_tables_auto = self.cign.calculate_optimal_q_tables(
                 true_labels=true_labels,
                 posteriors_dict=posterior_arrays_dict,
@@ -254,6 +257,33 @@ class BinaryRoutingTests(unittest.TestCase):
             for k_ in optimal_q_tables_auto.keys():
                 self.assertTrue(np.array_equal(optimal_q_tables_auto[k_], optimal_q_tables_manual[k_]))
         print("test_calculate_optimal_q_tables works!!!")
+
+    # @unittest.skip
+    def test_calculate_q_tables_from_network_outputs(self):
+        experiment_count = 100
+        batch_size = FashionNetConstants.batch_size
+        mean_accuracy = 0.922
+        std_accuracy = 0.03
+        for experiment_id in range(experiment_count):
+            print("Experiment:{0}".format(experiment_id))
+            true_labels, ig_activations_dict, posterior_arrays_dict, actions_predicted = self.cign. \
+                create_complete_output_mock_data(batch_size=batch_size, mean_accuracy=mean_accuracy,
+                                                 std_accuracy=std_accuracy)
+            regression_q_targets_auto = self.cign.calculate_q_tables_from_network_outputs(
+                true_labels=true_labels,
+                posteriors_dict=posterior_arrays_dict,
+                ig_activations_dict=ig_activations_dict,
+                actions_predicted=actions_predicted,
+                ig_masks_dict=None)
+            regression_q_targets_manual = self.cign.calculate_q_tables_from_network_outputs_manual(
+                true_labels=true_labels,
+                posteriors_dict=posterior_arrays_dict,
+                ig_activations_dict=ig_activations_dict,
+                actions_predicted=actions_predicted,
+                ig_masks_dict=None)
+            self.assertTrue(len(regression_q_targets_auto) == len(regression_q_targets_manual))
+            for level in range(len(regression_q_targets_auto)):
+                self.assertTrue(np.array_equal(regression_q_targets_auto[level], regression_q_targets_manual[level]))
 
 
 if __name__ == '__main__':

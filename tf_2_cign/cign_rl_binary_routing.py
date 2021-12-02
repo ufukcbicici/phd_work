@@ -30,6 +30,7 @@ class CignRlBinaryRouting(CignRlRouting):
                          learning_rate_schedule, decision_loss_coeff, bn_momentum)
         # Epsilon hyperparameter for exploration - explotation
         self.globalStep = tf.Variable(initial_value=0, trainable=False, dtype=tf.int32)
+        self.afterWarmUpEpochCount = 0
         self.epsilonDecayRate = epsilon_decay_rate
         self.epsilonStep = epsilon_step
         self.rewardType = reward_type
@@ -205,8 +206,8 @@ class CignRlBinaryRouting(CignRlRouting):
         model_output_arr.append(self.scRoutingMatricesDict)
         return model_output_arr
 
-    def get_model_outputs_dict(self, model_output_arr):
-        model_output_dict = super(CignRlBinaryRouting, self).get_model_outputs_dict(model_output_arr)
+    def convert_model_outputs_to_dict(self, model_output_arr):
+        model_output_dict = super(CignRlBinaryRouting, self).convert_model_outputs_to_dict(model_output_arr)
         model_output_dict["actions_predicted"] = model_output_arr[9]
         model_output_dict["sc_routing_matrices_dict"] = model_output_arr[10]
         return model_output_dict
@@ -458,6 +459,27 @@ class CignRlBinaryRouting(CignRlRouting):
         print("Final Accuracy:{0}".format(accuracy))
         return posterior_arrays_dict
 
+    def create_mock_predicted_actions(self, batch_size):
+        actions_predicted = []
+        for level in range(self.get_max_trajectory_length()):
+            actions_of_this_level = np.random.randint(low=0, high=2, size=(batch_size, ))
+            actions_predicted.append(actions_of_this_level)
+        return actions_predicted
+
+    def create_complete_output_mock_data(self, batch_size, mean_accuracy, std_accuracy):
+        # Create mock true labels
+        true_labels = np.random.randint(low=0, high=10, size=(batch_size,))
+        # Create mock information gain outputs
+        ig_activations_dict = self.create_mock_ig_activations(batch_size=batch_size)
+        # Create mock posterior
+        posterior_arrays_dict = self.create_mock_posteriors(true_labels=true_labels,
+                                                            batch_size=batch_size,
+                                                            mean_accuracy=mean_accuracy,
+                                                            std_accuracy=std_accuracy)
+        # Create mock actions predicted.
+        actions_predicted = self.create_mock_predicted_actions(batch_size=batch_size)
+        return true_labels, ig_activations_dict, posterior_arrays_dict, actions_predicted
+
     # This method calculates the optimal Q-tables of a given CIGN result, including each sample's true label,
     # predicted posteriors and for each sample the interior information gain activations.
     # The expected result is the optimal Q-values for every possible trajectory in the CIGN.
@@ -622,20 +644,159 @@ class CignRlBinaryRouting(CignRlRouting):
                                                 **kwargs):
         batch_size = true_labels.shape[0]
         actions_predicted = kwargs["actions_predicted"]
-        sc_routing_matrices_dict = kwargs["sc_routing_matrices_dict"]
         ig_activations_dict = kwargs["ig_activations_dict"]
 
-        # # Calculate the action spaces of each sample.
-        # action_spaces = self.calculate_sample_action_results(ig_activations_dict=ig_activations_dict)
+        # Calculate the Q-values for every action
+        optimal_q_values = self.calculate_optimal_q_tables(true_labels=true_labels,
+                                                           posteriors_dict=posteriors_dict,
+                                                           ig_activations_dict=ig_activations_dict)
+
+        # According to the predicted actions, gather the optimal q-values
+        regression_q_targets = []
+        trajectories = [np.zeros_like(true_labels)]
+        for level in range(self.get_max_trajectory_length()):
+            coords_action_0 = tuple([*trajectories, np.zeros_like(true_labels), np.arange(batch_size)])
+            q_values_action_0 = optimal_q_values[level + 1][coords_action_0]
+
+            coords_action_1 = tuple([*trajectories, np.ones_like(true_labels), np.arange(batch_size)])
+            q_values_action_1 = optimal_q_values[level + 1][coords_action_1]
+
+            q_target = np.stack([q_values_action_0, q_values_action_1], axis=-1)
+            regression_q_targets.append(q_target)
+            # Update the trajectories with the predicted action value
+            actions_predicted_this_level = np.array(actions_predicted[level])
+            trajectories.append(actions_predicted_this_level)
+        # Target q-values
+        return regression_q_targets
+
+    def calculate_q_tables_from_network_outputs_manual(self,
+                                                       true_labels,
+                                                       posteriors_dict,
+                                                       ig_masks_dict,
+                                                       **kwargs):
+        batch_size = true_labels.shape[0]
+        actions_predicted = kwargs["actions_predicted"]
+        ig_activations_dict = kwargs["ig_activations_dict"]
+
+        # Calculate the Q-values for every action
+        optimal_q_values = self.calculate_optimal_q_tables_manual(true_labels=true_labels,
+                                                                  posteriors_dict=posteriors_dict,
+                                                                  ig_activations_dict=ig_activations_dict)
+        regression_q_targets = [[] for _ in range(self.get_max_trajectory_length())]
+        for sample_id in range(batch_size):
+            trajectory = [0]
+            for level in range(self.get_max_trajectory_length()):
+                coords = []
+                coords.extend(trajectory)
+
+                action_0_trajectory = []
+                action_0_trajectory.extend(coords)
+                action_0_trajectory.append(0)
+                action_0_trajectory.append(sample_id)
+                q_s_a_0 = optimal_q_values[level + 1][tuple(action_0_trajectory)]
+
+                action_1_trajectory = []
+                action_1_trajectory.extend(coords)
+                action_1_trajectory.append(1)
+                action_1_trajectory.append(sample_id)
+                q_s_a_1 = optimal_q_values[level + 1][tuple(action_1_trajectory)]
+
+                regression_q_targets[level].append(np.array([q_s_a_0, q_s_a_1]))
+                trajectory.append(actions_predicted[level][sample_id])
+
+        for level in range(self.get_max_trajectory_length()):
+            regression_q_targets[level] = np.stack(regression_q_targets[level], axis=0)
+        return regression_q_targets
+
+    def update_states(self, run_id, epoch_id, epoch_count, constraints):
+        states_dict = {}
+        is_model_saved = False
+        # Is this a warm up epoch?
+        if epoch_id < constraints["warm_up_epoch_count"]:
+            states_dict["is_in_warm_up_period"] = True
+        else:
+            states_dict["is_in_warm_up_period"] = False
+            self.afterWarmUpEpochCount += 1
+
+        # Will we train Q-nets this epoch?
+        q_net_train_start_epoch = constraints["q_net_train_start_epoch"]
+        q_net_train_period = constraints["q_net_train_period"]
+        if (epoch_id - q_net_train_start_epoch + 1) % q_net_train_period == 0 or self.afterWarmUpEpochCount == 1:
+            if not is_model_saved:
+                self.save_model(run_id=run_id, epoch_id=epoch_id)
+                is_model_saved = True
+            states_dict["do_train_q_nets"] = True
+        else:
+            states_dict["do_train_q_nets"] = False
+
+        # Will we measure performance this epoch?
+        if (epoch_id >= epoch_count - 10) or (epoch_id % self.trainEvalPeriod == 0) or self.afterWarmUpEpochCount == 1:
+            if not is_model_saved:
+                self.save_model(run_id=run_id, epoch_id=epoch_id)
+            states_dict["measure_performance"] = True
+        else:
+            states_dict["measure_performance"] = False
+
+        return states_dict
+
+    def run_q_net_model(self, X, y, iteration):
+        with tf.GradientTape() as q_tape:
+            model_output_val = self.run_model(
+                X=X,
+                y=y,
+                iteration=iteration,
+                is_training=True,
+                warm_up_period=False)
+            # Calculate target values for the Q-Nets
+            posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
+            ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
+        #     regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
+        #                                                              posteriors_dict=posteriors_val,
+        #                                                              ig_masks_dict=ig_masks_val)
+        #     # Q-Net Losses
+        #     q_net_predicted = model_output_val["q_tables_predicted"]
+        #     q_net_losses = []
+        #     for idx, tpl in enumerate(zip(regs, q_net_predicted)):
+        #         q_truth = tpl[0]
+        #         q_predicted = tpl[1]
+        #         q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
+        #         mse = self.mseLoss(q_truth_tensor, q_predicted)
+        #         q_net_losses.append(mse)
+        #     full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
+        #     q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
+        #     total_q_loss = full_q_loss + q_regularization_loss
+        # q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
+        # return model_output_val, q_grads, q_net_losses
 
     def train(self, run_id, dataset, epoch_count, **kwargs):
         q_net_epoch_count = kwargs["q_net_epoch_count"]
-        fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
-        is_in_warm_up_period = True
+        # fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
+        # warm_up_epoch_count = kwargs["warm_up_epoch_count"]
+        # is_in_warm_up_period = True
+
+        constraints = kwargs["constraints"]
         # OK
         self.optimizer = self.get_sgd_optimizer()
         # OK
         self.build_trackers()
+
+        # Train loop
+        iteration = 0
+        for epoch_id in range(epoch_count):
+            states_dict = self.update_states(run_id=run_id, epoch_id=epoch_id, constraints=constraints)
+            # One epoch training of the main CIGN body, without Q-Nets - OK
+            iteration, times_list = self.train_cign_body_one_epoch(
+                dataset=dataset.trainDataTf,
+                run_id=run_id,
+                iteration=iteration,
+                is_in_warm_up_period=states_dict["is_in_warm_up_period"])
+            self.check_q_net_vars()
+            # If it is the valid epoch, train the Q-Nets
+            if states_dict["do_train_q_nets"]:
+                # Freeze the main CIGN and train the Q-Nets.
+                self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
+
+        # Warm up period:
 
         # Group main body CIGN variables and Q Net variables.
         # q_net_variables = [v for v in self.model.trainable_variables if "q_net" in v.name]
