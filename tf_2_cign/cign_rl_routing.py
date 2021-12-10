@@ -94,7 +94,7 @@ class CignRlRouting(CignNoMask):
 
     def load_model(self, run_id, epoch_id=0):
         root_path = os.path.dirname(__file__)
-        model_path = os.path.join(root_path, "..", "saved_models",  "model_{0}_epoch_{1}".format(run_id, epoch_id))
+        model_path = os.path.join(root_path, "..", "saved_models", "model_{0}_epoch_{1}".format(run_id, epoch_id))
         # with open(model_path, "rb") as f:
         #     model = pickle.load(f)
         # Load keras models
@@ -317,7 +317,7 @@ class CignRlRouting(CignNoMask):
 
         regression_targets.reverse()
         optimal_q_tables.reverse()
-        return regression_targets, optimal_q_tables
+        return regression_targets
 
     def convert_model_outputs_to_dict(self, model_output_arr):
         # eval_dict, classification_losses, info_gain_losses, posteriors_dict, \
@@ -537,9 +537,9 @@ class CignRlRouting(CignNoMask):
             for idx, node in enumerate(level_nodes):
                 x_features_list_all[t][idx] = np.concatenate(x_features_list_all[t][idx], axis=0)
 
-        regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y_,
-                                                                 posteriors_dict=posteriors,
-                                                                 ig_masks_dict=ig_masks)
+        regs = self.calculate_q_tables_from_network_outputs(true_labels=y_,
+                                                            posteriors_dict=posteriors,
+                                                            ig_masks_dict=ig_masks)
 
         # assert len(regs) == len(y_list)
         # assert len(q_s) == len(q_tables)
@@ -973,13 +973,14 @@ class CignRlRouting(CignNoMask):
             # Calculate target values for the Q-Nets
             posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
             ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
-            regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
-                                                                     posteriors_dict=posteriors_val,
-                                                                     ig_masks_dict=ig_masks_val)
+            # TODO: Check this
+            regression_q_targets = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
+                                                                                posteriors_dict=posteriors_val,
+                                                                                ig_masks_dict=ig_masks_val)
             # Q-Net Losses
             q_net_predicted = model_output_val["q_tables_predicted"]
             q_net_losses = []
-            for idx, tpl in enumerate(zip(regs, q_net_predicted)):
+            for idx, tpl in enumerate(zip(regression_q_targets, q_net_predicted)):
                 q_truth = tpl[0]
                 q_predicted = tpl[1]
                 q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
@@ -1025,6 +1026,7 @@ class CignRlRouting(CignNoMask):
                 self.qNetTrackers[layer_id].reset_states()
 
             for X, y in train_tf:
+                # DONE
                 model_output_val, q_grads, q_net_losses = self.run_q_net_model(X=X,
                                                                                y=y,
                                                                                iteration=iteration)
@@ -1060,9 +1062,9 @@ class CignRlRouting(CignNoMask):
     def calculate_total_q_net_loss(self, model_output, y):
         posteriors_val = {k: v.numpy() for k, v in model_output["posteriors_dict"].items()}
         ig_masks_val = {k: v.numpy() for k, v in model_output["ig_masks_dict"].items()}
-        regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
-                                                                 posteriors_dict=posteriors_val,
-                                                                 ig_masks_dict=ig_masks_val)
+        regs = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
+                                                            posteriors_dict=posteriors_val,
+                                                            ig_masks_dict=ig_masks_val)
         # Q-Net Losses
         q_net_predicted = model_output["q_tables_predicted"]
         q_net_losses = []
@@ -1080,6 +1082,7 @@ class CignRlRouting(CignNoMask):
         #     total_q_loss = full_q_loss
         return q_net_losses
 
+    # SEEMS OK
     def eval(self, run_id, iteration, dataset, dataset_type):
         if dataset is None:
             return 0.0

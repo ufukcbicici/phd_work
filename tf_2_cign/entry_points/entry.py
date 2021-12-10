@@ -98,9 +98,6 @@ if __name__ == "__main__":
         # cign.load_model(run_id=2965)
         # cign.train_q_nets_with_full_net(dataset=fashion_mnist, q_net_epoch_count=250)
 
-
-
-
         # cign.calculate_optimal_q_values(dataset=fashion_mnist.validationDataTf, batch_size=batch_size)
         cign.train(run_id=run_id,
                    dataset=fashion_mnist,

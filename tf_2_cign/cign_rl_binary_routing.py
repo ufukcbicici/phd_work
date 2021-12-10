@@ -739,38 +739,9 @@ class CignRlBinaryRouting(CignRlRouting):
 
         return states_dict
 
-    def run_q_net_model(self, X, y, iteration):
-        with tf.GradientTape() as q_tape:
-            model_output_val = self.run_model(
-                X=X,
-                y=y,
-                iteration=iteration,
-                is_training=True,
-                warm_up_period=False)
-            # Calculate target values for the Q-Nets
-            posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
-            ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
-        #     regs, q_s = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
-        #                                                              posteriors_dict=posteriors_val,
-        #                                                              ig_masks_dict=ig_masks_val)
-        #     # Q-Net Losses
-        #     q_net_predicted = model_output_val["q_tables_predicted"]
-        #     q_net_losses = []
-        #     for idx, tpl in enumerate(zip(regs, q_net_predicted)):
-        #         q_truth = tpl[0]
-        #         q_predicted = tpl[1]
-        #         q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
-        #         mse = self.mseLoss(q_truth_tensor, q_predicted)
-        #         q_net_losses.append(mse)
-        #     full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
-        #     q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
-        #     total_q_loss = full_q_loss + q_regularization_loss
-        # q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
-        # return model_output_val, q_grads, q_net_losses
-
     def train(self, run_id, dataset, epoch_count, **kwargs):
         q_net_epoch_count = kwargs["q_net_epoch_count"]
-        # fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
+        fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
         # warm_up_epoch_count = kwargs["warm_up_epoch_count"]
         # is_in_warm_up_period = True
 
@@ -783,7 +754,8 @@ class CignRlBinaryRouting(CignRlRouting):
         # Train loop
         iteration = 0
         for epoch_id in range(epoch_count):
-            states_dict = self.update_states(run_id=run_id, epoch_id=epoch_id, constraints=constraints)
+            states_dict = self.update_states(run_id=run_id, epoch_id=epoch_id,
+                                             constraints=constraints, epoch_count=epoch_count)
             # One epoch training of the main CIGN body, without Q-Nets - OK
             iteration, times_list = self.train_cign_body_one_epoch(
                 dataset=dataset.trainDataTf,
@@ -795,65 +767,31 @@ class CignRlBinaryRouting(CignRlRouting):
             if states_dict["do_train_q_nets"]:
                 # Freeze the main CIGN and train the Q-Nets.
                 self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
+            # Measure the model performance, if it is a valid epoch.
+            if states_dict["measure_performance"]:
+                self.measure_performance(dataset=dataset,
+                                         run_id=run_id,
+                                         iteration=iteration,
+                                         epoch_id=epoch_id,
+                                         times_list=times_list)
 
-        # Warm up period:
+        # Train the routing for the last time.
+        self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
 
-        # Group main body CIGN variables and Q Net variables.
-        # q_net_variables = [v for v in self.model.trainable_variables if "q_net" in v.name]
-        # q_net_var_set = set([v.name for v in q_net_variables])
-        # cign_main_body_variables = [v for v in self.model.trainable_variables if v.name not in q_net_var_set]
+        # Fine tune the model.
+        # Fine tune by merging training and validation sets
+        full_train_X = np.concatenate([dataset.trainX, dataset.valX], axis=0)
+        full_train_y = np.concatenate([dataset.trainY, dataset.valY], axis=0)
+        train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
+            shuffle(5000).batch(self.batchSizeNonTensor)
 
-        # epochs_after_warm_up = 0
-        # iteration = 0
-        # for epoch_id in range(epoch_count):
-        #     iteration, times_list = self.train_cign_body_one_epoch(dataset=dataset.trainDataTf,
-        #                                                            run_id=run_id,
-        #                                                            iteration=iteration,
-        #                                                            is_in_warm_up_period=is_in_warm_up_period)
-        #     self.check_q_net_vars()
-        #     if epoch_id >= self.warmUpPeriod:
-        #         # Run Q-Net learning for the first time.
-        #         if is_in_warm_up_period:
-        #             self.save_model(run_id=run_id)
-        #             is_in_warm_up_period = False
-        #             self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
-        #             self.measure_performance(dataset=dataset,
-        #                                      run_id=run_id,
-        #                                      iteration=iteration,
-        #                                      epoch_id=epoch_id,
-        #                                      times_list=times_list)
-        #         else:
-        #             is_performance_measured = False
-        #             if (epochs_after_warm_up + 1) % self.cignRlTrainPeriod == 0:
-        #                 self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
-        #                 self.measure_performance(dataset=dataset,
-        #                                          run_id=run_id,
-        #                                          iteration=iteration,
-        #                                          epoch_id=epoch_id,
-        #                                          times_list=times_list)
-        #                 is_performance_measured = True
-        #             if (epoch_id >= epoch_count - 10 or epoch_id % self.trainEvalPeriod == 0) \
-        #                     and is_performance_measured is False:
-        #                 self.measure_performance(dataset=dataset,
-        #                                          run_id=run_id,
-        #                                          iteration=iteration,
-        #                                          epoch_id=epoch_id,
-        #                                          times_list=times_list)
-        #         epochs_after_warm_up += 1
-        #
-        # # Fine tune by merging training and validation sets
-        # full_train_X = np.concatenate([dataset.trainX, dataset.valX], axis=0)
-        # full_train_y = np.concatenate([dataset.trainY, dataset.valY], axis=0)
-        # train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
-        #     shuffle(5000).batch(self.batchSizeNonTensor)
-        #
-        # for epoch_id in range(epoch_count, epoch_count + fine_tune_epoch_count):
-        #     iteration, times_list = self.train_cign_body_one_epoch(dataset=train_tf,
-        #                                                            run_id=run_id,
-        #                                                            iteration=iteration,
-        #                                                            is_in_warm_up_period=is_in_warm_up_period)
-        #     self.measure_performance(dataset=dataset,
-        #                              run_id=run_id,
-        #                              iteration=iteration,
-        #                              epoch_id=epoch_id,
-        #                              times_list=times_list)
+        for epoch_id in range(epoch_count, epoch_count + fine_tune_epoch_count):
+            iteration, times_list = self.train_cign_body_one_epoch(dataset=train_tf,
+                                                                   run_id=run_id,
+                                                                   iteration=iteration,
+                                                                   is_in_warm_up_period=False)
+            self.measure_performance(dataset=dataset,
+                                     run_id=run_id,
+                                     iteration=iteration,
+                                     epoch_id=epoch_id,
+                                     times_list=times_list)

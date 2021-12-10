@@ -474,6 +474,7 @@ class CignNoMask(Cign):
                                          epoch_id=epoch_id,
                                          times_list=times_list)
 
+    # TODO: Control that.
     def calculate_predictions_of_batch(self, model_output, y):
         leaf_weights = []
         posteriors = []
