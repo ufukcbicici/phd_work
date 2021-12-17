@@ -24,7 +24,7 @@ class CignBinaryActionGeneratorLayer(tf.keras.layers.Layer):
         explore_exploit_vec = eps > probs
         # Argmax indices for q_table
         exploit_actions = tf.argmax(q_table_predicted, axis=-1)
-        # Uniformly random indies for q_table
+        # Uniformly random indices for q_table
         explore_actions = tf.random.uniform(shape=[tf.shape(q_table_predicted)[0]], dtype=exploit_actions.dtype,
                                             minval=0, maxval=2)
         return explore_actions, exploit_actions, explore_exploit_vec

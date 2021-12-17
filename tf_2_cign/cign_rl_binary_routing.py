@@ -9,6 +9,7 @@ from tf_2_cign.custom_layers.cign_binary_action_generator_layer import CignBinar
 from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import CignBinaryActionResultGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
 from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
+from tf_2_cign.custom_layers.cign_test_layer import CignTestLayer
 from tf_2_cign.utilities.profiler import Profiler
 from collections import Counter
 from tf_2_cign.utilities.utilities import Utilities
@@ -38,6 +39,7 @@ class CignRlBinaryRouting(CignRlRouting):
             initial_learning_rate=1.0, decay_steps=self.epsilonStep, decay_rate=self.epsilonDecayRate)
         self.actionResultGenerators = {}
         self.actionCalculatorLayers = []
+        self.qNetEndToEndModel = []
 
     def convert_posteriors_dict_to_tensor(self, posteriors_dict):
         posteriors_tensor = []
@@ -172,7 +174,11 @@ class CignRlBinaryRouting(CignRlRouting):
         action_generator_layer = CignBinaryActionGeneratorLayer(network=self)
         predicted_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
             q_table_predicted)
-        q_net = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=[q_table_predicted, predicted_actions])
+        q_net = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=[q_table_predicted,
+                                                                     predicted_actions,
+                                                                     explore_exploit_vec,
+                                                                     explore_actions,
+                                                                     exploit_actions])
         return q_net
 
     # Here, some changes are needed.
@@ -180,11 +186,27 @@ class CignRlBinaryRouting(CignRlRouting):
         assert len(self.scRoutingCalculationLayers) == level
         q_net = self.build_isolated_q_net_model(input_f_tensor=input_f_tensor, level=level)
         # Connect the Q-Net to the rest of the network.
-        q_table_predicted, predicted_actions = q_net(inputs=input_f_tensor)
+        q_table_predicted, predicted_actions, explore_exploit_vec, explore_actions, exploit_actions = \
+            q_net(inputs=input_f_tensor)
+
+        q_net_end_to_end_model = tf.keras.Model(inputs=self.feedDict, outputs=[q_table_predicted,
+                                                                               predicted_actions,
+                                                                               explore_exploit_vec,
+                                                                               explore_actions,
+                                                                               exploit_actions])
+        self.qNetEndToEndModel.append(q_net_end_to_end_model)
         # Save Q-Net and its outputs.
         self.qNets.append(q_net)
         self.qTablesPredicted.append(q_table_predicted)
         self.actionsPredicted.append(predicted_actions)
+
+        test_layer = CignTestLayer(level=level, network=self)
+        res = test_layer([
+            predicted_actions,
+            explore_exploit_vec,
+            explore_actions,
+            exploit_actions])
+
         # Get information gain activations for the current level.
         ig_activations = tf.stack(
             [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
@@ -196,7 +218,12 @@ class CignRlBinaryRouting(CignRlRouting):
         # Create the routing layer.
         routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, network=self)
         secondary_routing_matrix_cign_output = routing_calculation_layer(
-            [ig_activations, sc_routing_matrix, predicted_actions])
+            [ig_activations,
+             sc_routing_matrix,
+             predicted_actions,
+             explore_exploit_vec,
+             explore_actions,
+             exploit_actions])
         self.scRoutingCalculationLayers.append(routing_calculation_layer)
         return secondary_routing_matrix_cign_output
 
@@ -462,7 +489,7 @@ class CignRlBinaryRouting(CignRlRouting):
     def create_mock_predicted_actions(self, batch_size):
         actions_predicted = []
         for level in range(self.get_max_trajectory_length()):
-            actions_of_this_level = np.random.randint(low=0, high=2, size=(batch_size, ))
+            actions_of_this_level = np.random.randint(low=0, high=2, size=(batch_size,))
             actions_predicted.append(actions_of_this_level)
         return actions_predicted
 
@@ -526,7 +553,7 @@ class CignRlBinaryRouting(CignRlRouting):
             # The distribution of the dimensions:
             # First level dimensions: The trajectory UP TO THIS level.
             # This excludes the action to be taken in this level.
-            # (level+1).th dimension: The action to be taken in this level.
+            # level.th dimension: The action to be taken in this level.
             # The last dimension: The batch size.
             optimal_q_table_for_level = np.zeros(shape=table_shape, dtype=np.float64)
 
@@ -708,67 +735,86 @@ class CignRlBinaryRouting(CignRlRouting):
             regression_q_targets[level] = np.stack(regression_q_targets[level], axis=0)
         return regression_q_targets
 
-    def update_states(self, run_id, epoch_id, epoch_count, constraints):
-        states_dict = {}
-        is_model_saved = False
-        # Is this a warm up epoch?
-        if epoch_id < constraints["warm_up_epoch_count"]:
-            states_dict["is_in_warm_up_period"] = True
-        else:
-            states_dict["is_in_warm_up_period"] = False
-            self.afterWarmUpEpochCount += 1
+    def get_epoch_states(self, epoch_count, constraints):
+        epoch_states = [dict() for _ in range(epoch_count)]
+        # Warm up periods
+        for epoch_id in range(epoch_count):
+            epochs_from_q_training_start = epoch_id - constraints["q_net_train_start_epoch"]
+            if epoch_id < constraints["q_net_train_start_epoch"]:
+                epoch_states[epoch_id]["is_in_warm_up_period"] = True
+            else:
+                epoch_states[epoch_id]["is_in_warm_up_period"] = False
 
-        # Will we train Q-nets this epoch?
-        q_net_train_start_epoch = constraints["q_net_train_start_epoch"]
-        q_net_train_period = constraints["q_net_train_period"]
-        if (epoch_id - q_net_train_start_epoch + 1) % q_net_train_period == 0 or self.afterWarmUpEpochCount == 1:
-            if not is_model_saved:
-                self.save_model(run_id=run_id, epoch_id=epoch_id)
-                is_model_saved = True
-            states_dict["do_train_q_nets"] = True
-        else:
-            states_dict["do_train_q_nets"] = False
+            if epoch_id >= constraints["q_net_train_start_epoch"] and epochs_from_q_training_start % constraints[
+                "q_net_train_period"] == 0:
+                epoch_states[epoch_id]["do_train_q_nets"] = True
+            else:
+                epoch_states[epoch_id]["do_train_q_nets"] = False
 
-        # Will we measure performance this epoch?
-        if (epoch_id >= epoch_count - 10) or (epoch_id % self.trainEvalPeriod == 0) or self.afterWarmUpEpochCount == 1:
-            if not is_model_saved:
-                self.save_model(run_id=run_id, epoch_id=epoch_id)
-            states_dict["measure_performance"] = True
-        else:
-            states_dict["measure_performance"] = False
+            if epochs_from_q_training_start >= 0 and ((epoch_id >= epoch_count - 10) or (
+                    epochs_from_q_training_start % self.trainEvalPeriod == 0) or
+                                                      epoch_states[epoch_id]["do_train_q_nets"]):
+                epoch_states[epoch_id]["do_measure_performance"] = True
+            else:
+                epoch_states[epoch_id]["do_measure_performance"] = False
+        return epoch_states
 
-        return states_dict
+    def run_model(self, **kwargs):
+        X = kwargs["X"]
+        y = kwargs["y"]
+        iteration = kwargs["iteration"]
+        is_training = kwargs["is_training"]
+        if "warm_up_period" in kwargs:
+            warm_up_period = kwargs["warm_up_period"]
+        else:
+            warm_up_period = False
+        feed_dict = self.get_feed_dict(x=X, y=y, iteration=iteration, is_training=is_training,
+                                       warm_up_period=warm_up_period)
+        outputs = self.qNetEndToEndModel[0](inputs=feed_dict, training=is_training)
+        model_output_arr = self.model(inputs=feed_dict, training=is_training)
+        model_output_dict = self.convert_model_outputs_to_dict(model_output_arr=model_output_arr)
+        return model_output_dict
 
     def train(self, run_id, dataset, epoch_count, **kwargs):
-        q_net_epoch_count = kwargs["q_net_epoch_count"]
-        fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
+        # q_net_epoch_count = kwargs["q_net_epoch_count"]
+        # fine_tune_epoch_count = kwargs["fine_tune_epoch_count"]
         # warm_up_epoch_count = kwargs["warm_up_epoch_count"]
         # is_in_warm_up_period = True
 
-        constraints = kwargs["constraints"]
+        constraints = {"q_net_epoch_count": kwargs["q_net_epoch_count"],
+                       "fine_tune_epoch_count": kwargs["fine_tune_epoch_count"],
+                       "warm_up_epoch_count": kwargs["warm_up_epoch_count"],
+                       "q_net_train_start_epoch": kwargs["q_net_train_start_epoch"],
+                       "q_net_train_period": kwargs["q_net_train_period"]}
         # OK
         self.optimizer = self.get_sgd_optimizer()
         # OK
         self.build_trackers()
+        states_dict = self.get_epoch_states(constraints=constraints, epoch_count=epoch_count)
 
         # Train loop
         iteration = 0
         for epoch_id in range(epoch_count):
-            states_dict = self.update_states(run_id=run_id, epoch_id=epoch_id,
-                                             constraints=constraints, epoch_count=epoch_count)
             # One epoch training of the main CIGN body, without Q-Nets - OK
+            #
+            # for train_X, train_y in dataset:
+            #
+            #
+            #
+            #
+
             iteration, times_list = self.train_cign_body_one_epoch(
                 dataset=dataset.trainDataTf,
                 run_id=run_id,
                 iteration=iteration,
-                is_in_warm_up_period=states_dict["is_in_warm_up_period"])
+                is_in_warm_up_period=states_dict[epoch_id]["is_in_warm_up_period"])
             self.check_q_net_vars()
             # If it is the valid epoch, train the Q-Nets
-            if states_dict["do_train_q_nets"]:
+            if states_dict[epoch_id]["do_train_q_nets"]:
                 # Freeze the main CIGN and train the Q-Nets.
-                self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
+                self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=kwargs["q_net_epoch_count"])
             # Measure the model performance, if it is a valid epoch.
-            if states_dict["measure_performance"]:
+            if states_dict[epoch_id]["do_measure_performance"]:
                 self.measure_performance(dataset=dataset,
                                          run_id=run_id,
                                          iteration=iteration,
@@ -776,7 +822,7 @@ class CignRlBinaryRouting(CignRlRouting):
                                          times_list=times_list)
 
         # Train the routing for the last time.
-        self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=q_net_epoch_count)
+        self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=kwargs["q_net_epoch_count"])
 
         # Fine tune the model.
         # Fine tune by merging training and validation sets
@@ -785,7 +831,7 @@ class CignRlBinaryRouting(CignRlRouting):
         train_tf = tf.data.Dataset.from_tensor_slices((full_train_X, full_train_y)). \
             shuffle(5000).batch(self.batchSizeNonTensor)
 
-        for epoch_id in range(epoch_count, epoch_count + fine_tune_epoch_count):
+        for epoch_id in range(epoch_count, epoch_count + kwargs["fine_tune_epoch_count"]):
             iteration, times_list = self.train_cign_body_one_epoch(dataset=train_tf,
                                                                    run_id=run_id,
                                                                    iteration=iteration,

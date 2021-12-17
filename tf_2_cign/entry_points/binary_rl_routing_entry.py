@@ -68,7 +68,10 @@ if __name__ == "__main__":
                    dataset=fashion_mnist,
                    epoch_count=100,
                    q_net_epoch_count=250,
-                   fine_tune_epoch_count=25)
+                   fine_tune_epoch_count=25,
+                   warm_up_epoch_count=25,
+                   q_net_train_start_epoch=25,
+                   q_net_train_period=25)
 
         print("X")
 

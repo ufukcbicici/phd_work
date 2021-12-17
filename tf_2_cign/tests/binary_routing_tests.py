@@ -1,15 +1,20 @@
 import unittest
 import numpy as np
 import tensorflow as tf
+import time
 
+from algorithms.info_gain import InfoGainLoss
 from auxillary.db_logger import DbLogger
 from tf_2_cign.custom_layers.cign_binary_action_generator_layer import CignBinaryActionGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import CignBinaryActionResultGeneratorLayer
 from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
+from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
+from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign_binary_rl import FashionRlBinaryRouting
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
+from tf_2_cign.utilities.utilities import Utilities
 from collections import Counter
 
 
@@ -127,64 +132,108 @@ class BinaryRoutingTests(unittest.TestCase):
 
         # Action generator
         action_generator_layer = CignBinaryActionGeneratorLayer(network=self.cign)
+        # Action generator in a tf.Model
+        q_net_output_simulated = tf.keras.Input(shape=[2], name="x_", dtype=tf.float32)
+        f_actions, xplr_vs_xplo, xplr_actions, xplo_actions = action_generator_layer(
+            q_net_output_simulated)
+        model = tf.keras.Model(inputs=q_net_output_simulated,
+                               outputs=[f_actions, xplr_vs_xplo, xplr_actions, xplo_actions])
         for exp_id in range(experiment_count):
             if (exp_id + 1) % 100 == 0:
                 print("test_action_generator_layer Experiment:{0}".format(exp_id + 1))
             step_count = np.random.randint(low=0, high=50000)
             self.cign.globalStep.assign(value=step_count)
             eps_prob = self.cign.exploreExploitEpsilon(step_count)
-            action_counter = Counter()
-            final_actions_training = []
-            explore_exploit_vectors = []
-            training_exploit_actions = []
-            training_explore_actions = []
+            combinations = Utilities.get_cartesian_product(list_of_lists=[
+                ["Without tf.model", "With tf.model"],
+                ["training", "test"]])
+            results_dict = {}
+            for tpl in combinations:
+                op_type = tpl[0]
+                phase = tpl[1]
+                if op_type not in results_dict:
+                    results_dict[op_type] = dict()
+                results_dict[op_type][phase] = dict()
+                results_dict[op_type][phase]["action_counter"] = Counter()
+                results_dict[op_type][phase]["final_actions"] = []
+                results_dict[op_type][phase]["explore_exploit_vec"] = []
+                results_dict[op_type][phase]["explore_actions"] = []
+                results_dict[op_type][phase]["exploit_actions"] = []
 
-            final_actions_test = []
-            final_actions_test_manuel = []
             for sample_id in range(sample_count):
                 if (sample_id + 1) % 100 == 0:
                     print("test_action_generator_layer Experiment:{0} Sample:{1}".format(exp_id + 1, sample_id + 1))
                 # Mock q_net output
-                q_net_output = tf.random.uniform(shape=[batch_size, 2], dtype=tf.float32,
-                                                 minval=-1.0, maxval=1.0)
-                # Measure if explore-exploit scheme works correctly by measuring exploration selection probability.
-                final_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
-                    q_net_output, training=True)
-                res_vec = tf.where(explore_exploit_vec,
-                                   tf.convert_to_tensor(["explore"] * batch_size),
-                                   tf.convert_to_tensor(["exploit"] * batch_size))
-                action_counter.update(Counter(res_vec.numpy()))
-                # Measure if explore-exploit scheme works correctly by manually calculating training phase actions.
-                final_actions_training.append(final_actions)
-                explore_exploit_vectors.append(explore_exploit_vec)
-                training_exploit_actions.append(exploit_actions)
-                training_explore_actions.append(explore_actions)
+                q_net_output = tf.random.uniform(shape=[batch_size, 2], dtype=tf.float32, minval=-1.0, maxval=1.0)
+                for tpl in [("Without tf.model", action_generator_layer), ("With tf.model", model)]:
+                    op_type = tpl[0]
+                    op = tpl[1]
+                    for phase in ["training", "test"]:
+                        is_training = phase == "training"
+                        final_actions, explore_exploit_vec, explore_actions, exploit_actions = op(q_net_output,
+                                                                                                  training=is_training)
+                        res_vec = tf.where(explore_exploit_vec,
+                                           tf.convert_to_tensor(["explore"] * batch_size),
+                                           tf.convert_to_tensor(["exploit"] * batch_size))
+                        results_dict[op_type][phase]["action_counter"].update(Counter(res_vec.numpy()))
+                        results_dict[op_type][phase]["final_actions"].append(final_actions.numpy())
+                        results_dict[op_type][phase]["explore_exploit_vec"].append(explore_exploit_vec.numpy())
+                        results_dict[op_type][phase]["explore_actions"].append(explore_actions.numpy())
+                        results_dict[op_type][phase]["exploit_actions"].append(exploit_actions.numpy())
 
-                # Measure if explore-exploit scheme works correctly by manually calculating test phase actions.
-                final_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
-                    q_net_output, training=False)
-                final_actions_test.append(final_actions)
-                final_actions_test_manuel.append(exploit_actions)
+            # Concatenate all arrays
+            for tpl in combinations:
+                op_type = tpl[0]
+                phase = tpl[1]
+                results_dict[op_type][phase]["final_actions"] = \
+                    np.concatenate(results_dict[op_type][phase]["final_actions"])
+                results_dict[op_type][phase]["explore_exploit_vec"] = \
+                    np.concatenate(results_dict[op_type][phase]["explore_exploit_vec"])
+                results_dict[op_type][phase]["explore_actions"] = \
+                    np.concatenate(results_dict[op_type][phase]["explore_actions"])
+                results_dict[op_type][phase]["exploit_actions"] = \
+                    np.concatenate(results_dict[op_type][phase]["exploit_actions"])
 
-            explore_exploit_vectors = tf.concat(explore_exploit_vectors, axis=0).numpy()
-            training_exploit_actions = tf.concat(training_exploit_actions, axis=0).numpy()
-            training_explore_actions = tf.concat(training_explore_actions, axis=0).numpy()
-            final_actions_training = tf.concat(final_actions_training, axis=0).numpy()
-            final_actions_manual = []
-            for idx in range(explore_exploit_vectors.shape[0]):
-                if explore_exploit_vectors[idx]:
-                    final_actions_manual.append(training_explore_actions[idx])
-                else:
-                    final_actions_manual.append(training_exploit_actions[idx])
-            final_actions_manual = np.array(final_actions_manual)
-            self.assertTrue(np.array_equal(final_actions_training, final_actions_manual))
-
-            final_actions_test = tf.concat(final_actions_test, axis=0).numpy()
-            final_actions_test_manuel = tf.concat(final_actions_test_manuel, axis=0).numpy()
-            self.assertTrue(np.array_equal(final_actions_test, final_actions_test_manuel))
-
-            monte_carlo_prob = action_counter[b"explore"] / (action_counter[b"explore"] + action_counter[b"exploit"])
-            self.assertTrue(eps_prob * (1.0 - 0.01) <= monte_carlo_prob <= eps_prob * (1.0 + 0.01))
+            # Check if exploit arrays are equal
+            # for arr_type in ["explore_exploit_vec", "explore_actions", "exploit_actions"]:
+            arr_type = "exploit_actions"
+            ref_array = results_dict["Without tf.model"]["training"][arr_type]
+            for tpl in combinations:
+                op_type = tpl[0]
+                phase = tpl[1]
+                print("Checking array:{0}".format(arr_type))
+                self.assertTrue(np.array_equal(ref_array,
+                                               results_dict[op_type][phase][arr_type]))
+            # Check if final_actions are DIFFERENT among training and test phases, for all model types.
+            # This test will assert that TF 2.3.0 error in if branches are dealt with.
+            for op_type in ["Without tf.model", "With tf.model"]:
+                print("Op Type:{0}".format(op_type))
+                self.assertFalse(np.array_equal(
+                    results_dict[op_type]["training"]["final_actions"],
+                    results_dict[op_type]["test"]["final_actions"]))
+            # Check if during the training phase "final_actions" does reflect "explore_exploit_vec".
+            # This test will also assert that the TF 2.3.0 error is handled.
+            for op_type in ["Without tf.model", "With tf.model"]:
+                final_actions_manual = []
+                explore_exploit_vec = results_dict[op_type]["training"]["explore_exploit_vec"]
+                explore_actions = results_dict[op_type]["training"]["explore_actions"]
+                exploit_actions = results_dict[op_type]["training"]["exploit_actions"]
+                final_actions = results_dict[op_type]["training"]["final_actions"]
+                for idx in range(explore_exploit_vec.shape[0]):
+                    if explore_exploit_vec[idx]:
+                        final_actions_manual.append(explore_actions[idx])
+                    else:
+                        final_actions_manual.append(exploit_actions[idx])
+                final_actions_manual = np.array(final_actions_manual)
+                self.assertTrue(np.array_equal(final_actions, final_actions_manual))
+            # Finally, check if explore_exploit_vec has an acceptable distribution.
+            for tpl in combinations:
+                op_type = tpl[0]
+                phase = tpl[1]
+                action_counter = results_dict[op_type][phase]["action_counter"]
+                monte_carlo_prob = action_counter[b"explore"] / \
+                                   (action_counter[b"explore"] + action_counter[b"exploit"])
+                self.assertTrue(eps_prob * (1.0 - 0.01) <= monte_carlo_prob <= eps_prob * (1.0 + 0.01))
 
     # @unittest.skip
     def test_binary_rl_routing_layer(self):
