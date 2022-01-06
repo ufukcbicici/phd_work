@@ -187,8 +187,9 @@ class Utilities:
         return cartesian_product
 
     @staticmethod
-    def append_dict_to_dict(dict_destination, dict_source):
-        for k, arr in dict_source.items():
+    def append_dict_to_dict(dict_destination, dict_source, convert_to_numpy=True):
+        for k, v in dict_source.items():
+            arr = v.numpy() if convert_to_numpy else v
             if k not in dict_destination:
                 dict_destination[k] = [arr]
             else:

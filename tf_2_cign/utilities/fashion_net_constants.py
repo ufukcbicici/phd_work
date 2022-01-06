@@ -8,7 +8,7 @@ class FashionNetConstants:
     batch_size = 125
     epoch_count = 110
     decision_drop_probability = 0.0
-    drop_probability = 0.15
+    drop_probability = 0.0
     classification_wd = 0.0
     decision_wd = 0.0
     softmax_decay_initial = 25.0

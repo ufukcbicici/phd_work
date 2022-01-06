@@ -9,7 +9,7 @@ from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_no_mask import CignNoMask
 from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
 from sklearn.metrics import classification_report
-from utilities.utilities import Utilities
+from tf_2_cign.utilities.utilities import Utilities
 
 
 class CignRlRouting(CignNoMask):
@@ -1009,7 +1009,7 @@ class CignRlRouting(CignNoMask):
         train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).batch(self.batchSizeNonTensor)
         # q_net_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
         # q_net_optimizer = self.get_sgd_optimizer()
-
+        # Kod adı: TONPİLOY
         boundaries = [2000, 5000, 9000]
         values = [0.1, 0.01, 0.001, 0.0001]
         self.globalStep.assign(value=0)
@@ -1041,11 +1041,12 @@ class CignRlRouting(CignNoMask):
                 y=y,
                 iteration=iteration)
             Utilities.append_dict_to_dict(dict_destination=posteriors_dict_baseline,
-                                          dict_source=model_outputs["actions_predicted"])
+                                          dict_source=model_outputs["posteriors_dict"])
             Utilities.append_dict_to_dict(dict_destination=ig_activations_baseline,
                                           dict_source=model_outputs["ig_activations_dict"])
             Utilities.append_dict_to_dict(dict_destination=Q_values_baseline,
-                                          dict_source=optimal_q_values)
+                                          dict_source=optimal_q_values,
+                                          convert_to_numpy=False)
             iteration += 1
 
         X_baseline = np.concatenate(X_baseline, axis=0)
@@ -1082,11 +1083,12 @@ class CignRlRouting(CignNoMask):
                     iteration=iteration)
 
                 Utilities.append_dict_to_dict(dict_destination=posteriors_dict_epoch,
-                                              dict_source=model_outputs["actions_predicted"])
+                                              dict_source=model_outputs["posteriors_dict"])
                 Utilities.append_dict_to_dict(dict_destination=ig_activations_epoch,
                                               dict_source=model_outputs["ig_activations_dict"])
                 Utilities.append_dict_to_dict(dict_destination=Q_values_epoch,
-                                              dict_source=optimal_q_values)
+                                              dict_source=optimal_q_values,
+                                              convert_to_numpy=False)
 
                 # Keep track of decision statistics
                 for layer_id in range(self.get_max_trajectory_length()):
@@ -1129,6 +1131,15 @@ class CignRlRouting(CignNoMask):
             Utilities.concatenate_dict_of_arrays(dict_=Q_values_epoch, axis=-1)
             Utilities.concatenate_dict_of_arrays(dict_=posteriors_dict_epoch, axis=0)
             Utilities.concatenate_dict_of_arrays(dict_=ig_activations_epoch, axis=0)
+
+            for nid in ig_activations_baseline.keys():
+                assert np.allclose(ig_activations_baseline[nid], ig_activations_epoch[nid])
+
+            for nid in posteriors_dict_baseline.keys():
+                assert np.allclose(posteriors_dict_baseline[nid], posteriors_dict_epoch[nid])
+
+            for nid in Q_values_baseline.keys():
+                assert np.allclose(Q_values_baseline[nid], Q_values_epoch[nid])
 
             print("X")
 
