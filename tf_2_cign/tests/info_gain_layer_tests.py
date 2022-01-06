@@ -1,20 +1,12 @@
+import time
 import unittest
+
 import numpy as np
 import tensorflow as tf
-import time
 
 from algorithms.info_gain import InfoGainLoss
-from auxillary.db_logger import DbLogger
-from tf_2_cign.custom_layers.cign_binary_action_generator_layer import CignBinaryActionGeneratorLayer
-from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import CignBinaryActionResultGeneratorLayer
-from tf_2_cign.custom_layers.cign_binary_rl_routing_layer import CignBinaryRlRoutingLayer
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
-from tf_2_cign.data.fashion_mnist import FashionMnist
-from tf_2_cign.fashion_net.fashion_cign_binary_rl import FashionRlBinaryRouting
-from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
-from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
-from collections import Counter
 
 
 class InfoGainLayerTests(unittest.TestCase):

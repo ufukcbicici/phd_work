@@ -52,4 +52,4 @@ class FashionNetConstants:
     rl_cign_iteration_period = 10
     fine_tune_epoch_count = 25
     epsilon_decay_rate = 0.75
-    epsilon_step = 5000
+    epsilon_step = 1000

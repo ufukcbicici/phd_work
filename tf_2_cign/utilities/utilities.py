@@ -185,3 +185,16 @@ class Utilities:
     def get_cartesian_product(list_of_lists):
         cartesian_product = list(itertools.product(*list_of_lists))
         return cartesian_product
+
+    @staticmethod
+    def append_dict_to_dict(dict_destination, dict_source):
+        for k, arr in dict_source.items():
+            if k not in dict_destination:
+                dict_destination[k] = [arr]
+            else:
+                dict_destination[k].append(arr)
+
+    @staticmethod
+    def concatenate_dict_of_arrays(dict_, axis):
+        for k in dict_.keys():
+            dict_[k] = np.concatenate(dict_[k], axis=axis)

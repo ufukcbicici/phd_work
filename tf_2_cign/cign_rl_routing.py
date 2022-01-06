@@ -8,6 +8,8 @@ from tf_2_cign.utilities.profiler import Profiler
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_no_mask import CignNoMask
 from tf_2_cign.custom_layers.cign_rl_routing_layer import CignRlRoutingLayer
+from sklearn.metrics import classification_report
+from utilities.utilities import Utilities
 
 
 class CignRlRouting(CignNoMask):
@@ -68,6 +70,7 @@ class CignRlRouting(CignNoMask):
         self.qNetTrackers = []
         self.mseLoss = tf.keras.losses.MeanSquaredError()
         self.qNetCoeff = q_net_coeff
+        self.globalStep = tf.Variable(initial_value=0, trainable=False, dtype=tf.int32)
 
     def save_model(self, run_id, epoch_id=0):
         root_path = os.path.dirname(__file__)
@@ -225,11 +228,9 @@ class CignRlRouting(CignNoMask):
         ig_paths_matrix = np.stack(ig_paths_matrix, axis=-1)
         return ig_paths_matrix
 
-    def calculate_q_tables_from_network_outputs(self,
-                                                true_labels,
-                                                posteriors_dict,
-                                                ig_masks_dict,
-                                                **kwargs):
+    def calculate_q_tables_from_network_outputs(self, true_labels, model_outputs):
+        posteriors_dict = {k: v.numpy() for k, v in model_outputs["posteriors_dict"].items()}
+        ig_masks_dict = {k: v.numpy() for k, v in model_outputs["ig_masks_dict"].items()}
         sample_count = true_labels.shape[0]
         ig_paths_matrix = self.get_ig_paths(ig_masks_dict=ig_masks_dict)
         c = Counter([tuple(ig_paths_matrix[i]) for i in range(ig_paths_matrix.shape[0])])
@@ -537,9 +538,8 @@ class CignRlRouting(CignNoMask):
             for idx, node in enumerate(level_nodes):
                 x_features_list_all[t][idx] = np.concatenate(x_features_list_all[t][idx], axis=0)
 
-        regs = self.calculate_q_tables_from_network_outputs(true_labels=y_,
-                                                            posteriors_dict=posteriors,
-                                                            ig_masks_dict=ig_masks)
+        model_outputs = {"posteriors_dict": posteriors, "ig_masks_dict": ig_masks}
+        regs = self.calculate_q_tables_from_network_outputs(true_labels=y_, model_outputs=model_outputs)
 
         # assert len(regs) == len(y_list)
         # assert len(q_s) == len(q_tables)
@@ -695,6 +695,11 @@ class CignRlRouting(CignNoMask):
             model_output, main_grads, total_loss = \
                 self.run_main_model(X=train_X, y=train_y,
                                     iteration=iteration, is_in_warm_up_period=is_in_warm_up_period)
+            # Check that Q-net variables do not receive gradients
+            for grad, var in zip(main_grads, self.model.trainable_variables):
+                np_grad = grad.numpy()
+                if "q_net" in var.name:
+                    assert np.allclose(np.zeros_like(np_grad), np_grad)
             self.optimizer.apply_gradients(zip(main_grads, self.model.trainable_variables))
             profiler.add_measurement("One Cign Training Iteration")
             # Track losses
@@ -964,21 +969,19 @@ class CignRlRouting(CignNoMask):
 
     def run_q_net_model(self, X, y, iteration):
         with tf.GradientTape() as q_tape:
-            model_output_val = self.run_model(
+            model_outputs = self.run_model(
                 X=X,
                 y=y,
                 iteration=iteration,
                 is_training=True,
                 warm_up_period=False)
-            # Calculate target values for the Q-Nets
-            posteriors_val = {k: v.numpy() for k, v in model_output_val["posteriors_dict"].items()}
-            ig_masks_val = {k: v.numpy() for k, v in model_output_val["ig_masks_dict"].items()}
             # TODO: Check this
-            regression_q_targets = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
-                                                                                posteriors_dict=posteriors_val,
-                                                                                ig_masks_dict=ig_masks_val)
+            regression_q_targets, optimal_q_values = self.calculate_q_tables_from_network_outputs(
+                true_labels=y.numpy(),
+                model_outputs=model_outputs)
             # Q-Net Losses
-            q_net_predicted = model_output_val["q_tables_predicted"]
+            q_net_predicted = model_outputs["q_tables_predicted"]
+            q_net_predicted_np = []
             q_net_losses = []
             for idx, tpl in enumerate(zip(regression_q_targets, q_net_predicted)):
                 q_truth = tpl[0]
@@ -986,11 +989,13 @@ class CignRlRouting(CignNoMask):
                 q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
                 mse = self.mseLoss(q_truth_tensor, q_predicted)
                 q_net_losses.append(mse)
+                q_net_predicted_np.append(q_predicted.numpy())
             full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
             q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
             total_q_loss = full_q_loss + q_regularization_loss
         q_grads = q_tape.gradient(total_q_loss, self.model.trainable_variables)
-        return model_output_val, q_grads, q_net_losses
+        return model_outputs, q_grads, q_net_losses, regression_q_targets, \
+               q_net_predicted_np, optimal_q_values, model_outputs
 
     def train_q_nets_with_full_net(self, dataset, q_net_epoch_count):
         def augment_training_image_fn(image, labels):
@@ -999,13 +1004,15 @@ class CignRlRouting(CignNoMask):
 
         self.build_trackers()
         self.reset_trackers()
-        train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).shuffle(
-            5000).batch(self.batchSizeNonTensor)
+        # train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).shuffle(
+        #     5000).batch(self.batchSizeNonTensor)
+        train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).batch(self.batchSizeNonTensor)
         # q_net_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
         # q_net_optimizer = self.get_sgd_optimizer()
 
         boundaries = [2000, 5000, 9000]
         values = [0.1, 0.01, 0.001, 0.0001]
+        self.globalStep.assign(value=0)
         learning_rate_scheduler_tf = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
             boundaries=boundaries, values=values)
         q_net_optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
@@ -1019,17 +1026,74 @@ class CignRlRouting(CignNoMask):
                 q_net_var_set_from_models.add(q_var.name)
 
         assert q_net_var_set_from_models == q_net_var_set
+        X_baseline = []
+        Q_values_baseline = {}
+        posteriors_dict_baseline = {}
+        ig_activations_baseline = {}
+        actions_predicted_baseline = {}
+
+        iteration = 0
+        for X, y in train_tf:
+            X_baseline.append(X.numpy())
+            model_output_val, q_grads, q_net_losses, regression_q_targets, \
+            q_net_predicted, optimal_q_values, model_outputs = self.run_q_net_model(
+                X=X,
+                y=y,
+                iteration=iteration)
+            Utilities.append_dict_to_dict(dict_destination=posteriors_dict_baseline,
+                                          dict_source=model_outputs["actions_predicted"])
+            Utilities.append_dict_to_dict(dict_destination=ig_activations_baseline,
+                                          dict_source=model_outputs["ig_activations_dict"])
+            Utilities.append_dict_to_dict(dict_destination=Q_values_baseline,
+                                          dict_source=optimal_q_values)
+            iteration += 1
+
+        X_baseline = np.concatenate(X_baseline, axis=0)
+        Utilities.concatenate_dict_of_arrays(dict_=Q_values_baseline, axis=-1)
+        Utilities.concatenate_dict_of_arrays(dict_=posteriors_dict_baseline, axis=0)
+        Utilities.concatenate_dict_of_arrays(dict_=ig_activations_baseline, axis=0)
 
         iteration = 0
         for epoch_id in range(q_net_epoch_count):
+            X_epoch = []
+            Q_values_epoch = {}
+            posteriors_dict_epoch = {}
+            ig_activations_epoch = {}
+
             for layer_id in range(len(self.qNetTrackers)):
                 self.qNetTrackers[layer_id].reset_states()
 
+            # Keep track of prediction statistics
+            zero_to_one_counters = []
+            optimal_decisions_ground_truths = []
+            optimal_decisions_predictions = []
+            for layer_id in range(self.get_max_trajectory_length()):
+                zero_to_one_counters.append(Counter())
+                optimal_decisions_ground_truths.append([])
+                optimal_decisions_predictions.append([])
+
             for X, y in train_tf:
+                X_epoch.append(X.numpy())
                 # DONE
-                model_output_val, q_grads, q_net_losses = self.run_q_net_model(X=X,
-                                                                               y=y,
-                                                                               iteration=iteration)
+                model_output_val, q_grads, q_net_losses, regression_q_targets, \
+                q_net_predicted, optimal_q_values, model_outputs = self.run_q_net_model(
+                    X=X,
+                    y=y,
+                    iteration=iteration)
+
+                Utilities.append_dict_to_dict(dict_destination=posteriors_dict_epoch,
+                                              dict_source=model_outputs["actions_predicted"])
+                Utilities.append_dict_to_dict(dict_destination=ig_activations_epoch,
+                                              dict_source=model_outputs["ig_activations_dict"])
+                Utilities.append_dict_to_dict(dict_destination=Q_values_epoch,
+                                              dict_source=optimal_q_values)
+
+                # Keep track of decision statistics
+                for layer_id in range(self.get_max_trajectory_length()):
+                    c = Counter(np.argmax(regression_q_targets[layer_id], axis=1))
+                    zero_to_one_counters[layer_id].update(c)
+                    optimal_decisions_ground_truths[layer_id].append(regression_q_targets[layer_id])
+                    optimal_decisions_predictions[layer_id].append(q_net_predicted[layer_id])
                 # Don't update non-Q-net variables
                 q_grads_zeroed = []
                 for grad, var in zip(q_grads, self.model.trainable_variables):
@@ -1058,17 +1122,35 @@ class CignRlRouting(CignNoMask):
                 print("Lr:{0}".format(q_net_optimizer._decayed_lr(tf.float32).numpy()))
                 print("*************************************")
                 iteration += 1
+                self.globalStep.assign(value=iteration)
+
+            X_epoch = np.concatenate(X_epoch, axis=0)
+            assert np.array_equal(X_baseline, X_epoch)
+            Utilities.concatenate_dict_of_arrays(dict_=Q_values_epoch, axis=-1)
+            Utilities.concatenate_dict_of_arrays(dict_=posteriors_dict_epoch, axis=0)
+            Utilities.concatenate_dict_of_arrays(dict_=ig_activations_epoch, axis=0)
+
+            print("X")
+
+            # Keep track of decision statistics
+            for layer_id in range(self.get_max_trajectory_length()):
+                print("****************Layer {0}****************".format(layer_id))
+                print(zero_to_one_counters[layer_id])
+                gt_table = np.concatenate(optimal_decisions_ground_truths[layer_id], axis=0)
+                pr_table = np.concatenate(optimal_decisions_predictions[layer_id], axis=0)
+                gt_optimal_actions = np.argmax(gt_table, axis=1)
+                pr_optimal_actions = np.argmax(pr_table, axis=1)
+                c_report = classification_report(y_true=gt_optimal_actions, y_pred=pr_optimal_actions)
+                print(c_report)
+                print("****************Layer {0}****************".format(layer_id))
 
     def calculate_total_q_net_loss(self, model_output, y):
-        posteriors_val = {k: v.numpy() for k, v in model_output["posteriors_dict"].items()}
-        ig_masks_val = {k: v.numpy() for k, v in model_output["ig_masks_dict"].items()}
-        regs = self.calculate_q_tables_from_network_outputs(true_labels=y.numpy(),
-                                                            posteriors_dict=posteriors_val,
-                                                            ig_masks_dict=ig_masks_val)
+        regression_q_targets = self.calculate_q_tables_from_network_outputs(
+            true_labels=y.numpy(), model_outputs=model_output)
         # Q-Net Losses
         q_net_predicted = model_output["q_tables_predicted"]
         q_net_losses = []
-        for idx, tpl in enumerate(zip(regs, q_net_predicted)):
+        for idx, tpl in enumerate(zip(regression_q_targets, q_net_predicted)):
             q_truth = tpl[0]
             q_predicted = tpl[1]
             q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)

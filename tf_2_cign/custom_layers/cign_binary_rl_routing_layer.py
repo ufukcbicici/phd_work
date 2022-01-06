@@ -65,6 +65,7 @@ class CignBinaryRlRoutingLayer(tf.keras.layers.Layer):
         #     [self.igActivationsDict[nd.index] for nd in self.orderedNodesPerLevel[level]], axis=-1)
         sc_routing_next_level_matrix_action_0, sc_routing_next_level_matrix_action_1 = \
             self.actionResultGeneratorLayer([ig_activations, sc_routing_matrix_curr_level])
+        actions = tf.expand_dims(actions, axis=-1)
         sc_routing_matrix = tf.where(tf.cast(actions, dtype=tf.bool),
                                      sc_routing_next_level_matrix_action_1,
                                      sc_routing_next_level_matrix_action_0)

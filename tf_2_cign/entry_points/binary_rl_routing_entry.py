@@ -64,14 +64,16 @@ if __name__ == "__main__":
         # cign.measure_performance(dataset=fashion_mnist, run_id=run_id)
         # cign.calculate_ideal_accuracy(dataset=fashion_mnist.testDataTf)
 
-        cign.train(run_id=run_id,
-                   dataset=fashion_mnist,
-                   epoch_count=100,
-                   q_net_epoch_count=250,
-                   fine_tune_epoch_count=25,
-                   warm_up_epoch_count=25,
-                   q_net_train_start_epoch=25,
-                   q_net_train_period=25)
+        # cign.train(run_id=run_id,
+        #            dataset=fashion_mnist,
+        #            epoch_count=100,
+        #            q_net_epoch_count=250,
+        #            fine_tune_epoch_count=25,
+        #            warm_up_epoch_count=25,
+        #            q_net_train_start_epoch=25,
+        #            q_net_train_period=25)
+        #
+        # print("X")
 
-        print("X")
-
+        cign.load_model(run_id=3094, epoch_id=25)
+        cign.train_q_nets_with_full_net(dataset=fashion_mnist, q_net_epoch_count=250)

@@ -28,9 +28,8 @@ class CignRlBinaryRouting(CignRlRouting):
                          lambda_mac_cost, warm_up_period, cign_rl_train_period, batch_size, input_dims, class_count,
                          node_degrees, decision_drop_probability, classification_drop_probability, decision_wd,
                          classification_wd, information_gain_balance_coeff, softmax_decay_controller,
-                         learning_rate_schedule, decision_loss_coeff, bn_momentum)
+                         learning_rate_schedule, decision_loss_coeff, q_net_coeff, bn_momentum)
         # Epsilon hyperparameter for exploration - explotation
-        self.globalStep = tf.Variable(initial_value=0, trainable=False, dtype=tf.int32)
         self.afterWarmUpEpochCount = 0
         self.epsilonDecayRate = epsilon_decay_rate
         self.epsilonStep = epsilon_step
@@ -199,13 +198,6 @@ class CignRlBinaryRouting(CignRlRouting):
         self.qNets.append(q_net)
         self.qTablesPredicted.append(q_table_predicted)
         self.actionsPredicted.append(predicted_actions)
-
-        test_layer = CignTestLayer(level=level, network=self)
-        res = test_layer([
-            predicted_actions,
-            explore_exploit_vec,
-            explore_actions,
-            exploit_actions])
 
         # Get information gain activations for the current level.
         ig_activations = tf.stack(
@@ -551,7 +543,7 @@ class CignRlBinaryRouting(CignRlRouting):
             list_of_all_trajectories = Utilities.get_cartesian_product(list_of_lists=actions_each_layer)
             table_shape = action_spaces[level].shape[:-1]
             # The distribution of the dimensions:
-            # First level dimensions: The trajectory UP TO THIS level.
+            # First 0,1,...,(level - 1) dimensions: The trajectory UP TO THIS level.
             # This excludes the action to be taken in this level.
             # level.th dimension: The action to be taken in this level.
             # The last dimension: The batch size.
@@ -664,14 +656,12 @@ class CignRlBinaryRouting(CignRlRouting):
             optimal_q_tables[level] = optimal_q_table
         return optimal_q_tables
 
-    def calculate_q_tables_from_network_outputs(self,
-                                                true_labels,
-                                                posteriors_dict,
-                                                ig_masks_dict,
-                                                **kwargs):
+    def calculate_q_tables_from_network_outputs(self, true_labels, model_outputs):
         batch_size = true_labels.shape[0]
-        actions_predicted = kwargs["actions_predicted"]
-        ig_activations_dict = kwargs["ig_activations_dict"]
+        posteriors_dict = {k: v.numpy() for k, v in model_outputs["posteriors_dict"].items()}
+        # ig_masks_dict = {k: v.numpy() for k, v in model_outputs["ig_masks_dict"].items()}
+        actions_predicted = model_outputs["actions_predicted"]
+        ig_activations_dict = model_outputs["ig_activations_dict"]
 
         # Calculate the Q-values for every action
         optimal_q_values = self.calculate_optimal_q_tables(true_labels=true_labels,
@@ -694,7 +684,7 @@ class CignRlBinaryRouting(CignRlRouting):
             actions_predicted_this_level = np.array(actions_predicted[level])
             trajectories.append(actions_predicted_this_level)
         # Target q-values
-        return regression_q_targets
+        return regression_q_targets, optimal_q_values
 
     def calculate_q_tables_from_network_outputs_manual(self,
                                                        true_labels,
@@ -770,7 +760,6 @@ class CignRlBinaryRouting(CignRlRouting):
             warm_up_period = False
         feed_dict = self.get_feed_dict(x=X, y=y, iteration=iteration, is_training=is_training,
                                        warm_up_period=warm_up_period)
-        outputs = self.qNetEndToEndModel[0](inputs=feed_dict, training=is_training)
         model_output_arr = self.model(inputs=feed_dict, training=is_training)
         model_output_dict = self.convert_model_outputs_to_dict(model_output_arr=model_output_arr)
         return model_output_dict
@@ -811,6 +800,7 @@ class CignRlBinaryRouting(CignRlRouting):
             self.check_q_net_vars()
             # If it is the valid epoch, train the Q-Nets
             if states_dict[epoch_id]["do_train_q_nets"]:
+                self.save_model(run_id=run_id, epoch_id=epoch_id)
                 # Freeze the main CIGN and train the Q-Nets.
                 self.train_q_nets_with_full_net(dataset=dataset, q_net_epoch_count=kwargs["q_net_epoch_count"])
             # Measure the model performance, if it is a valid epoch.
