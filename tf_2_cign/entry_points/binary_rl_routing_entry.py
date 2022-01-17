@@ -13,14 +13,13 @@ from tf_2_cign.fashion_net.fashion_cign_rl import FashionCignRl
 from tf_2_cign.fashion_net.fashion_cign_binary_rl import FashionRlBinaryRouting
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
 
-
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
     fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
                                  validation_size=5000,
-                                 validation_source="training")
+                                 validation_source="t*/raining")
     softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
                                                       initial_value=FashionNetConstants.softmax_decay_initial,
                                                       decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
@@ -60,6 +59,8 @@ if __name__ == "__main__":
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
+        # Utilities.pickle_save_to_file(path=)
+
         # cign.load_model(run_id=2953)
         # cign.measure_performance(dataset=fashion_mnist, run_id=run_id)
         # cign.calculate_ideal_accuracy(dataset=fashion_mnist.testDataTf)
@@ -72,8 +73,19 @@ if __name__ == "__main__":
         #            warm_up_epoch_count=25,
         #            q_net_train_start_epoch=25,
         #            q_net_train_period=25)
-        #
+
+        cign.train_using_q_nets_as_post_processing(run_id=run_id,
+                                                   dataset=fashion_mnist,
+                                                   epoch_count=100,
+                                                   q_net_epoch_count=250,
+                                                   fine_tune_epoch_count=25,
+                                                   warm_up_epoch_count=25,
+                                                   q_net_train_start_epoch=25,
+                                                   q_net_train_period=25)
+
+        # cign.train_q_nets_separately(dataset=fashion_mnist, q_net_epoch_count=250)
+
         # print("X")
 
-        cign.load_model(run_id=3094, epoch_id=25)
-        cign.train_q_nets_with_full_net(dataset=fashion_mnist, q_net_epoch_count=250)
+        # cign.load_model(run_id=3094, epoch_id=25)
+        # cign.train_q_nets_with_full_net(dataset=fashion_mnist, q_net_epoch_count=250)

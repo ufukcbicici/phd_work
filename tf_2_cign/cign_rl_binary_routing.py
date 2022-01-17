@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 import time
 
+from sklearn.model_selection import train_test_split
+
 from auxillary.dag_utilities import Dag
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cign_rl_routing import CignRlRouting
@@ -39,6 +41,18 @@ class CignRlBinaryRouting(CignRlRouting):
         self.actionResultGenerators = {}
         self.actionCalculatorLayers = []
         self.qNetEndToEndModel = []
+        self.enforcedActions = []
+        for lid in range(self.get_max_trajectory_length()):
+            enforced_actions = tf.keras.Input(shape=(),
+                                              name="enforced_actions_{0}".format(lid),
+                                              dtype=tf.int64)
+            self.enforcedActions.append(enforced_actions)
+            self.feedDict["enforced_actions_{0}".format(lid)] = enforced_actions
+        self.onlyUseInformationGainForRouting = tf.keras.Input(shape=(),
+                                                               name="only_use_information_gain_for_routing",
+                                                               dtype=tf.bool)
+        self.feedDict["only_use_ig_routing"] = self.onlyUseInformationGainForRouting
+        self.qNetInputs = []
 
     def convert_posteriors_dict_to_tensor(self, posteriors_dict):
         posteriors_tensor = []
@@ -167,36 +181,40 @@ class CignRlBinaryRouting(CignRlRouting):
         # global_step_input = tf.keras.Input(shape=(),
         #                                    name="global_step_input_level_{0}".format(level),
         #                                    dtype=tf.int32)
-        q_net_layer = self.get_q_net_layer(level=level)
-        q_table_predicted = q_net_layer(q_net_input_f_tensor)
+        isolated_q_net_layer = self.get_q_net_layer(level=level)
+        q_table_predicted = isolated_q_net_layer(q_net_input_f_tensor)
         # Create the action generator layer. Get predicted actions for the next layer.
         action_generator_layer = CignBinaryActionGeneratorLayer(network=self)
         predicted_actions, explore_exploit_vec, explore_actions, exploit_actions = action_generator_layer(
             q_table_predicted)
+        q_net_isolated = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=[q_table_predicted])
         q_net = tf.keras.Model(inputs=q_net_input_f_tensor, outputs=[q_table_predicted,
                                                                      predicted_actions,
                                                                      explore_exploit_vec,
                                                                      explore_actions,
                                                                      exploit_actions])
-        return q_net
+        return q_net, q_net_isolated
 
     # Here, some changes are needed.
     def calculate_secondary_routing_matrix(self, level, input_f_tensor, input_ig_routing_matrix):
         assert len(self.scRoutingCalculationLayers) == level
-        q_net = self.build_isolated_q_net_model(input_f_tensor=input_f_tensor, level=level)
+        q_net, isolated_q_net = self.build_isolated_q_net_model(input_f_tensor=input_f_tensor, level=level)
         # Connect the Q-Net to the rest of the network.
         q_table_predicted, predicted_actions, explore_exploit_vec, explore_actions, exploit_actions = \
             q_net(inputs=input_f_tensor)
-
         q_net_end_to_end_model = tf.keras.Model(inputs=self.feedDict, outputs=[q_table_predicted,
                                                                                predicted_actions,
                                                                                explore_exploit_vec,
                                                                                explore_actions,
                                                                                exploit_actions])
+        self.qNetInputs.append(input_f_tensor)
         self.qNetEndToEndModel.append(q_net_end_to_end_model)
         # Save Q-Net and its outputs.
-        self.qNets.append(q_net)
+        self.qNets.append(isolated_q_net)
         self.qTablesPredicted.append(q_table_predicted)
+        # Pick enforced actions, if they are provided.
+        are_enforced_actions_provided = tf.greater(self.enforcedActions[level], -1)
+        predicted_actions = tf.where(are_enforced_actions_provided, self.enforcedActions[level], predicted_actions)
         self.actionsPredicted.append(predicted_actions)
 
         # Get information gain activations for the current level.
@@ -217,18 +235,27 @@ class CignRlBinaryRouting(CignRlRouting):
              explore_actions,
              exploit_actions])
         self.scRoutingCalculationLayers.append(routing_calculation_layer)
+        secondary_routing_matrix_cign_output = tf.where(self.onlyUseInformationGainForRouting,
+                                                        input_ig_routing_matrix,
+                                                        secondary_routing_matrix_cign_output)
         return secondary_routing_matrix_cign_output
 
     def get_model_outputs_array(self):
         model_output_arr = super().get_model_outputs_array()
         model_output_arr.append(self.actionsPredicted)
         model_output_arr.append(self.scRoutingMatricesDict)
+        model_output_arr.append(self.enforcedActions)
+        model_output_arr.append(self.igRoutingMatricesDict)
+        model_output_arr.append(self.qNetInputs)
         return model_output_arr
 
     def convert_model_outputs_to_dict(self, model_output_arr):
         model_output_dict = super(CignRlBinaryRouting, self).convert_model_outputs_to_dict(model_output_arr)
         model_output_dict["actions_predicted"] = model_output_arr[9]
         model_output_dict["sc_routing_matrices_dict"] = model_output_arr[10]
+        model_output_dict["enforced_actions"] = model_output_arr[11]
+        model_output_dict["ig_routing_matrices_dict"] = model_output_arr[12]
+        model_output_dict["q_net_inputs"] = model_output_arr[13]
         return model_output_dict
 
     # OK
@@ -659,7 +686,6 @@ class CignRlBinaryRouting(CignRlRouting):
     def calculate_q_tables_from_network_outputs(self, true_labels, model_outputs):
         batch_size = true_labels.shape[0]
         posteriors_dict = {k: v.numpy() for k, v in model_outputs["posteriors_dict"].items()}
-        # ig_masks_dict = {k: v.numpy() for k, v in model_outputs["ig_masks_dict"].items()}
         actions_predicted = model_outputs["actions_predicted"]
         ig_activations_dict = model_outputs["ig_activations_dict"]
 
@@ -730,7 +756,7 @@ class CignRlBinaryRouting(CignRlRouting):
         # Warm up periods
         for epoch_id in range(epoch_count):
             epochs_from_q_training_start = epoch_id - constraints["q_net_train_start_epoch"]
-            if epoch_id < constraints["q_net_train_start_epoch"]:
+            if epoch_id <= constraints["q_net_train_start_epoch"]:
                 epoch_states[epoch_id]["is_in_warm_up_period"] = True
             else:
                 epoch_states[epoch_id]["is_in_warm_up_period"] = False
@@ -749,6 +775,86 @@ class CignRlBinaryRouting(CignRlRouting):
                 epoch_states[epoch_id]["do_measure_performance"] = False
         return epoch_states
 
+    def run_main_model(self, X, y, iteration, is_in_warm_up_period, only_use_ig_routing):
+        with tf.GradientTape() as main_tape:
+            model_output = self.run_model(
+                X=X,
+                y=y,
+                iteration=iteration,
+                is_training=True,
+                warm_up_period=is_in_warm_up_period,
+                only_use_ig_routing=only_use_ig_routing)
+            classification_losses = model_output["classification_losses"]
+            info_gain_losses = model_output["info_gain_losses"]
+            # Weight decaying; Q-Net variables excluded
+            total_regularization_loss = self.get_regularization_loss(is_for_q_nets=False)
+            # Classification losses
+            classification_loss = tf.add_n([loss for loss in classification_losses.values()])
+            # Information Gain losses
+            info_gain_loss = self.decisionLossCoeff * tf.add_n([loss for loss in info_gain_losses.values()])
+            # Total loss
+            total_loss = total_regularization_loss + info_gain_loss + classification_loss
+        # Calculate grads with respect to the main loss
+        main_grads = main_tape.gradient(total_loss, self.model.trainable_variables)
+        self.softmaxDecayController.update(iteration=iteration + 1)
+
+        # for idx, v in enumerate(self.model.trainable_variables):
+        #     if "q_net" not in v.name:
+        #         continue
+        #     grad_arr = main_grads[idx].numpy()
+        #     assert np.array_equal(grad_arr, np.zeros_like(grad_arr))
+
+        return model_output, main_grads, total_loss
+
+    # OK
+    def train_cign_body_one_epoch(self,
+                                  dataset,
+                                  run_id,
+                                  iteration,
+                                  is_in_warm_up_period,
+                                  only_use_ig_routing):
+        # self.build_trackers()
+        # OK
+        self.reset_trackers()
+        times_list = []
+        # Train for one loop the main CIGN
+        for train_X, train_y in dataset:
+            profiler = Profiler()
+            # OK
+            model_output, main_grads, total_loss = \
+                self.run_main_model(X=train_X,
+                                    y=train_y,
+                                    iteration=iteration,
+                                    is_in_warm_up_period=is_in_warm_up_period,
+                                    only_use_ig_routing=only_use_ig_routing)
+            # Check that Q-net variables do not receive gradients
+            for grad, var in zip(main_grads, self.model.trainable_variables):
+                if "q_net" in var.name:
+                    np_grad = grad.numpy()
+                    assert np.allclose(np.zeros_like(np_grad), np_grad)
+            self.optimizer.apply_gradients(zip(main_grads, self.model.trainable_variables))
+            profiler.add_measurement("One Cign Training Iteration")
+            # Track losses
+            self.track_losses(total_loss=total_loss,
+                              classification_losses=model_output["classification_losses"],
+                              info_gain_losses=model_output["info_gain_losses"])
+
+            self.print_train_step_info(
+                iteration=iteration,
+                classification_losses=model_output["classification_losses"],
+                info_gain_losses=model_output["info_gain_losses"],
+                time_intervals=profiler.get_all_measurements(),
+                eval_dict=model_output["eval_dict"])
+            times_list.append(sum(profiler.get_all_measurements().values()))
+            iteration += 1
+            # Print outputs
+
+        self.save_log_data(run_id=run_id,
+                           iteration=iteration,
+                           eval_dict=model_output["eval_dict"])
+
+        return iteration, times_list
+
     def run_model(self, **kwargs):
         X = kwargs["X"]
         y = kwargs["y"]
@@ -760,9 +866,282 @@ class CignRlBinaryRouting(CignRlRouting):
             warm_up_period = False
         feed_dict = self.get_feed_dict(x=X, y=y, iteration=iteration, is_training=is_training,
                                        warm_up_period=warm_up_period)
+        for lid in range(self.get_max_trajectory_length()):
+            input_name = "enforced_actions_{0}".format(lid)
+            if input_name not in kwargs:
+                batch_size = X.shape[0]
+                feed_dict[input_name] = -1 * tf.ones(shape=(batch_size,))
+            else:
+                feed_dict[input_name] = kwargs[input_name]
+
+        if "only_use_ig_routing" not in kwargs:
+            feed_dict["only_use_ig_routing"] = False
+        else:
+            feed_dict["only_use_ig_routing"] = kwargs["only_use_ig_routing"]
+
+        # feed_dict["only_use_ig_routing"] = False
+        # feed_dict["warm_up_period"] = False
+
         model_output_arr = self.model(inputs=feed_dict, training=is_training)
         model_output_dict = self.convert_model_outputs_to_dict(model_output_arr=model_output_arr)
         return model_output_dict
+
+    def train_q_nets_separately(self, dataset, q_net_epoch_count):
+        train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).batch(self.batchSizeNonTensor)
+        sample_count = dataset.valX.shape[0]
+        action_combinations = []
+
+        ig_activations = {}
+        inputs_per_tree_level = {}
+        targets_per_tree_level = {}
+        for _ in range(self.get_max_trajectory_length()):
+            action_combinations.append([0, 1])
+
+        action_combinations = Utilities.get_cartesian_product(list_of_lists=action_combinations)
+
+        def augment_training_image_fn(image, labels):
+            image = tf.image.random_flip_left_right(image)
+            return image, labels
+
+        self.build_trackers()
+        self.reset_trackers()
+
+        # Build the training inputs: Intermediate features which are fed to the Q-Nets at every tree layer,
+        # for every action trajectory.
+        # Build the training targets: Optimal Q-tables for every sample, under every possible trajectory.
+        for X, y in train_tf:
+            # input_source_dict = {}
+            # target_source_dict = {}
+            for trajectory_nd in action_combinations:
+                trajectory_tpl = tuple(trajectory_nd)
+                # Model inputs
+                kwargs = {"X": X, "y": y, "iteration": 0,
+                          "is_training": False, "warm_up_period": False, "only_use_ig_routing": False}
+
+                # Predetermined actions as input
+                for lid in range(self.get_max_trajectory_length()):
+                    input_name = "enforced_actions_{0}".format(lid)
+                    kwargs[input_name] = trajectory_tpl[lid] * np.ones(shape=(self.batchSizeNonTensor,), dtype=np.int64)
+
+                # Run the model
+                model_output_dict = self.run_model(**kwargs)
+
+                # Gather Q-Net inputs
+                for lid in range(self.get_max_trajectory_length()):
+                    idx = (lid, trajectory_tpl)
+                    if idx not in inputs_per_tree_level:
+                        inputs_per_tree_level[idx] = []
+                    inputs_per_tree_level[idx].append(model_output_dict["q_net_inputs"][lid])
+
+                # Gather IG activations
+                for node_id in model_output_dict["ig_activations_dict"].keys():
+                    idx = (node_id, trajectory_tpl)
+                    if idx not in ig_activations:
+                        ig_activations[idx] = []
+                    ig_activations[idx].append(model_output_dict["ig_activations_dict"][node_id])
+
+                # Gather Q-Net regression targets
+                regression_q_targets, optimal_q_values = self.calculate_q_tables_from_network_outputs(
+                    true_labels=y.numpy(),
+                    model_outputs=model_output_dict)
+                for lid in range(self.get_max_trajectory_length()):
+                    idx = (lid, trajectory_tpl)
+                    if idx not in targets_per_tree_level:
+                        targets_per_tree_level[idx] = []
+                    targets_per_tree_level[idx].append(regression_q_targets[lid])
+
+        # Merge all collected data
+        for k in ig_activations:
+            ig_activations[k] = np.concatenate(ig_activations[k], axis=0)
+
+        for k in inputs_per_tree_level:
+            inputs_per_tree_level[k] = np.concatenate(inputs_per_tree_level[k], axis=0)
+
+        for k in targets_per_tree_level:
+            targets_per_tree_level[k] = np.concatenate(targets_per_tree_level[k], axis=0)
+
+        # Ensure the integrity and correctness of the collected data.
+        # Rule - 1: All ig activations should be equal, independent of the followed trajectory.
+        for node in self.innerNodes:
+            ig_activation_arrs = [arr for idx, arr in ig_activations.items() if idx[0] == node.index]
+            res = []
+            for idx in range(len(ig_activation_arrs) - 1):
+                res.append(np.allclose(ig_activation_arrs[idx], ig_activation_arrs[idx + 1]))
+            assert all(res)
+
+        # Rule - 2: When the previous trajectories are equal, all input arrays must be equal.
+        inputs = {}
+        for lid in range(self.get_max_trajectory_length()):
+            for trajectory_nd in action_combinations:
+                trajectory_tpl = tuple(trajectory_nd)
+                input_arrays_to_be_equal = []
+                for idx, arr in inputs_per_tree_level.items():
+                    if idx[0] == lid and idx[1][:lid] == trajectory_tpl[:lid]:
+                        input_arrays_to_be_equal.append(arr)
+                res = []
+                for idx in range(len(input_arrays_to_be_equal) - 1):
+                    res.append(np.allclose(input_arrays_to_be_equal[idx], input_arrays_to_be_equal[idx + 1]))
+                assert all(res)
+                final_arr = input_arrays_to_be_equal[0]
+                k_ = (lid, trajectory_tpl[:lid])
+                if k_ in inputs:
+                    assert np.allclose(inputs[k_], final_arr)
+                else:
+                    inputs[k_] = final_arr
+
+        # Rule - 3: When the previous trajectories are equal, all regression targets (output arrays) must be equal.
+        outputs = {}
+        for lid in range(self.get_max_trajectory_length()):
+            for trajectory_nd in action_combinations:
+                trajectory_tpl = tuple(trajectory_nd)
+                output_arrays_to_be_equal = []
+                for idx, arr in targets_per_tree_level.items():
+                    if idx[0] == lid and idx[1][:lid] == trajectory_tpl[:lid]:
+                        output_arrays_to_be_equal.append(arr)
+                res = []
+                for idx in range(len(output_arrays_to_be_equal) - 1):
+                    res.append(np.allclose(output_arrays_to_be_equal[idx], output_arrays_to_be_equal[idx + 1]))
+                assert all(res)
+                final_arr = output_arrays_to_be_equal[0]
+                k_ = (lid, trajectory_tpl[:lid])
+                if k_ in outputs:
+                    assert np.allclose(outputs[k_], final_arr)
+                else:
+                    outputs[k_] = final_arr
+
+        # Rule - 4: The Q-Net inputs must reflect the information gain activations from the previous layer, and the,
+        # action taken there.
+        ig_activations_temp = {}
+        for idx, arr in ig_activations.items():
+            if idx[0] not in ig_activations_temp:
+                ig_activations_temp[idx[0]] = arr
+        ig_activations = ig_activations_temp
+
+        for sample_id in range(sample_count):
+            for trajectory_nd in action_combinations:
+                trajectory_tpl = tuple(trajectory_nd)
+                route_signal = [1]
+                for lid in range(self.get_max_trajectory_length()):
+                    assert len(route_signal) == len(self.orderedNodesPerLevel[lid])
+                    feature_array = inputs_per_tree_level[(lid, trajectory_tpl)][sample_id]
+                    feature_width = feature_array.shape[-1]
+                    route_width = feature_width // len(route_signal)
+                    curr_index = 0
+                    for path_id in range(len(route_signal)):
+                        start_index = curr_index
+                        if path_id < len(route_signal) - 1:
+                            end_index = start_index + route_width
+                        else:
+                            end_index = feature_width
+                        route_feature = feature_array[..., start_index:end_index]
+                        feat_sum = np.sum(route_feature)
+                        is_route_open = route_signal[path_id]
+                        if is_route_open:
+                            assert feat_sum != 0
+                        else:
+                            assert feat_sum == 0
+                        curr_index = end_index
+                    # Prepare routing signal for the next layer
+                    action_for_this_level = trajectory_tpl[lid]
+                    next_level_route_signal = []
+                    for node_layer_id, node in enumerate(self.orderedNodesPerLevel[lid]):
+                        if route_signal[node_layer_id] == 0:
+                            next_level_route_signal.extend([0] * len(self.dagObject.children(node=node)))
+                        else:
+                            if action_for_this_level == 0:
+                                ig_activation = ig_activations[node.index][sample_id]
+                                max_id = np.argmax(ig_activation)
+                                for activation_id in range(len(ig_activation)):
+                                    next_level_route_signal.append(int(activation_id == max_id))
+                            else:
+                                next_level_route_signal.extend([1] * len(self.dagObject.children(node=node)))
+                    route_signal = next_level_route_signal
+
+            # for lid in range(self.get_max_trajectory_length()):
+            #     if lid == 0:
+            #         continue
+            #     route_signal = []
+            #     for node in self.orderedNodesPerLevel[lid - 1]:
+            #         ig_activation = ig_activations[node.inde][sample_id]
+            #         max_id = np.argmax(ig_activation)
+            #         for activation_id in range(len(ig_activation)):
+            #             route_signal.append(int(activation_id == max_id))
+
+        # Training procedure
+        # q_net_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+        # q_net_optimizer = self.get_sgd_optimizer()
+        # Kod adı: TONPİLOY
+
+        X_per_levels = {}
+        y_per_levels = {}
+        for lid in range(self.get_max_trajectory_length()):
+            boundaries = [2000, 5000, 9000]
+            values = [0.1, 0.01, 0.001, 0.0001]
+            self.globalStep.assign(value=0)
+            # q_net_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            q_net_optimizer = self.get_sgd_optimizer()
+
+            correct_array_keys = [tpl for tpl in inputs.keys() if tpl[0] == lid]
+            X = [inputs[tpl] for tpl in correct_array_keys]
+            X = np.concatenate(X, axis=0)
+            y = [outputs[tpl] for tpl in correct_array_keys]
+            y = np.concatenate(y, axis=0)
+
+            X_per_levels[lid] = X
+            y_per_levels[lid] = y
+            test_ratio = 0.1
+            assert X.shape[0] == y.shape[0]
+            assert X.shape[0] % sample_count == 0
+
+            train_indices, test_indices = train_test_split(np.arange(sample_count), test_size=test_ratio)
+            train_indices_multiplied = []
+            multiplier = X.shape[0] // sample_count
+            for idx in train_indices:
+                for coefficient in range(multiplier):
+                    train_indices_multiplied.append(idx + coefficient * sample_count)
+
+            test_indices_multiplied = []
+            for idx in test_indices:
+                for coefficient in range(multiplier):
+                    test_indices_multiplied.append(idx + coefficient * sample_count)
+
+            X_train = X[train_indices_multiplied]
+            X_test = X[test_indices_multiplied]
+            y_train = y[train_indices_multiplied]
+            y_test = y[test_indices_multiplied]
+
+            q_net_train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train)).shuffle(5000).batch(
+                self.batchSizeNonTensor)
+            q_net_test_dataset = tf.data.Dataset.from_tensor_slices((X_test, y_test)).batch(
+                self.batchSizeNonTensor)
+
+            q_net = self.qNets[lid]
+
+            # Train the q-net model
+            iteration = 0
+            for epoch_id in range(q_net_epoch_count):
+                self.qNetTrackers[lid].reset_states()
+                # Keep track of prediction statistics
+                action_counters = []
+                optimal_decisions_ground_truth = []
+                optimal_decisions_prediction = []
+
+                for X_batch, y_batch in q_net_train_dataset:
+                    with tf.GradientTape() as q_tape:
+                        y_hat = q_net(inputs=X_batch)
+                        mse = self.mseLoss(y_batch, y_hat)
+                        reg_losses = []
+                        for var in q_net.trainable_variables:
+                            assert var.ref() in self.regularizationCoefficients
+                            reg_coeff = self.regularizationCoefficients[var.ref()]
+                            reg_losses.append(reg_coeff * tf.nn.l2_loss(var))
+                        regularization_loss = tf.add_n(reg_losses)
+                        total_loss = mse + regularization_loss
+                    q_grads = q_tape.gradient(total_loss, q_net.trainable_variables)
+                    q_net_optimizer.apply_gradients(zip(q_grads, q_net.trainable_variables))
+
+            print("X")
+        print("X")
 
     def train(self, run_id, dataset, epoch_count, **kwargs):
         # q_net_epoch_count = kwargs["q_net_epoch_count"]
@@ -831,3 +1210,122 @@ class CignRlBinaryRouting(CignRlRouting):
                                      iteration=iteration,
                                      epoch_id=epoch_id,
                                      times_list=times_list)
+
+    def train_using_q_nets_as_post_processing(self, run_id, dataset, epoch_count, **kwargs):
+        constraints = {"q_net_epoch_count": kwargs["q_net_epoch_count"],
+                       "fine_tune_epoch_count": kwargs["fine_tune_epoch_count"],
+                       "warm_up_epoch_count": kwargs["warm_up_epoch_count"],
+                       "q_net_train_start_epoch": kwargs["q_net_train_start_epoch"],
+                       "q_net_train_period": kwargs["q_net_train_period"]}
+        # OK
+        self.optimizer = self.get_sgd_optimizer()
+        self.build_trackers()
+        states_dict = self.get_epoch_states(constraints=constraints, epoch_count=epoch_count)
+
+        # Train loop
+        iteration = 0
+        for epoch_id in range(epoch_count):
+            # TODO: Go on from here.
+            iteration, times_list = self.train_cign_body_one_epoch(
+                dataset=dataset.trainDataTf,
+                run_id=run_id,
+                iteration=iteration,
+                is_in_warm_up_period=states_dict[epoch_id]["is_in_warm_up_period"],
+                only_use_ig_routing=not states_dict[epoch_id]["is_in_warm_up_period"])
+            if states_dict[epoch_id]["do_measure_performance"]:
+                self.measure_performance(dataset=dataset,
+                                         run_id=run_id,
+                                         iteration=iteration,
+                                         epoch_id=epoch_id,
+                                         times_list=times_list,
+                                         only_use_ig_routing=True)
+        assert epoch_id == epoch_count
+        self.save_model(run_id=run_id, epoch_id=epoch_id)
+
+    def measure_performance(self, dataset, run_id, iteration=-1, epoch_id=0, times_list=tuple([0]), **kwargs):
+        only_use_ig_routing = kwargs["only_use_ig_routing"]
+
+        accuracy_dict = {}
+        for dataset_type, ds in zip(
+                ["train", "validation", "test"],
+                [dataset.trainDataTf, dataset.validationDataTf, dataset.testDataTf]):
+            accuracy, q_losses = self.eval(run_id=run_id, iteration=iteration, dataset=ds,
+                                           dataset_type=dataset_type, only_use_ig_routing=only_use_ig_routing)
+            print("{0} accuracy:{1}".format(dataset_type, accuracy))
+            print("{0} Q Losses:{1}".format(dataset_type, q_losses))
+            accuracy_dict[dataset_type] = accuracy
+        mean_time_passed = np.mean(np.array(times_list))
+        DbLogger.write_into_table(
+            rows=[(run_id, iteration, epoch_id, accuracy_dict["train"],
+                   accuracy_dict["validation"], accuracy_dict["test"],
+                   mean_time_passed, 0.0, "XXX")], table=DbLogger.logsTable)
+
+    def calculate_total_q_net_loss(self, model_output, y):
+        regression_q_targets, optimal_q_values = self.calculate_q_tables_from_network_outputs(
+            true_labels=y.numpy(), model_outputs=model_output)
+        # Q-Net Losses
+        q_net_predicted = model_output["q_tables_predicted"]
+        q_net_losses = []
+        for idx, tpl in enumerate(zip(regression_q_targets, q_net_predicted)):
+            q_truth = tpl[0]
+            q_predicted = tpl[1]
+            q_truth_tensor = tf.convert_to_tensor(q_truth, dtype=q_predicted.dtype)
+            mse = self.mseLoss(q_truth_tensor, q_predicted)
+            q_net_losses.append(mse)
+        # full_q_loss = self.qNetCoeff * tf.add_n(q_net_losses)
+        # if add_regularization:
+        #     q_regularization_loss = self.get_regularization_loss(is_for_q_nets=True)
+        #     total_q_loss = full_q_loss + q_regularization_loss
+        # else:
+        #     total_q_loss = full_q_loss
+        return q_net_losses
+
+    # SEEMS OK
+    def eval(self, run_id, iteration, dataset, dataset_type, **kwargs):
+        if dataset is None:
+            return 0.0
+        y_true = []
+        y_pred = []
+        q_loss_list = [[] for _ in range(self.get_max_trajectory_length())]
+        leaf_distributions = {node.index: [] for node in self.leafNodes}
+        only_use_ig_routing = kwargs["only_use_ig_routing"]
+
+        for X, y in dataset:
+            model_output = self.run_model(
+                X=X,
+                y=y,
+                iteration=-1,
+                is_training=False,
+                only_use_ig_routing=only_use_ig_routing)
+            y_pred_batch, leaf_distributions_batch = self.calculate_predictions_of_batch(
+                model_output=model_output, y=y)
+            for leaf_node in self.leafNodes:
+                leaf_distributions[leaf_node.index].extend(leaf_distributions_batch[leaf_node.index])
+            y_pred.append(y_pred_batch)
+            y_true.append(y.numpy())
+            q_net_losses = self.calculate_total_q_net_loss(model_output=model_output, y=y)
+            for idx, q_loss in enumerate(q_net_losses):
+                q_loss_list[idx].append(q_loss.numpy())
+        y_true = np.concatenate(y_true)
+        y_pred = np.concatenate(y_pred)
+        truth_vector = y_true == y_pred
+        accuracy = np.mean(truth_vector.astype(np.float))
+        for idx, q_losses in enumerate(q_loss_list):
+            mean_q_loss = np.mean(np.array(q_losses))
+            q_loss_list[idx] = mean_q_loss
+
+        # Print sample distribution
+        kv_rows = []
+        for leaf_node in self.leafNodes:
+            c = Counter(leaf_distributions[leaf_node.index])
+            str_ = "{0} Node {1} Sample Distribution:{2}".format(dataset_type, leaf_node.index, c)
+            print(str_)
+            kv_rows.append((run_id, iteration,
+                            "{0} Node {1} Sample Distribution".format(dataset_type, leaf_node.index),
+                            "{0}".format(c)))
+        for idx, q_loss in enumerate(q_loss_list):
+            kv_rows.append((run_id, iteration,
+                            "{0} Q-Net{1} MSE Loss".format(dataset_type, idx),
+                            np.asscalar(q_loss)))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
+        return accuracy, q_loss_list

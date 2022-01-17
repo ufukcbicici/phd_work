@@ -127,7 +127,7 @@ class BinaryRoutingTests(unittest.TestCase):
     # @unittest.skip
     def test_action_generator_layer(self):
         experiment_count = 10
-        sample_count = 10000
+        sample_count = 25000
         batch_size = FashionNetConstants.batch_size
 
         # Action generator
@@ -141,9 +141,11 @@ class BinaryRoutingTests(unittest.TestCase):
         for exp_id in range(experiment_count):
             if (exp_id + 1) % 100 == 0:
                 print("test_action_generator_layer Experiment:{0}".format(exp_id + 1))
-            step_count = np.random.randint(low=0, high=50000)
+            step_count = np.random.randint(low=5000, high=50000)
+            print("step_count={0}".format(step_count))
             self.cign.globalStep.assign(value=step_count)
             eps_prob = self.cign.exploreExploitEpsilon(step_count)
+            print("eps_prob={0}".format(eps_prob))
             combinations = Utilities.get_cartesian_product(list_of_lists=[
                 ["Without tf.model", "With tf.model"],
                 ["training", "test"]])
@@ -230,10 +232,17 @@ class BinaryRoutingTests(unittest.TestCase):
             for tpl in combinations:
                 op_type = tpl[0]
                 phase = tpl[1]
+                print("Op Type:{0}".format(tpl[0]))
+                print("Phase:{0}".format(phase))
+                print("eps_prob:{0}".format(eps_prob))
+
                 action_counter = results_dict[op_type][phase]["action_counter"]
                 monte_carlo_prob = action_counter[b"explore"] / \
                                    (action_counter[b"explore"] + action_counter[b"exploit"])
-                self.assertTrue(eps_prob * (1.0 - 0.01) <= monte_carlo_prob <= eps_prob * (1.0 + 0.01))
+
+                print("monte_carlo_prob:{0}".format(monte_carlo_prob))
+                # self.assertTrue(eps_prob.numpy() * (1.0 - 0.05) <= monte_carlo_prob <= eps_prob.numpy() * (1.0 + 0.05))
+                self.assertTrue(np.abs(eps_prob.numpy() - monte_carlo_prob) <= 0.01)
 
     # @unittest.skip
     def test_binary_rl_routing_layer(self):
@@ -250,7 +259,7 @@ class BinaryRoutingTests(unittest.TestCase):
                 ig_activations = tf.stack(
                     [ig_activations_dict[nd.index] for nd in self.cign.orderedNodesPerLevel[level]], axis=-1)
                 # Mock actions
-                predicted_actions = tf.random.uniform([batch_size, 1], dtype=tf.int32, minval=0, maxval=2)
+                predicted_actions = tf.random.uniform([batch_size, ], dtype=tf.int32, minval=0, maxval=2)
 
                 routing_calculation_layer = CignBinaryRlRoutingLayer(level=level, network=self.cign)
                 secondary_routing_matrix_cign_output = routing_calculation_layer(
@@ -263,7 +272,7 @@ class BinaryRoutingTests(unittest.TestCase):
                         sc_routing_matrix_curr_level=curr_sc_routing_matrix)
                 secondary_routing_matrix_cign_output_manual = []
                 for idx in range(batch_size):
-                    if predicted_actions[idx] == 1:
+                    if predicted_actions.numpy()[idx] == 1:
                         secondary_routing_matrix_cign_output_manual.append(next_level_config_action_1[idx])
                     else:
                         secondary_routing_matrix_cign_output_manual.append(next_level_config_action_0[idx])
@@ -318,12 +327,12 @@ class BinaryRoutingTests(unittest.TestCase):
             true_labels, ig_activations_dict, posterior_arrays_dict, actions_predicted = self.cign. \
                 create_complete_output_mock_data(batch_size=batch_size, mean_accuracy=mean_accuracy,
                                                  std_accuracy=std_accuracy)
-            regression_q_targets_auto = self.cign.calculate_q_tables_from_network_outputs(
-                true_labels=true_labels,
-                posteriors_dict=posterior_arrays_dict,
-                ig_activations_dict=ig_activations_dict,
-                actions_predicted=actions_predicted,
-                ig_masks_dict=None)
+            posterior_arrays_dict = {k: tf.convert_to_tensor(v) for k, v in posterior_arrays_dict.items()}
+            model_outputs = {"posteriors_dict": posterior_arrays_dict, "actions_predicted": actions_predicted,
+                             "ig_activations_dict": ig_activations_dict}
+
+            regression_q_targets_auto, optimal_q_values = self.cign.calculate_q_tables_from_network_outputs(
+                true_labels=true_labels, model_outputs=model_outputs)
             regression_q_targets_manual = self.cign.calculate_q_tables_from_network_outputs_manual(
                 true_labels=true_labels,
                 posteriors_dict=posterior_arrays_dict,
