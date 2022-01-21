@@ -43,7 +43,7 @@ if __name__ == "__main__":
                                       classification_wd=FashionNetConstants.classification_wd,
                                       decision_dimensions=FashionNetConstants.decision_dimensions,
                                       class_count=10,
-                                      information_gain_balance_coeff=1.0,
+                                      information_gain_balance_coeff=FashionNetConstants.information_gain_balance_coeff,
                                       softmax_decay_controller=softmax_decay_controller,
                                       learning_rate_schedule=FashionNetConstants.learning_rate_calculator,
                                       decision_loss_coeff=1.0,

@@ -16,6 +16,7 @@ class FashionNetConstants:
     softmax_decay_period = 2
     softmax_decay_min_limit = 1.0
     softmax_decay_controllers = {}
+    information_gain_balance_coeff = 5.0
 
     # FashionNet parameters
     filter_counts = [32, 32, 32]

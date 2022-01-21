@@ -1239,8 +1239,8 @@ class CignRlBinaryRouting(CignRlRouting):
                                          epoch_id=epoch_id,
                                          times_list=times_list,
                                          only_use_ig_routing=True)
-        assert epoch_id == epoch_count
-        self.save_model(run_id=run_id, epoch_id=epoch_id)
+        # assert epoch_id == epoch_count
+        self.save_model(run_id=run_id, epoch_id=epoch_count-1)
 
     def measure_performance(self, dataset, run_id, iteration=-1, epoch_id=0, times_list=tuple([0]), **kwargs):
         only_use_ig_routing = kwargs["only_use_ig_routing"]
