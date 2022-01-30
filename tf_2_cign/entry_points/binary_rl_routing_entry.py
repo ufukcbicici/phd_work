@@ -18,8 +18,7 @@ if __name__ == "__main__":
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
     fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
-                                 validation_size=5000,
-                                 validation_source="t*/raining")
+                                 validation_size=0)
     softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
                                                       initial_value=FashionNetConstants.softmax_decay_initial,
                                                       decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
@@ -59,11 +58,31 @@ if __name__ == "__main__":
         explanation = cign.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
 
+        cign.train_end_to_end(run_id=run_id,
+                              dataset=fashion_mnist,
+                              epoch_count=125,
+                              q_net_epoch_count=250,
+                              fine_tune_epoch_count=25,
+                              warm_up_epoch_count=25,
+                              q_net_train_start_epoch=25,
+                              q_net_train_period=25)
+
         # Utilities.pickle_save_to_file(path=)
 
-        # cign.load_model(run_id=2953)
-        # cign.measure_performance(dataset=fashion_mnist, run_id=run_id)
+        # cign.load_model(run_id=3172, epoch_id=99)
+        # cign.measure_performance(dataset=fashion_mnist, run_id=run_id, only_use_ig_routing=True)
         # cign.calculate_ideal_accuracy(dataset=fashion_mnist.testDataTf)
+        #
+        # autoencoders = cign.load_autoencoders(dataset=fashion_mnist,
+        #                                       run_id_list=[3247, 3248],
+        #                                       epoch_list=[378, 261])
+        # for i in range(1000):
+        #     delta = i * 0.0001
+        #     print("{0}-{1}".format(0.051-2.0*delta, 0.320-delta))
+        #     cign.calculate_accuracy_with_anomaly_detectors(dataset=fashion_mnist.testDataTf,
+        #                                                    anomaly_detectors=autoencoders,
+        #                                                    selection_thresholds=[0.051-2.0*delta, 0.320-delta])
+        # print("X")
 
         # cign.train(run_id=run_id,
         #            dataset=fashion_mnist,
@@ -74,16 +93,18 @@ if __name__ == "__main__":
         #            q_net_train_start_epoch=25,
         #            q_net_train_period=25)
 
-        cign.train_using_q_nets_as_post_processing(run_id=run_id,
-                                                   dataset=fashion_mnist,
-                                                   epoch_count=100,
-                                                   q_net_epoch_count=250,
-                                                   fine_tune_epoch_count=25,
-                                                   warm_up_epoch_count=25,
-                                                   q_net_train_start_epoch=25,
-                                                   q_net_train_period=25)
+        # cign.train_using_q_nets_as_post_processing(run_id=run_id,
+        #                                            dataset=fashion_mnist,
+        #                                            epoch_count=100,
+        #                                            q_net_epoch_count=250,
+        #                                            fine_tune_epoch_count=25,
+        #                                            warm_up_epoch_count=25,
+        #                                            q_net_train_start_epoch=25,
+        #                                            q_net_train_period=25)
 
-        # cign.train_q_nets_separately(dataset=fashion_mnist, q_net_epoch_count=250)
+        # cign.train_q_nets_as_anomaly_detectors(run_id=3172,
+        #                                        dataset=fashion_mnist,
+        #                                        q_net_epoch_count=1000)
 
         # print("X")
 

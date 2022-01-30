@@ -29,7 +29,8 @@ class FashionNetConstants:
                                                  value=initial_lr,
                                                  schedule=[(15000, 0.005),
                                                            (30000, 0.0025),
-                                                           (40000, 0.00025)])
+                                                           (45000, 0.00125),
+                                                           (52000, 0.000125)])
 
     # Reinforcement learning routing parameters
     valid_prediction_reward = 1.0

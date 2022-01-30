@@ -1,7 +1,10 @@
 import numpy as np
 import tensorflow as tf
 import time
-
+import os
+from scipy.stats import norm
+from sklearn import metrics
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 
 from auxillary.dag_utilities import Dag
@@ -71,7 +74,8 @@ class CignRlBinaryRouting(CignRlRouting):
         true_labels = []
 
         for X, y in dataset:
-            model_output = self.run_model(X=X, y=y, iteration=-1, is_training=False, warm_up_period=False)
+            model_output = self.run_model(X=X, y=y, iteration=-1,
+                                          is_training=False, warm_up_period=False, only_use_ig_routing=False)
             posteriors_batch_dict = {k: v.numpy() for k, v in model_output["posteriors_dict"].items()}
             ig_masks_batch_dict = {k: v.numpy() for k, v in model_output["ig_masks_dict"].items()}
             ig_activations_batch_dict = {k: v.numpy() for k, v in model_output["ig_activations_dict"].items()}
@@ -111,12 +115,11 @@ class CignRlBinaryRouting(CignRlRouting):
         ideal_routing_accuracy = np.mean(ideal_validity_vector)
         print("Ideal Routing Accuracy:{0}".format(ideal_routing_accuracy))
 
-    def calculate_binary_rl_configurations(self, ig_activations_dict):
-        # Create action spaces
-        # All actions are binary at each tree level
+    def get_action_configurations(self):
         trajectory_length = self.get_max_trajectory_length()
         all_action_compositions_count = 2 ** trajectory_length
         action_configurations = np.zeros(shape=(all_action_compositions_count, trajectory_length), dtype=np.int32)
+        actions_dict = {}
         for action_id in range(all_action_compositions_count):
             l = [int(x) for x in list('{0:0b}'.format(action_id))]
             for layer_id in range(trajectory_length):
@@ -124,7 +127,16 @@ class CignRlBinaryRouting(CignRlRouting):
                     break
                 action_configurations[action_id, (trajectory_length - 1) - layer_id] = \
                     l[len(l) - 1 - layer_id]
+            action_trajectory_as_tuple = tuple(action_configurations[action_id])
+            actions_dict[action_trajectory_as_tuple] = action_id
+        # for action_id in range(all_action_compositions_count):
+        return action_configurations, actions_dict
 
+    def calculate_binary_rl_configurations(self, ig_activations_dict):
+        # Create action spaces
+        # All actions are binary at each tree level
+        trajectory_length = self.get_max_trajectory_length()
+        action_configurations, actions_dict = self.get_action_configurations()
         # Traverse all samples; calculate the leaf configurations according to the IG results.
         assert len(set([arr.shape[0] for arr in ig_activations_dict.values()]))
         sample_count = ig_activations_dict[self.topologicalSortedNodes[0].index].shape[0]
@@ -136,7 +148,8 @@ class CignRlBinaryRouting(CignRlRouting):
                 selected_level_nodes = [self.topologicalSortedNodes[0]]
                 for level in range(trajectory_length):
                     next_level_nodes = []
-                    level_action = action_config[trajectory_length - 1 - level]
+                    # level_action = action_config[trajectory_length - 1 - level]
+                    level_action = action_config[level]
                     for selected_node in selected_level_nodes:
                         routing_probs = ig_activations_dict[selected_node.index][sample_id]
                         selected_child_id = np.argmax(routing_probs)
@@ -247,6 +260,7 @@ class CignRlBinaryRouting(CignRlRouting):
         model_output_arr.append(self.enforcedActions)
         model_output_arr.append(self.igRoutingMatricesDict)
         model_output_arr.append(self.qNetInputs)
+        model_output_arr.append(self.qTablesPredicted)
         return model_output_arr
 
     def convert_model_outputs_to_dict(self, model_output_arr):
@@ -256,6 +270,7 @@ class CignRlBinaryRouting(CignRlRouting):
         model_output_dict["enforced_actions"] = model_output_arr[11]
         model_output_dict["ig_routing_matrices_dict"] = model_output_arr[12]
         model_output_dict["q_net_inputs"] = model_output_arr[13]
+        model_output_dict["q_tables_predicted"] = model_output_arr[14]
         return model_output_dict
 
     # OK
@@ -886,30 +901,21 @@ class CignRlBinaryRouting(CignRlRouting):
         model_output_dict = self.convert_model_outputs_to_dict(model_output_arr=model_output_arr)
         return model_output_dict
 
-    def train_q_nets_separately(self, dataset, q_net_epoch_count):
-        train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).batch(self.batchSizeNonTensor)
-        sample_count = dataset.valX.shape[0]
-        action_combinations = []
-
+    def prepare_anomaly_dataset(self, dataset_tf):
         ig_activations = {}
         inputs_per_tree_level = {}
         targets_per_tree_level = {}
+        action_combinations = []
+
         for _ in range(self.get_max_trajectory_length()):
             action_combinations.append([0, 1])
 
         action_combinations = Utilities.get_cartesian_product(list_of_lists=action_combinations)
 
-        def augment_training_image_fn(image, labels):
-            image = tf.image.random_flip_left_right(image)
-            return image, labels
-
-        self.build_trackers()
-        self.reset_trackers()
-
         # Build the training inputs: Intermediate features which are fed to the Q-Nets at every tree layer,
         # for every action trajectory.
         # Build the training targets: Optimal Q-tables for every sample, under every possible trajectory.
-        for X, y in train_tf:
+        for X, y in dataset_tf:
             # input_source_dict = {}
             # target_source_dict = {}
             for trajectory_nd in action_combinations:
@@ -1009,13 +1015,17 @@ class CignRlBinaryRouting(CignRlRouting):
                 else:
                     outputs[k_] = final_arr
 
-        # Rule - 4: The Q-Net inputs must reflect the information gain activations from the previous layer, and the,
+        # Rule - 4: The Q-Net inputs must reflect the information gain activations from the previous layer, and the
         # action taken there.
         ig_activations_temp = {}
+        sample_count = set()
         for idx, arr in ig_activations.items():
             if idx[0] not in ig_activations_temp:
                 ig_activations_temp[idx[0]] = arr
+            sample_count.add(arr.shape[0])
         ig_activations = ig_activations_temp
+        assert len(sample_count) == 1
+        sample_count = list(sample_count)[0]
 
         for sample_id in range(sample_count):
             for trajectory_nd in action_combinations:
@@ -1057,6 +1067,492 @@ class CignRlBinaryRouting(CignRlRouting):
                                 next_level_route_signal.extend([1] * len(self.dagObject.children(node=node)))
                     route_signal = next_level_route_signal
 
+        X_per_levels = {}
+        y_per_levels = {}
+        for lid in range(self.get_max_trajectory_length()):
+            correct_array_keys = [tpl for tpl in inputs.keys() if tpl[0] == lid]
+            X = [inputs[tpl] for tpl in correct_array_keys]
+            X = np.concatenate(X, axis=0)
+            y = [outputs[tpl] for tpl in correct_array_keys]
+            y = np.concatenate(y, axis=0)
+            y = np.argmax(y, axis=-1)
+            X_per_levels[lid] = X
+            y_per_levels[lid] = y
+            histogram = Counter(y_per_levels[lid])
+            print("Histogram:{0}".format(histogram))
+        return X_per_levels, y_per_levels, ig_activations
+
+    def get_autoencoder(self, q_net_of_level):
+        q_net_input_shape = q_net_of_level.layers[0].input_shape[0]
+        # input_x = tf.keras.Input(shape=q_net_input_shape[1:], dtype=q_net_of_level.layers[0].dtype)
+        # net = input_x
+        if q_net_input_shape[1] % 2 == 1:
+            input_shape = (q_net_input_shape[1] + 1, q_net_input_shape[2] + 1, q_net_input_shape[3])
+        else:
+            input_shape = q_net_input_shape[1:]
+
+        # Train an autoencoder
+        input_x = tf.keras.Input(shape=input_shape, dtype=q_net_of_level.layers[0].dtype)
+        net = input_x
+        # if use_bilinear:
+        #     net = tf.image.resize(input_x, size=(input_shape[1], input_shape[1]), method="bilinear")
+        # else:
+        #     net = input_x
+        conv_layer = tf.keras.layers.Conv2D(filters=64,
+                                            kernel_size=3,
+                                            strides=2,
+                                            padding="same",
+                                            use_bias=False,
+                                            name="conv1")
+        net = conv_layer(net)
+        last_conv_layer_shape = net.shape
+        batch_norm = tf.keras.layers.BatchNormalization()
+        net = batch_norm(net)
+        leaky_relu_conv = tf.keras.layers.LeakyReLU(alpha=0.1)
+        net = leaky_relu_conv(net)
+
+        flatten = tf.keras.layers.Flatten()
+        net = flatten(net)
+        flat_dim = net.shape
+
+        dense1 = tf.keras.layers.Dense(units=128)
+        net = dense1(net)
+        leaky_relu1 = tf.keras.layers.LeakyReLU(alpha=0.1)
+        net = leaky_relu1(net)
+
+        dense2 = tf.keras.layers.Dense(units=64)
+        net = dense2(net)
+
+        dense3 = tf.keras.layers.Dense(units=128)
+        net = dense3(net)
+        leaky_relu3 = tf.keras.layers.LeakyReLU(alpha=0.1)
+        net = leaky_relu3(net)
+
+        dense4 = tf.keras.layers.Dense(units=flat_dim[1])
+        net = dense4(net)
+
+        reshape_to_conv = tf.keras.layers.Reshape(target_shape=last_conv_layer_shape[1:])
+        net = reshape_to_conv(net)
+
+        transpose_conv_layer = tf.keras.layers.Conv2DTranspose(input_x.shape[-1],
+                                                               kernel_size=3,
+                                                               strides=2,
+                                                               padding="same",
+                                                               name="trans_conv1",
+                                                               use_bias=False)
+        net = transpose_conv_layer(net)
+        batch_norm = tf.keras.layers.BatchNormalization()
+        net = batch_norm(net)
+        leaky_relu_trans_conv = tf.keras.layers.LeakyReLU(alpha=0.1)
+        net = leaky_relu_trans_conv(net)
+
+        # Last linear layer
+        linear_1x1_conv = tf.keras.layers.Conv2D(input_x.shape[-1],
+                                                 kernel_size=1,
+                                                 strides=1,
+                                                 padding="same",
+                                                 use_bias=False,
+                                                 name="linear_1x1_conv")
+        net = linear_1x1_conv(net)
+        output_x = net
+        autoencoder_model = tf.keras.Model(inputs=input_x, outputs=output_x)
+        return autoencoder_model
+
+    def get_anomaly_detection_statistics(self, autoencoder, normal_data, anomaly_data):
+        # Calculate distributions of the normal and anomaly data
+        normal_distances = []
+        anomaly_distances = []
+        for X_batch in normal_data:
+            if X_batch.shape[1] % 2 == 1:
+                X_batch = tf.image.resize(X_batch, size=(X_batch.shape[1] + 1,
+                                                         X_batch.shape[2] + 1), method="bilinear")
+            X_batch_hat = autoencoder(inputs=X_batch, training=False)
+            d_ = X_batch_hat - X_batch
+            d_ = tf.pow(d_, 2.0)
+            error_vector = np.mean(d_, axis=(1, 2, 3))
+            normal_distances.append(error_vector)
+        normal_distances = np.concatenate(normal_distances)
+
+        for X_batch in anomaly_data:
+            if X_batch.shape[1] % 2 == 1:
+                X_batch = tf.image.resize(X_batch, size=(X_batch.shape[1] + 1,
+                                                         X_batch.shape[2] + 1), method="bilinear")
+            X_batch_hat = autoencoder(inputs=X_batch, training=False)
+            d_ = X_batch_hat - X_batch
+            d_ = tf.pow(d_, 2.0)
+            error_vector = np.mean(d_, axis=(1, 2, 3))
+            anomaly_distances.append(error_vector)
+        anomaly_distances = np.concatenate(anomaly_distances)
+
+        normal_mean = np.mean(normal_distances)
+        normal_std = np.std(normal_distances)
+        anomaly_mean = np.mean(anomaly_distances)
+        anomaly_std = np.std(anomaly_distances)
+        return normal_mean, normal_std, anomaly_mean, anomaly_std
+
+    def eval_dataset_with_anomaly_detector(self, autoencoder, normal_data, anomaly_data,
+                                           normal_mean, normal_std, anomaly_mean, anomaly_std):
+        errors_normal_data = []
+        errors_anomaly_data = []
+        for X_batch in normal_data:
+            if X_batch.shape[1] % 2 == 1:
+                X_batch = tf.image.resize(X_batch, size=(X_batch.shape[1] + 1,
+                                                         X_batch.shape[2] + 1), method="bilinear")
+            x_hat = autoencoder(inputs=X_batch, training=False)
+            d_ = x_hat - X_batch
+            d_ = tf.pow(d_, 2.0)
+            error_vector = np.mean(d_, axis=(1, 2, 3))
+            errors_normal_data.append(error_vector)
+
+        for X_batch in anomaly_data:
+            if X_batch.shape[1] % 2 == 1:
+                X_batch = tf.image.resize(X_batch, size=(X_batch.shape[1] + 1,
+                                                         X_batch.shape[2] + 1), method="bilinear")
+            x_hat = autoencoder(inputs=X_batch, training=False)
+            d_ = x_hat - X_batch
+            d_ = tf.pow(d_, 2.0)
+            error_vector = np.mean(d_, axis=(1, 2, 3))
+            errors_anomaly_data.append(error_vector)
+
+        errors_normal_data = np.concatenate(errors_normal_data)
+        errors_anomaly_data = np.concatenate(errors_anomaly_data)
+        distances = np.concatenate([errors_normal_data, errors_anomaly_data])
+        y_ = np.concatenate(
+            [np.zeros(shape=(errors_normal_data.shape[0],), dtype=np.int32),
+             np.ones(shape=(errors_anomaly_data.shape[0],), dtype=np.int32)])
+
+        norm_p = norm.pdf(distances, loc=normal_mean, scale=normal_std)
+        anorm_p = norm.pdf(distances, loc=anomaly_mean, scale=anomaly_std)
+        scores = np.stack([norm_p, anorm_p], axis=-1)
+        y_hat = np.argmax(scores, axis=-1)
+        report = classification_report(y_, y_hat)
+        print(report)
+        fpr, tpr, thresholds = metrics.roc_curve(y_, y_hat, pos_label=1)
+        auc = metrics.auc(fpr, tpr)
+        print("auc={0}".format(auc))
+        return report, auc
+
+    def save_autoencoder(self, autoencoder, run_id, level_id, epoch_id):
+        root_path = os.path.dirname(__file__)
+        model_path = os.path.join(root_path,
+                                  "..", "saved_models", "model_{0}_autoencoder_level_{1}_epoch_{2}".format(run_id,
+                                                                                                           level_id,
+                                                                                                           epoch_id))
+        os.mkdir(model_path)
+        autoencoder_model_path = os.path.join(model_path, "model")
+        os.mkdir(autoencoder_model_path)
+        autoencoder.save_weights(autoencoder_model_path)
+
+    def load_autoencoder(self, autoencoder, run_id, level_id, epoch_id):
+        try:
+            root_path = os.path.dirname(__file__)
+            model_path = os.path.join(root_path,
+                                      "..", "saved_models",
+                                      "model_{0}_autoencoder_level_{1}_epoch_{2}".format(run_id, level_id, epoch_id))
+            autoencoder_model_path = os.path.join(model_path, "model")
+            autoencoder.load_weights(autoencoder_model_path)
+            return True
+        except:
+            return False
+
+    def train_q_nets_as_anomaly_detectors(self, run_id, dataset, q_net_epoch_count):
+        run_id = DbLogger.get_run_id()
+        self.build_trackers()
+        self.reset_trackers()
+        train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).batch(self.batchSizeNonTensor)
+        test_tf = tf.data.Dataset.from_tensor_slices((dataset.testX, dataset.testY)).batch(self.batchSizeNonTensor)
+
+        train_x, train_y, train_ig = self.prepare_anomaly_dataset(dataset_tf=train_tf)
+        test_x, test_y, test_ig = self.prepare_anomaly_dataset(dataset_tf=test_tf)
+
+        action_combinations = []
+        for _ in range(self.get_max_trajectory_length()):
+            action_combinations.append([0, 1])
+
+        for lid in range(self.get_max_trajectory_length()):
+            if lid == 0:
+                continue
+            boundaries = [2000, 5000, 9000]
+            values = [0.1, 0.01, 0.001, 0.0001]
+            self.globalStep.assign(value=0)
+            q_net_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+
+            # Prepare data
+            train_x_normal = train_x[lid][train_y[lid] == 0]
+            train_x_anomaly = train_x[lid][train_y[lid] == 1]
+            test_x_normal = test_x[lid][test_y[lid] == 0]
+            test_x_anomaly = test_x[lid][test_y[lid] == 1]
+            normal_train_data = tf.data.Dataset.from_tensor_slices(train_x_normal).shuffle(5000).batch(
+                self.batchSizeNonTensor)
+            anomaly_train_data = tf.data.Dataset.from_tensor_slices(train_x_anomaly).batch(
+                self.batchSizeNonTensor)
+            normal_test_data = tf.data.Dataset.from_tensor_slices(test_x_normal).batch(self.batchSizeNonTensor)
+            anomaly_test_data = tf.data.Dataset.from_tensor_slices(test_x_anomaly).batch(self.batchSizeNonTensor)
+
+            # Get autoencoder
+            autoencoder = self.get_autoencoder(q_net_of_level=self.qNets[lid])
+            iteration = 0
+            # Train the autoencoder with only normal data
+            # ***************** COMMENT THAT PART OUT, LOAD SAVED MODEL *****************
+            # Train the q-net model
+            iteration = 0
+            for epoch_id in range(q_net_epoch_count):
+                self.qNetTrackers[lid].reset_states()
+                for X_batch in normal_train_data:
+                    with tf.GradientTape() as q_tape:
+                        if X_batch.shape[1] % 2 == 1:
+                            X_batch = tf.image.resize(X_batch, size=(X_batch.shape[1] + 1,
+                                                                     X_batch.shape[2] + 1), method="bilinear")
+                        X_batch_hat = autoencoder(inputs=X_batch, training=True)
+                        mse = self.mseLoss(X_batch, X_batch_hat)
+                        # reg_losses = []
+                        # for var in q_net.trainable_variables:
+                        #     assert var.ref() in self.regularizationCoefficients
+                        #     reg_coeff = self.regularizationCoefficients[var.ref()]
+                        #     reg_losses.append(reg_coeff * tf.nn.l2_loss(var))
+                        # regularization_loss = tf.add_n(reg_losses)
+                        # total_loss = mse + regularization_loss
+                        total_loss = mse
+                    self.qNetTrackers[lid].update_state(mse)
+                    q_grads = q_tape.gradient(total_loss, autoencoder.trainable_variables)
+                    q_net_optimizer.apply_gradients(zip(q_grads, autoencoder.trainable_variables))
+                    iteration += 1
+                    print("Level:{0} Iteration:{1} Epoch:{2} MSE:{3}".format(lid,
+                                                                             iteration,
+                                                                             epoch_id,
+                                                                             self.qNetTrackers[
+                                                                                 lid].result().numpy()))
+                    print("Lr:{0}".format(q_net_optimizer._decayed_lr(tf.float32).numpy()))
+
+                # Get anomaly detector statistics
+                normal_mean, normal_std, anomaly_mean, anomaly_std = self.get_anomaly_detection_statistics(
+                    autoencoder=autoencoder, normal_data=normal_train_data, anomaly_data=anomaly_train_data)
+                print("************Training************")
+                train_report, train_auc = self.eval_dataset_with_anomaly_detector(autoencoder=autoencoder,
+                                                                                  normal_data=normal_train_data,
+                                                                                  anomaly_data=anomaly_train_data,
+                                                                                  normal_mean=normal_mean,
+                                                                                  normal_std=normal_std,
+                                                                                  anomaly_mean=anomaly_mean,
+                                                                                  anomaly_std=anomaly_std)
+                print("************Test************")
+                test_report, test_auc = self.eval_dataset_with_anomaly_detector(autoencoder=autoencoder,
+                                                                                normal_data=normal_test_data,
+                                                                                anomaly_data=anomaly_test_data,
+                                                                                normal_mean=normal_mean,
+                                                                                normal_std=normal_std,
+                                                                                anomaly_mean=anomaly_mean,
+                                                                                anomaly_std=anomaly_std)
+                DbLogger.write_into_table(rows=[(run_id, epoch_id, lid, "training", train_report, train_auc),
+                                                (run_id, epoch_id, lid, "test", test_report, test_auc)],
+                                          table="q_net_anomaly_logs")
+                # Save trained autoencoder
+                self.save_autoencoder(autoencoder=autoencoder, run_id=run_id, level_id=lid, epoch_id=epoch_id)
+
+            # ***************** COMMENT THAT PART OUT, LOAD SAVE MODEL *****************
+
+            #
+            # # Calculate results of anomaly model.
+            # for normal_data, anomaly_data, dataset_name in (
+            #         [(normal_train_data, anomaly_train_data, "train"),
+            #          (normal_test_data, anomaly_test_data, "test")]):
+            #     print("*****************{0}*****************".format(dataset_name))
+            #     errors_normal_data = []
+            #     errors_anomaly_data = []
+            #     for X_batch in normal_data:
+            #         # x = tf.image.resize(x, size=(32, 32), method="bilinear")
+            #         if X_batch.shape[1] % 2 == 1:
+            #             X_batch = tf.image.resize(X_batch, size=(X_batch.shape[1] + 1,
+            #                                                      X_batch.shape[2] + 1), method="bilinear")
+            #         x_hat = autoencoder(inputs=X_batch, training=False)
+            #         d_ = x_hat - X_batch
+            #         d_ = tf.pow(d_, 2.0)
+            #         error_vector = np.mean(d_, axis=(1, 2, 3))
+            #         errors_normal_data.append(error_vector)
+            #
+            #     for X_batch in anomaly_data:
+            #         # x = tf.image.resize(x, size=(32, 32), method="bilinear")
+            #         if X_batch.shape[1] % 2 == 1:
+            #             X_batch = tf.image.resize(X_batch, size=(X_batch.shape[1] + 1,
+            #                                                      X_batch.shape[2] + 1), method="bilinear")
+            #         x_hat = autoencoder(inputs=X_batch, training=False)
+            #         d_ = x_hat - X_batch
+            #         d_ = tf.pow(d_, 2.0)
+            #         error_vector = np.mean(d_, axis=(1, 2, 3))
+            #         errors_anomaly_data.append(error_vector)
+            #
+            #     errors_normal_data = np.concatenate(errors_normal_data)
+            #     errors_anomaly_data = np.concatenate(errors_anomaly_data)
+            #
+            #     distances = np.concatenate([errors_normal_data, errors_anomaly_data])
+            #     y_ = np.concatenate(
+            #         [np.zeros(shape=(errors_normal_data.shape[0],), dtype=np.int32),
+            #          np.ones(shape=(errors_anomaly_data.shape[0],), dtype=np.int32)])
+            #
+            #     norm_p = norm.pdf(distances, loc=normal_mean, scale=normal_std)
+            #     anorm_p = norm.pdf(distances, loc=anomaly_mean, scale=anomaly_std)
+            #     scores = np.stack([norm_p, anorm_p], axis=-1)
+            #     y_hat = np.argmax(scores, axis=-1)
+            #     report = classification_report(y_, y_hat)
+            #     print(report)
+            #     fpr, tpr, thresholds = metrics.roc_curve(y_, y_hat, pos_label=1)
+            #     auc = metrics.auc(fpr, tpr)
+            #     print("auc={0}".format(auc))
+
+    def load_autoencoders(self, dataset, run_id_list, epoch_list, test_models=False):
+        assert self.get_max_trajectory_length() == len(run_id_list)
+        assert self.get_max_trajectory_length() == len(epoch_list)
+        train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).batch(self.batchSizeNonTensor)
+        test_tf = tf.data.Dataset.from_tensor_slices((dataset.testX, dataset.testY)).batch(self.batchSizeNonTensor)
+
+        train_x, train_y, train_ig = self.prepare_anomaly_dataset(dataset_tf=train_tf)
+        test_x, test_y, test_ig = self.prepare_anomaly_dataset(dataset_tf=test_tf)
+
+        autoencoders = []
+        for lid in range(self.get_max_trajectory_length()):
+            train_x_normal = train_x[lid][train_y[lid] == 0]
+            train_x_anomaly = train_x[lid][train_y[lid] == 1]
+            test_x_normal = test_x[lid][test_y[lid] == 0]
+            test_x_anomaly = test_x[lid][test_y[lid] == 1]
+            normal_train_data = tf.data.Dataset.from_tensor_slices(train_x_normal).shuffle(5000).batch(
+                self.batchSizeNonTensor)
+            anomaly_train_data = tf.data.Dataset.from_tensor_slices(train_x_anomaly).batch(
+                self.batchSizeNonTensor)
+            normal_test_data = tf.data.Dataset.from_tensor_slices(test_x_normal).batch(self.batchSizeNonTensor)
+            anomaly_test_data = tf.data.Dataset.from_tensor_slices(test_x_anomaly).batch(self.batchSizeNonTensor)
+
+            autoencoder = self.get_autoencoder(q_net_of_level=self.qNets[lid])
+            self.load_autoencoder(autoencoder=autoencoder, run_id=run_id_list[lid],
+                                  epoch_id=epoch_list[lid], level_id=lid)
+
+            if test_models:
+                # Get anomaly detector statistics
+                normal_mean, normal_std, anomaly_mean, anomaly_std = self.get_anomaly_detection_statistics(
+                    autoencoder=autoencoder, normal_data=normal_train_data, anomaly_data=anomaly_train_data)
+                print("normal_mean={0}".format(normal_mean))
+                print("normal_std={0}".format(normal_std))
+                print("anomaly_mean={0}".format(anomaly_mean))
+                print("anomaly_std={0}".format(anomaly_std))
+                print("************Training************")
+                train_report, train_auc = self.eval_dataset_with_anomaly_detector(autoencoder=autoencoder,
+                                                                                  normal_data=normal_train_data,
+                                                                                  anomaly_data=anomaly_train_data,
+                                                                                  normal_mean=normal_mean,
+                                                                                  normal_std=normal_std,
+                                                                                  anomaly_mean=anomaly_mean,
+                                                                                  anomaly_std=anomaly_std)
+                print(train_report)
+                print("Auc:{0}".format(train_auc))
+
+                print("************Test************")
+                test_report, test_auc = self.eval_dataset_with_anomaly_detector(autoencoder=autoencoder,
+                                                                                normal_data=normal_test_data,
+                                                                                anomaly_data=anomaly_test_data,
+                                                                                normal_mean=normal_mean,
+                                                                                normal_std=normal_std,
+                                                                                anomaly_mean=anomaly_mean,
+                                                                                anomaly_std=anomaly_std)
+                print(test_report)
+                print("Auc:{0}".format(test_auc))
+            autoencoders.append(autoencoder)
+        return autoencoders
+
+    def calculate_accuracy_with_anomaly_detectors(self, dataset, anomaly_detectors, selection_thresholds):
+        posteriors_dict = {}
+        ig_activations_dict = {}
+        true_labels = []
+        q_net_inputs_per_tree_level_dict = {}
+        anomaly_scores = {}
+        action_configurations, actions_dict = self.get_action_configurations()
+
+        for X, y in dataset:
+            kwargs = {"X": X, "y": y, "iteration": 0,
+                      "is_training": False, "warm_up_period": False, "only_use_ig_routing": False}
+            # Run the model
+            model_output_dict = self.run_model(**kwargs)
+            # Obtain Q-Net inputs
+            for lid in range(self.get_max_trajectory_length()):
+                if lid not in q_net_inputs_per_tree_level_dict:
+                    q_net_inputs_per_tree_level_dict[lid] = []
+                q_net_inputs_per_tree_level_dict[lid].append(model_output_dict["q_net_inputs"][lid])
+            # Obtain IG activations
+            for node_id in model_output_dict["ig_activations_dict"].keys():
+                if node_id not in ig_activations_dict:
+                    ig_activations_dict[node_id] = []
+                ig_activations_dict[node_id].append(model_output_dict["ig_activations_dict"][node_id])
+            # Obtain true labels
+            true_labels.append(y)
+            # Obtain posteriors
+            for node in self.leafNodes:
+                if node.index not in posteriors_dict:
+                    posteriors_dict[node.index] = []
+                posteriors_dict[node.index].append(model_output_dict["posteriors_dict"][node.index])
+            # Run autoencoders
+            for lid in range(self.get_max_trajectory_length()):
+                X_q = model_output_dict["q_net_inputs"][lid]
+                if lid not in anomaly_scores:
+                    anomaly_scores[lid] = []
+                if X_q.shape[1] % 2 == 1:
+                    X_q = tf.image.resize(X_q, size=(X_q.shape[1] + 1, X_q.shape[2] + 1), method="bilinear")
+                X_hat = anomaly_detectors[lid](inputs=X_q, training=False)
+                d_ = X_hat - X_q
+                d_ = tf.pow(d_, 2.0)
+                error_vector = np.mean(d_, axis=(1, 2, 3))
+                anomaly_scores[lid].append(error_vector)
+
+        # Merge all outputs
+        # IG activations
+        for k in ig_activations_dict.keys():
+            ig_activations_dict[k] = np.concatenate(ig_activations_dict[k], axis=0)
+        # Posterior probabilities
+        for k in posteriors_dict.keys():
+            posteriors_dict[k] = np.concatenate(posteriors_dict[k], axis=0)
+        # True labels
+        true_labels = np.concatenate(true_labels, axis=0)
+        # Anomaly Scores for every CIGN level
+        for lid in range(self.get_max_trajectory_length()):
+            anomaly_scores[lid] = np.concatenate(anomaly_scores[lid], axis=0)
+
+        posteriors_tensor = np.stack([posteriors_dict[node.index] for node in self.leafNodes], axis=-1)
+        routing_configurations = self.calculate_binary_rl_configurations(ig_activations_dict=ig_activations_dict)
+        # Determine actions with respect to anomaly thresholds.
+        actions_taken = []
+        for lid in range(self.get_max_trajectory_length()):
+            actions = tf.cast(anomaly_scores[lid] >= selection_thresholds[lid], dtype=tf.int64)
+            actions_taken.append(actions)
+        action_trajectories = np.stack(actions_taken, axis=-1)
+        action_id_list = np.apply_along_axis(lambda row: actions_dict[tuple(row)], axis=1, arr=action_trajectories)
+        routing_matrix = routing_configurations[np.arange(start=0, stop=action_id_list.shape[0]), action_id_list, :]
+        routing_accuracy, validity_vec = self.evaluate_routing_configuration(
+            posteriors_tensor=posteriors_tensor,
+            routing_matrix=routing_matrix,
+            true_labels=true_labels)
+        print("routing_accuracy={0}".format(routing_accuracy))
+
+    def train_q_nets_separately(self, run_id, dataset, q_net_epoch_count):
+        self.build_trackers()
+        self.reset_trackers()
+        train_tf = tf.data.Dataset.from_tensor_slices((dataset.valX, dataset.valY)).batch(self.batchSizeNonTensor)
+        test_tf = tf.data.Dataset.from_tensor_slices((dataset.testX, dataset.testY)).batch(self.batchSizeNonTensor)
+
+        train_x, train_y, train_ig = self.prepare_anomaly_dataset(dataset_tf=train_tf)
+        test_x, test_y, test_ig = self.prepare_anomaly_dataset(dataset_tf=test_tf)
+
+        sample_count = dataset.valX.shape[0]
+        action_combinations = []
+
+        ig_activations = {}
+        inputs_per_tree_level = {}
+        targets_per_tree_level = {}
+        for _ in range(self.get_max_trajectory_length()):
+            action_combinations.append([0, 1])
+
+        action_combinations = Utilities.get_cartesian_product(list_of_lists=action_combinations)
+
+        def augment_training_image_fn(image, labels):
+            image = tf.image.random_flip_left_right(image)
+            return image, labels
+
             # for lid in range(self.get_max_trajectory_length()):
             #     if lid == 0:
             #         continue
@@ -1078,8 +1574,11 @@ class CignRlBinaryRouting(CignRlRouting):
             boundaries = [2000, 5000, 9000]
             values = [0.1, 0.01, 0.001, 0.0001]
             self.globalStep.assign(value=0)
-            # q_net_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
-            q_net_optimizer = self.get_sgd_optimizer()
+
+            q_net_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            # learning_rate_scheduler_tf = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
+            #     boundaries=boundaries, values=values)
+            # q_net_optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
 
             correct_array_keys = [tpl for tpl in inputs.keys() if tpl[0] == lid]
             X = [inputs[tpl] for tpl in correct_array_keys]
@@ -1093,22 +1592,37 @@ class CignRlBinaryRouting(CignRlRouting):
             assert X.shape[0] == y.shape[0]
             assert X.shape[0] % sample_count == 0
 
-            train_indices, test_indices = train_test_split(np.arange(sample_count), test_size=test_ratio)
-            train_indices_multiplied = []
-            multiplier = X.shape[0] // sample_count
-            for idx in train_indices:
-                for coefficient in range(multiplier):
-                    train_indices_multiplied.append(idx + coefficient * sample_count)
-
-            test_indices_multiplied = []
-            for idx in test_indices:
-                for coefficient in range(multiplier):
-                    test_indices_multiplied.append(idx + coefficient * sample_count)
+            # train_indices, test_indices = train_test_split(np.arange(sample_count), test_size=test_ratio)
+            # train_indices_multiplied = []
+            # multiplier = X.shape[0] // sample_count
+            # for idx in train_indices:
+            #     for coefficient in range(multiplier):
+            #         train_indices_multiplied.append(idx + coefficient * sample_count)
+            #
+            # test_indices_multiplied = []
+            # for idx in test_indices:
+            #     for coefficient in range(multiplier):
+            #         test_indices_multiplied.append(idx + coefficient * sample_count)
 
             X_train = X[train_indices_multiplied]
             X_test = X[test_indices_multiplied]
             y_train = y[train_indices_multiplied]
             y_test = y[test_indices_multiplied]
+
+            y_train_labels = np.argmax(y_train, axis=-1)
+            y_test_labels = np.argmax(y_test, axis=-1)
+
+            X_train_normal = X_train[y_train_labels == 0]
+            X_train_anomaly = X_train[y_train_labels == 1]
+            X_test_normal = X_test[y_test_labels == 0]
+            X_test_anomaly = X_test[y_test_labels == 1]
+
+            normal_train_data = tf.data.Dataset.from_tensor_slices(X_train_normal).shuffle(5000).batch(
+                self.batchSizeNonTensor)
+            anomaly_train_data = tf.data.Dataset.from_tensor_slices(X_train_anomaly).shuffle(5000).batch(
+                self.batchSizeNonTensor)
+            normal_test_data = tf.data.Dataset.from_tensor_slices(X_test_normal).batch(self.batchSizeNonTensor)
+            anomaly_test_data = tf.data.Dataset.from_tensor_slices(X_test_anomaly).batch(self.batchSizeNonTensor)
 
             q_net_train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train)).shuffle(5000).batch(
                 self.batchSizeNonTensor)
@@ -1117,31 +1631,155 @@ class CignRlBinaryRouting(CignRlRouting):
 
             q_net = self.qNets[lid]
 
-            # Train the q-net model
-            iteration = 0
-            for epoch_id in range(q_net_epoch_count):
-                self.qNetTrackers[lid].reset_states()
-                # Keep track of prediction statistics
-                action_counters = []
-                optimal_decisions_ground_truth = []
-                optimal_decisions_prediction = []
+            # Analysis of optimal decisions
+            optimal_decisions_ground_truth = []
+            for X_batch, y_batch in q_net_train_dataset:
+                optimal_decisions_ground_truth.append(y_batch)
+            optimal_decisions_ground_truth = np.concatenate(optimal_decisions_ground_truth, axis=0)
+            histogram = Counter(np.argmax(optimal_decisions_ground_truth, axis=-1))
+            print("Histogram:{0}".format(histogram))
 
-                for X_batch, y_batch in q_net_train_dataset:
-                    with tf.GradientTape() as q_tape:
-                        y_hat = q_net(inputs=X_batch)
-                        mse = self.mseLoss(y_batch, y_hat)
-                        reg_losses = []
-                        for var in q_net.trainable_variables:
-                            assert var.ref() in self.regularizationCoefficients
-                            reg_coeff = self.regularizationCoefficients[var.ref()]
-                            reg_losses.append(reg_coeff * tf.nn.l2_loss(var))
-                        regularization_loss = tf.add_n(reg_losses)
-                        total_loss = mse + regularization_loss
-                    q_grads = q_tape.gradient(total_loss, q_net.trainable_variables)
-                    q_net_optimizer.apply_gradients(zip(q_grads, q_net.trainable_variables))
+            # Load trained autoencoder
+            root_path = os.path.dirname(__file__)
+            model_path = os.path.join(root_path, "..", "saved_models", "model_{0}_autoencoder".format(run_id))
+            autoencoder_model_path = os.path.join(model_path, "model")
+            autoencoder_model.load_weights(autoencoder_model_path)
+
+            # ***************** COMMENT THAT PART OUT, LOAD SAVE MODEL *****************
+            # # Train the q-net model
+            # iteration = 0
+            # for epoch_id in range(q_net_epoch_count):
+            #     self.qNetTrackers[lid].reset_states()
+            #     # Keep track of prediction statistics
+            #     action_counters = []
+            #     optimal_decisions_ground_truth = []
+            #     optimal_decisions_prediction = []
+            #
+            #     for X_batch in normal_train_data:
+            #         with tf.GradientTape() as q_tape:
+            #             X_batch_hat = autoencoder_model(inputs=X_batch, training=True)
+            #             mse = self.mseLoss(X_batch, X_batch_hat)
+            #             # reg_losses = []
+            #             # for var in q_net.trainable_variables:
+            #             #     assert var.ref() in self.regularizationCoefficients
+            #             #     reg_coeff = self.regularizationCoefficients[var.ref()]
+            #             #     reg_losses.append(reg_coeff * tf.nn.l2_loss(var))
+            #             # regularization_loss = tf.add_n(reg_losses)
+            #             # total_loss = mse + regularization_loss
+            #             total_loss = mse
+            #         self.qNetTrackers[lid].update_state(mse)
+            #         q_grads = q_tape.gradient(total_loss, autoencoder_model.trainable_variables)
+            #         q_net_optimizer.apply_gradients(zip(q_grads, autoencoder_model.trainable_variables))
+            #         iteration += 1
+            #         print("Level:{0} Iteration:{1} Epoch:{2} MSE:{3}".format(lid,
+            #                                                                  iteration,
+            #                                                                  epoch_id,
+            #                                                                  self.qNetTrackers[lid].result().numpy()))
+            #         print("Lr:{0}".format(q_net_optimizer._decayed_lr(tf.float32).numpy()))
+            #
+            # # Save trained autoencoder
+            # root_path = os.path.dirname(__file__)
+            # model_path = os.path.join(root_path, "..", "saved_models", "model_{0}_autoencoder".format(run_id))
+            # os.mkdir(model_path)
+            # autoencoder_model_path = os.path.join(model_path, "model")
+            # os.mkdir(autoencoder_model_path)
+            # autoencoder_model.save_weights(autoencoder_model_path)
+            # ***************** COMMENT THAT PART OUT, LOAD SAVE MODEL *****************
+
+            normal_distances = []
+            anomaly_distances = []
+            for X_batch in normal_train_data:
+                X_batch_hat = autoencoder_model(inputs=X_batch, training=False)
+                d_ = X_batch_hat - X_batch
+                d_ = tf.pow(d_, 2.0)
+                error_vector = np.mean(d_, axis=(1, 2, 3))
+                normal_distances.append(error_vector)
+
+            for X_batch in anomaly_train_data:
+                X_batch_hat = autoencoder_model(inputs=X_batch, training=False)
+                d_ = X_batch_hat - X_batch
+                d_ = tf.pow(d_, 2.0)
+                error_vector = np.mean(d_, axis=(1, 2, 3))
+                anomaly_distances.append(error_vector)
+
+            normal_distances = np.concatenate(normal_distances)
+            anomaly_distances = np.concatenate(anomaly_distances)
+
+            normal_mean = np.mean(normal_distances)
+            normal_std = np.std(normal_distances)
+            anomaly_mean = np.mean(anomaly_distances)
+            anomaly_std = np.std(anomaly_distances)
 
             print("X")
-        print("X")
+
+            for dataset, dataset_type in [(q_net_train_dataset, "training"), (q_net_test_dataset, "test")]:
+                ground_truth = []
+                predictions = []
+                for X_batch, y_batch in dataset:
+                    y_hat = q_net(inputs=X_batch)
+                    ground_truth.append(y_batch)
+                    predictions.append(y_hat)
+                ground_truth = np.concatenate(ground_truth, axis=0)
+                predictions = np.concatenate(predictions, axis=0)
+                ground_truth = np.argmax(ground_truth, axis=-1)
+                predictions = np.argmax(predictions, axis=-1)
+                report = classification_report(ground_truth, predictions)
+                print("Dataset:{0} Report:{1}".format(dataset_type, report))
+
+            # conv_transpose = tf.keras.layers.Conv2DTranspose(64,
+            #                                                  kernel_size=self.kernelSize,
+            #                                                  strides=3,
+            #                                                  padding="same",
+            #                                                  name="trans_conv_{0}".format(block_id),
+            #                                                  use_bias=False)
+
+        #     # Train the q-net model
+        #     iteration = 0
+        #     for epoch_id in range(q_net_epoch_count):
+        #         self.qNetTrackers[lid].reset_states()
+        #         # Keep track of prediction statistics
+        #         action_counters = []
+        #         optimal_decisions_ground_truth = []
+        #         optimal_decisions_prediction = []
+        #
+        #         for X_batch, y_batch in q_net_train_dataset:
+        #             with tf.GradientTape() as q_tape:
+        #                 y_hat = q_net(inputs=X_batch)
+        #                 mse = self.mseLoss(y_batch, y_hat)
+        #                 reg_losses = []
+        #                 for var in q_net.trainable_variables:
+        #                     assert var.ref() in self.regularizationCoefficients
+        #                     reg_coeff = self.regularizationCoefficients[var.ref()]
+        #                     reg_losses.append(reg_coeff * tf.nn.l2_loss(var))
+        #                 regularization_loss = tf.add_n(reg_losses)
+        #                 total_loss = mse + regularization_loss
+        #             self.qNetTrackers[lid].update_state(mse)
+        #             q_grads = q_tape.gradient(total_loss, q_net.trainable_variables)
+        #             q_net_optimizer.apply_gradients(zip(q_grads, q_net.trainable_variables))
+        #             iteration += 1
+        #             print("Level:{0} Iteration:{1} Epoch:{2} MSE:{3}".format(lid,
+        #                                                                      iteration,
+        #                                                                      epoch_id,
+        #                                                                      self.qNetTrackers[lid].result().numpy()))
+        #             print("Lr:{0}".format(q_net_optimizer._decayed_lr(tf.float32).numpy()))
+        #
+        #         if (epoch_id + 1) % 10 == 0:
+        #             for dataset, dataset_type in [(q_net_train_dataset, "training"), (q_net_test_dataset, "test")]:
+        #                 ground_truth = []
+        #                 predictions = []
+        #                 for X_batch, y_batch in dataset:
+        #                     y_hat = q_net(inputs=X_batch)
+        #                     ground_truth.append(y_batch)
+        #                     predictions.append(y_hat)
+        #                 ground_truth = np.concatenate(ground_truth, axis=0)
+        #                 predictions = np.concatenate(predictions, axis=0)
+        #                 ground_truth = np.argmax(ground_truth, axis=-1)
+        #                 predictions = np.argmax(predictions, axis=-1)
+        #                 report = classification_report(ground_truth, predictions)
+        #                 print("Dataset:{0} Report:{1}".format(dataset_type, report))
+        #
+        #     print("X")
+        # print("X")
 
     def train(self, run_id, dataset, epoch_count, **kwargs):
         # q_net_epoch_count = kwargs["q_net_epoch_count"]
@@ -1240,7 +1878,7 @@ class CignRlBinaryRouting(CignRlRouting):
                                          times_list=times_list,
                                          only_use_ig_routing=True)
         # assert epoch_id == epoch_count
-        self.save_model(run_id=run_id, epoch_id=epoch_count-1)
+        self.save_model(run_id=run_id, epoch_id=epoch_count - 1)
 
     def measure_performance(self, dataset, run_id, iteration=-1, epoch_id=0, times_list=tuple([0]), **kwargs):
         only_use_ig_routing = kwargs["only_use_ig_routing"]
@@ -1249,6 +1887,9 @@ class CignRlBinaryRouting(CignRlRouting):
         for dataset_type, ds in zip(
                 ["train", "validation", "test"],
                 [dataset.trainDataTf, dataset.validationDataTf, dataset.testDataTf]):
+            if ds is None:
+                accuracy_dict[dataset_type] = 0.0
+                continue
             accuracy, q_losses = self.eval(run_id=run_id, iteration=iteration, dataset=ds,
                                            dataset_type=dataset_type, only_use_ig_routing=only_use_ig_routing)
             print("{0} accuracy:{1}".format(dataset_type, accuracy))
@@ -1329,3 +1970,118 @@ class CignRlBinaryRouting(CignRlRouting):
                             np.asscalar(q_loss)))
         DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
         return accuracy, q_loss_list
+
+    def print_train_step_info(self, **kwargs):
+        iteration = kwargs["iteration"]
+        time_intervals = kwargs["time_intervals"]
+        eval_dict = kwargs["eval_dict"]
+        # Print outputs
+        print("************************************")
+        print("Iteration {0}".format(iteration))
+        for k, v in time_intervals.items():
+            print("{0}={1}".format(k, v))
+        self.print_losses(eval_dict=eval_dict)
+
+        q_str = "Q-Net Losses: "
+        for idx, q_net_loss in enumerate(self.qNetTrackers):
+            q_str += "Q-Net_{0}:{1} ".format(idx, self.qNetTrackers[idx].result().numpy())
+
+        print(q_str)
+        print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
+        print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
+        print("************************************")
+
+    def track_losses(self, **kwargs):
+        super().track_losses(**kwargs)
+        q_net_losses = kwargs["q_net_losses"]
+        if q_net_losses is not None:
+            for idx, q_net_loss in enumerate(q_net_losses):
+                self.qNetTrackers[idx].update_state(q_net_loss)
+
+    def train_end_to_end(self, run_id, dataset, epoch_count, **kwargs):
+        constraints = {"q_net_epoch_count": kwargs["q_net_epoch_count"],
+                       "fine_tune_epoch_count": kwargs["fine_tune_epoch_count"],
+                       "warm_up_epoch_count": kwargs["warm_up_epoch_count"],
+                       "q_net_train_start_epoch": kwargs["q_net_train_start_epoch"],
+                       "q_net_train_period": kwargs["q_net_train_period"]}
+        # OK
+        self.optimizer = self.get_sgd_optimizer()
+        # OK
+        self.build_trackers()
+        states_dict = self.get_epoch_states(constraints=constraints, epoch_count=epoch_count)
+        iteration = 0
+        iterations_in_warm_up = 0
+        for epoch_id in range(epoch_count):
+            is_in_warm_up_period = states_dict[epoch_id]["is_in_warm_up_period"]
+            self.reset_trackers()
+            for train_X, train_y in dataset.trainDataTf:
+                profiler = Profiler()
+                with tf.GradientTape() as main_tape:
+                    model_output = self.run_model(
+                        X=train_X,
+                        y=train_y,
+                        iteration=iteration,
+                        is_training=True,
+                        warm_up_period=is_in_warm_up_period,
+                        only_use_ig_routing=False)
+                    regression_q_targets, optimal_q_values = self.calculate_q_tables_from_network_outputs(
+                        true_labels=train_y.numpy(), model_outputs=model_output)
+                    classification_losses = model_output["classification_losses"]
+                    info_gain_losses = model_output["info_gain_losses"]
+                    q_net_outputs = model_output["q_tables_predicted"]
+
+                    # L2 Loss for regularization
+                    regularization_losses = []
+                    for var in self.model.trainable_variables:
+                        assert var.ref() in self.regularizationCoefficients
+                        lambda_coeff = self.regularizationCoefficients[var.ref()]
+                        regularization_losses.append(lambda_coeff * tf.nn.l2_loss(var))
+                    regularization_loss_total = tf.add_n(regularization_losses)
+
+                    # Classification losses
+                    classification_loss = tf.add_n([loss for loss in classification_losses.values()])
+
+                    # Information Gain losses
+                    info_gain_loss = self.decisionLossCoeff * tf.add_n([loss for loss in info_gain_losses.values()])
+
+                    # Q-Net Loss
+                    q_net_losses = []
+                    for lid in range(self.get_max_trajectory_length()):
+                        q_truth = regression_q_targets[lid]
+                        q_hat = q_net_outputs[lid]
+                        mse = self.mseLoss(q_truth, q_hat)
+                        q_net_losses.append(mse)
+                    total_qnet_loss = tf.add_n(q_net_losses)
+                    # Update Q Nets only outside warm-up period
+                    if is_in_warm_up_period:
+                        total_loss = classification_loss + regularization_loss_total + \
+                                     info_gain_loss + 0.0 * total_qnet_loss
+                    else:
+                        total_loss = classification_loss + regularization_loss_total + info_gain_loss + total_qnet_loss
+                grads = main_tape.gradient(total_loss, self.model.trainable_variables)
+                self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+                iteration += 1
+                self.softmaxDecayController.update(iteration=iteration)
+                if is_in_warm_up_period:
+                    iterations_in_warm_up += 1
+                else:
+                    self.globalStep.assign(value=iteration - iterations_in_warm_up)
+                profiler.add_measurement(label="One Iteration")
+                self.track_losses(total_loss=total_loss,
+                                  classification_losses=model_output["classification_losses"],
+                                  info_gain_losses=model_output["info_gain_losses"],
+                                  q_net_losses=q_net_losses)
+                self.print_train_step_info(
+                    iteration=iteration,
+                    classification_losses=model_output["classification_losses"],
+                    info_gain_losses=model_output["info_gain_losses"],
+                    time_intervals=profiler.get_all_measurements(),
+                    eval_dict=model_output["eval_dict"])
+            # times_list.append(sum(profiler.get_all_measurements().values()))
+            if states_dict[epoch_id]["do_measure_performance"]:
+                self.measure_performance(dataset=dataset,
+                                         run_id=run_id,
+                                         iteration=iteration,
+                                         epoch_id=epoch_id,
+                                         times_list=[0],
+                                         only_use_ig_routing=False)

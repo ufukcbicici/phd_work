@@ -11,13 +11,16 @@ from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
 class CigjBlock(tf.keras.layers.Layer):
 
-    def __init__(self, network, ig_activations, routing_matrix):
+    def __init__(self, network, node, ig_activations, routing_matrix):
         super().__init__()
         self.network = network
-        self.igActivations = ig_activations
-        self.routingMatrix = routing_matrix
+        self.node = node
         self.operationLayers = []
         self.maskingLayers = []
+        # IMPORTANT: THESE TWO ARE ALWAYS THE OUTPUTS OF THE PREVIOUS (PARENT) BLOCK!!!
+        self.igActivations = ig_activations
+        self.routingMatrix = routing_matrix
+
 
     # def create_masking_layers(self):
     #     for op in self.operationLayers:
