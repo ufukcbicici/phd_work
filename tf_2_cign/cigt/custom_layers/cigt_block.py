@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from tf_2_cign.cigj.custom_layers.cigj_masking_layer import CigjMaskingLayer
+from tf_2_cign.cigt.custom_layers.cigt_masking_layer import CigtMaskingLayer
 from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import CignBinaryActionResultGeneratorLayer
 
 
@@ -9,7 +9,7 @@ from tf_2_cign.custom_layers.cign_conv_layer import CignConvLayer
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
 
-class CigjBlock(tf.keras.layers.Layer):
+class CigtBlock(tf.keras.layers.Layer):
 
     def __init__(self, network, node, ig_activations, routing_matrix):
         super().__init__()
@@ -34,7 +34,7 @@ class CigjBlock(tf.keras.layers.Layer):
         pass
 
     def mask_layer(self, net, mask_op):
-        assert isinstance(mask_op, CigjMaskingLayer)
+        assert isinstance(mask_op, CigtMaskingLayer)
         masked_net = mask_op([net, self.routingMatrix])
         return masked_net
 

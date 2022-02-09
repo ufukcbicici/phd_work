@@ -4,7 +4,7 @@ from tf_2_cign.custom_layers.cign_binary_action_result_generator_layer import Ci
 
 
 # OK
-class CigjMaskingLayer(tf.keras.layers.Layer):
+class CigtMaskingLayer(tf.keras.layers.Layer):
 
     def __init__(self):
         super().__init__()

@@ -59,7 +59,7 @@ class WeightedBatchNormalization(tf.keras.layers.Layer):
                                            dtype=tf.int32,
                                            trainable=False)
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         x_ = inputs[0]
         weight_vector = inputs[1]

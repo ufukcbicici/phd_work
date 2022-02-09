@@ -3,12 +3,15 @@ import numpy as np
 import tensorflow as tf
 import time
 
-from tf_2_cign.cigj.custom_layers.cigj_masking_layer import CigjMaskingLayer
+from tf_2_cign.cigt.custom_layers.cigt_masking_layer import CigtMaskingLayer
+
+gpus = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(gpus[0], True)
 
 
-class CigjTests(unittest.TestCase):
+class CigtMaskingAlgorithmTests(unittest.TestCase):
 
-    # @unittest.skip
+    @unittest.skip
     def test_masking_layer_cnn(self):
         with tf.device("GPU"):
             batch_size = 125
@@ -29,7 +32,7 @@ class CigjTests(unittest.TestCase):
                                          padding="same",
                                          use_bias=True,
                                          name="conv")(i_x)
-            masking_layer = CigjMaskingLayer()
+            masking_layer = CigtMaskingLayer()
             net_output = masking_layer([net, routing_matrix])
 
             model = tf.keras.Model(inputs=[i_x, routing_matrix],
@@ -57,7 +60,7 @@ class CigjTests(unittest.TestCase):
                         if is_route_open:
                             self.assertTrue(np.array_equal(masked_arr, unmasked_arr))
                         else:
-                            self.assertTrue(np.sum(masked_arr) == 0)
+                            self.assertTrue(np.array_equal(masked_arr, np.zeros_like(masked_arr)))
 
     # @unittest.skip
     def test_masking_layer_dense(self):
@@ -72,7 +75,7 @@ class CigjTests(unittest.TestCase):
             routing_matrix = tf.keras.Input(shape=(route_count,), dtype=tf.int32)
             net = tf.keras.layers.Dense(dim, activation=tf.nn.relu)(i_x)
 
-            masking_layer = CigjMaskingLayer()
+            masking_layer = CigtMaskingLayer()
             net_output = masking_layer([net, routing_matrix])
 
             model = tf.keras.Model(inputs=[i_x, routing_matrix],
@@ -99,10 +102,10 @@ class CigjTests(unittest.TestCase):
                         if is_route_open:
                             self.assertTrue(np.array_equal(masked_arr, unmasked_arr))
                         else:
-                            self.assertTrue(np.sum(masked_arr) == 0)
+                            self.assertTrue(np.array_equal(masked_arr, np.zeros_like(masked_arr)))
 
 
 if __name__ == '__main__':
-    gpus = tf.config.list_physical_devices('GPU')
-    tf.config.experimental.set_memory_growth(gpus[0], True)
+    # gpus = tf.config.list_physical_devices('GPU')
+    # tf.config.experimental.set_memory_growth(gpus[0], True)
     unittest.main()

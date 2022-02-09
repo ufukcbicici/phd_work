@@ -18,6 +18,9 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 from collections import Counter
 
+gpus = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(gpus[0], True)
+
 
 class WeightedBatchNormTests(unittest.TestCase):
 
@@ -156,7 +159,7 @@ class WeightedBatchNormTests(unittest.TestCase):
                                  error_tol_ratio=error_tol_ratio,
                                  batch_dim=[32, 32, dim])
 
-    # @unittest.skip
+    @unittest.skip
     def test_weighted_batch_norm_layer_with_dense(self):
         with tf.device("GPU"):
             batch_size = 125
@@ -205,6 +208,4 @@ class WeightedBatchNormTests(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    gpus = tf.config.list_physical_devices('GPU')
-    tf.config.experimental.set_memory_growth(gpus[0], True)
     unittest.main()

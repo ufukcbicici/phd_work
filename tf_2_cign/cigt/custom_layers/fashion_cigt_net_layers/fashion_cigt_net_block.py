@@ -1,11 +1,11 @@
 import tensorflow as tf
 
-from tf_2_cign.cigj.custom_layers.cigj_block import CigjBlock
+from tf_2_cign.cigt.custom_layers.cigt_block import CigtBlock
 from tf_2_cign.custom_layers.cign_conv_layer import CignConvLayer
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
 
-class FashionCigjNetBlock(CigjBlock):
+class FashionCigtNetBlock(CigtBlock):
     def __init__(self, network, node,  ig_activations, routing_matrix,
                  kernel_size, num_of_filters, strides, activation, use_bias, padding,
                  decision_drop_probability, decision_dim):
