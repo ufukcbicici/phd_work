@@ -11,11 +11,13 @@ from tf_2_cign.utilities.utilities import Utilities
 
 
 class CigtBatchNormalization(WeightedBatchNormalization):
-    def __init__(self, momentum, node=None, name=""):
+    def __init__(self, momentum, epsilon, node=None, name="", start_moving_averages_from_zero=False):
         super().__init__(momentum, node, name)
         # self.routingMatrix = node.routingMatrix
+        self.epsilon = epsilon
+        self.startMovingAveragesFromZero = start_moving_averages_from_zero
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         x_ = inputs[0]
         routing_matrix = inputs[1]
@@ -63,10 +65,15 @@ class CigtBatchNormalization(WeightedBatchNormalization):
                                              variance_epsilon=1e-5)
         if is_training:
             with tf.control_dependencies([normed_x]):
-                new_pop_mean = tf.where(self.timesCalled > 0,
-                                        (self.momentum * self.popMean + (1.0 - self.momentum) * mu), mu)
-                new_pop_var = tf.where(self.timesCalled > 0,
-                                       (self.momentum * self.popVar + (1.0 - self.momentum) * sigma), sigma)
+                if not self.startMovingAveragesFromZero:
+                    new_pop_mean = tf.where(self.timesCalled > 0,
+                                            (self.momentum * self.popMean + (1.0 - self.momentum) * mu), mu)
+                    new_pop_var = tf.where(self.timesCalled > 0,
+                                           (self.momentum * self.popVar + (1.0 - self.momentum) * sigma), sigma)
+                else:
+                    new_pop_mean = self.momentum * self.popMean + (1.0 - self.momentum) * mu
+                    new_pop_var = self.momentum * self.popVar + (1.0 - self.momentum) * sigma
+
                 self.timesCalled.assign_add(delta=1)
                 self.popMean.assign(value=new_pop_mean)
                 self.popVar.assign(value=new_pop_var)
