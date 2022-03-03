@@ -5,6 +5,7 @@ class FashionNetConstants:
     # Fashion_net_constants
     input_dims = (28, 28, 1)
     degree_list = [2, 2]
+    class_count = 10
     batch_size = 125
     epoch_count = 110
     decision_drop_probability = 0.0
