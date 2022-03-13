@@ -11,6 +11,11 @@ class CigtConvLayer(CignConvLayer):
         super().__init__(kernel_size, num_of_filters, strides, node, activation, use_bias, padding, name)
         self.cigtMaskingLayer = CigtMaskingLayer()
 
+    def build(self, input_shape):
+        assert len(input_shape) == 2
+        tensor_shape = input_shape[0]
+        super(CigtConvLayer, self).build(tensor_shape)
+
     def call(self, inputs, **kwargs):
         net = inputs[0]
         routing_matrix = inputs[1]

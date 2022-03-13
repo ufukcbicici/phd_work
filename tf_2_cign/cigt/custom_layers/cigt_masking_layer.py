@@ -17,7 +17,7 @@ class CigtMaskingLayer(tf.keras.layers.Layer):
     #     x_ = tf.expand_dims(x_, axis=1)
     #     x_ = tf.
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         x_ = inputs[0]
         routing_matrix = inputs[1]

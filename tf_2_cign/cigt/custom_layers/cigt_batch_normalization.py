@@ -17,7 +17,7 @@ class CigtBatchNormalization(WeightedBatchNormalization):
         self.epsilon = epsilon
         self.startMovingAveragesFromZero = start_moving_averages_from_zero
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         x_ = inputs[0]
         routing_matrix = inputs[1]

@@ -45,7 +45,7 @@ class BinaryRoutingTests(unittest.TestCase):
                                               kernel_sizes=FashionNetConstants.kernel_sizes,
                                               hidden_layers=FashionNetConstants.hidden_layers,
                                               decision_drop_probability=FashionNetConstants.decision_drop_probability,
-                                              classification_drop_probability=FashionNetConstants.drop_probability,
+                                              classification_drop_probability=FashionNetConstants.classification_drop_probability,
                                               decision_wd=FashionNetConstants.decision_wd,
                                               classification_wd=FashionNetConstants.classification_wd,
                                               decision_dimensions=FashionNetConstants.decision_dimensions,

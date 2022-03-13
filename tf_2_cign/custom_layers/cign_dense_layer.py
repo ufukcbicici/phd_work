@@ -5,7 +5,7 @@ from tf_2_cign.utilities.utilities import Utilities
 
 class CignDenseLayer(tf.keras.layers.Layer):
     def __init__(self, output_dim, activation, node, use_bias=True, name="fc_op"):
-        super().__init__()
+        super().__init__(name=name)
         if node is not None:
             # node.macCost += cost
             op_id = 0

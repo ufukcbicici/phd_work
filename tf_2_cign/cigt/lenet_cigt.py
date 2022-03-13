@@ -1,0 +1,72 @@
+import tensorflow as tf
+import numpy as np
+
+from auxillary.dag_utilities import Dag
+from simple_tf.uncategorized.node import Node
+from tf_2_cign.cigt.cigt import Cigt
+from tf_2_cign.cigt.custom_layers.lenet_cigt_layers.lenet_cigt_inner_block import LeNetCigtInnerBlock
+from tf_2_cign.cigt.custom_layers.lenet_cigt_layers.lenet_cigt_leaf_block import LeNetCigtLeafBlock
+
+
+class LenetCigt(Cigt):
+    def __init__(self, batch_size, input_dims, filter_counts, kernel_sizes, hidden_layers, decision_drop_probability,
+                 classification_drop_probability, decision_wd, classification_wd, decision_dimensions, class_count,
+                 information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule, decision_loss_coeff,
+                 path_counts, bn_momentum, warm_up_period, routing_strategy_name, *args, **kwargs):
+        super().__init__(input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
+                         decision_loss_coeff, routing_strategy_name, warm_up_period, decision_drop_probability,
+                         classification_drop_probability, decision_wd, classification_wd, *args, **kwargs)
+        self.batchSize = batch_size
+        self.filterCounts = filter_counts
+        self.kernelSizes = kernel_sizes
+        self.hiddenLayers = hidden_layers
+        self.bnMomentum = bn_momentum
+        assert len(path_counts) + 1 == len(filter_counts)
+        assert len(filter_counts) == len(kernel_sizes)
+        self.decisionDimensions = decision_dimensions
+        self.informationGainBalanceCoeff = information_gain_balance_coeff
+        self.optimizer = None
+        self.build_network()
+        # self.dummyBlock = None
+        # self.calculate_regularization_coefficients()
+        self.optimizer = self.get_sgd_optimizer()
+
+    def build_network(self):
+        self.cigtBlocks = []
+        super(LenetCigt, self).build_network()
+        curr_node = self.rootNode
+        for block_id, path_count in enumerate(self.pathCounts):
+            if block_id < len(self.pathCounts) - 1:
+                block = LeNetCigtInnerBlock(node=curr_node,
+                                            kernel_size=self.kernelSizes[block_id],
+                                            num_of_filters=self.filterCounts[block_id],
+                                            strides=(1, 1),
+                                            activation="relu",
+                                            use_bias=True,
+                                            padding="same",
+                                            decision_drop_probability=self.decisionDropProbability,
+                                            decision_dim=self.decisionDimensions[block_id],
+                                            bn_momentum=self.bnMomentum,
+                                            next_block_path_count=self.pathCounts[block_id + 1],
+                                            ig_balance_coefficient=self.informationGainBalanceCoeff,
+                                            class_count=self.classCount)
+            else:
+                block = LeNetCigtLeafBlock(node=curr_node,
+                                           kernel_size=self.kernelSizes[block_id],
+                                           num_of_filters=self.filterCounts[block_id],
+                                           activation="relu",
+                                           hidden_layer_dims=self.hiddenLayers,
+                                           classification_dropout_prob=self.classificationDropProbability,
+                                           use_bias=True,
+                                           padding="same",
+                                           strides=(1, 1),
+                                           class_count=self.classCount)
+            self.cigtBlocks.append(block)
+            if curr_node.isLeaf:
+                curr_node = self.dagObject.children(node=curr_node)
+                assert len(curr_node) == 0
+            else:
+                curr_node = self.dagObject.children(node=curr_node)
+                assert len(curr_node) == 1
+                curr_node = curr_node[0]
+        # self.build(input_shape=[(self.batchSize, *self.inputDims), (self.batchSize, )])

@@ -4,6 +4,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cign import Cign
 from tf_2_cign.cigt.cigt import Cigt
+from tf_2_cign.cigt.lenet_cigt import LenetCigt
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign import FashionCign
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
@@ -25,15 +26,48 @@ if __name__ == "__main__":
                                                       decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
                                                       decay_period=FashionNetConstants.softmax_decay_period,
                                                       decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
-    # Hyper parameters
-    path_counts = [2, 2]
 
     with tf.device("GPU"):
-        fashion_cigt = Cigt(input_dims=FashionNetConstants.input_dims,
-                            class_count=FashionNetConstants.class_count,
-                            path_counts=path_counts,
-                            blocks_list=None)
+        fashion_cigt = LenetCigt(batch_size=FashionNetConstants.batch_size,
+                                 input_dims=FashionNetConstants.input_dims,
+                                 filter_counts=FashionNetConstants.filter_counts,
+                                 kernel_sizes=FashionNetConstants.kernel_sizes,
+                                 hidden_layers=FashionNetConstants.hidden_layers,
+                                 decision_drop_probability=FashionNetConstants.decision_drop_probability,
+                                 classification_drop_probability=FashionNetConstants.classification_drop_probability,
+                                 decision_wd=FashionNetConstants.decision_wd,
+                                 classification_wd=FashionNetConstants.classification_wd,
+                                 decision_dimensions=FashionNetConstants.decision_dimensions,
+                                 class_count=10,
+                                 information_gain_balance_coeff=FashionNetConstants.information_gain_balance_coeff,
+                                 softmax_decay_controller=softmax_decay_controller,
+                                 learning_rate_schedule=FashionNetConstants.learning_rate_calculator,
+                                 decision_loss_coeff=1.0,
+                                 path_counts=FashionNetConstants.path_counts,
+                                 bn_momentum=FashionNetConstants.bn_momentum,
+                                 warm_up_period=FashionNetConstants.warm_up_period,
+                                 routing_strategy_name="Approximate_Training")
+        fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf)
 
+        # input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
+        # decision_loss_coeff, routing_strategy_name, warm_up_period,
+
+
+        # cigt = Cigt(input_dims=FashionNetConstants.input_dims,
+        #             class_count=10,
+        #             softmax_decay_controller=softmax_decay_controller,
+        #             learning_rate_schedule=FashionNetConstants.learning_rate_calculator,
+        #             decision_loss_coeff=1.0,
+        #             path_counts=FashionNetConstants.path_counts,
+        #             warm_up_period=FashionNetConstants.warm_up_period,
+        #             routing_strategy_name="Approximate_Training")
+        # print("X")
+        # fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf)
+
+        # fashion_cigt = Cigt(input_dims=FashionNetConstants.input_dims,
+        #                     class_count=FashionNetConstants.class_count,
+        #                     path_counts=path_counts,
+        #                     blocks_list=None)
 
         # cign = FashionRlBinaryRouting(valid_prediction_reward=FashionNetConstants.valid_prediction_reward,
         #                               invalid_prediction_penalty=FashionNetConstants.invalid_prediction_penalty,

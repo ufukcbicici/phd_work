@@ -6,7 +6,7 @@ from tf_2_cign.utilities.utilities import Utilities
 class CignConvLayer(tf.keras.layers.Layer):
     def __init__(self, kernel_size, num_of_filters, strides, node, activation,
                  use_bias=True, padding="same", name="conv_op"):
-        super().__init__()
+        super().__init__(name=name)
         if node is not None:
             op_id = 0
             while True:

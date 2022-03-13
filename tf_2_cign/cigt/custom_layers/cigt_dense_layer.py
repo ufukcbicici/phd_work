@@ -10,6 +10,11 @@ class CigtDenseLayer(CignDenseLayer):
         super().__init__(output_dim, activation, node, use_bias, name)
         self.cigtMaskingLayer = CigtMaskingLayer()
 
+    def build(self, input_shape):
+        assert len(input_shape) == 2
+        tensor_shape = input_shape[0]
+        super(CigtDenseLayer, self).build(input_shape=tensor_shape)
+        
     def call(self, inputs, **kwargs):
         net = inputs[0]
         routing_matrix = inputs[1]

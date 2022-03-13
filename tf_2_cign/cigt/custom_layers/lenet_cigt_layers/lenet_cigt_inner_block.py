@@ -7,12 +7,13 @@ from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 
 
-class FashionCigtNetInnerBlock(tf.keras.layers.Layer):
-    def __init__(self, network, node, kernel_size, num_of_filters, strides, activation, use_bias, padding,
-                 decision_drop_probability, decision_dim, **kwargs):
-        super().__init__(**kwargs)
-        self.network = network
+class LeNetCigtInnerBlock(tf.keras.layers.Layer):
+    def __init__(self, node, kernel_size, num_of_filters, strides, activation, use_bias, padding,
+                 decision_drop_probability, decision_dim, bn_momentum,
+                 next_block_path_count, class_count, ig_balance_coefficient):
+        super().__init__()
         self.node = node
+        self.bnMomentum = bn_momentum
 
         # F operations
         self.convLayer = CigtConvLayer(kernel_size=kernel_size,
@@ -21,7 +22,8 @@ class FashionCigtNetInnerBlock(tf.keras.layers.Layer):
                                        node=node,
                                        activation=activation,
                                        use_bias=use_bias,
-                                       padding=padding)
+                                       padding=padding,
+                                       name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
         self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
 
         # H operations
@@ -33,15 +35,20 @@ class FashionCigtNetInnerBlock(tf.keras.layers.Layer):
                                               activation="relu",
                                               node=node,
                                               use_bias=True,
-                                              name="fc_op_decision")
-        self.cigtDecisionLayer = CigtDecisionLayer(network=self, node=node, decision_bn_momentum=self.bnMomentum)
+                                              name="Lenet_Cigt_Node_{0}_fc_op_decision".format(self.node.index))
+        self.decisionDropoutLayer = tf.keras.layers.Dropout(rate=self.decisionDropProbability)
+        self.cigtDecisionLayer = CigtDecisionLayer(node=node,
+                                                   decision_bn_momentum=self.bnMomentum,
+                                                   next_block_path_count=next_block_path_count,
+                                                   class_count=class_count,
+                                                   ig_balance_coefficient=ig_balance_coefficient)
 
     def call(self, inputs, **kwargs):
         f_input = inputs[0]
-        ig_activations_parent = inputs[1]
-        routing_matrix = inputs[2]
-        temperature = inputs[3]
-        labels = inputs[4]
+        routing_matrix = inputs[1]
+        temperature = inputs[2]
+        labels = inputs[3]
+        training = kwargs["training"]
 
         # F ops
         f_net = self.convLayer([f_input, routing_matrix])
@@ -56,5 +63,6 @@ class FashionCigtNetInnerBlock(tf.keras.layers.Layer):
         h_net = self.decisionDropoutLayer(h_net)
 
         # Decision layer
-        ig_value, ig_activations_this = self.cigtDecisionLayer([h_net, labels, temperature])
-        return f_net, ig_value, ig_activations_this
+        ig_value, ig_activations_this, routing_probabilities = \
+            self.cigtDecisionLayer([h_net, labels, temperature], training=training)
+        return f_net, ig_value, ig_activations_this, routing_probabilities

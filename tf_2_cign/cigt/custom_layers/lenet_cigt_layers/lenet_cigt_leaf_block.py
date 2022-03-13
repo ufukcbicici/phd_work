@@ -6,13 +6,12 @@ from tf_2_cign.custom_layers.cign_conv_layer import CignConvLayer
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
 
-class FashionNetLeafNodeFunc(tf.keras.layers.Layer):
-    def __init__(self, node, network, kernel_size, num_of_filters, strides, activation, hidden_layer_dims,
-                 classification_dropout_prob,
+class LeNetCigtLeafBlock(tf.keras.layers.Layer):
+    def __init__(self, node, kernel_size, num_of_filters, strides, activation, hidden_layer_dims,
+                 classification_dropout_prob, class_count,
                  use_bias=True, padding="same"):
         super().__init__()
         self.node = node
-        self.network = network
         # F Operations - Conv layer
         self.convLayer = CigtConvLayer(kernel_size=kernel_size,
                                        num_of_filters=num_of_filters,
@@ -20,7 +19,8 @@ class FashionNetLeafNodeFunc(tf.keras.layers.Layer):
                                        node=node,
                                        activation=activation,
                                        use_bias=use_bias,
-                                       padding=padding)
+                                       padding=padding,
+                                       name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
         self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
 
         # F Operations - Dense Layers
@@ -33,19 +33,21 @@ class FashionNetLeafNodeFunc(tf.keras.layers.Layer):
             fc_layer = CigtDenseLayer(output_dim=hidden_layer_dim,
                                       activation="relu",
                                       node=node,
-                                      use_bias=True)
+                                      use_bias=True,
+                                      name="Lenet_Cigt_Node_{0}_fc".format(self.node.index))
             self.hiddenLayers.append(fc_layer)
             dropout_layer = tf.keras.layers.Dropout(rate=self.classificationDropoutProb)
             self.dropoutLayers.append(dropout_layer)
-        self.lossLayer = CignDenseLayer(output_dim=self.classCount, activation=None, node=node, use_bias=True,
+        self.lossLayer = CignDenseLayer(output_dim=class_count, activation=None, node=node, use_bias=True,
                                         name="loss_layer")
 
     # @tf.function
     def call(self, inputs, **kwargs):
         f_input = inputs[0]
-        ig_activations_parent = inputs[1]
-        routing_matrix = inputs[2]
-        labels = inputs[3]
+        # ig_activations_parent = inputs[1]
+        routing_matrix = inputs[1]
+        labels = tf.cast(inputs[2], dtype=tf.int32)
+        training = kwargs["training"]
 
         # F ops -  # 1 Conv layer
         f_net = self.convLayer([f_input, routing_matrix])

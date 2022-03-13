@@ -9,7 +9,7 @@ class FashionNetConstants:
     batch_size = 125
     epoch_count = 110
     decision_drop_probability = 0.0
-    drop_probability = 0.15
+    classification_drop_probability = 0.0
     classification_wd = 0.0
     decision_wd = 0.0
     softmax_decay_initial = 25.0
@@ -17,12 +17,13 @@ class FashionNetConstants:
     softmax_decay_period = 2
     softmax_decay_min_limit = 1.0
     softmax_decay_controllers = {}
-    information_gain_balance_coeff = 5.0
+    information_gain_balance_coeff = 1.0
 
     # FashionNet parameters
-    filter_counts = [32, 32, 32]
+    bn_momentum = 0.9
+    filter_counts = [32, 64, 128]
     kernel_sizes = [5, 5, 1]
-    hidden_layers = [128, 64]
+    hidden_layers = [1028, 512]
     decision_dimensions = [128, 128]
     # node_build_funcs = [FashionCign.inner_func, FashionCign.inner_func, FashionCign.leaf_func]
     initial_lr = 0.01
@@ -30,8 +31,10 @@ class FashionNetConstants:
                                                  value=initial_lr,
                                                  schedule=[(15000, 0.005),
                                                            (30000, 0.0025),
-                                                           (45000, 0.00125),
-                                                           (52000, 0.000125)])
+                                                           (40000, 0.00025)])
+
+    # CIGT Parameters
+    path_counts = [2, 4]
 
     # Reinforcement learning routing parameters
     valid_prediction_reward = 1.0

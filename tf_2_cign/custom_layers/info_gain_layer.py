@@ -11,7 +11,7 @@ class InfoGainLayer(tf.keras.layers.Layer):
         super().__init__()
         self.classCount = tf.constant(class_count)
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         activations = inputs[0]
         labels = inputs[1]
@@ -53,6 +53,6 @@ class InfoGainLayer(tf.keras.layers.Layer):
         # Calculate the information gain
         information_gain = (balance_coefficient * entropy_p_n) + entropy_p_c - entropy_p_cn
         information_gain = -1.0 * information_gain
-        return information_gain
+        return information_gain, p_n_given_x
 
 

@@ -11,7 +11,7 @@ from tf_2_cign.utilities.utilities import Utilities
 
 class WeightedBatchNormalization(tf.keras.layers.Layer):
     def __init__(self, momentum, node=None, name=""):
-        super().__init__()
+        super().__init__(name=name)
         self.gamma = None
         self.beta = None
         self.popMean = None
