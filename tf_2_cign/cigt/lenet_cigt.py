@@ -9,14 +9,16 @@ from tf_2_cign.cigt.custom_layers.lenet_cigt_layers.lenet_cigt_leaf_block import
 
 
 class LenetCigt(Cigt):
-    def __init__(self, batch_size, input_dims, filter_counts, kernel_sizes, hidden_layers, decision_drop_probability,
-                 classification_drop_probability, decision_wd, classification_wd, decision_dimensions, class_count,
-                 information_gain_balance_coeff, softmax_decay_controller, learning_rate_schedule, decision_loss_coeff,
-                 path_counts, bn_momentum, warm_up_period, routing_strategy_name, *args, **kwargs):
-        super().__init__(input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
-                         decision_loss_coeff, routing_strategy_name, warm_up_period, decision_drop_probability,
-                         classification_drop_probability, decision_wd, classification_wd, *args, **kwargs)
-        self.batchSize = batch_size
+    def __init__(self, run_id, batch_size, input_dims, filter_counts, kernel_sizes, hidden_layers,
+                 decision_drop_probability, classification_drop_probability, decision_wd, classification_wd,
+                 evaluation_period, decision_dimensions, class_count, information_gain_balance_coeff,
+                 softmax_decay_controller, learning_rate_schedule, decision_loss_coeff, path_counts, bn_momentum,
+                 warm_up_period, routing_strategy_name, *args, **kwargs):
+
+        super().__init__(run_id, batch_size, input_dims, class_count, path_counts, softmax_decay_controller,
+                         learning_rate_schedule, decision_loss_coeff, routing_strategy_name, warm_up_period,
+                         decision_drop_probability, classification_drop_probability, decision_wd, classification_wd,
+                         evaluation_period, *args, **kwargs)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers
@@ -70,3 +72,26 @@ class LenetCigt(Cigt):
                 assert len(curr_node) == 1
                 curr_node = curr_node[0]
         # self.build(input_shape=[(self.batchSize, *self.inputDims), (self.batchSize, )])
+
+    def get_explanation_string(self):
+        explanation = "Lenet CIGT\n"
+        explanation += super().get_explanation_string()
+        # Fashion CIGN parameters
+        explanation += "tf.function Experiment - WITHOUT call() in tf.function\n"
+        explanation += "filterCounts:{0}\n".format(self.filterCounts)
+        explanation += "kernelSizes:{0}\n".format(self.kernelSizes)
+        explanation += "hiddenLayers:{0}\n".format(self.hiddenLayers)
+        explanation += "decisionDimensions:{0}\n".format(self.decisionDimensions)
+        return explanation
+
+        # RL Parameters
+        # explanation += "Q Net Parameters\n"
+        # for level, q_net_params in enumerate(self.qNetParams):
+        #     explanation += "Level:{0}\n".format(level)
+        #     explanation += "Level:{0} Q Net Kernel Size:{1}\n".format(level, q_net_params["Conv_Filter"])
+        #     explanation += "Level:{0} Q Net Kernel Strides:{1}\n".format(level, q_net_params["Conv_Strides"])
+        #     explanation += "Level:{0} Q Net Feature Maps:{1}\n".format(level, q_net_params["Conv_Feature_Maps"])
+        #     explanation += "Level:{0} Q Net Hidden Layers:{1}\n".format(level, q_net_params["Hidden_Layers"])
+        # explanation += "train_period:{0}\n".format(self.cignRlTrainPeriod)
+        # explanation += "qNetCoeff:{0}\n".format(self.qNetCoeff)
+        # return explanation

@@ -28,26 +28,33 @@ if __name__ == "__main__":
                                                       decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
 
     with tf.device("GPU"):
-        fashion_cigt = LenetCigt(batch_size=FashionNetConstants.batch_size,
-                                 input_dims=FashionNetConstants.input_dims,
-                                 filter_counts=FashionNetConstants.filter_counts,
-                                 kernel_sizes=FashionNetConstants.kernel_sizes,
-                                 hidden_layers=FashionNetConstants.hidden_layers,
-                                 decision_drop_probability=FashionNetConstants.decision_drop_probability,
-                                 classification_drop_probability=FashionNetConstants.classification_drop_probability,
-                                 decision_wd=FashionNetConstants.decision_wd,
-                                 classification_wd=FashionNetConstants.classification_wd,
-                                 decision_dimensions=FashionNetConstants.decision_dimensions,
-                                 class_count=10,
-                                 information_gain_balance_coeff=FashionNetConstants.information_gain_balance_coeff,
-                                 softmax_decay_controller=softmax_decay_controller,
-                                 learning_rate_schedule=FashionNetConstants.learning_rate_calculator,
-                                 decision_loss_coeff=1.0,
-                                 path_counts=FashionNetConstants.path_counts,
-                                 bn_momentum=FashionNetConstants.bn_momentum,
-                                 warm_up_period=FashionNetConstants.warm_up_period,
-                                 routing_strategy_name="Approximate_Training")
-        fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf)
+        experiment_count = 250
+        for exp_id in range(experiment_count):
+            run_id = DbLogger.get_run_id()
+            fashion_cigt = LenetCigt(batch_size=FashionNetConstants.batch_size,
+                                     input_dims=FashionNetConstants.input_dims,
+                                     filter_counts=FashionNetConstants.filter_counts,
+                                     kernel_sizes=FashionNetConstants.kernel_sizes,
+                                     hidden_layers=FashionNetConstants.hidden_layers,
+                                     decision_drop_probability=FashionNetConstants.decision_drop_probability,
+                                     classification_drop_probability=FashionNetConstants.classification_drop_probability,
+                                     decision_wd=FashionNetConstants.decision_wd,
+                                     classification_wd=FashionNetConstants.classification_wd,
+                                     decision_dimensions=FashionNetConstants.decision_dimensions,
+                                     class_count=10,
+                                     information_gain_balance_coeff=FashionNetConstants.information_gain_balance_coeff,
+                                     softmax_decay_controller=softmax_decay_controller,
+                                     learning_rate_schedule=FashionNetConstants.learning_rate_calculator,
+                                     decision_loss_coeff=1.0,
+                                     path_counts=FashionNetConstants.path_counts,
+                                     bn_momentum=FashionNetConstants.bn_momentum,
+                                     warm_up_period=FashionNetConstants.warm_up_period,
+                                     routing_strategy_name="Approximate_Training",
+                                     run_id=run_id,
+                                     evaluation_period=1)
+            explanation = fashion_cigt.get_explanation_string()
+            DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
+            fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf)
 
         # input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
         # decision_loss_coeff, routing_strategy_name, warm_up_period,

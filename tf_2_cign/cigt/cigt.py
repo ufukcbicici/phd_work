@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import time
+from auxillary.db_logger import DbLogger
 
 from auxillary.dag_utilities import Dag
 from simple_tf.uncategorized.node import Node
@@ -10,12 +11,15 @@ from tqdm import tqdm
 
 class Cigt(tf.keras.Model):
     def __init__(self,
-                 input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
+                 run_id,
+                 batch_size, input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
                  decision_loss_coeff, routing_strategy_name, warm_up_period,
                  decision_drop_probability, classification_drop_probability,
-                 decision_wd, classification_wd,
+                 decision_wd, classification_wd, evaluation_period,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.runId = run_id
+        self.batchSize = batch_size
         self.pathCounts = [1]
         self.pathCounts.extend(path_counts)
         self.classCount = class_count
@@ -23,6 +27,7 @@ class Cigt(tf.keras.Model):
         self.learningRateSchedule = learning_rate_schedule
         self.decisionLossCoefficient = decision_loss_coeff
         self.softmaxDecayController = softmax_decay_controller
+        self.evaluationPeriod = evaluation_period
         self.dagObject = Dag()
         self.cigtBlocks = []
         self.rootNode = None
@@ -76,6 +81,7 @@ class Cigt(tf.keras.Model):
                 self.rootNode = node
             last_block = node
 
+    # @tf.function
     def call(self, inputs, **kwargs):
         x = inputs[0]
         y = inputs[1]
@@ -238,12 +244,14 @@ class Cigt(tf.keras.Model):
             for metric in self.metricsDict.values():
                 metric.reset_states()
 
+            times_passed = []
             for train_x, train_y in train_dataset:
                 t0 = time.time()
                 with tf.GradientTape() as tape:
                     results_dict = self.call(inputs=[train_x, train_y], training=True)
                 grads = tape.gradient(results_dict["total_loss"], self.trainable_variables)
                 t1 = time.time()
+                times_passed.append(t1-t0)
                 self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
                 print("t1-t0:{0}".format(t1-t0))
                 # Update metrics
@@ -253,10 +261,20 @@ class Cigt(tf.keras.Model):
                 self.numOfTrainingIterations += 1
             # Train statistics
             print("Epoch {0} Train Statistics".format(epoch_id))
-            self.evaluate(x=train_dataset)
+            training_accuracy = self.evaluate(x=train_dataset, epoch_id=epoch_id, dataset_type="training")
             # Validation / Test statistics
             print("Epoch {0} Test Statistics".format(epoch_id))
-            self.evaluate(x=val_dataset)
+            test_accuracy = self.evaluate(x=val_dataset, epoch_id=epoch_id, dataset_type="test")
+            DbLogger.write_into_table(
+                rows=[(self.runId,
+                       self.numOfTrainingIterations,
+                       epoch_id,
+                       np.asscalar(training_accuracy),
+                       0.0,
+                       np.asscalar(test_accuracy),
+                       np.asscalar(np.mean(np.array(times_passed))),
+                       0.0,
+                       "XXX")], table=DbLogger.logsTable)
 
     def evaluate(self,
                  x=None,
@@ -271,6 +289,9 @@ class Cigt(tf.keras.Model):
                  use_multiprocessing=False,
                  return_dict=False,
                  **kwargs):
+        # epoch_id = kwargs["epoch_id"]
+        # dataset_type = kwargs["dataset_type"]
+
         dataset = x
         # Reset all metrics
         for metric in self.metricsDict.values():
@@ -280,3 +301,27 @@ class Cigt(tf.keras.Model):
             # Update metrics
             self.update_metrics(results_dict=results_dict, labels=y_)
         self.report_metrics()
+        accuracy = self.metricsDict["accuracy_metric"].result().numpy()
+        return accuracy
+
+    def get_explanation_string(self):
+        explanation = ""
+        total_param_count = 0
+        for v in self.trainable_variables:
+            total_param_count += np.prod(v.get_shape().as_list())
+
+        explanation += "Batch Size:{0}\n".format(self.batchSizeNonTensor)
+        explanation += "Path Counts:{0}\n".format(self.pathCounts)
+        explanation += "Routing Strategy:{0}\n".format(self.routingStrategy)
+        explanation += "********Lr Settings********\n"
+        explanation += self.learningRateSchedule.get_explanation()
+        explanation += "********Lr Settings********\n"
+        explanation += "Decision Loss Coeff:{0}\n".format(self.decisionLossCoeff)
+        explanation += "Batch Norm Decay:{0}\n".format(self.bnMomentum)
+        explanation += "Param Count:{0}\n".format(total_param_count)
+        explanation += "Classification Wd:{0}\n".format(self.classificationWd)
+        explanation += "Decision Wd:{0}\n".format(self.decisionWd)
+        explanation += "Information Gain Balance Coefficient:{0}\n".format(self.informationGainBalanceCoeff)
+        explanation += "Decision Dropout:{0}\n".format(self.decisionDropProbability)
+        explanation += "Classification Dropout:{0}\n".format(self.classificationDropProbability)
+        return explanation
