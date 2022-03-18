@@ -92,6 +92,7 @@ class Cigt(tf.keras.Model):
             is_training = False
 
         if is_training:
+            self.routingStrategy.modify_temperature(softmax_decay_controller=self.softmaxDecayController)
             temperature = self.softmaxDecayController.get_value()
         else:
             temperature = 1.0
@@ -112,7 +113,7 @@ class Cigt(tf.keras.Model):
                 # Keep track of the results.
                 information_gain_values.append(ig_value)
                 # Build the routing matrix for the next block
-                routing_matrix = self.routingStrategy(routing_probabilities)
+                routing_matrix = self.routingStrategy(routing_probabilities, training=is_training)
                 # Last block
             else:
                 logits, posteriors, classification_loss = \
@@ -259,6 +260,11 @@ class Cigt(tf.keras.Model):
                 print("********** Epoch:{0} Iteration:{1} **********".format(epoch_id, self.numOfTrainingIterations))
                 self.report_metrics()
                 self.numOfTrainingIterations += 1
+                self.routingStrategy.set_training_statistics(iteration_count=self.numOfTrainingIterations,
+                                                             epoch_count=self.numOfTrainingEpochs)
+            self.numOfTrainingEpochs += 1
+            self.routingStrategy.set_training_statistics(iteration_count=self.numOfTrainingIterations,
+                                                         epoch_count=self.numOfTrainingEpochs)
             # Train statistics
             print("Epoch {0} Train Statistics".format(epoch_id))
             training_accuracy = self.evaluate(x=train_dataset, epoch_id=epoch_id, dataset_type="training")
@@ -273,6 +279,7 @@ class Cigt(tf.keras.Model):
                        0.0,
                        np.asscalar(test_accuracy),
                        np.asscalar(np.mean(np.array(times_passed))),
+                       0.0,
                        0.0,
                        "XXX")], table=DbLogger.logsTable)
 
@@ -310,13 +317,13 @@ class Cigt(tf.keras.Model):
         for v in self.trainable_variables:
             total_param_count += np.prod(v.get_shape().as_list())
 
-        explanation += "Batch Size:{0}\n".format(self.batchSizeNonTensor)
+        explanation += "Batch Size:{0}\n".format(self.batchSize)
         explanation += "Path Counts:{0}\n".format(self.pathCounts)
-        explanation += "Routing Strategy:{0}\n".format(self.routingStrategy)
+        explanation += "Routing Strategy:{0}\n".format(self.routingStrategy.__class__)
         explanation += "********Lr Settings********\n"
         explanation += self.learningRateSchedule.get_explanation()
         explanation += "********Lr Settings********\n"
-        explanation += "Decision Loss Coeff:{0}\n".format(self.decisionLossCoeff)
+        explanation += "Decision Loss Coeff:{0}\n".format(self.decisionLossCoefficient)
         explanation += "Batch Norm Decay:{0}\n".format(self.bnMomentum)
         explanation += "Param Count:{0}\n".format(total_param_count)
         explanation += "Classification Wd:{0}\n".format(self.classificationWd)

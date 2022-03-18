@@ -77,7 +77,7 @@ class LenetCigt(Cigt):
         explanation = "Lenet CIGT\n"
         explanation += super().get_explanation_string()
         # Fashion CIGN parameters
-        explanation += "tf.function Experiment - WITHOUT call() in tf.function\n"
+        explanation += "tf.function Experiment - WITH call() in tf.function\n"
         explanation += "filterCounts:{0}\n".format(self.filterCounts)
         explanation += "kernelSizes:{0}\n".format(self.kernelSizes)
         explanation += "hiddenLayers:{0}\n".format(self.hiddenLayers)

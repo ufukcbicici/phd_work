@@ -20,7 +20,9 @@ class ApproximateTrainingStrategy(RoutingStrategy):
             self.isInWarmUp = False
 
     def modify_temperature(self, softmax_decay_controller):
-        softmax_decay_controller.update(iteration=self.iterationCount)
+        if not self.isInWarmUp:
+            decay_t = self.iterationCount - self.warmUpFinalIteration
+            softmax_decay_controller.update(iteration=decay_t)
 
     def calculate_information_gain_losses(self, ig_losses, decision_loss_coefficient):
         if self.isInWarmUp:
@@ -31,6 +33,7 @@ class ApproximateTrainingStrategy(RoutingStrategy):
 
     def call(self, inputs, **kwargs):
         activation_matrix = inputs
+        training = kwargs["training"]
 
         path_count = tf.shape(activation_matrix)[1]
 

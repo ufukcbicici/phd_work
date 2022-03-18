@@ -7,7 +7,7 @@ class FashionNetConstants:
     degree_list = [2, 2]
     class_count = 10
     batch_size = 125
-    epoch_count = 110
+    epoch_count = 125
     decision_drop_probability = 0.0
     classification_drop_probability = 0.0
     classification_wd = 0.0
@@ -29,9 +29,9 @@ class FashionNetConstants:
     initial_lr = 0.01
     learning_rate_calculator = DiscreteParameter(name="lr_calculator",
                                                  value=initial_lr,
-                                                 schedule=[(15000, 0.005),
-                                                           (30000, 0.0025),
-                                                           (40000, 0.00025)])
+                                                 schedule=[(15000 + 12000, 0.005),
+                                                           (30000 + 12000, 0.0025),
+                                                           (40000 + 12000, 0.00025)])
 
     # CIGT Parameters
     path_counts = [2, 4]
