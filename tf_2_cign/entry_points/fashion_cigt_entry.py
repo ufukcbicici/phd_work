@@ -53,7 +53,7 @@ if __name__ == "__main__":
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
         fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf,
-                        epochs=fashion_mnist)
+                         epochs=FashionNetConstants.epoch_count)
 
         # experiment_count = 250
         # for exp_id in range(experiment_count):
@@ -85,7 +85,6 @@ if __name__ == "__main__":
 
         # input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
         # decision_loss_coeff, routing_strategy_name, warm_up_period,
-
 
         # cigt = Cigt(input_dims=FashionNetConstants.input_dims,
         #             class_count=10,

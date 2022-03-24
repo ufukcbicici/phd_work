@@ -7,6 +7,7 @@ from auxillary.dag_utilities import Dag
 from simple_tf.uncategorized.node import Node
 from tf_2_cign.cigt.routing_strategy.approximate_training_strategy import ApproximateTrainingStrategy
 from tqdm import tqdm
+from collections import Counter
 
 
 class Cigt(tf.keras.Model):
@@ -102,6 +103,7 @@ class Cigt(tf.keras.Model):
         # ig_activations = tf.ones(shape=(batch_size, 1), dtype=tf.float32)
         routing_matrix = tf.ones(shape=(batch_size, 1), dtype=tf.int32)
         information_gain_values = []
+        routing_matrices = []
         logits = None
         posteriors = None
         classification_loss = None
@@ -114,6 +116,7 @@ class Cigt(tf.keras.Model):
                 information_gain_values.append(ig_value)
                 # Build the routing matrix for the next block
                 routing_matrix = self.routingStrategy(routing_probabilities, training=is_training)
+                routing_matrices.append(routing_matrix)
                 # Last block
             else:
                 logits, posteriors, classification_loss = \
@@ -134,9 +137,37 @@ class Cigt(tf.keras.Model):
             "information_gain_loss_list": information_gain_values,
             "regularization_loss": regularization_loss,
             "logits": logits,
-            "posteriors": posteriors
+            "posteriors": posteriors,
+            "routing_matrices": routing_matrices
         }
         return results_dict
+
+    def calculate_branch_statistics(self, run_id, iteration, dataset_type, routing_matrices, labels):
+        kv_rows = []
+        for block_id, routing_matrix in enumerate(routing_matrices):
+            path_count = tf.shape(routing_matrix)[1].numpy()
+            selected_paths = tf.argmax(routing_matrix, axis=1).numpy()
+            path_counter = Counter(selected_paths)
+            print("Path Distributions Data Type:{0} Block ID:{1} Iteration:{2} Path Distribution:{3}".format(
+                dataset_type, block_id, iteration, path_counter))
+            kv_rows.append((run_id,
+                            iteration,
+                            "Path Distributions Data Type:{0} Block ID:{1} Path Distribution".format(
+                                dataset_type, block_id),
+                            "{0}".format(path_counter)))
+            for path_id in range(path_count):
+                path_labels = labels[selected_paths == path_id]
+                label_counter = Counter(path_labels)
+                str_ = \
+                    "Path Distributions Data Type:{0} Block ID:{1} Path ID:{2} Iteration:{3} Label Distribution:{4}" \
+                        .format(dataset_type, block_id, path_id, iteration, label_counter)
+                print(str_)
+                kv_rows.append((run_id,
+                                iteration,
+                                "Path Distributions Data Type:{0} Block ID:{1} Path ID:{2} Label Distribution".format(
+                                    dataset_type, block_id, path_id),
+                                "{0}".format(label_counter)))
+        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
 
     def update_metrics(self, results_dict, labels):
         self.metricsDict["total_loss_metric"].update_state(values=results_dict["total_loss"])
@@ -164,6 +195,8 @@ class Cigt(tf.keras.Model):
             print("Block {0} Info Gain Loss:{1}".format(
                 block_id,
                 self.metricsDict["info_gain_loss_{0}".format(block_id)].result().numpy()))
+        print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
+        print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
         print("Accuracy:{0}".format(self.metricsDict["accuracy_metric"].result().numpy()))
 
     def is_decision_variable(self, variable):
@@ -252,13 +285,20 @@ class Cigt(tf.keras.Model):
                     results_dict = self.call(inputs=[train_x, train_y], training=True)
                 grads = tape.gradient(results_dict["total_loss"], self.trainable_variables)
                 t1 = time.time()
-                times_passed.append(t1-t0)
+                times_passed.append(t1 - t0)
                 self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
-                print("t1-t0:{0}".format(t1-t0))
+                print("t1-t0:{0}".format(t1 - t0))
                 # Update metrics
                 self.update_metrics(results_dict=results_dict, labels=train_y)
                 print("********** Epoch:{0} Iteration:{1} **********".format(epoch_id, self.numOfTrainingIterations))
                 self.report_metrics()
+                # run_id, iteration, dataset_type, routing_matrix, labels
+                self.calculate_branch_statistics(
+                    run_id=self.runId,
+                    iteration=self.numOfTrainingIterations,
+                    dataset_type="training",
+                    labels=train_y,
+                    routing_matrices=results_dict["routing_matrices"])
                 self.numOfTrainingIterations += 1
                 self.routingStrategy.set_training_statistics(iteration_count=self.numOfTrainingIterations,
                                                              epoch_count=self.numOfTrainingEpochs)
@@ -297,18 +337,37 @@ class Cigt(tf.keras.Model):
                  return_dict=False,
                  **kwargs):
         # epoch_id = kwargs["epoch_id"]
-        # dataset_type = kwargs["dataset_type"]
+        dataset_type = kwargs["dataset_type"]
 
         dataset = x
         # Reset all metrics
         for metric in self.metricsDict.values():
             metric.reset_states()
+        list_of_labels = []
+        list_of_routing_matrices = []
+        for _ in range(len(self.cigtBlocks) - 1):
+            list_of_routing_matrices.append([])
+
         for x_, y_ in tqdm(dataset):
             results_dict = self.call(inputs=[x_, y_], training=False)
+            list_of_labels.append(y_)
+            assert len(results_dict["routing_matrices"]) == len(list_of_routing_matrices)
+            for idx_, matr_ in results_dict["routing_matrices"]:
+                list_of_routing_matrices[idx_].append(matr_)
             # Update metrics
             self.update_metrics(results_dict=results_dict, labels=y_)
         self.report_metrics()
         accuracy = self.metricsDict["accuracy_metric"].result().numpy()
+        list_of_labels = tf.stack(list_of_labels, axis=0)
+        for idx_ in range(len(self.cigtBlocks) - 1):
+            list_of_routing_matrices[idx_] = tf.stack(list_of_routing_matrices[idx_], axis=0)
+
+        self.calculate_branch_statistics(
+            run_id=self.runId,
+            iteration=self.numOfTrainingIterations,
+            dataset_type=dataset_type,
+            labels=list_of_labels,
+            routing_matrices=list_of_routing_matrices)
         return accuracy
 
     def get_explanation_string(self):
