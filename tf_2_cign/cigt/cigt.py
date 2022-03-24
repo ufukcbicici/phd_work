@@ -103,6 +103,7 @@ class Cigt(tf.keras.Model):
         # ig_activations = tf.ones(shape=(batch_size, 1), dtype=tf.float32)
         routing_matrix = tf.ones(shape=(batch_size, 1), dtype=tf.int32)
         information_gain_values = []
+        routing_probabilities = []
         routing_matrices = []
         logits = None
         posteriors = None
@@ -112,6 +113,7 @@ class Cigt(tf.keras.Model):
                 # Run the CIGT block
                 f_net, ig_value, ig_activations, routing_probabilities = \
                     block([f_net, routing_matrix, temperature, y], training=is_training)
+                routing_probabilities.append(routing_probabilities)
                 # Keep track of the results.
                 information_gain_values.append(ig_value)
                 # Build the routing matrix for the next block
@@ -138,15 +140,16 @@ class Cigt(tf.keras.Model):
             "regularization_loss": regularization_loss,
             "logits": logits,
             "posteriors": posteriors,
-            "routing_matrices": routing_matrices
+            "routing_matrices": routing_matrices,
+            "routing_probabilities": routing_probabilities
         }
         return results_dict
 
-    def calculate_branch_statistics(self, run_id, iteration, dataset_type, routing_matrices, labels):
+    def calculate_branch_statistics(self, run_id, iteration, dataset_type, routing_probability_matrices, labels):
         kv_rows = []
-        for block_id, routing_matrix in enumerate(routing_matrices):
-            path_count = tf.shape(routing_matrix)[1].numpy()
-            selected_paths = tf.argmax(routing_matrix, axis=1).numpy()
+        for block_id, routing_probability_matrix in enumerate(routing_probability_matrices):
+            path_count = tf.shape(routing_probability_matrix)[1].numpy()
+            selected_paths = tf.argmax(routing_probability_matrix, axis=1).numpy()
             path_counter = Counter(selected_paths)
             print("Path Distributions Data Type:{0} Block ID:{1} Iteration:{2} Path Distribution:{3}".format(
                 dataset_type, block_id, iteration, path_counter))
@@ -298,7 +301,7 @@ class Cigt(tf.keras.Model):
                     iteration=self.numOfTrainingIterations,
                     dataset_type="training",
                     labels=train_y,
-                    routing_matrices=results_dict["routing_matrices"])
+                    routing_probability_matrices=results_dict["routing_probabilities"])
                 self.numOfTrainingIterations += 1
                 self.routingStrategy.set_training_statistics(iteration_count=self.numOfTrainingIterations,
                                                              epoch_count=self.numOfTrainingEpochs)
@@ -344,30 +347,30 @@ class Cigt(tf.keras.Model):
         for metric in self.metricsDict.values():
             metric.reset_states()
         list_of_labels = []
-        list_of_routing_matrices = []
+        list_of_routing_probability_matrices = []
         for _ in range(len(self.cigtBlocks) - 1):
-            list_of_routing_matrices.append([])
+            list_of_routing_probability_matrices.append([])
 
         for x_, y_ in tqdm(dataset):
             results_dict = self.call(inputs=[x_, y_], training=False)
             list_of_labels.append(y_)
-            assert len(results_dict["routing_matrices"]) == len(list_of_routing_matrices)
-            for idx_, matr_ in results_dict["routing_matrices"]:
-                list_of_routing_matrices[idx_].append(matr_)
+            assert len(results_dict["routing_probabilities"]) == len(list_of_routing_probability_matrices)
+            for idx_, matr_ in results_dict["routing_probabilities"]:
+                list_of_routing_probability_matrices[idx_].append(matr_)
             # Update metrics
             self.update_metrics(results_dict=results_dict, labels=y_)
         self.report_metrics()
         accuracy = self.metricsDict["accuracy_metric"].result().numpy()
         list_of_labels = tf.stack(list_of_labels, axis=0)
         for idx_ in range(len(self.cigtBlocks) - 1):
-            list_of_routing_matrices[idx_] = tf.stack(list_of_routing_matrices[idx_], axis=0)
+            list_of_routing_probability_matrices[idx_] = tf.stack(list_of_routing_probability_matrices[idx_], axis=0)
 
         self.calculate_branch_statistics(
             run_id=self.runId,
             iteration=self.numOfTrainingIterations,
             dataset_type=dataset_type,
             labels=list_of_labels,
-            routing_matrices=list_of_routing_matrices)
+            routing_probability_matrices=list_of_routing_probability_matrices)
         return accuracy
 
     def get_explanation_string(self):
