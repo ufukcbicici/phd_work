@@ -54,7 +54,7 @@ class FashionNetConstants:
             "Hidden_Layers": [32]
         }
     ]
-    warm_up_period = 25
+    warm_up_period = 2
     rl_cign_iteration_period = 10
     fine_tune_epoch_count = 25
     epsilon_decay_rate = 0.75

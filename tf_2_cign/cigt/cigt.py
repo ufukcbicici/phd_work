@@ -37,11 +37,13 @@ class Cigt(tf.keras.Model):
         self.decisionWd = decision_wd
         self.classificationWd = classification_wd
         self.warmUpPeriod = warm_up_period
+        self.warmUpFinalIteration = None
+        self.isInWarmUp = True
         self.numOfTrainingIterations = 0
         self.numOfTrainingEpochs = 0
         self.regularizationCoefficients = {}
         if routing_strategy_name == "Approximate_Training":
-            self.routingStrategy = ApproximateTrainingStrategy(warm_up_epoch_count=self.warmUpPeriod)
+            self.routingStrategy = ApproximateTrainingStrategy()
         else:
             raise NotImplementedError()
         self.metricsDict = {}
@@ -82,29 +84,31 @@ class Cigt(tf.keras.Model):
                 self.rootNode = node
             last_block = node
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         x = inputs[0]
         y = inputs[1]
+        temperature = inputs[2]
+        is_warm_up = inputs[3]
+
         batch_size = tf.shape(x)[0]
         if "training" in kwargs:
             is_training = kwargs["training"]
         else:
             is_training = False
 
-        if is_training:
-            self.routingStrategy.modify_temperature(softmax_decay_controller=self.softmaxDecayController)
-            temperature = self.softmaxDecayController.get_value()
-        else:
-            temperature = 1.0
-
-        temperature = tf.convert_to_tensor(temperature)
+        # if is_training:
+        #     self.routingStrategy.modify_temperature(softmax_decay_controller=self.softmaxDecayController)
+        #     temperature = self.softmaxDecayController.get_value()
+        # else:
+        #     temperature = 1.0
+        # temperature = tf.convert_to_tensor(temperature)
         f_net = x
         # ig_activations = tf.ones(shape=(batch_size, 1), dtype=tf.float32)
         routing_matrix = tf.ones(shape=(batch_size, 1), dtype=tf.int32)
         information_gain_values = []
-        routing_probabilities = []
-        routing_matrices = []
+        list_of_routing_probabilities = []
+        list_of_routing_matrices = []
         logits = None
         posteriors = None
         classification_loss = None
@@ -113,12 +117,12 @@ class Cigt(tf.keras.Model):
                 # Run the CIGT block
                 f_net, ig_value, ig_activations, routing_probabilities = \
                     block([f_net, routing_matrix, temperature, y], training=is_training)
-                routing_probabilities.append(routing_probabilities)
+                list_of_routing_probabilities.append(routing_probabilities)
                 # Keep track of the results.
                 information_gain_values.append(ig_value)
                 # Build the routing matrix for the next block
-                routing_matrix = self.routingStrategy(routing_probabilities, training=is_training)
-                routing_matrices.append(routing_matrix)
+                routing_matrix = self.routingStrategy([routing_probabilities, is_warm_up], training=is_training)
+                list_of_routing_matrices.append(routing_matrix)
                 # Last block
             else:
                 logits, posteriors, classification_loss = \
@@ -127,8 +131,9 @@ class Cigt(tf.keras.Model):
         # Get regularization losses
         regularization_loss = self.get_regularization_loss()
         # Get information gain loss
-        total_information_gain_loss = self.routingStrategy.calculate_information_gain_losses(
-            ig_losses=information_gain_values, decision_loss_coefficient=self.decisionLossCoefficient)
+        total_information_gain_loss = tf.where(is_warm_up,
+                                               0.0 * tf.add_n(information_gain_values),
+                                               self.decisionLossCoefficient * tf.add_n(information_gain_values))
         # Classification loss is already calculated. Calculate the total loss.
         total_loss = classification_loss + total_information_gain_loss + regularization_loss
 
@@ -140,13 +145,15 @@ class Cigt(tf.keras.Model):
             "regularization_loss": regularization_loss,
             "logits": logits,
             "posteriors": posteriors,
-            "routing_matrices": routing_matrices,
-            "routing_probabilities": routing_probabilities
+            "routing_matrices": list_of_routing_matrices,
+            "routing_probabilities": list_of_routing_probabilities
         }
         return results_dict
 
-    def calculate_branch_statistics(self, run_id, iteration, dataset_type, routing_probability_matrices, labels):
+    def calculate_branch_statistics(self, run_id, iteration, dataset_type, routing_probability_matrices, labels,
+                                    write_to_db):
         kv_rows = []
+        labels = labels.numpy()
         for block_id, routing_probability_matrix in enumerate(routing_probability_matrices):
             path_count = tf.shape(routing_probability_matrix)[1].numpy()
             selected_paths = tf.argmax(routing_probability_matrix, axis=1).numpy()
@@ -170,7 +177,8 @@ class Cigt(tf.keras.Model):
                                 "Path Distributions Data Type:{0} Block ID:{1} Path ID:{2} Label Distribution".format(
                                     dataset_type, block_id, path_id),
                                 "{0}".format(label_counter)))
-        DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
+        if write_to_db:
+            DbLogger.write_into_table(rows=kv_rows, table=DbLogger.runKvStore)
 
     def update_metrics(self, results_dict, labels):
         self.metricsDict["total_loss_metric"].update_state(values=results_dict["total_loss"])
@@ -272,6 +280,7 @@ class Cigt(tf.keras.Model):
             use_multiprocessing=False):
 
         self.numOfTrainingIterations = 0
+        self.numOfTrainingEpochs = 0
         train_dataset = x
         val_dataset = validation_data
         for epoch_id in range(epochs):
@@ -283,9 +292,16 @@ class Cigt(tf.keras.Model):
 
             times_passed = []
             for train_x, train_y in train_dataset:
+                if not self.isInWarmUp:
+                    decay_t = self.numOfTrainingIterations - self.warmUpFinalIteration
+                    self.softmaxDecayController.update(iteration=decay_t)
+                temperature = self.softmaxDecayController.get_value()
+
                 t0 = time.time()
                 with tf.GradientTape() as tape:
-                    results_dict = self.call(inputs=[train_x, train_y], training=True)
+                    results_dict = self.call(inputs=[train_x, train_y,
+                                                     tf.convert_to_tensor(temperature),
+                                                     tf.convert_to_tensor(self.isInWarmUp)], training=True)
                 grads = tape.gradient(results_dict["total_loss"], self.trainable_variables)
                 t1 = time.time()
                 times_passed.append(t1 - t0)
@@ -296,18 +312,19 @@ class Cigt(tf.keras.Model):
                 print("********** Epoch:{0} Iteration:{1} **********".format(epoch_id, self.numOfTrainingIterations))
                 self.report_metrics()
                 # run_id, iteration, dataset_type, routing_matrix, labels
-                self.calculate_branch_statistics(
-                    run_id=self.runId,
-                    iteration=self.numOfTrainingIterations,
-                    dataset_type="training",
-                    labels=train_y,
-                    routing_probability_matrices=results_dict["routing_probabilities"])
+                # self.calculate_branch_statistics(
+                #     run_id=self.runId,
+                #     iteration=self.numOfTrainingIterations,
+                #     dataset_type="training",
+                #     labels=train_y,
+                #     routing_probability_matrices=results_dict["routing_probabilities"],
+                #     write_to_db=False)
                 self.numOfTrainingIterations += 1
-                self.routingStrategy.set_training_statistics(iteration_count=self.numOfTrainingIterations,
-                                                             epoch_count=self.numOfTrainingEpochs)
             self.numOfTrainingEpochs += 1
-            self.routingStrategy.set_training_statistics(iteration_count=self.numOfTrainingIterations,
-                                                         epoch_count=self.numOfTrainingEpochs)
+            if self.numOfTrainingEpochs > self.warmUpPeriod and self.isInWarmUp:
+                self.warmUpFinalIteration = self.numOfTrainingIterations
+                self.isInWarmUp = False
+            print("In Warm Up:{0}".format(self.isInWarmUp))
             # Train statistics
             print("Epoch {0} Train Statistics".format(epoch_id))
             training_accuracy = self.evaluate(x=train_dataset, epoch_id=epoch_id, dataset_type="training")
@@ -352,25 +369,27 @@ class Cigt(tf.keras.Model):
             list_of_routing_probability_matrices.append([])
 
         for x_, y_ in tqdm(dataset):
-            results_dict = self.call(inputs=[x_, y_], training=False)
+            results_dict = self.call(inputs=[x_, y_, tf.convert_to_tensor(1.0), tf.convert_to_tensor(self.isInWarmUp)],
+                                     training=False)
             list_of_labels.append(y_)
             assert len(results_dict["routing_probabilities"]) == len(list_of_routing_probability_matrices)
-            for idx_, matr_ in results_dict["routing_probabilities"]:
+            for idx_, matr_ in enumerate(results_dict["routing_probabilities"]):
                 list_of_routing_probability_matrices[idx_].append(matr_)
             # Update metrics
             self.update_metrics(results_dict=results_dict, labels=y_)
         self.report_metrics()
         accuracy = self.metricsDict["accuracy_metric"].result().numpy()
-        list_of_labels = tf.stack(list_of_labels, axis=0)
-        for idx_ in range(len(self.cigtBlocks) - 1):
-            list_of_routing_probability_matrices[idx_] = tf.stack(list_of_routing_probability_matrices[idx_], axis=0)
+        list_of_labels = tf.concat(list_of_labels, axis=0)
+        for idx_ in range(len(list_of_routing_probability_matrices)):
+            list_of_routing_probability_matrices[idx_] = tf.concat(list_of_routing_probability_matrices[idx_], axis=0)
 
         self.calculate_branch_statistics(
             run_id=self.runId,
             iteration=self.numOfTrainingIterations,
             dataset_type=dataset_type,
             labels=list_of_labels,
-            routing_probability_matrices=list_of_routing_probability_matrices)
+            routing_probability_matrices=list_of_routing_probability_matrices,
+            write_to_db=True)
         return accuracy
 
     def get_explanation_string(self):
@@ -382,6 +401,7 @@ class Cigt(tf.keras.Model):
         explanation += "Batch Size:{0}\n".format(self.batchSize)
         explanation += "Path Counts:{0}\n".format(self.pathCounts)
         explanation += "Routing Strategy:{0}\n".format(self.routingStrategy.__class__)
+        explanation += "Warm Up Period:{0}\n".format(self.warmUpPeriod)
         explanation += "********Lr Settings********\n"
         explanation += self.learningRateSchedule.get_explanation()
         explanation += "********Lr Settings********\n"

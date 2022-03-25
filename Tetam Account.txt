@@ -1,0 +1,6 @@
+╭─────┤ TETAM ├─────
+│username: ucbicici
+│password: lieNaef3
+│host: 193.140.196.49
+│port: 37822
+╰─────

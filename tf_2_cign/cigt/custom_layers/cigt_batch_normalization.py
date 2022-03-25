@@ -54,9 +54,11 @@ class CigtBatchNormalization(WeightedBatchNormalization):
         if is_training:
             final_mean = mu
             final_var = sigma
+            # tf.print("!!! CIGT - TRAINING!!!")
         else:
             final_mean = self.popMean
             final_var = self.popVar
+            # tf.print("!!! CIGT - TEST!!!")
         normed_x = tf.nn.batch_normalization(x=x_,
                                              mean=final_mean,
                                              variance=final_var,

@@ -1,0 +1,72 @@
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Wd:") + LENGTH("Wd:"), 10) AS Wd,
+
+SUBSTR(Explanation, INSTR(Explanation,"Iteration:0 Value:") + LENGTH("Iteration:0 Value:"), 10) AS Lr,
+
+SUBSTR(Explanation, INSTR(Explanation,"Info Gain Balance Coefficient:") + LENGTH("Info Gain Balance Coefficient:"), 10) AS IG_Balance
+
+FROM
+(
+SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+WHERE logs_table.Epoch >= 190
+AND
+Explanation LIKE "%Batch Size:125%"
+AND
+Explanation LIKE "%USPS - CIGN%"
+AND
+(Explanation LIKE "%0.00146918%" OR Explanation LIKE "%0.00584801%" OR Explanation LIKE "%0.00163591%")
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
+
+
+SELECT * FROM run_meta_data WHERE RunID = 1700
+
+SELECT COUNT(*) FROM dataset_link WHERE NetworkId = 1971  --30105
+SELECT COUNT(*) FROM dataset_link WHERE NetworkName = "USPS_CIGN" --180630 2137455
+SELECT NetworkId, COUNT(1) AS CNT FROM dataset_link WHERE NetworkName = "USPS_CIGN" GROUP BY NetworkId
+
+
+DELETE FROM dataset_link WHERE NetworkName = "USPS_CIGN"
+
+DELETE FROM 
+
+
+
+SELECT
+RunId,
+Max(RunId),
+Min(RunId),
+Max(ValidationAccuracy) AS MaxValidationAccuracy,
+Min(ValidationAccuracy) AS MinValidationAccuracy,
+Avg(ValidationAccuracy) AS AvgValidationAccuracy,
+Avg(TestAccuracy) AS AvgCorrectedValidationAccuracy,
+Avg(TrainingAccuracy) AS AvgTrainingAccuracy,
+COUNT(1) AS CNT,
+SUBSTR(Explanation, INSTR(Explanation,"Wd:") + LENGTH("Wd:"), 10) AS Wd,
+SUBSTR(Explanation, INSTR(Explanation,"Iteration:0 Value:") + LENGTH("Iteration:0 Value:"), 10) AS Lr,
+SUBSTR(Explanation, INSTR(Explanation,"Info Gain Balance Coefficient:") + LENGTH("Info Gain Balance Coefficient:"), 10) AS IG_Balance
+FROM
+(
+SELECT logs_table.*,run_meta_data.Explanation FROM logs_table
+LEFT JOIN run_meta_data ON logs_table.RunId = run_meta_data.RunId
+WHERE logs_table.Epoch >= 190
+AND
+Explanation LIKE "%Batch Size:125%"
+AND
+Explanation LIKE "%USPS - CIGN%"
+AND
+Explanation LIKE "%5522%"
+)
+GROUP BY Explanation
+ORDER BY AvgValidationAccuracy DESC
