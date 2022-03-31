@@ -325,23 +325,24 @@ class Cigt(tf.keras.Model):
                 self.warmUpFinalIteration = self.numOfTrainingIterations
                 self.isInWarmUp = False
             print("In Warm Up:{0}".format(self.isInWarmUp))
-            # Train statistics
-            print("Epoch {0} Train Statistics".format(epoch_id))
-            training_accuracy = self.evaluate(x=train_dataset, epoch_id=epoch_id, dataset_type="training")
-            # Validation / Test statistics
-            print("Epoch {0} Test Statistics".format(epoch_id))
-            test_accuracy = self.evaluate(x=val_dataset, epoch_id=epoch_id, dataset_type="test")
-            DbLogger.write_into_table(
-                rows=[(self.runId,
-                       self.numOfTrainingIterations,
-                       epoch_id,
-                       np.asscalar(training_accuracy),
-                       0.0,
-                       np.asscalar(test_accuracy),
-                       np.asscalar(np.mean(np.array(times_passed))),
-                       0.0,
-                       0.0,
-                       "XXX")], table=DbLogger.logsTable)
+            if self.numOfTrainingEpochs % self.evaluationPeriod == 0 or self.numOfTrainingEpochs >= epochs - 11:
+                # Train statistics
+                print("Epoch {0} Train Statistics".format(epoch_id))
+                training_accuracy = self.evaluate(x=train_dataset, epoch_id=epoch_id, dataset_type="training")
+                # Validation / Test statistics
+                print("Epoch {0} Test Statistics".format(epoch_id))
+                test_accuracy = self.evaluate(x=val_dataset, epoch_id=epoch_id, dataset_type="test")
+                DbLogger.write_into_table(
+                    rows=[(self.runId,
+                           self.numOfTrainingIterations,
+                           epoch_id,
+                           np.asscalar(training_accuracy),
+                           0.0,
+                           np.asscalar(test_accuracy),
+                           np.asscalar(np.mean(np.array(times_passed))),
+                           0.0,
+                           0.0,
+                           "XXX")], table=DbLogger.logsTable)
 
     def evaluate(self,
                  x=None,

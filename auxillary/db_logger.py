@@ -27,6 +27,9 @@ class DbLogger:
     # DGX DB 3
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
+    # TETAM CIGT
+    # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
+
     # TETAM 1
     # log_db_path = "/cta/users/ucbicici/phd_work/dblogger.db"
 

@@ -23,7 +23,7 @@ class FashionNetConstants:
     bn_momentum = 0.9
     filter_counts = [32, 64, 128]
     kernel_sizes = [5, 5, 1]
-    hidden_layers = [1028, 512]
+    hidden_layers = [512, 256]
     decision_dimensions = [128, 128]
     # node_build_funcs = [FashionCign.inner_func, FashionCign.inner_func, FashionCign.leaf_func]
     initial_lr = 0.01
@@ -54,8 +54,10 @@ class FashionNetConstants:
             "Hidden_Layers": [32]
         }
     ]
-    warm_up_period = 2
+    warm_up_period = 25
     rl_cign_iteration_period = 10
     fine_tune_epoch_count = 25
     epsilon_decay_rate = 0.75
     epsilon_step = 1000
+
+    experiment_factor = 10
