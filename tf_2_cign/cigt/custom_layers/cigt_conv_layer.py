@@ -1,15 +1,20 @@
 import tensorflow as tf
 
 from tf_2_cign.cigt.custom_layers.cigt_masking_layer import CigtMaskingLayer
+from tf_2_cign.cigt.custom_layers.cigt_masking_layer_with_boolean_mask import CigtMaskingLayerWithBooleanMask
 from tf_2_cign.custom_layers.cign_conv_layer import CignConvLayer
 from tf_2_cign.utilities.utilities import Utilities
 
 
 class CigtConvLayer(CignConvLayer):
-    def __init__(self, kernel_size, num_of_filters, strides, node, activation, use_bias=True, padding="same",
+    def __init__(self, use_boolean_mask_layer,
+                 kernel_size, num_of_filters, strides, node, activation, use_bias=True, padding="same",
                  name="conv_op"):
         super().__init__(kernel_size, num_of_filters, strides, node, activation, use_bias, padding, name)
-        self.cigtMaskingLayer = CigtMaskingLayer()
+        if not use_boolean_mask_layer:
+            self.cigtMaskingLayer = CigtMaskingLayer()
+        else:
+            self.cigtMaskingLayer = CigtMaskingLayerWithBooleanMask()
 
     def build(self, input_shape):
         assert len(input_shape) == 2

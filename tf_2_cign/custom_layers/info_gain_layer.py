@@ -7,9 +7,10 @@ from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
 
 class InfoGainLayer(tf.keras.layers.Layer):
-    def __init__(self, class_count):
+    def __init__(self, class_count, normalize):
         super().__init__()
         self.classCount = tf.constant(class_count)
+        self.normalize = normalize
 
     # @tf.function
     def call(self, inputs, **kwargs):
@@ -25,6 +26,14 @@ class InfoGainLayer(tf.keras.layers.Layer):
 
         batch_size = tf.shape(activations)[0]
         node_degree = tf.shape(activations)[1]
+
+        # self.max_information_gain = (self.balance_coefficient * math.log(self.num_routes)) + math.log(self.num_classes)
+        # self.min_information_gain = - math.log(self.num_classes * self.num_routes)
+
+        A = tf.cast(node_degree, dtype=tf.float32)
+        B = tf.cast(self.classCount, dtype=tf.float32)
+        max_information_gain = (balance_coefficient * tf.math.log(A)) + tf.math.log(B)
+        min_information_gain = - tf.math.log(A * B)
 
         joint_distribution = tf.ones(shape=(batch_size, self.classCount, node_degree), dtype=activations.dtype)
 
@@ -52,7 +61,9 @@ class InfoGainLayer(tf.keras.layers.Layer):
         entropy_p_c, log_prob_p_c = InfoGainLoss.calculate_entropy(prob_distribution=marginal_p_c)
         # Calculate the information gain
         information_gain = (balance_coefficient * entropy_p_n) + entropy_p_c - entropy_p_cn
-        information_gain = -1.0 * information_gain
+        if self.normalize:
+            information_gain = 1.0 - (information_gain - min_information_gain) / \
+                               (max_information_gain - min_information_gain)
+        else:
+            information_gain = -1.0 * information_gain
         return information_gain, p_n_given_x
-
-

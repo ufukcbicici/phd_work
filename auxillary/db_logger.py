@@ -30,6 +30,9 @@ class DbLogger:
     # TETAM CIGT
     # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
 
+    # TETAM CIGT 2
+    # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
+
     # TETAM 1
     # log_db_path = "/cta/users/ucbicici/phd_work/dblogger.db"
 

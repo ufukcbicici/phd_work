@@ -13,12 +13,14 @@ class LenetCigt(Cigt):
                  decision_drop_probability, classification_drop_probability, decision_wd, classification_wd,
                  evaluation_period, decision_dimensions, class_count, information_gain_balance_coeff,
                  softmax_decay_controller, learning_rate_schedule, decision_loss_coeff, path_counts, bn_momentum,
-                 warm_up_period, routing_strategy_name, *args, **kwargs):
+                 warm_up_period, routing_strategy_name, use_boolean_mask_routing, normalize_information_gain,
+                 *args, **kwargs):
 
-        super().__init__(run_id, batch_size, input_dims, class_count, path_counts, softmax_decay_controller,
+        super().__init__(run_id, batch_size, input_dims, class_count,
+                         path_counts, information_gain_balance_coeff, softmax_decay_controller,
                          learning_rate_schedule, decision_loss_coeff, routing_strategy_name, warm_up_period,
                          decision_drop_probability, classification_drop_probability, decision_wd, classification_wd,
-                         evaluation_period, *args, **kwargs)
+                         evaluation_period, use_boolean_mask_routing, normalize_information_gain,*args, **kwargs)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers
@@ -26,7 +28,6 @@ class LenetCigt(Cigt):
         assert len(path_counts) + 1 == len(filter_counts)
         assert len(filter_counts) == len(kernel_sizes)
         self.decisionDimensions = decision_dimensions
-        self.informationGainBalanceCoeff = information_gain_balance_coeff
         self.optimizer = None
         self.build_network()
         # self.dummyBlock = None
@@ -39,7 +40,8 @@ class LenetCigt(Cigt):
         curr_node = self.rootNode
         for block_id, path_count in enumerate(self.pathCounts):
             if block_id < len(self.pathCounts) - 1:
-                block = LeNetCigtInnerBlock(node=curr_node,
+                block = LeNetCigtInnerBlock(use_boolean_mask_layer=self.useBooleanMaskRouting,
+                                            node=curr_node,
                                             kernel_size=self.kernelSizes[block_id],
                                             num_of_filters=self.filterCounts[block_id],
                                             strides=(1, 1),
@@ -49,11 +51,10 @@ class LenetCigt(Cigt):
                                             decision_drop_probability=self.decisionDropProbability,
                                             decision_dim=self.decisionDimensions[block_id],
                                             bn_momentum=self.bnMomentum,
-                                            next_block_path_count=self.pathCounts[block_id + 1],
-                                            ig_balance_coefficient=self.informationGainBalanceCoeff,
-                                            class_count=self.classCount)
+                                            next_block_path_count=self.pathCounts[block_id + 1])
             else:
-                block = LeNetCigtLeafBlock(node=curr_node,
+                block = LeNetCigtLeafBlock(use_boolean_mask_layer=self.useBooleanMaskRouting,
+                                           node=curr_node,
                                            kernel_size=self.kernelSizes[block_id],
                                            num_of_filters=self.filterCounts[block_id],
                                            activation="relu",

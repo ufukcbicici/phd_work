@@ -8,15 +8,17 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 
 
 class LeNetCigtInnerBlock(tf.keras.layers.Layer):
-    def __init__(self, node, kernel_size, num_of_filters, strides, activation, use_bias, padding,
+    def __init__(self, use_boolean_mask_layer, node, kernel_size, num_of_filters, strides, activation, use_bias, padding,
                  decision_drop_probability, decision_dim, bn_momentum,
-                 next_block_path_count, class_count, ig_balance_coefficient):
+                 next_block_path_count):
         super().__init__()
+        self.useBooleanMaskLayer = use_boolean_mask_layer
         self.node = node
         self.bnMomentum = bn_momentum
 
         # F operations
-        self.convLayer = CigtConvLayer(kernel_size=kernel_size,
+        self.convLayer = CigtConvLayer(use_boolean_mask_layer=self.useBooleanMaskLayer,
+                                       kernel_size=kernel_size,
                                        num_of_filters=num_of_filters,
                                        strides=strides,
                                        node=node,
@@ -24,7 +26,7 @@ class LeNetCigtInnerBlock(tf.keras.layers.Layer):
                                        use_bias=use_bias,
                                        padding=padding,
                                        name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
-        self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
+        self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2)
 
         # H operations
         self.cigtRouteAveragingLayer = CigtRouteAveragingLayer()
@@ -40,8 +42,7 @@ class LeNetCigtInnerBlock(tf.keras.layers.Layer):
         self.cigtDecisionLayer = CigtDecisionLayer(node=node,
                                                    decision_bn_momentum=self.bnMomentum,
                                                    next_block_path_count=next_block_path_count,
-                                                   class_count=class_count,
-                                                   ig_balance_coefficient=ig_balance_coefficient)
+                                                   use_boolean_mask_layer=self.useBooleanMaskLayer)
 
     def call(self, inputs, **kwargs):
         f_input = inputs[0]
@@ -57,12 +58,12 @@ class LeNetCigtInnerBlock(tf.keras.layers.Layer):
         # H ops
         pre_branch_feature = f_net
         h_net = pre_branch_feature
-        h_net = self.cigtRouteAveragingLayer([h_net, routing_matrix])
+        if not self.useBooleanMaskLayer:
+            h_net = self.cigtRouteAveragingLayer([h_net, routing_matrix])
         h_net = self.decisionGAPLayer(h_net)
         h_net = self.decisionFcLayer(h_net)
         h_net = self.decisionDropoutLayer(h_net)
 
         # Decision layer
-        ig_value, ig_activations_this, routing_probabilities = \
-            self.cigtDecisionLayer([h_net, labels, temperature], training=training)
-        return f_net, ig_value, ig_activations_this, routing_probabilities
+        ig_activations = self.cigtDecisionLayer([h_net, labels, temperature], training=training)
+        return f_net, ig_activations

@@ -9,22 +9,31 @@ from tf_2_cign.cigt.routing_strategy.approximate_training_strategy import Approx
 from tqdm import tqdm
 from collections import Counter
 
+from tf_2_cign.cigt.routing_strategy.approximate_training_strategy_with_random_routing import \
+    ApproximateTrainingStrategyWithRandomRouting
+from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
+
 
 class Cigt(tf.keras.Model):
     def __init__(self,
                  run_id,
-                 batch_size, input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
+                 batch_size, input_dims, class_count, path_counts, information_gain_balance_coeff,
+                 softmax_decay_controller, learning_rate_schedule,
                  decision_loss_coeff, routing_strategy_name, warm_up_period,
                  decision_drop_probability, classification_drop_probability,
                  decision_wd, classification_wd, evaluation_period,
+                 use_boolean_mask_routing, normalize_information_gain,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.runId = run_id
         self.batchSize = batch_size
+        self.useBooleanMaskRouting = use_boolean_mask_routing
+        self.normalizeInformationGain = normalize_information_gain
         self.pathCounts = [1]
         self.pathCounts.extend(path_counts)
         self.classCount = class_count
         self.inputDims = input_dims
+        self.informationGainBalanceCoeff = information_gain_balance_coeff
         self.learningRateSchedule = learning_rate_schedule
         self.decisionLossCoefficient = decision_loss_coeff
         self.softmaxDecayController = softmax_decay_controller
@@ -39,11 +48,16 @@ class Cigt(tf.keras.Model):
         self.warmUpPeriod = warm_up_period
         self.warmUpFinalIteration = None
         self.isInWarmUp = True
+        self.infoGainLayer = InfoGainLayer(class_count=self.classCount, normalize=self.normalizeInformationGain)
         self.numOfTrainingIterations = 0
         self.numOfTrainingEpochs = 0
         self.regularizationCoefficients = {}
         if routing_strategy_name == "Approximate_Training":
             self.routingStrategy = ApproximateTrainingStrategy()
+        elif routing_strategy_name == "Approximate_Training_With_Random_Routing_With_Gumbel":
+            self.routingStrategy = ApproximateTrainingStrategyWithRandomRouting(use_gumbel=True)
+        elif routing_strategy_name == "Approximate_Training_With_Random_Routing_Without_Gumbel":
+            self.routingStrategy = ApproximateTrainingStrategyWithRandomRouting(use_gumbel=False)
         else:
             raise NotImplementedError()
         self.metricsDict = {}
@@ -57,7 +71,7 @@ class Cigt(tf.keras.Model):
         values.extend([tpl[1] for tpl in self.learningRateSchedule.schedule])
         learning_rate_scheduler_tf = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
             boundaries=boundaries, values=values)
-        optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9, nesterov=True)
         return optimizer
 
     def build_network(self):
@@ -84,7 +98,7 @@ class Cigt(tf.keras.Model):
                 self.rootNode = node
             last_block = node
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         x = inputs[0]
         y = inputs[1]
@@ -106,6 +120,7 @@ class Cigt(tf.keras.Model):
         f_net = x
         # ig_activations = tf.ones(shape=(batch_size, 1), dtype=tf.float32)
         routing_matrix = tf.ones(shape=(batch_size, 1), dtype=tf.int32)
+        list_of_ig_activations = []
         information_gain_values = []
         list_of_routing_probabilities = []
         list_of_routing_matrices = []
@@ -114,14 +129,30 @@ class Cigt(tf.keras.Model):
         classification_loss = None
         for block_id, block in enumerate(self.cigtBlocks):
             if block_id < len(self.cigtBlocks) - 1:
+                # f_input = inputs[0]
+                # routing_matrix = inputs[1]
+                # temperature = inputs[2]
+                # labels = inputs[3]
+                # training = kwargs["training"]
+
                 # Run the CIGT block
-                f_net, ig_value, ig_activations, routing_probabilities = \
+                f_net, ig_activations_matrix = \
                     block([f_net, routing_matrix, temperature, y], training=is_training)
-                list_of_routing_probabilities.append(routing_probabilities)
-                # Keep track of the results.
+                list_of_ig_activations.append(ig_activations_matrix)
+                # Calculate the information gain loss
+                ig_mask = tf.ones_like(y)
+                if self.pathCounts[block_id + 1] > 1:
+                    ig_value, routing_probabilities = \
+                        self.infoGainLayer([ig_activations_matrix, y, temperature,
+                                            self.informationGainBalanceCoeff, ig_mask])
+                else:
+                    ig_value = 0.0
+                    routing_probabilities = tf.ones(shape=(batch_size, 1))
                 information_gain_values.append(ig_value)
+                list_of_routing_probabilities.append(routing_probabilities)
                 # Build the routing matrix for the next block
-                routing_matrix = self.routingStrategy([routing_probabilities, is_warm_up], training=is_training)
+                routing_matrix = self.routingStrategy([ig_activations_matrix, is_warm_up, temperature],
+                                                      training=is_training)
                 list_of_routing_matrices.append(routing_matrix)
                 # Last block
             else:
@@ -399,6 +430,7 @@ class Cigt(tf.keras.Model):
         for v in self.trainable_variables:
             total_param_count += np.prod(v.get_shape().as_list())
 
+        explanation += "Uses Boolean Mask Routing:{0}\n".format(self.useBooleanMaskRouting)
         explanation += "Batch Size:{0}\n".format(self.batchSize)
         explanation += "Path Counts:{0}\n".format(self.pathCounts)
         explanation += "Routing Strategy:{0}\n".format(self.routingStrategy.__class__)

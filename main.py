@@ -1,20 +1,13 @@
 import tensorflow as tf
-import numpy as np
+
 from auxillary.db_logger import DbLogger
-from auxillary.general_utility_funcs import UtilityFuncs
+from tf_2_cign.utilities.utilities import Utilities
 from auxillary.parameters import DiscreteParameter
-from tf_2_cign.cign import Cign
-from tf_2_cign.cigt.cigt import Cigt
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
 from tf_2_cign.data.fashion_mnist import FashionMnist
-from tf_2_cign.fashion_net.fashion_cign import FashionCign
-from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
-from tf_2_cign.utilities.utilities import Utilities
-
 # Hyper-parameters
-from tf_2_cign.fashion_net.fashion_cign_rl import FashionCignRl
-from tf_2_cign.fashion_net.fashion_cign_binary_rl import FashionRlBinaryRouting
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
+from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -42,8 +35,8 @@ if __name__ == "__main__":
     classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
                                           FashionNetConstants.experiment_factor)
 
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[info_gain_balance_coeffs,
-                                                                          classification_dropout_probs])
+    cartesian_product = Utilities.get_cartesian_product(list_of_lists=[info_gain_balance_coeffs,
+                                                                       classification_dropout_probs])
     run_id = 0
     for tpl in cartesian_product:
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
@@ -69,7 +62,7 @@ if __name__ == "__main__":
                                      input_dims=(28, 28, 1),
                                      filter_counts=[32, 64, 128],
                                      kernel_sizes=[5, 5, 1],
-                                     hidden_layers=[512, 256],
+                                     hidden_layers=[256, 128],
                                      decision_drop_probability=0.0,
                                      classification_drop_probability=classification_dropout_prob,
                                      decision_wd=0.0,
@@ -80,7 +73,7 @@ if __name__ == "__main__":
                                      softmax_decay_controller=softmax_decay_controller,
                                      learning_rate_schedule=learning_rate_calculator,
                                      decision_loss_coeff=1.0,
-                                     path_counts=[2, 4],
+                                     path_counts=[2, 2],
                                      bn_momentum=0.9,
                                      warm_up_period=warm_up_period,
                                      routing_strategy_name="Approximate_Training",

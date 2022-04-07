@@ -7,21 +7,27 @@ from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
 
 class LeNetCigtLeafBlock(tf.keras.layers.Layer):
-    def __init__(self, node, kernel_size, num_of_filters, strides, activation, hidden_layer_dims,
+    def __init__(self, use_boolean_mask_layer, node, kernel_size, num_of_filters, strides, activation, hidden_layer_dims,
                  classification_dropout_prob, class_count,
                  use_bias=True, padding="same"):
         super().__init__()
+        self.useBooleanMaskLayer = use_boolean_mask_layer
         self.node = node
         # F Operations - Conv layer
-        self.convLayer = CigtConvLayer(kernel_size=kernel_size,
-                                       num_of_filters=num_of_filters,
-                                       strides=strides,
-                                       node=node,
-                                       activation=activation,
-                                       use_bias=use_bias,
-                                       padding=padding,
-                                       name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
-        self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
+        if num_of_filters is not None:
+            self.convLayer = CigtConvLayer(use_boolean_mask_layer=self.useBooleanMaskLayer,
+                                           kernel_size=kernel_size,
+                                           num_of_filters=num_of_filters,
+                                           strides=strides,
+                                           node=node,
+                                           activation=activation,
+                                           use_bias=use_bias,
+                                           padding=padding,
+                                           name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
+            self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2)
+        else:
+            self.convLayer = None
+            self.maxPoolLayer = None
 
         # F Operations - Dense Layers
         self.hiddenLayerDims = hidden_layer_dims
@@ -30,7 +36,8 @@ class LeNetCigtLeafBlock(tf.keras.layers.Layer):
         self.dropoutLayers = []
         self.classificationDropoutProb = classification_dropout_prob
         for hidden_layer_dim in self.hiddenLayerDims:
-            fc_layer = CigtDenseLayer(output_dim=hidden_layer_dim,
+            fc_layer = CigtDenseLayer(use_boolean_mask_layer=self.useBooleanMaskLayer,
+                                      output_dim=hidden_layer_dim,
                                       activation="relu",
                                       node=node,
                                       use_bias=True,
@@ -50,8 +57,11 @@ class LeNetCigtLeafBlock(tf.keras.layers.Layer):
         training = kwargs["training"]
 
         # F ops -  # 1 Conv layer
-        f_net = self.convLayer([f_input, routing_matrix])
-        f_net = self.maxPoolLayer(f_net)
+        if self.convLayer is not None and self.maxPoolLayer is not None:
+            f_net = self.convLayer([f_input, routing_matrix])
+            f_net = self.maxPoolLayer(f_net)
+        else:
+            f_net = tf.identity(f_input)
 
         # F ops - Dense layers
         f_net = self.flattenLayer(f_net)

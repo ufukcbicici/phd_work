@@ -47,9 +47,11 @@ if __name__ == "__main__":
                                  path_counts=FashionNetConstants.path_counts,
                                  bn_momentum=FashionNetConstants.bn_momentum,
                                  warm_up_period=FashionNetConstants.warm_up_period,
-                                 routing_strategy_name="Approximate_Training",
+                                 routing_strategy_name="Approximate_Training_With_Random_Routing_With_Gumbel",
                                  run_id=run_id,
-                                 evaluation_period=1)
+                                 evaluation_period=1,
+                                 use_boolean_mask_routing=True,
+                                 normalize_information_gain=True)
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
         fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf,
