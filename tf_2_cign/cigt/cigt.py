@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import time
+from datetime import datetime
 from auxillary.db_logger import DbLogger
 
 from auxillary.dag_utilities import Dag
@@ -16,7 +17,7 @@ class Cigt(tf.keras.Model):
                  batch_size, input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
                  decision_loss_coeff, routing_strategy_name, warm_up_period,
                  decision_drop_probability, classification_drop_probability,
-                 decision_wd, classification_wd, evaluation_period,
+                 decision_wd, classification_wd, evaluation_period, measurement_start,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.runId = run_id
@@ -29,6 +30,7 @@ class Cigt(tf.keras.Model):
         self.decisionLossCoefficient = decision_loss_coeff
         self.softmaxDecayController = softmax_decay_controller
         self.evaluationPeriod = evaluation_period
+        self.measurementStart = measurement_start
         self.dagObject = Dag()
         self.cigtBlocks = []
         self.rootNode = None
@@ -84,7 +86,7 @@ class Cigt(tf.keras.Model):
                 self.rootNode = node
             last_block = node
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         x = inputs[0]
         y = inputs[1]
@@ -281,8 +283,14 @@ class Cigt(tf.keras.Model):
 
         self.numOfTrainingIterations = 0
         self.numOfTrainingEpochs = 0
+        scoring_start_epoch = epochs - self.measurementStart
+        scores = []
         train_dataset = x
         val_dataset = validation_data
+        kv_rows = []
+        self.add_explanation(name_of_param="Start Time", value=datetime.now(),
+                             explanation="", kv_rows=kv_rows)
+        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         for epoch_id in range(epochs):
             print("Start of epoch:{0}".format(epoch_id))
 
@@ -318,20 +326,31 @@ class Cigt(tf.keras.Model):
                 #     dataset_type="training",
                 #     labels=train_y,
                 #     routing_probability_matrices=results_dict["routing_probabilities"],
-                #     write_to_db=False)
+                #     write_to_db=
+                if self.numOfTrainingIterations == 0:
+                    total_param_count = 0
+                    kv_rows = []
+                    for v in self.trainable_variables:
+                        total_param_count += np.prod(v.get_shape().as_list())
+                    self.add_explanation(name_of_param="Num Of Variables", value=total_param_count,
+                                         explanation="", kv_rows=kv_rows)
+                    DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
+
                 self.numOfTrainingIterations += 1
             self.numOfTrainingEpochs += 1
             if self.numOfTrainingEpochs > self.warmUpPeriod and self.isInWarmUp:
                 self.warmUpFinalIteration = self.numOfTrainingIterations
                 self.isInWarmUp = False
             print("In Warm Up:{0}".format(self.isInWarmUp))
-            if self.numOfTrainingEpochs % self.evaluationPeriod == 0 or self.numOfTrainingEpochs >= epochs - 11:
+            if self.numOfTrainingEpochs % self.evaluationPeriod == 0 or self.numOfTrainingEpochs >= scoring_start_epoch:
                 # Train statistics
                 print("Epoch {0} Train Statistics".format(epoch_id))
                 training_accuracy = self.evaluate(x=train_dataset, epoch_id=epoch_id, dataset_type="training")
                 # Validation / Test statistics
                 print("Epoch {0} Test Statistics".format(epoch_id))
                 test_accuracy = self.evaluate(x=val_dataset, epoch_id=epoch_id, dataset_type="test")
+                if self.numOfTrainingEpochs >= scoring_start_epoch:
+                    scores.append(test_accuracy)
                 DbLogger.write_into_table(
                     rows=[(self.runId,
                            self.numOfTrainingIterations,
@@ -343,6 +362,12 @@ class Cigt(tf.keras.Model):
                            0.0,
                            0.0,
                            "XXX")], table=DbLogger.logsTable)
+        kv_rows = []
+        self.add_explanation(name_of_param="End Time", value=datetime.now(),
+                             explanation="", kv_rows=kv_rows)
+        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
+        mean_score = np.mean(np.array(scores))
+        return mean_score
 
     def evaluate(self,
                  x=None,
@@ -393,25 +418,47 @@ class Cigt(tf.keras.Model):
             write_to_db=True)
         return accuracy
 
-    def get_explanation_string(self):
-        explanation = ""
-        total_param_count = 0
-        for v in self.trainable_variables:
-            total_param_count += np.prod(v.get_shape().as_list())
+    def add_explanation(self, name_of_param, value, explanation, kv_rows):
+        explanation += "{0}:{1}\n".format(name_of_param, value)
+        kv_rows.append((self.runId, name_of_param, "{0}".format(value)))
+        return explanation
 
-        explanation += "Batch Size:{0}\n".format(self.batchSize)
-        explanation += "Path Counts:{0}\n".format(self.pathCounts)
-        explanation += "Routing Strategy:{0}\n".format(self.routingStrategy.__class__)
-        explanation += "Warm Up Period:{0}\n".format(self.warmUpPeriod)
-        explanation += "********Lr Settings********\n"
-        explanation += self.learningRateSchedule.get_explanation()
-        explanation += "********Lr Settings********\n"
-        explanation += "Decision Loss Coeff:{0}\n".format(self.decisionLossCoefficient)
-        explanation += "Batch Norm Decay:{0}\n".format(self.bnMomentum)
-        explanation += "Param Count:{0}\n".format(total_param_count)
-        explanation += "Classification Wd:{0}\n".format(self.classificationWd)
-        explanation += "Decision Wd:{0}\n".format(self.decisionWd)
-        explanation += "Information Gain Balance Coefficient:{0}\n".format(self.informationGainBalanceCoeff)
-        explanation += "Decision Dropout:{0}\n".format(self.decisionDropProbability)
-        explanation += "Classification Dropout:{0}\n".format(self.classificationDropProbability)
+    def get_explanation_string(self):
+        kv_rows = []
+        explanation = ""
+
+        # total_param_count = 0
+        # for v in self.trainable_variables:
+        #     total_param_count += np.prod(v.get_shape().as_list())
+        # explanation = self.add_explanation(name_of_param="Num Of Variables", value=total_param_count,
+        #                                    explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Batch Size", value=self.batchSize,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Path Counts", value=self.pathCounts,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Routing Strategy", value=self.routingStrategy.__class__,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Warm Up Period", value=self.warmUpPeriod,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Lr Settings",
+                                           value=self.learningRateSchedule.get_explanation(),
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Decision Loss Coeff", value=self.decisionLossCoefficient,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Batch Norm Decay", value=self.bnMomentum,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Classification Wd", value=self.classificationWd,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Decision Wd", value=self.decisionWd,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Information Gain Balance Coefficient",
+                                           value=self.informationGainBalanceCoeff,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Decision Dropout",
+                                           value=self.decisionDropProbability,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Classification Dropout",
+                                           value=self.classificationDropProbability,
+                                           explanation=explanation, kv_rows=kv_rows)
+        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         return explanation

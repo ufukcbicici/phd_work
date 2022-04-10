@@ -1,13 +1,13 @@
-from auxillary.path_query import execute_path_query
-import sys
+import tensorflow as tf
 
-print('Number of arguments:', len(sys.argv), 'arguments.')
+from tf_2_cign.entry_points.fashion_cigt_bo_hyperparameter_search import optimize_with_bayesian_optimization
 
-# min_id = sys.argv[1]
-# max_id = sys.argv[2]
+# from auxillary.db_logger import DbLogger
+# from auxillary.general_utility_funcs import UtilityFuncs
+# Hyper-parameters
 
-min_id = 26
-max_id = 29
+if __name__ == "__main__":
+    gpus = tf.config.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(gpus[0], True)
 
-
-execute_path_query(min_id=min_id, max_id=max_id)
+    optimize_with_bayesian_optimization()

@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
+# from auxillary.db_logger import DbLogger
+# from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.db_logger import DbLogger
-from auxillary.general_utility_funcs import UtilityFuncs
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cign import Cign
 from tf_2_cign.cigt.cigt import Cigt
@@ -38,12 +39,11 @@ if __name__ == "__main__":
     #                                                                       classification_dropout_probs,
     #                                                                       decision_dropout_probs])
 
-    info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    # info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
     classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
                                           FashionNetConstants.experiment_factor)
 
-    cartesian_product = UtilityFuncs.get_cartesian_product(list_of_lists=[info_gain_balance_coeffs,
-                                                                          classification_dropout_probs])
+    cartesian_product = Utilities.get_cartesian_product(list_of_lists=[classification_dropout_probs])
     run_id = 0
     for tpl in cartesian_product:
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
@@ -59,8 +59,8 @@ if __name__ == "__main__":
                                                      schedule=[(15000 + 12000, 0.005),
                                                                (30000 + 12000, 0.0025),
                                                                (40000 + 12000, 0.00025)])
-        info_gain_balance_coeff = tpl[0]
-        classification_dropout_prob = tpl[1]
+        # info_gain_balance_coeff = tpl[0]
+        classification_dropout_prob = tpl[0]
         warm_up_period = 25
 
         with tf.device("GPU"):
@@ -76,7 +76,7 @@ if __name__ == "__main__":
                                      classification_wd=0.0,
                                      decision_dimensions=[128, 128],
                                      class_count=10,
-                                     information_gain_balance_coeff=info_gain_balance_coeff,
+                                     information_gain_balance_coeff=1.0,
                                      softmax_decay_controller=softmax_decay_controller,
                                      learning_rate_schedule=learning_rate_calculator,
                                      decision_loss_coeff=1.0,
@@ -85,7 +85,8 @@ if __name__ == "__main__":
                                      warm_up_period=warm_up_period,
                                      routing_strategy_name="Approximate_Training",
                                      run_id=run_id,
-                                     evaluation_period=10)
+                                     evaluation_period=10,
+                                     measurement_start=11)
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
         fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf, epochs=125)

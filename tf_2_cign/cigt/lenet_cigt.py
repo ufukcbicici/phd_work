@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from auxillary.dag_utilities import Dag
+from auxillary.db_logger import DbLogger
 from simple_tf.uncategorized.node import Node
 from tf_2_cign.cigt.cigt import Cigt
 from tf_2_cign.cigt.custom_layers.lenet_cigt_layers.lenet_cigt_inner_block import LeNetCigtInnerBlock
@@ -11,14 +12,14 @@ from tf_2_cign.cigt.custom_layers.lenet_cigt_layers.lenet_cigt_leaf_block import
 class LenetCigt(Cigt):
     def __init__(self, run_id, batch_size, input_dims, filter_counts, kernel_sizes, hidden_layers,
                  decision_drop_probability, classification_drop_probability, decision_wd, classification_wd,
-                 evaluation_period, decision_dimensions, class_count, information_gain_balance_coeff,
+                 evaluation_period, measurement_start, decision_dimensions, class_count, information_gain_balance_coeff,
                  softmax_decay_controller, learning_rate_schedule, decision_loss_coeff, path_counts, bn_momentum,
                  warm_up_period, routing_strategy_name, *args, **kwargs):
 
         super().__init__(run_id, batch_size, input_dims, class_count, path_counts, softmax_decay_controller,
                          learning_rate_schedule, decision_loss_coeff, routing_strategy_name, warm_up_period,
                          decision_drop_probability, classification_drop_probability, decision_wd, classification_wd,
-                         evaluation_period, *args, **kwargs)
+                         evaluation_period, measurement_start, *args, **kwargs)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers
@@ -74,14 +75,21 @@ class LenetCigt(Cigt):
         # self.build(input_shape=[(self.batchSize, *self.inputDims), (self.batchSize, )])
 
     def get_explanation_string(self):
-        explanation = "Lenet CIGT\n"
+        kv_rows = []
+        explanation = ""
+        explanation = self.add_explanation(name_of_param="Network Name",
+                                           value="Lenet CIGT - Bayesian Optimization [2,4]",
+                                           explanation=explanation, kv_rows=kv_rows)
         explanation += super().get_explanation_string()
-        # Fashion CIGN parameters
-        explanation += "tf.function Experiment - WITH call() in tf.function\n"
-        explanation += "filterCounts:{0}\n".format(self.filterCounts)
-        explanation += "kernelSizes:{0}\n".format(self.kernelSizes)
-        explanation += "hiddenLayers:{0}\n".format(self.hiddenLayers)
-        explanation += "decisionDimensions:{0}\n".format(self.decisionDimensions)
+        explanation = self.add_explanation(name_of_param="Filter Counts", value=self.filterCounts,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Kernel Sizes", value=self.kernelSizes,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Hidden Layers", value=self.hiddenLayers,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Decision Dimensions", value=self.decisionDimensions,
+                                           explanation=explanation, kv_rows=kv_rows)
+        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         return explanation
 
         # RL Parameters
