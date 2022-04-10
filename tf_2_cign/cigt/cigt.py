@@ -311,9 +311,9 @@ class Cigt(tf.keras.Model):
                                                      tf.convert_to_tensor(temperature),
                                                      tf.convert_to_tensor(self.isInWarmUp)], training=True)
                 grads = tape.gradient(results_dict["total_loss"], self.trainable_variables)
+                self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
                 t1 = time.time()
                 times_passed.append(t1 - t0)
-                self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
                 print("t1-t0:{0}".format(t1 - t0))
                 # Update metrics
                 self.update_metrics(results_dict=results_dict, labels=train_y)
