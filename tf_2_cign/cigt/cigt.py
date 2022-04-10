@@ -86,7 +86,7 @@ class Cigt(tf.keras.Model):
                 self.rootNode = node
             last_block = node
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         x = inputs[0]
         y = inputs[1]
@@ -293,6 +293,10 @@ class Cigt(tf.keras.Model):
         DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         for epoch_id in range(epochs):
             print("Start of epoch:{0}".format(epoch_id))
+            kv_rows = []
+            self.add_explanation(name_of_param="Start Time Epoch{0}".format(epoch_id), value=datetime.now(),
+                                 explanation="", kv_rows=kv_rows)
+            DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
 
             # Reset all metrics
             for metric in self.metricsDict.values():
@@ -300,24 +304,25 @@ class Cigt(tf.keras.Model):
 
             times_passed = []
             for train_x, train_y in train_dataset:
+                t0 = time.time()
                 if not self.isInWarmUp:
                     decay_t = self.numOfTrainingIterations - self.warmUpFinalIteration
                     self.softmaxDecayController.update(iteration=decay_t)
                 temperature = self.softmaxDecayController.get_value()
 
-                t0 = time.time()
+                t1 = time.time()
                 with tf.GradientTape() as tape:
                     results_dict = self.call(inputs=[train_x, train_y,
                                                      tf.convert_to_tensor(temperature),
                                                      tf.convert_to_tensor(self.isInWarmUp)], training=True)
                 grads = tape.gradient(results_dict["total_loss"], self.trainable_variables)
                 self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
-                t1 = time.time()
-                times_passed.append(t1 - t0)
-                print("t1-t0:{0}".format(t1 - t0))
+                t2 = time.time()
+
                 # Update metrics
                 self.update_metrics(results_dict=results_dict, labels=train_y)
                 print("********** Epoch:{0} Iteration:{1} **********".format(epoch_id, self.numOfTrainingIterations))
+                t3 = time.time()
                 self.report_metrics()
                 # run_id, iteration, dataset_type, routing_matrix, labels
                 # self.calculate_branch_statistics(
@@ -337,6 +342,24 @@ class Cigt(tf.keras.Model):
                     DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
 
                 self.numOfTrainingIterations += 1
+
+                t4 = time.time()
+                times_passed.append(t4 - t0)
+
+                temperature_time = t1 - t0
+                training_call_time = t2 - t1
+                update_metrics_time = t3 - t2
+                report_metrics_time = t4 - t3
+                print("temperature_time:{0}".format(temperature_time))
+                print("training_call_time:{0}".format(training_call_time))
+                print("update_metrics_time:{0}".format(update_metrics_time))
+                print("report_metrics_time:{0}".format(report_metrics_time))
+
+            kv_rows = []
+            self.add_explanation(name_of_param="End Time Epoch{0}".format(epoch_id), value=datetime.now(),
+                                 explanation="", kv_rows=kv_rows)
+            DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
+
             self.numOfTrainingEpochs += 1
             if self.numOfTrainingEpochs > self.warmUpPeriod and self.isInWarmUp:
                 self.warmUpFinalIteration = self.numOfTrainingIterations
