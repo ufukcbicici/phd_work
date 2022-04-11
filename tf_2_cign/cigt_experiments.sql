@@ -32,3 +32,4 @@ WHERE logs_table.RunID IN
 logs_table.RunId = run_meta_data.RunId
 WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Dropout Optimization-1%") AND logs_table.Epoch >= 115
 GROUP BY ClassificationDropout, InformationGainBalanceCoefficient, DecisionLossCoefficient
+--Check after experiment 91 for Dropout=0.05

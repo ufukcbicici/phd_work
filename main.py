@@ -40,9 +40,9 @@ if __name__ == "__main__":
     #                                                                       decision_dropout_probs])
 
     # info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
-    classification_dropout_probs = sorted([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
+    classification_dropout_probs = sorted([0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
                                           FashionNetConstants.experiment_factor)
-
+    # classification_dropout_probs = [0.05]
     cartesian_product = Utilities.get_cartesian_product(list_of_lists=[classification_dropout_probs])
     run_id = 0
     for tpl in cartesian_product:
@@ -86,7 +86,7 @@ if __name__ == "__main__":
                                      routing_strategy_name="Approximate_Training",
                                      run_id=run_id,
                                      evaluation_period=10,
-                                     measurement_start=11)
+                                     measurement_start=25)
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
         fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf, epochs=125)

@@ -318,12 +318,11 @@ class Cigt(tf.keras.Model):
                 grads = tape.gradient(results_dict["total_loss"], self.trainable_variables)
                 self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
                 t2 = time.time()
-
                 # Update metrics
                 self.update_metrics(results_dict=results_dict, labels=train_y)
-                print("********** Epoch:{0} Iteration:{1} **********".format(epoch_id, self.numOfTrainingIterations))
+                # print("********** Epoch:{0} Iteration:{1} **********".format(epoch_id, self.numOfTrainingIterations))
                 t3 = time.time()
-                self.report_metrics()
+                # self.report_metrics()
                 # run_id, iteration, dataset_type, routing_matrix, labels
                 # self.calculate_branch_statistics(
                 #     run_id=self.runId,
@@ -344,16 +343,16 @@ class Cigt(tf.keras.Model):
                 self.numOfTrainingIterations += 1
 
                 t4 = time.time()
-                times_passed.append(t4 - t0)
+                times_passed.append(t2 - t1)
 
                 temperature_time = t1 - t0
                 training_call_time = t2 - t1
                 update_metrics_time = t3 - t2
                 report_metrics_time = t4 - t3
-                print("temperature_time:{0}".format(temperature_time))
-                print("training_call_time:{0}".format(training_call_time))
-                print("update_metrics_time:{0}".format(update_metrics_time))
-                print("report_metrics_time:{0}".format(report_metrics_time))
+                # print("temperature_time:{0}".format(temperature_time))
+                # print("training_call_time:{0}".format(training_call_time))
+                # print("update_metrics_time:{0}".format(update_metrics_time))
+                # print("report_metrics_time:{0}".format(report_metrics_time))
 
             kv_rows = []
             self.add_explanation(name_of_param="End Time Epoch{0}".format(epoch_id), value=datetime.now(),
