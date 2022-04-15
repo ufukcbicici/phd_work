@@ -30,30 +30,36 @@ def cigt_test_function(classification_dropout_probability,
                                                       decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
                                                       decay_period=FashionNetConstants.softmax_decay_period,
                                                       decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
+    learning_rate_calculator = DiscreteParameter(name="lr_calculator",
+                                                 value=0.01,
+                                                 schedule=[(15000 + 12000, 0.005),
+                                                           (30000 + 12000, 0.0025),
+                                                           (40000 + 12000, 0.00025)])
     with tf.device("GPU"):
         run_id = DbLogger.get_run_id()
-        fashion_cigt = LenetCigt(batch_size=FashionNetConstants.batch_size,
-                                 input_dims=FashionNetConstants.input_dims,
-                                 filter_counts=FashionNetConstants.filter_counts,
-                                 kernel_sizes=FashionNetConstants.kernel_sizes,
-                                 hidden_layers=FashionNetConstants.hidden_layers,
-                                 decision_drop_probability=FashionNetConstants.decision_drop_probability,
+        fashion_cigt = LenetCigt(batch_size=125,
+                                 input_dims=(28, 28, 1),
+                                 filter_counts=[32, 64, 128],
+                                 kernel_sizes=[5, 5, 1],
+                                 hidden_layers=[512, 256],
+                                 decision_drop_probability=0.0,
                                  classification_drop_probability=X,
-                                 decision_wd=FashionNetConstants.decision_wd,
-                                 classification_wd=FashionNetConstants.classification_wd,
-                                 decision_dimensions=FashionNetConstants.decision_dimensions,
+                                 decision_wd=0.0,
+                                 classification_wd=0.0,
+                                 decision_dimensions=[128, 128],
                                  class_count=10,
                                  information_gain_balance_coeff=Y,
                                  softmax_decay_controller=softmax_decay_controller,
-                                 learning_rate_schedule=FashionNetConstants.learning_rate_calculator,
+                                 learning_rate_schedule=learning_rate_calculator,
                                  decision_loss_coeff=Z,
-                                 path_counts=FashionNetConstants.path_counts,
-                                 bn_momentum=FashionNetConstants.bn_momentum,
-                                 warm_up_period=FashionNetConstants.warm_up_period,
+                                 path_counts=[2, 4],
+                                 bn_momentum=0.9,
+                                 warm_up_period=25,
                                  routing_strategy_name="Approximate_Training",
                                  run_id=run_id,
                                  evaluation_period=10,
-                                 measurement_start=11)
+                                 measurement_start=25)
+
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
         score = fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf,
@@ -74,7 +80,7 @@ def optimize_with_bayesian_optimization():
     )
 
     optimizer.maximize(
-        n_iter=1000,
-        init_points=300,
+        n_iter=300,
+        init_points=100,
         acq="ei",
         xi=0.01)

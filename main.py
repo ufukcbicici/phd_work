@@ -39,11 +39,12 @@ if __name__ == "__main__":
     #                                                                       classification_dropout_probs,
     #                                                                       decision_dropout_probs])
 
-    # info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
-    classification_dropout_probs = sorted([0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] *
-                                          FashionNetConstants.experiment_factor)
+    #
+    classification_dropout_probs = sorted([0.2, 0.35] * FashionNetConstants.experiment_factor)
+    info_gain_balance_coeffs = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
     # classification_dropout_probs = [0.05]
-    cartesian_product = Utilities.get_cartesian_product(list_of_lists=[classification_dropout_probs])
+    cartesian_product = Utilities.get_cartesian_product(list_of_lists=[classification_dropout_probs,
+                                                                       info_gain_balance_coeffs])
     run_id = 0
     for tpl in cartesian_product:
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
@@ -59,8 +60,8 @@ if __name__ == "__main__":
                                                      schedule=[(15000 + 12000, 0.005),
                                                                (30000 + 12000, 0.0025),
                                                                (40000 + 12000, 0.00025)])
-        # info_gain_balance_coeff = tpl[0]
         classification_dropout_prob = tpl[0]
+        info_gain_balance_coeff = tpl[1]
         warm_up_period = 25
 
         with tf.device("GPU"):
@@ -76,7 +77,7 @@ if __name__ == "__main__":
                                      classification_wd=0.0,
                                      decision_dimensions=[128, 128],
                                      class_count=10,
-                                     information_gain_balance_coeff=1.0,
+                                     information_gain_balance_coeff=info_gain_balance_coeff,
                                      softmax_decay_controller=softmax_decay_controller,
                                      learning_rate_schedule=learning_rate_calculator,
                                      decision_loss_coeff=1.0,
