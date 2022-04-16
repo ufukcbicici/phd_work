@@ -86,7 +86,7 @@ class Cigt(tf.keras.Model):
                 self.rootNode = node
             last_block = node
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         x = inputs[0]
         y = inputs[1]
