@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
 from bayes_opt import BayesianOptimization
-
+from bayes_opt.logger import JSONLogger
+from bayes_opt.event import Events
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cign import Cign
@@ -78,6 +79,9 @@ def optimize_with_bayesian_optimization():
         f=cigt_test_function,
         pbounds=pbounds
     )
+
+    logger = JSONLogger(path="./bo_logs.json")
+    optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
 
     optimizer.maximize(
         n_iter=300,
