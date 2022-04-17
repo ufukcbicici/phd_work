@@ -388,7 +388,9 @@ class Cigt(tf.keras.Model):
         self.add_explanation(name_of_param="End Time", value=datetime.now(),
                              explanation="", kv_rows=kv_rows)
         DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
-        mean_score = np.mean(np.array(scores))
+        print(scores)
+        print(scores[-10:])
+        mean_score = np.mean(np.array(scores[-10:]))
         return mean_score
 
     def evaluate(self,

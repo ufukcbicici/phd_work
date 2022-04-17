@@ -28,7 +28,7 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # TETAM CIGT
-    log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
+    # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
 
     # TETAM CIGT 2
     # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
@@ -43,7 +43,8 @@ class DbLogger:
     # log_db_path = "/cta/users/ucbicici/phd_work/dblogger3.db"
 
     # Lab
-    # log_db_path = "C://Users//ufuk.bicici//Desktop//phd_work//phd_work//simple_tf//dblogger3.db"
+    log_db_path = "C://Users//munu_.DESKTOP-5DFQOJ6//phd_work//dblogger.db"
+    # C:\Users\munu_.DESKTOP-5DFQOJ6\phd_work
 
     # Home
     # log_db_path = "D://phd_work//simple_tf//dblogger.db"

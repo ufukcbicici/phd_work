@@ -25,6 +25,7 @@ def cigt_test_function(classification_dropout_probability,
     X = classification_dropout_probability
     Y = information_gain_balance_coefficient
     Z = decision_loss_coefficient
+
     fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
     softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
                                                       initial_value=FashionNetConstants.softmax_decay_initial,
@@ -77,10 +78,11 @@ def optimize_with_bayesian_optimization():
 
     optimizer = BayesianOptimization(
         f=cigt_test_function,
-        pbounds=pbounds
+        pbounds=pbounds,
+        verbose=10
     )
 
-    logger = JSONLogger(path="./bo_logs.json")
+    logger = JSONLogger(path="bo_logs.json")
     optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
 
     optimizer.maximize(
