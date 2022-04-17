@@ -50,7 +50,7 @@ class DbLogger:
     # log_db_path = "D://phd_work//simple_tf//dblogger.db"
 
     # Home ASUS
-    # log_db_path = "C://Users//asus//Desktop//phd_work//dblogger.db"
+    log_db_path = "C://Users//asus//Desktop//phd_work//dblogger.db"
 
     # Idea GPU
     # log_db_path = "C://Users//ufuk.bicici.IDEATEKNOLOJI//Desktop//phd_work//simple_tf//dblogger.db"
