@@ -1,2 +1,4 @@
 Kullanıcı Adı: ubicici
 Şifreniz: xclhb4d2
+IP: 172.16.7.1
+Port: 22

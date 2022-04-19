@@ -3,4 +3,6 @@
 │password: lieNaef3
 │host: 193.140.196.49
 │port: 37822
+ Tuna: hmeral
+ Tuna: 3aFbnS5P
 ╰─────
