@@ -2,3 +2,9 @@ Kullanıcı Adı: ubicici
 Şifreniz: xclhb4d2
 IP: 172.16.7.1
 Port: 22
+
+
+conda install -c anaconda tensorflow-gpu
+conda install -c anaconda scikit-learn
+conda install -c anaconda networkx
+conda install -c conda-forge tqdm
