@@ -28,7 +28,7 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # TETAM CIGT
-    # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
+    log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
 
     # TETAM CIGT 2
     # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
@@ -80,7 +80,7 @@ class DbLogger:
     # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger6_cign.db"
 
     # TRUBA MY
-    log_db_path = "/truba/home/seberger/main/repo/phd_work/cigt_logger.db"
+    # log_db_path = "/truba/home/seberger/main/repo/phd_work/cigt_logger.db"
 
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')

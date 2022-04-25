@@ -40,11 +40,14 @@ if __name__ == "__main__":
     #                                                                       decision_dropout_probs])
 
     #
-    classification_dropout_probs = sorted([0.2, 0.35] * FashionNetConstants.experiment_factor)
-    info_gain_balance_coeffs = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    classification_dropout_probs = [0.35] * FashionNetConstants.experiment_factor
+    info_gain_balance_coeffs = [2.0]
+    decision_loss_coeffs = [0.0, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    # 994887500405312|0.921634499430656|0.35|2.0|1.0|200
     # classification_dropout_probs = [0.05]
     cartesian_product = Utilities.get_cartesian_product(list_of_lists=[classification_dropout_probs,
-                                                                       info_gain_balance_coeffs])
+                                                                       info_gain_balance_coeffs,
+                                                                       decision_loss_coeffs])
     run_id = 0
     for tpl in cartesian_product:
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
@@ -62,6 +65,7 @@ if __name__ == "__main__":
                                                                (40000 + 12000, 0.00025)])
         classification_dropout_prob = tpl[0]
         info_gain_balance_coeff = tpl[1]
+        decision_loss_coeff = tpl[2]
         warm_up_period = 25
 
         with tf.device("GPU"):
@@ -80,7 +84,7 @@ if __name__ == "__main__":
                                      information_gain_balance_coeff=info_gain_balance_coeff,
                                      softmax_decay_controller=softmax_decay_controller,
                                      learning_rate_schedule=learning_rate_calculator,
-                                     decision_loss_coeff=1.0,
+                                     decision_loss_coeff=decision_loss_coeff,
                                      path_counts=[2, 4],
                                      bn_momentum=0.9,
                                      warm_up_period=warm_up_period,

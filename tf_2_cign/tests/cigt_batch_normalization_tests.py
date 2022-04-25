@@ -5,6 +5,9 @@ import tensorflow as tf
 
 from tf_2_cign.cigt.custom_layers.cigt_batch_normalization import CigtBatchNormalization
 from tf_2_cign.cigt.custom_layers.cigt_masking_layer import CigtMaskingLayer
+from tf_2_cign.cigt.custom_layers.cigt_probabilistic_batch_normalization import CigtProbabilisticBatchNormalization
+from tf_2_cign.utilities.utilities import Utilities
+from tqdm import tqdm
 
 gpus = tf.config.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(gpus[0], True)
@@ -63,6 +66,14 @@ class CigtBatchNormTests(unittest.TestCase):
         cigt_normed_net = cigt_batch_normalization([op_layer_output, routing_matrix])
         cigt_masking_layer = CigtMaskingLayer()
         cigt_normed_net = cigt_masking_layer([cigt_normed_net, routing_matrix])
+        # Probabilistic Cigt route
+        cigt_probabilistic_batch_normalization = CigtProbabilisticBatchNormalization(
+            momentum=momentum, epsilon=epsilon, name="cigt_probabilistic", start_moving_averages_from_zero=True)
+        cigt_probabilistic_normed_net = cigt_probabilistic_batch_normalization([op_layer_output, routing_matrix])
+        cigt_probabilistic_masking_layer = CigtMaskingLayer()
+        cigt_probabilistic_normed_net = cigt_probabilistic_masking_layer([cigt_probabilistic_normed_net,
+                                                                          routing_matrix])
+
         # A separate batch normalization operation for every route
         list_of_conventional_batch_norms = []
         list_of_non_zero_indices = []
@@ -112,6 +123,7 @@ class CigtBatchNormTests(unittest.TestCase):
                                outputs={
                                    "op_layer_output": op_layer_output,
                                    "cigt_normed_net": cigt_normed_net,
+                                   "cigt_probabilistic_normed_net": cigt_probabilistic_normed_net,
                                    "list_of_route_x": list_of_route_x,
                                    "list_of_conventional_batch_norms_after_scatter_nd":
                                        list_of_conventional_batch_norms_after_scatter_nd,
@@ -152,6 +164,7 @@ class CigtBatchNormTests(unittest.TestCase):
 
     def compare_cigt_output_with_conventional_bn_output(self, output_dict):
         cigt_normed_net_res = output_dict["cigt_normed_net"].numpy()
+        cigt_probabilistic_net_res = output_dict["cigt_probabilistic_normed_net"].numpy()
         conventional_normed_net_res = output_dict["conventional_normed_net"].numpy()
         diff_matrix_1 = np.abs(cigt_normed_net_res - conventional_normed_net_res)
         max_diff = np.max(diff_matrix_1)
@@ -165,7 +178,11 @@ class CigtBatchNormTests(unittest.TestCase):
         is_close_matrix = np.isclose(cigt_normed_net_res, conventional_normed_net_res,
                                      atol=self.ABSOLUTE_ERROR_TOLERANCE,
                                      rtol=self.RELATIVE_ERROR_TOLERANCE)
+        is_close_with_probabilistic_version_matrix = np.isclose(cigt_normed_net_res, cigt_probabilistic_net_res,
+                                                                atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                                rtol=self.RELATIVE_ERROR_TOLERANCE)
         self.assertTrue(np.all(is_close_matrix))
+        self.assertTrue(np.all(is_close_with_probabilistic_version_matrix))
 
     def update_batch_norm_parameters(self, cigt_value, conventional_value,
                                      model, parameter_name):
@@ -307,6 +324,59 @@ class CigtBatchNormTests(unittest.TestCase):
                     self.LARGEST_MOVING_MEAN_DIFF_PAIR = None
                     self.LARGEST_MOVING_VAR_DIFF = 0.0
                     self.LARGEST_MOVING_VAR_DIFF_PAIR = None
+
+    def test_joint_probability_calculation(self):
+        momentum = 0.9
+        epsilon = 1e-5
+        cigt_probabilistic_batch_normalization_layer = CigtProbabilisticBatchNormalization(
+            momentum=momentum, epsilon=epsilon,
+            start_moving_averages_from_zero=False)
+
+        experiment_count = 1
+        input_shapes = [(128, 4, 4, 64), (128, 16, 16, 64),
+                        (125, 7, 7, 128), (120, 1, 1, 512), (125, 64), (128, 256)]
+        route_counts = [1, 2, 4, 16, 32]
+        matrix_types = ["one_hot", "probability"]
+        for exp_id in range(experiment_count):
+            cartesian_product = Utilities.get_cartesian_product(list_of_lists=[input_shapes,
+                                                                               route_counts, matrix_types])
+            pbar = tqdm(cartesian_product)
+            for tpl in pbar:
+                input_shape = tpl[0]
+                route_count = tpl[1]
+                matrix_type = tpl[2]
+                pbar.set_postfix({'Current Tuple': "({0},{1},{2})".format(input_shape, route_count, matrix_type)})
+                batch_size = input_shape[0]
+                channel_count = input_shape[-1]
+                channels_per_route = channel_count // route_count
+                x_ = np.random.uniform(size=input_shape)
+                route_activations = np.random.uniform(size=(batch_size, route_count))
+                if matrix_type == "one_hot":
+                    arg_max_indices = np.argmax(route_activations, axis=1)
+                    routing_matrix = np.zeros_like(route_activations)
+                    routing_matrix[np.arange(routing_matrix.shape[0]), arg_max_indices] = 1.0
+                else:
+                    normalizing_constants = np.sum(route_activations, axis=1)
+                    routing_matrix = route_activations * np.reciprocal(normalizing_constants)[:, np.newaxis]
+                # Manual joint probability calculation
+                manual_joint_probability = np.zeros_like(x_)
+                it = np.nditer(x_, flags=['multi_index'])
+                for _ in it:
+                    sample_id = it.multi_index[0]
+                    channel_id = it.multi_index[-1]
+                    route_id = channel_id // channels_per_route
+                    population_count = np.prod(x_.shape[1:-1])
+                    p_s = 1.0 / batch_size
+                    p_r_given_s = routing_matrix[sample_id, route_id]
+                    p_ch_given_r = 1.0 / channels_per_route
+                    p_c_given_ch = 1.0 / population_count
+                    p_srchc = p_s * p_r_given_s * p_ch_given_r * p_c_given_ch
+                    manual_joint_probability[it.multi_index] = p_srchc
+                tf_joint_probabilities_s_r_ch_c, tf_marginal_probabilities_r_ch = \
+                    cigt_probabilistic_batch_normalization_layer.calculate_joint_probabilities(
+                        x_=tf.convert_to_tensor(x_, dtype=tf.float32),
+                        routing_matrix=tf.convert_to_tensor(routing_matrix, dtype=tf.float32))
+                self.assertTrue(np.allclose(tf_joint_probabilities_s_r_ch_c.numpy(), manual_joint_probability))
 
 
 if __name__ == '__main__':
