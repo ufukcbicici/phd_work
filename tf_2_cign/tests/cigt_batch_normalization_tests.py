@@ -109,12 +109,14 @@ class CigtBatchNormTests(unittest.TestCase):
 
         if model_type == "conv":
             normed_1d_layer = tf.keras.layers.GlobalAveragePooling2D()(cigt_normed_net)
+            normed_1d_probabilistic_layer = tf.keras.layers.GlobalAveragePooling2D()(cigt_probabilistic_normed_net)
             conventional_normed_1d_layer = tf.keras.layers.GlobalAveragePooling2D()(conventional_normed_net)
         else:
             normed_1d_layer = tf.identity(cigt_normed_net)
+            normed_1d_probabilistic_layer = tf.identity(cigt_probabilistic_normed_net)
             conventional_normed_1d_layer = tf.identity(conventional_normed_net)
 
-        final_layer = (1.0 / 2.0) * (normed_1d_layer + conventional_normed_1d_layer)
+        final_layer = (1.0 / 3.0) * (normed_1d_layer + normed_1d_probabilistic_layer + conventional_normed_1d_layer)
         y_hat = tf.reduce_mean(final_layer, axis=-1)
         y_gt = target_val * tf.ones_like(y_hat)
         loss = tf.keras.losses.mean_squared_error(y_gt, y_hat)
@@ -184,16 +186,23 @@ class CigtBatchNormTests(unittest.TestCase):
         self.assertTrue(np.all(is_close_matrix))
         self.assertTrue(np.all(is_close_with_probabilistic_version_matrix))
 
-    def update_batch_norm_parameters(self, cigt_value, conventional_value,
+    def update_batch_norm_parameters(self, cigt_value, cigt_probabilistic_value, conventional_value,
                                      model, parameter_name):
-        shared_value = 0.5 * (cigt_value + conventional_value)
+        shared_value = (1.0 / 3.0) * (cigt_value + cigt_probabilistic_value + conventional_value)
         if parameter_name == "gamma":
-            cigt_variable = self.get_cigt_variable(model=model, var_name="wb_gamma", return_numpy=False)
+            cigt_variable = self.get_cigt_variable(model=model, var_name="cigt/wb_gamma", return_numpy=False)
+            cigt_probabilistic_variable = self.get_cigt_variable(model=model,
+                                                                 var_name="cigt_probabilistic/wb_gamma",
+                                                                 return_numpy=False)
         elif parameter_name == "beta":
-            cigt_variable = self.get_cigt_variable(model=model, var_name="wb_beta", return_numpy=False)
+            cigt_variable = self.get_cigt_variable(model=model, var_name="cigt/wb_beta", return_numpy=False)
+            cigt_probabilistic_variable = self.get_cigt_variable(model=model,
+                                                                 var_name="cigt_probabilistic/wb_beta",
+                                                                 return_numpy=False)
         else:
             raise NotImplementedError()
         cigt_variable.assign(shared_value)
+        cigt_probabilistic_variable.assign(shared_value)
 
         conventional_vars = [v for v in model.variables if parameter_name
                              in v.name and "conventional_batch_norm" in v.name]
@@ -266,8 +275,13 @@ class CigtBatchNormTests(unittest.TestCase):
 
                         # Compare scale and location parameters between cigt batch norm
                         # and conventional batch norm: gamma and beta
-                        cigt_gamma = self.get_cigt_variable(model=model, var_name="wb_gamma")
-                        cigt_beta = self.get_cigt_variable(model=model, var_name="wb_beta")
+                        cigt_gamma = self.get_cigt_variable(model=model, var_name="cigt/wb_gamma")
+                        cigt_beta = self.get_cigt_variable(model=model, var_name="cigt/wb_beta")
+                        cigt_probabilistic_gamma = self.get_cigt_variable(model=model,
+                                                                          var_name="cigt_probabilistic/wb_gamma")
+                        cigt_probabilistic_beta = self.get_cigt_variable(model=model,
+                                                                         var_name="cigt_probabilistic/wb_beta")
+
                         conventional_gamma = self.get_conventional_batch_norm_variable(model=model, var_name="gamma")
                         conventional_beta = self.get_conventional_batch_norm_variable(model=model, var_name="beta")
                         self.assertTrue(np.allclose(cigt_gamma, conventional_gamma,
@@ -276,10 +290,26 @@ class CigtBatchNormTests(unittest.TestCase):
                         self.assertTrue(np.allclose(cigt_beta, conventional_beta,
                                                     atol=self.ABSOLUTE_ERROR_TOLERANCE,
                                                     rtol=self.RELATIVE_ERROR_TOLERANCE))
+                        self.assertTrue(np.allclose(cigt_probabilistic_gamma, conventional_gamma,
+                                                    atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                    rtol=self.RELATIVE_ERROR_TOLERANCE))
+                        self.assertTrue(np.allclose(cigt_probabilistic_beta, conventional_beta,
+                                                    atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                    rtol=self.RELATIVE_ERROR_TOLERANCE))
+                        self.assertTrue(np.allclose(cigt_probabilistic_gamma, cigt_gamma,
+                                                    atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                    rtol=self.RELATIVE_ERROR_TOLERANCE))
+                        self.assertTrue(np.allclose(cigt_probabilistic_beta, cigt_beta,
+                                                    atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                    rtol=self.RELATIVE_ERROR_TOLERANCE))
 
                         # Compare population statistics
-                        cigt_moving_mean = self.get_cigt_variable(model=model, var_name="popMean")
-                        cigt_moving_var = self.get_cigt_variable(model=model, var_name="popVar")
+                        cigt_moving_mean = self.get_cigt_variable(model=model, var_name="cigt/popMean")
+                        cigt_moving_var = self.get_cigt_variable(model=model, var_name="cigt/popVar")
+                        cigt_probabilistic_moving_mean = self.get_cigt_variable(model=model,
+                                                                                var_name="cigt_probabilistic/popMean")
+                        cigt_probabilistic_moving_var = self.get_cigt_variable(model=model,
+                                                                               var_name="cigt_probabilistic/popVar")
                         conventional_moving_mean = self.get_conventional_batch_norm_variable(model=model,
                                                                                              var_name="moving_mean")
                         conventional_moving_var = self.get_conventional_batch_norm_variable(model=model,
@@ -287,27 +317,50 @@ class CigtBatchNormTests(unittest.TestCase):
                         self.assertTrue(np.allclose(cigt_moving_mean, conventional_moving_mean,
                                                     atol=self.ABSOLUTE_ERROR_TOLERANCE,
                                                     rtol=self.RELATIVE_ERROR_TOLERANCE))
-                        max_diff_mean = np.max(np.abs(cigt_moving_mean - conventional_moving_mean))
+                        self.assertTrue(np.allclose(cigt_moving_mean, cigt_probabilistic_moving_mean,
+                                                    atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                    rtol=self.RELATIVE_ERROR_TOLERANCE))
+                        self.assertTrue(np.allclose(cigt_probabilistic_moving_mean, conventional_moving_mean,
+                                                    atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                    rtol=self.RELATIVE_ERROR_TOLERANCE))
+
+                        max_diff_mean = \
+                            np.max([
+                                np.max(np.abs(cigt_moving_mean - conventional_moving_mean)),
+                                np.max(np.abs(cigt_moving_mean - cigt_probabilistic_moving_mean)),
+                                np.max(np.abs(cigt_probabilistic_moving_mean - conventional_moving_mean))])
                         if max_diff_mean > self.LARGEST_MOVING_MEAN_DIFF:
                             self.LARGEST_MOVING_MEAN_DIFF = max_diff_mean
-                            self.LARGEST_MOVING_MEAN_DIFF_PAIR = (cigt_moving_mean, conventional_moving_mean)
+                            # self.LARGEST_MOVING_MEAN_DIFF_PAIR = (cigt_moving_mean, conventional_moving_mean)
                             print("Iteration:{0} LARGEST_MOVING_MEAN_DIFF:{1}".format(i, max_diff_mean))
-                        max_diff_var = np.max(np.abs(cigt_moving_var - conventional_moving_var))
+                        max_diff_var = \
+                            np.max([
+                                np.max(np.abs(cigt_moving_var - conventional_moving_var)),
+                                np.max(np.abs(cigt_moving_var - cigt_probabilistic_moving_var)),
+                                np.max(np.abs(cigt_probabilistic_moving_var - conventional_moving_var))])
                         if max_diff_var > self.LARGEST_MOVING_VAR_DIFF:
                             self.LARGEST_MOVING_VAR_DIFF = max_diff_var
-                            self.LARGEST_MOVING_VAR_DIFF_PAIR = (cigt_moving_var, conventional_moving_var)
+                            # self.LARGEST_MOVING_VAR_DIFF_PAIR = (cigt_moving_var, conventional_moving_var)
                             print("Iteration:{0} LARGEST_MOVING_VAR_DIFF:{1}".format(i, max_diff_var))
 
                         self.assertTrue(np.allclose(cigt_moving_var, conventional_moving_var,
                                                     atol=self.ABSOLUTE_ERROR_TOLERANCE,
                                                     rtol=self.RELATIVE_ERROR_TOLERANCE))
+                        self.assertTrue(np.allclose(cigt_moving_var, cigt_probabilistic_moving_var,
+                                                    atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                    rtol=self.RELATIVE_ERROR_TOLERANCE))
+                        self.assertTrue(np.allclose(cigt_probabilistic_moving_var, conventional_moving_var,
+                                                    atol=self.ABSOLUTE_ERROR_TOLERANCE,
+                                                    rtol=self.RELATIVE_ERROR_TOLERANCE))
 
                         # Set cigt and conventional moving statistics to the same value.
                         self.update_batch_norm_parameters(cigt_value=cigt_gamma,
+                                                          cigt_probabilistic_value=cigt_probabilistic_gamma,
                                                           conventional_value=conventional_gamma,
                                                           model=model,
                                                           parameter_name="gamma")
                         self.update_batch_norm_parameters(cigt_value=cigt_beta,
+                                                          cigt_probabilistic_value=cigt_probabilistic_beta,
                                                           conventional_value=conventional_beta,
                                                           model=model,
                                                           parameter_name="beta")
@@ -325,6 +378,7 @@ class CigtBatchNormTests(unittest.TestCase):
                     self.LARGEST_MOVING_VAR_DIFF = 0.0
                     self.LARGEST_MOVING_VAR_DIFF_PAIR = None
 
+    @unittest.skip
     def test_joint_probability_calculation(self):
         momentum = 0.9
         epsilon = 1e-5

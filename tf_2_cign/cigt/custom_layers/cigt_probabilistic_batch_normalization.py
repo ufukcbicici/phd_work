@@ -17,7 +17,7 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
         self.epsilon = epsilon
         self.startMovingAveragesFromZero = start_moving_averages_from_zero
 
-    @tf.function
+    # @tf.function
     def calculate_joint_probabilities(self, x_, routing_matrix):
         num_routes = tf.shape(routing_matrix)[-1]
         route_width = tf.shape(x_)[-1] // num_routes
@@ -32,7 +32,7 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
         route_probabilities = tf.repeat(routing_matrix, repeats=repeat_array, axis=-1)
         for i in range(len(x_.get_shape()) - 2):
             route_probabilities = tf.expand_dims(route_probabilities, axis=1)
-        joint_probabilities_s_r_ch_c = joint_probabilities_s_r_ch_c * route_probabilities
+        joint_probabilities_s_r_ch_c = joint_probabilities_s_r_ch_c * tf.cast(route_probabilities, dtype=tf.float32)
         # Step 3): Calculate channel probabilities given a route p(ch|r) = (1.0 / route_width)
         joint_probabilities_s_r_ch_c = (1.0 / tf.cast(route_width, dtype=tf.float32)) * joint_probabilities_s_r_ch_c
         # Step 4): Probability of an entry in the feature map p(c|ch) = (1.0 / population_count)
@@ -41,7 +41,7 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
                                                     [idx for idx in range(len(x_.get_shape()) - 1)])
         return joint_probabilities_s_r_ch_c, marginal_probabilities_r_ch
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         x_ = inputs[0]
         routing_matrix = inputs[1]
