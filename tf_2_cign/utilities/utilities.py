@@ -196,6 +196,15 @@ class Utilities:
                 dict_destination[k].append(arr)
 
     @staticmethod
+    def discretize_value(sampled_value, interval_start, interval_end, discrete_values):
+        sorted_values = sorted(discrete_values)
+        interval_length = interval_end - interval_start
+        step_length = interval_length / len(discrete_values)
+        interval_id = int((sampled_value - interval_start) / step_length)
+        discretized_value = sorted_values[interval_id]
+        return discretized_value
+
+    @staticmethod
     def concatenate_dict_of_arrays(dict_, axis):
         for k in dict_.keys():
             dict_[k] = np.concatenate(dict_[k], axis=axis)
