@@ -200,7 +200,7 @@ class Utilities:
         sorted_values = sorted(discrete_values)
         interval_length = interval_end - interval_start
         step_length = interval_length / len(discrete_values)
-        interval_id = int((sampled_value - interval_start) / step_length)
+        interval_id = min(int((sampled_value - interval_start) / step_length), len(sorted_values) - 1)
         discretized_value = sorted_values[interval_id]
         return discretized_value
 

@@ -378,8 +378,8 @@ class CigtBatchNormTests(unittest.TestCase):
                     self.LARGEST_MOVING_VAR_DIFF = 0.0
                     self.LARGEST_MOVING_VAR_DIFF_PAIR = None
 
-    @unittest.skip
-    def test_joint_probability_calculation(self):
+    # @unittest.skip
+    def test_joint_probability_calculation_and_probabilistic_cigt_batch_norm(self):
         momentum = 0.9
         epsilon = 1e-5
         cigt_probabilistic_batch_normalization_layer = CigtProbabilisticBatchNormalization(
