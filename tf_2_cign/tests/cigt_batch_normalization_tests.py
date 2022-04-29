@@ -212,7 +212,7 @@ class CigtBatchNormTests(unittest.TestCase):
             arr_route = shared_value[rid * self.ROUTE_WIDTH:(rid + 1) * self.ROUTE_WIDTH]
             conventional_vars[rid].assign(arr_route)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cigt_batch_norm_layer(self):
         with tf.device("GPU"):
             momentum = 0.9
@@ -386,23 +386,36 @@ class CigtBatchNormTests(unittest.TestCase):
             momentum=momentum, epsilon=epsilon,
             start_moving_averages_from_zero=False)
 
-        experiment_count = 1
+        experiment_count = 1000
         input_shapes = [(128, 4, 4, 64), (128, 16, 16, 64),
                         (125, 7, 7, 128), (120, 1, 1, 512), (125, 64), (128, 256)]
         route_counts = [1, 2, 4, 16, 32]
         matrix_types = ["one_hot", "probability"]
-        for exp_id in range(experiment_count):
-            cartesian_product = Utilities.get_cartesian_product(list_of_lists=[input_shapes,
-                                                                               route_counts, matrix_types])
-            pbar = tqdm(cartesian_product)
-            for tpl in pbar:
-                input_shape = tpl[0]
-                route_count = tpl[1]
-                matrix_type = tpl[2]
-                pbar.set_postfix({'Current Tuple': "({0},{1},{2})".format(input_shape, route_count, matrix_type)})
-                batch_size = input_shape[0]
-                channel_count = input_shape[-1]
-                channels_per_route = channel_count // route_count
+        cartesian_product = Utilities.get_cartesian_product(list_of_lists=[input_shapes, route_counts, matrix_types])
+        pbar = tqdm(cartesian_product)
+        for tpl in pbar:
+            input_shape = tpl[0]
+            route_count = tpl[1]
+            matrix_type = tpl[2]
+            pbar.set_postfix({'Current Tuple': "({0},{1},{2})".format(input_shape, route_count, matrix_type)})
+            batch_size = input_shape[0]
+            channel_count = input_shape[-1]
+            channels_per_route = channel_count // route_count
+            i_x = tf.keras.Input(shape=input_shape[1:])
+            tf_routing_matrix = tf.keras.Input(shape=(route_count,))
+            cigt_probabilistic_batch_normalization = CigtProbabilisticBatchNormalization(
+                momentum=momentum, epsilon=epsilon, name="cigt_probabilistic")
+            cigt_probabilistic_normed_net = cigt_probabilistic_batch_normalization([i_x, tf_routing_matrix])
+            tf_joint_probabilities_s_r_ch_c, tf_marginal_probabilities_r_ch = \
+                cigt_probabilistic_batch_normalization_layer.calculate_joint_probabilities(
+                    x_=i_x, routing_matrix=tf_routing_matrix)
+            model = tf.keras.Model(inputs=[i_x, tf_routing_matrix], outputs={
+                "cigt_probabilistic_normed_net": cigt_probabilistic_normed_net,
+                "tf_joint_probabilities_s_r_ch_c": tf_joint_probabilities_s_r_ch_c,
+                "tf_marginal_probabilities_r_ch": tf_marginal_probabilities_r_ch})
+            moving_mean = np.zeros(shape=(input_shape[-1],))
+            moving_var = np.zeros(shape=(input_shape[-1],))
+            for exp_id in range(experiment_count):
                 x_ = np.random.uniform(size=input_shape)
                 route_activations = np.random.uniform(size=(batch_size, route_count))
                 if matrix_type == "one_hot":
@@ -412,25 +425,47 @@ class CigtBatchNormTests(unittest.TestCase):
                 else:
                     normalizing_constants = np.sum(route_activations, axis=1)
                     routing_matrix = route_activations * np.reciprocal(normalizing_constants)[:, np.newaxis]
-                # Manual joint probability calculation
-                manual_joint_probability = np.zeros_like(x_)
-                it = np.nditer(x_, flags=['multi_index'])
-                for _ in it:
-                    sample_id = it.multi_index[0]
-                    channel_id = it.multi_index[-1]
-                    route_id = channel_id // channels_per_route
-                    population_count = np.prod(x_.shape[1:-1])
-                    p_s = 1.0 / batch_size
-                    p_r_given_s = routing_matrix[sample_id, route_id]
-                    p_ch_given_r = 1.0 / channels_per_route
-                    p_c_given_ch = 1.0 / population_count
-                    p_srchc = p_s * p_r_given_s * p_ch_given_r * p_c_given_ch
-                    manual_joint_probability[it.multi_index] = p_srchc
-                tf_joint_probabilities_s_r_ch_c, tf_marginal_probabilities_r_ch = \
-                    cigt_probabilistic_batch_normalization_layer.calculate_joint_probabilities(
-                        x_=tf.convert_to_tensor(x_, dtype=tf.float32),
-                        routing_matrix=tf.convert_to_tensor(routing_matrix, dtype=tf.float32))
-                self.assertTrue(np.allclose(tf_joint_probabilities_s_r_ch_c.numpy(), manual_joint_probability))
+                model_output = model([x_, routing_matrix])
+                # Joint probability calculation
+                routing_matrix_extended = np.repeat(routing_matrix, repeats=[channels_per_route] * route_count, axis=-1)
+                for _ in range(len(input_shape) - 2):
+                    routing_matrix_extended = np.expand_dims(routing_matrix_extended, axis=1)
+                p_s = (1.0 / batch_size) * np.ones_like(x_)
+                p_r_given_s = routing_matrix_extended
+                p_ch = (1.0 / channels_per_route) * np.ones_like(x_)
+                p_c = (1.0 / np.prod(input_shape[1:-1])) * np.ones_like(x_)
+                p_c_r_ch_c = p_s * p_r_given_s * p_ch * p_c
+                self.assertTrue(np.allclose(model_output["tf_joint_probabilities_s_r_ch_c"].numpy(), p_c_r_ch_c))
+                mean_manual = np.sum(p_c_r_ch_c * x_, axis=[i_ for i_ in range(len(input_shape) - 1)])
+                for _ in range(len(input_shape) - 1):
+                    mean_manual = np.expand_dims(mean_manual, axis=0)
+                x_mean_zero = x_ - mean_manual
+                var_manual = np.sum(p_c_r_ch_c * np.sqrt(x_mean_zero), axis=[i_ for i_ in range(len(input_shape) - 1)])
+                for _ in range(len(input_shape) - 1):
+                    var_manual = np.expand_dims(var_manual, axis=0)
+                x_hat = x_mean_zero * np.reciprocal(var_manual)
+                self.assertTrue(model_output["cigt_probabilistic_normed_net"].numpy(), x_hat)
+
+
+            # # Manual joint probability calculation
+            # manual_joint_probability = np.zeros_like(x_)
+            # it = np.nditer(x_, flags=['multi_index'])
+            # for _ in it:
+            #     sample_id = it.multi_index[0]
+            #     channel_id = it.multi_index[-1]
+            #     route_id = channel_id // channels_per_route
+            #     population_count = np.prod(x_.shape[1:-1])
+            #     p_s = 1.0 / batch_size
+            #     p_r_given_s = routing_matrix[sample_id, route_id]
+            #     p_ch_given_r = 1.0 / channels_per_route
+            #     p_c_given_ch = 1.0 / population_count
+            #     p_srchc = p_s * p_r_given_s * p_ch_given_r * p_c_given_ch
+            #     manual_joint_probability[it.multi_index] = p_srchc
+            # tf_joint_probabilities_s_r_ch_c, tf_marginal_probabilities_r_ch = \
+            #     cigt_probabilistic_batch_normalization_layer.calculate_joint_probabilities(
+            #         x_=tf.convert_to_tensor(x_, dtype=tf.float32),
+            #         routing_matrix=tf.convert_to_tensor(routing_matrix, dtype=tf.float32))
+            # self.assertTrue(np.allclose(tf_joint_probabilities_s_r_ch_c.numpy(), manual_joint_probability))
 
 
 if __name__ == '__main__':
