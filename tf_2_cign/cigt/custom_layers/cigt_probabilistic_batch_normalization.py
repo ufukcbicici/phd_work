@@ -15,7 +15,38 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
         super().__init__(momentum, node, name)
         # self.routingMatrix = node.routingMatrix
         self.epsilon = epsilon
+        self.batchMean = None
+        self.batchVar = None
+        # self.batchJointProbability = None
         self.startMovingAveragesFromZero = start_moving_averages_from_zero
+
+    def build(self, input_shape):
+        super().build(input_shape=input_shape)
+        input_dim = input_shape[0].as_list()[-1]
+
+        self.batchMean = self.add_weight(
+            name="batchMean" if self.node is None else Utilities.get_variable_name(
+                name="{0}_batchMean".format(self.opPrefix),
+                node=self.node),
+            shape=input_dim,
+            initializer=tf.keras.initializers.Constant(value=0.0),
+            trainable=False)
+
+        self.batchVar = self.add_weight(
+            name="batchVar" if self.node is None else Utilities.get_variable_name(
+                name="{0}_batchVar".format(self.opPrefix),
+                node=self.node),
+            shape=input_dim,
+            initializer=tf.keras.initializers.Constant(value=0.0),
+            trainable=False)
+
+        # self.batchJointProbability = self.add_weight(
+        #     name="batchJointProbability" if self.node is None else Utilities.get_variable_name(
+        #         name="{0}_batchJointProbability".format(self.opPrefix),
+        #         node=self.node),
+        #     shape=input_shape,
+        #     initializer=tf.keras.initializers.Constant(value=0.0),
+        #     trainable=False)
 
     # @tf.function
     def calculate_joint_probabilities(self, x_, routing_matrix):
@@ -41,7 +72,7 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
                                                     [idx for idx in range(len(x_.get_shape()) - 1)])
         return joint_probabilities_s_r_ch_c, marginal_probabilities_r_ch
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         x_ = inputs[0]
         routing_matrix = inputs[1]
@@ -65,6 +96,8 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
                                    [idx for idx in range(len(x_.get_shape()) - 1)])
         mu = mean_x
         sigma = variance_x
+        self.batchMean.assign(value=mu)
+        self.batchVar.assign(value=sigma)
         if is_training:
             final_mean = mu
             final_var = sigma
@@ -93,4 +126,6 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
                 self.timesCalled.assign_add(delta=1)
                 self.popMean.assign(value=new_pop_mean)
                 self.popVar.assign(value=new_pop_var)
-        return normed_x
+        # return normed_x, mean_x, variance_x, weighted_x, \
+        #        joint_probabilities_s_r_ch_c, marginal_probabilities_r_ch, zero_meaned
+        return normed_x, joint_probabilities_s_r_ch_c
