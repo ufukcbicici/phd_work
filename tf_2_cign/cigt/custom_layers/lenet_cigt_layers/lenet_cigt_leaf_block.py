@@ -13,15 +13,19 @@ class LeNetCigtLeafBlock(tf.keras.layers.Layer):
         super().__init__()
         self.node = node
         # F Operations - Conv layer
-        self.convLayer = CigtConvLayer(kernel_size=kernel_size,
-                                       num_of_filters=num_of_filters,
-                                       strides=strides,
-                                       node=node,
-                                       activation=activation,
-                                       use_bias=use_bias,
-                                       padding=padding,
-                                       name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
-        self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
+        if num_of_filters is not None and kernel_size is not None:
+            self.convLayer = CigtConvLayer(kernel_size=kernel_size,
+                                           num_of_filters=num_of_filters,
+                                           strides=strides,
+                                           node=node,
+                                           activation=activation,
+                                           use_bias=use_bias,
+                                           padding=padding,
+                                           name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
+            self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
+        else:
+            self.convLayer = None
+            self.maxPoolLayer = None
 
         # F Operations - Dense Layers
         self.hiddenLayerDims = hidden_layer_dims
@@ -50,8 +54,11 @@ class LeNetCigtLeafBlock(tf.keras.layers.Layer):
         training = kwargs["training"]
 
         # F ops -  # 1 Conv layer
-        f_net = self.convLayer([f_input, routing_matrix])
-        f_net = self.maxPoolLayer(f_net)
+        if self.convLayer is not None and self.maxPoolLayer is not None:
+            f_net = self.convLayer([f_input, routing_matrix])
+            f_net = self.maxPoolLayer(f_net)
+        else:
+            f_net = tf.identity(f_input)
 
         # F ops - Dense layers
         f_net = self.flattenLayer(f_net)

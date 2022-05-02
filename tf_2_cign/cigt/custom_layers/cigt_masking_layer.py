@@ -25,7 +25,7 @@ class CigtMaskingLayer(tf.keras.layers.Layer):
         num_routes = tf.shape(routing_matrix)[-1]
         route_width = tf.shape(x_)[-1] // num_routes
 
-        repeat_array = route_width * tf.ones_like(routing_matrix[0])
+        repeat_array = route_width * tf.ones_like(routing_matrix[0], dtype=tf.int32)
         mask_array = tf.repeat(routing_matrix, repeats=repeat_array, axis=-1)
         mask_array = tf.cast(mask_array, dtype=x_.dtype)
 

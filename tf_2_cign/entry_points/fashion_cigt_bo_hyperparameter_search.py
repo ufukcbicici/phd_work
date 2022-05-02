@@ -68,20 +68,20 @@ def cigt_test_function(classification_dropout_probability,
         run_id = DbLogger.get_run_id()
         fashion_cigt = LenetCigt(batch_size=125,
                                  input_dims=(28, 28, 1),
-                                 filter_counts=[32, 64, 128],
-                                 kernel_sizes=[5, 5, 1],
-                                 hidden_layers=[512, 256],
+                                 filter_counts=[32, 64, 128, None],
+                                 kernel_sizes=[5, 5, 1, None],
+                                 hidden_layers=[768, 384],
                                  decision_drop_probability=0.0,
                                  classification_drop_probability=X,
                                  decision_wd=0.0,
                                  classification_wd=0.0,
-                                 decision_dimensions=[128, 128],
+                                 decision_dimensions=[128, 128, 128],
                                  class_count=10,
                                  information_gain_balance_coeff=Y,
                                  softmax_decay_controller=softmax_decay_controller,
                                  learning_rate_schedule=learning_rate_calculator,
                                  decision_loss_coeff=Z,
-                                 path_counts=[2, 2],
+                                 path_counts=[2, 4, 6],
                                  bn_momentum=0.9,
                                  warm_up_period=25,
                                  routing_strategy_name="Approximate_Training",
@@ -130,7 +130,7 @@ def optimize_with_bayesian_optimization():
         verbose=10
     )
 
-    logger = JSONLogger(path="bo_logs_[364, 182].json")
+    logger = JSONLogger(path="bo_logs_3_blocks.json")
     optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
 
     optimizer.maximize(

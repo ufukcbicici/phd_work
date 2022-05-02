@@ -26,20 +26,25 @@ class CigtRouteAveragingTests(unittest.TestCase):
     LARGEST_DIFF = 0.0
     LARGEST_DIFF_PAIR = None
 
-    def create_mock_input(self, batch_dim, batch_size, route_count, ratio_of_all_one_routes=0.2):
+    def create_mock_input(self, batch_dim, batch_size, route_count, matrix_type, ratio_of_all_one_routes=0.2):
         x = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, *batch_dim))
-        # Create mock routing matrix
-        open_route_indices = np.random.randint(low=0, high=route_count, size=(batch_size,))
-        route_matrix = np.zeros(shape=(batch_size, route_count), dtype=np.int32)
-        route_matrix[np.arange(batch_size), open_route_indices] = 1
-        # Create fully selected routes
-        fully_route_indices = np.random.choice(batch_size, int(batch_size * ratio_of_all_one_routes), replace=False)
-        route_matrix[fully_route_indices] = np.ones_like(route_matrix[fully_route_indices])
+        if matrix_type == "one_hot":
+            # Create mock routing matrix
+            open_route_indices = np.random.randint(low=0, high=route_count, size=(batch_size,))
+            route_matrix = np.zeros(shape=(batch_size, route_count), dtype=np.int32)
+            route_matrix[np.arange(batch_size), open_route_indices] = 1
+            # Create fully selected routes
+            fully_route_indices = np.random.choice(batch_size, int(batch_size * ratio_of_all_one_routes), replace=False)
+            route_matrix[fully_route_indices] = np.ones_like(route_matrix[fully_route_indices])
+        else:
+            route_activations = np.random.uniform(size=(batch_size, route_count))
+            normalizing_constants = np.sum(route_activations, axis=1)
+            route_matrix = route_activations * np.reciprocal(normalizing_constants)[:, np.newaxis]
         return x, route_matrix
 
     def build_test_model(self, input_shape, model_type):
         i_x = tf.keras.Input(shape=input_shape)
-        routing_matrix = tf.keras.Input(shape=(self.ROUTE_COUNT,), dtype=tf.int32)
+        routing_matrix = tf.keras.Input(shape=(self.ROUTE_COUNT,))
 
         # CNN Output
         if model_type == "conv":
@@ -68,37 +73,39 @@ class CigtRouteAveragingTests(unittest.TestCase):
 
             for model_type in ["conv", "dense"]:
                 for num_of_routes in [4, 1]:
-                    self.ROUTE_COUNT = num_of_routes
-                    if model_type == "conv":
-                        self.BATCH_DIM = [32, 32, self.CONV_DIM]
-                    else:
-                        self.BATCH_DIM = [self.DENSE_DIM]
+                    for matrix_type in ["one_hot", "probability"]:
+                        self.ROUTE_COUNT = num_of_routes
+                        if model_type == "conv":
+                            self.BATCH_DIM = [32, 32, self.CONV_DIM]
+                        else:
+                            self.BATCH_DIM = [self.DENSE_DIM]
 
-                    model = self.build_test_model(model_type=model_type, input_shape=self.BATCH_DIM)
+                        model = self.build_test_model(model_type=model_type, input_shape=self.BATCH_DIM)
 
-                    for i in range(iter_count):
-                        print("Model Type:{0} Num of Routes:{1} Iteration:{2}".format(model_type,
-                                                                                      num_of_routes, i))
-                        x, route_matrix = self.create_mock_input(batch_dim=self.BATCH_DIM,
-                                                                 batch_size=self.BATCH_SIZE,
-                                                                 route_count=self.ROUTE_COUNT)
-                        output_dict = model([x, route_matrix], training=True)
-                        # Check if the route averaging works as intended.
-                        averaged_array = output_dict["averaged_array"]
-                        op_layer_output = output_dict["op_layer_output"]
-                        coefficients = np.reciprocal(np.sum(route_matrix, axis=1, dtype=np.float32))
-                        for i in range(len(x.shape) - 1):
-                            coefficients = tf.expand_dims(coefficients, axis=1)
+                        for i in range(iter_count):
+                            print("Model Type:{0} Num of Routes:{1} Matrix Type:{2} Iteration:{3}".format(
+                                model_type, num_of_routes, matrix_type, i))
+                            x, route_matrix = self.create_mock_input(batch_dim=self.BATCH_DIM,
+                                                                     batch_size=self.BATCH_SIZE,
+                                                                     route_count=self.ROUTE_COUNT,
+                                                                     matrix_type=matrix_type)
+                            output_dict = model([x, route_matrix], training=True)
+                            # Check if the route averaging works as intended.
+                            averaged_array = output_dict["averaged_array"]
+                            op_layer_output = output_dict["op_layer_output"]
+                            coefficients = np.reciprocal(np.sum(route_matrix, axis=1, dtype=np.float32))
+                            for i in range(len(x.shape) - 1):
+                                coefficients = tf.expand_dims(coefficients, axis=1)
 
-                        route_parts = []
-                        for rid in range(self.ROUTE_COUNT):
-                            x_part = op_layer_output[..., rid * self.ROUTE_WIDTH:(rid + 1) * self.ROUTE_WIDTH]
-                            route_parts.append(x_part)
-                        accum_arr = np.zeros_like(route_parts[rid])
-                        for route_part in route_parts:
-                            accum_arr += route_part
-                        averaged_array_np = coefficients * accum_arr
-                        self.assertTrue(np.allclose(averaged_array_np.numpy(), averaged_array.numpy()))
+                            route_parts = []
+                            for rid in range(self.ROUTE_COUNT):
+                                x_part = op_layer_output[..., rid * self.ROUTE_WIDTH:(rid + 1) * self.ROUTE_WIDTH]
+                                route_parts.append(x_part)
+                            accum_arr = np.zeros_like(route_parts[rid])
+                            for route_part in route_parts:
+                                accum_arr += route_part
+                            averaged_array_np = coefficients * accum_arr
+                            self.assertTrue(np.allclose(averaged_array_np, averaged_array.numpy()))
 
 
 if __name__ == '__main__':

@@ -77,7 +77,7 @@ class LenetCigt(Cigt):
     def get_explanation_string(self):
         kv_rows = []
         explanation = ""
-        explanation = self.add_explanation(name_of_param="Lenet CIGT - Bayesian Optimization - [2,2] - [32, 64, 128] - [512, 256]",
+        explanation = self.add_explanation(name_of_param="Lenet CIGT - Bayesian Optimization - [2,4,6] Routes",
                                            value="Lenet CIGT - Decision ",
                                            explanation=explanation, kv_rows=kv_rows)
         explanation += super().get_explanation_string()
