@@ -60,4 +60,4 @@ class FashionNetConstants:
     epsilon_decay_rate = 0.75
     epsilon_step = 1000
 
-    experiment_factor = 20
+    experiment_factor = 10

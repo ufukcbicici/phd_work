@@ -22,7 +22,8 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 optimization_bounds_continuous = {
     "classification_dropout_probability": (0.0, 0.5),
     "information_gain_balance_coefficient": (1.0, 10.0),
-    "decision_loss_coefficient": (0.01, 1.0)
+    "decision_loss_coefficient": (0.01, 1.0),
+    "lr_initial_rate": (0.0, 0.05)
 }
 
 optimization_bounds_discrete = {
@@ -42,10 +43,17 @@ discrete_values = {
 
 def cigt_test_function(classification_dropout_probability,
                        information_gain_balance_coefficient,
-                       decision_loss_coefficient):
+                       decision_loss_coefficient,
+                       lr_initial_rate):
     X = classification_dropout_probability
     Y = information_gain_balance_coefficient
     Z = decision_loss_coefficient
+    W = lr_initial_rate
+
+    print("classification_dropout_probability={0}".format(classification_dropout_probability))
+    print("information_gain_balance_coefficient={0}".format(information_gain_balance_coefficient))
+    print("decision_loss_coefficient={0}".format(decision_loss_coefficient))
+    print("lr_initial_rate={0}".format(lr_initial_rate))
     #
     # dX = X - 0.25
     # dY = Y - 5.5
@@ -60,28 +68,30 @@ def cigt_test_function(classification_dropout_probability,
                                                       decay_period=FashionNetConstants.softmax_decay_period,
                                                       decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
     learning_rate_calculator = DiscreteParameter(name="lr_calculator",
-                                                 value=0.01,
-                                                 schedule=[(15000 + 12000, 0.005),
-                                                           (30000 + 12000, 0.0025),
-                                                           (40000 + 12000, 0.00025)])
+                                                 value=W,
+                                                 schedule=[(15000 + 12000, (1.0 / 2.0) * W),
+                                                           (30000 + 12000, (1.0 / 4.0) * W),
+                                                           (40000 + 12000, (1.0 / 40.0) * W)])
+    print(learning_rate_calculator)
+
     with tf.device("GPU"):
         run_id = DbLogger.get_run_id()
         fashion_cigt = LenetCigt(batch_size=125,
                                  input_dims=(28, 28, 1),
-                                 filter_counts=[32, 64, 128, None],
-                                 kernel_sizes=[5, 5, 1, None],
-                                 hidden_layers=[768, 384],
+                                 filter_counts=[32, 64, 128],
+                                 kernel_sizes=[5, 5, 1],
+                                 hidden_layers=[512, 256],
                                  decision_drop_probability=0.0,
                                  classification_drop_probability=X,
                                  decision_wd=0.0,
                                  classification_wd=0.0,
-                                 decision_dimensions=[128, 128, 128],
+                                 decision_dimensions=[128, 128],
                                  class_count=10,
                                  information_gain_balance_coeff=Y,
                                  softmax_decay_controller=softmax_decay_controller,
                                  learning_rate_schedule=learning_rate_calculator,
                                  decision_loss_coeff=Z,
-                                 path_counts=[2, 4, 6],
+                                 path_counts=[2, 4],
                                  bn_momentum=0.9,
                                  warm_up_period=25,
                                  routing_strategy_name="Approximate_Training",
@@ -130,7 +140,7 @@ def optimize_with_bayesian_optimization():
         verbose=10
     )
 
-    logger = JSONLogger(path="bo_logs_3_blocks.json")
+    logger = JSONLogger(path="bo_logs_with_lr_optimization.json")
     optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
 
     optimizer.maximize(

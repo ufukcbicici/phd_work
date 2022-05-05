@@ -40,9 +40,8 @@ if __name__ == "__main__":
     #                                                                       decision_dropout_probs])
 
     #
-    classification_dropout_probs = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25,
-                                    0.3, 0.35, 0.4, 0.45, 0.5] * FashionNetConstants.experiment_factor
-    info_gain_balance_coeffs = [2.0]
+    classification_dropout_probs = [0.15, 0.2, 0.3] * FashionNetConstants.experiment_factor
+    info_gain_balance_coeffs = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.5, 5.0]
     decision_loss_coeffs = [0.5]
     # 994887500405312|0.921634499430656|0.35|2.0|1.0|200
     # classification_dropout_probs = [0.05]
