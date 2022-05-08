@@ -8,9 +8,34 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 
 
 class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
-    def __init__(self, node, decision_bn_momentum, next_block_path_count, class_count, ig_balance_coefficient):
+    def __init__(self, node, decision_bn_momentum, next_block_path_count, class_count, ig_balance_coefficient,
+                 sample_count=100):
         super().__init__(node, decision_bn_momentum, next_block_path_count, class_count, ig_balance_coefficient)
+        self.softPlusLayer = tf.keras.activations.softplus()
 
+    def sample_from_gumbel_softmax(self, logits, temperature, z_sample_count, use_stable_version=False):
+        logits_shape = tf.shape(logits)
+        samples_shape = tf.concat([logits_shape[0], logits_shape[1], z_sample_count], axis=0)
+        U_ = tf.random.uniform(shape=samples_shape, minval=0.0, maxval=1.0)
+        G_ = -1.0 * tf.math.log(-1.0 * tf.math.log(U_))
+
+        # Gumbel-Softmax
+        log_logits = tf.math.log(logits)
+        log_logits = tf.expand_dims(log_logits, axis=-1)
+        pre_transform_G = log_logits + G_
+        gumbel_logits = pre_transform_G / temperature
+        # gumbel_logits = tf.math.exp(pre_transform_G_temp_divided)
+
+        if not use_stable_version:
+            exp_logits = tf.math.exp(gumbel_logits)
+            nominator = tf.expand_dims(tf.reduce_sum(exp_logits, axis=1), axis=1)
+            z_samples = exp_logits / nominator
+        else:
+            # Numerically stable
+            log_sum_exp = tf.expand_dims(tf.reduce_logsumexp(gumbel_logits, axis=1), axis=1)
+            log_z_samples = gumbel_logits - log_sum_exp
+            z_samples = tf.math.exp(log_z_samples)
+        return z_samples
 #
 #     # @tf.function
     def call(self, inputs, **kwargs):
@@ -23,6 +48,11 @@ class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
         dummy_route_vector = tf.cast(tf.expand_dims(tf.ones_like(labels), axis=1), dtype=tf.int32)
         h_net_normed = self.decisionBatchNorm([h_net, dummy_route_vector], training=training)
         activations = self.decisionActivationsLayer(h_net_normed)
+        # Softplus, because the logits must be positive for Gumbel-Softmax to work correctly.
+        logits = self.softPlusLayer(activations)
+
+
+
 #         ig_mask = tf.ones_like(labels)
 #         ig_value, routing_probabilities = \
 #             self.infoGainLayer([activations, labels, temperature, self.balanceCoeff, ig_mask])

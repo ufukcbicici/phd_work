@@ -1,0 +1,65 @@
+--Fashion MNIST CIGT LeNet Results
+
+--Query:
+SELECT logs_table.RunId,
+       AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       MIN(A.Value) AS ClassificationDropoutMin,
+       MAX(A.Value) AS ClassificationDropoutMax,
+       MIN(B.Value) AS InformationGainBalanceCoefficientMin,
+       MAX(B.Value) AS InformationGainBalanceCoefficientMax,
+       MIN(C.Value) AS DecisionLossCoefficientMin,
+       MAX(C.Value) AS DecisionLossCoefficientMax,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Dropout") AS A ON
+    logs_table.RunID = A.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Information Gain Balance Coefficient") AS B ON
+    logs_table.RunID = B.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Loss Coeff") AS C ON
+    logs_table.RunID = C.RunID
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_parameters ON
+logs_table.RunId = run_parameters.RunId
+WHERE run_parameters.Parameter = "Path Counts" AND
+      run_parameters.Value = "ListWrapper([1, 2, 4])") AND
+      logs_table.Epoch >= 115
+GROUP BY logs_table.RunID
+ORDER BY TestAccuracy DESC
+
+--Parameters:
+
+747|Batch Size|125
+747|Path Counts|ListWrapper([1, 2, 4])
+747|Routing Strategy|<class 'tf_2_cign.cigt.routing_strategy.approximate_training_strategy.ApproximateTrainingStrategy'>
+747|Warm Up Period|25
+747|Lr Settings|Iteration:0 Value:0.01
+Iteration:27000 Value:0.005
+Iteration:42000 Value:0.0025
+Iteration:52000 Value:0.00025
+
+747|Decision Loss Coeff|0.4
+747|Batch Norm Decay|0.9
+747|Classification Wd|0.0
+747|Decision Wd|0.0
+747|Information Gain Balance Coefficient|2.0
+747|Decision Dropout|0.0
+747|Classification Dropout|0.35
+747|Network Name:Lenet CIGT - Decision Loss Coeff Optimization-1|Lenet CIGT - Decision
+747|Filter Counts|ListWrapper([32, 64, 128])
+747|Kernel Sizes|ListWrapper([5, 5, 1])
+747|Hidden Layers|ListWrapper([512, 256])
+747|Decision Dimensions|ListWrapper([128, 128])
+
+
+--Results
+0.926240009
+0.925199991
+0.924299997
+0.924479991
+0.923850006
+0.921949995
+0.921820009
+0.924869996
+0.922850007
+0.924659997

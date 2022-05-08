@@ -1364,3 +1364,32 @@ WHERE run_meta_data.Explanation
           LIKE "%Lenet CIGT - Bayesian Optimization - [2,4]- [32,64,128] - [512,256] + Lr Initial Rate%") AND logs_table.Epoch >= 115
 GROUP BY ClassificationDropout, InformationGainBalanceCoefficient, DecisionLossCoefficient
 ORDER BY TestAccuracy DESC
+
+
+
+
+SELECT logs_table.RunId,
+       AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       MIN(A.Value) AS ClassificationDropoutMin,
+       MAX(A.Value) AS ClassificationDropoutMax,
+       MIN(B.Value) AS InformationGainBalanceCoefficientMin,
+       MAX(B.Value) AS InformationGainBalanceCoefficientMax,
+       MIN(C.Value) AS DecisionLossCoefficientMin,
+       MAX(C.Value) AS DecisionLossCoefficientMax,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Dropout") AS A ON
+    logs_table.RunID = A.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Information Gain Balance Coefficient") AS B ON
+    logs_table.RunID = B.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Loss Coeff") AS C ON
+    logs_table.RunID = C.RunID
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_parameters ON
+logs_table.RunId = run_parameters.RunId
+WHERE run_parameters.Parameter = "Path Counts" AND
+      run_parameters.Value = "ListWrapper([1, 2, 4])") AND
+      logs_table.Epoch >= 115
+GROUP BY logs_table.RunID
+ORDER BY TestAccuracy DESC
