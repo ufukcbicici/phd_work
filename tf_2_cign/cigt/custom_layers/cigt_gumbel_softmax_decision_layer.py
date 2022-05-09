@@ -25,6 +25,7 @@ class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
         pre_transform_G = log_logits + G_
         gumbel_logits = pre_transform_G / temperature
         # gumbel_logits = tf.math.exp(pre_transform_G_temp_divided)
+        z_samples_softmax = tf.nn.softmax(gumbel_logits)
 
         if not use_stable_version:
             exp_logits = tf.math.exp(gumbel_logits)
