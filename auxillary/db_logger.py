@@ -49,6 +49,12 @@ class DbLogger:
     # log_db_path = "C://Users//munu_.DESKTOP-5DFQOJ6//phd_work//dblogger.db"
     # C:\Users\munu_.DESKTOP-5DFQOJ6\phd_work
 
+    # Linux-1
+    # log_db_path = "/home/ubicici/personal_stuff/phd_work/cigt_logger.db"
+
+    # Docker
+    log_db_path = "/opt/project/cigt_logger.db"
+
     # Home
     # log_db_path = "D://phd_work//simple_tf//dblogger.db"
 

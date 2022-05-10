@@ -20,7 +20,10 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
-
+    # gpus = tf.config.list_physical_devices('GPU')
+    # with tf.device("GPU"):
+    #     x = tf.convert_to_tensor(5.0)
+    #     y = tf.zeros(shape=(5, 5))
     # classification_wd = [0.0]
     # decision_wd = [0.0]
     # info_gain_balance_coeffs = [1.0, 2.0, 3.0, 4.0, 5.0]
