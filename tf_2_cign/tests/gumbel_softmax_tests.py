@@ -14,41 +14,50 @@ from tf_2_cign.utilities.utilities import Utilities
 
 class GumbelSoftmaxTests(unittest.TestCase):
 
-    def test_rounding_property(self):
+    def test_gumbel_softmax_properties(self):
         sample_count = 1000000
         route_counts = [2, 3, 4, 5, 10]
-        temperatures = [0.1, 0.5, 1.0, 5.0, 10.0]
+        temperatures = [1e-20, 0.1, 0.5, 1.0, 5.0, 10.0]
         cartesian_product = Utilities.get_cartesian_product(list_of_lists=[route_counts,
                                                                            temperatures,
                                                                            [True, False]])
+        with tf.device("CPU"):
+            for tpl in cartesian_product:
+                route_count = tpl[0]
+                temperature = tpl[1]
+                is_train = tpl[2]
+                print("Gumbel Softmax Testing route_count:{0} temperature:{1} is_train:{2}".format(
+                    route_count, temperature, is_train))
+                gs_layer = CigtGumbelSoftmax()
+                logits = np.random.uniform(low=-10.0, high=10.0, size=(125, route_count))
+                logits_soft_plus = tf.nn.softplus(logits)
+                z_samples, gumbel_logits, gumbel_logits_tempered, log_logits, G_ = gs_layer(
+                    [logits_soft_plus, temperature, sample_count], training=is_train)
+                logits_soft_plus_normalized = (logits_soft_plus / tf.reduce_sum(logits_soft_plus, axis=1,
+                                                                                keepdims=True)).numpy()
+                arg_max_indices = tf.argmax(z_samples, axis=1).numpy()
+                z_hard = tf.one_hot(arg_max_indices, axis=1, depth=route_count).numpy()
 
-        for tpl in cartesian_product:
-            route_count = tpl[0]
-            temperature = tpl[1]
-            is_train = tpl[2]
-            print("Gumbel Softmax Testing route_count:{0} temperature:{1} is_train:{2}".format(
-                route_count, temperature, is_train))
-            gs_layer = CigtGumbelSoftmax()
-            logits = np.random.uniform(low=-10.0, high=10.0, size=(125, route_count))
-            logits_soft_plus = tf.nn.softplus(logits)
-            z_samples = gs_layer([logits_soft_plus, temperature, sample_count], training=is_train)
-            logits_soft_plus_normalized = (logits_soft_plus / tf.reduce_sum(logits_soft_plus, axis=1,
-                                                                            keepdims=True)).numpy()
-            arg_max_indices = tf.argmax(z_samples, axis=1).numpy()
-            z_hard = tf.one_hot(arg_max_indices, axis=1, depth=route_count).numpy()
+                # This piece of code checks if one hot works correctly.
+                # it = np.nditer(arg_max_indices, flags=["multi_index"])
+                # for x_ in it:
+                #     vec = np.zeros(shape=(route_count,), dtype=z_hard.dtype)
+                #     vec[x_] = 1
+                #     self.assertTrue(np.array_equal(vec, z_hard[it.multi_index[0], :, it.multi_index[1]]))
 
-            # This piece of code checks if one hot works correctly.
-            # it = np.nditer(arg_max_indices, flags=["multi_index"])
-            # for x_ in it:
-            #     vec = np.zeros(shape=(route_count,), dtype=z_hard.dtype)
-            #     vec[x_] = 1
-            #     self.assertTrue(np.array_equal(vec, z_hard[it.multi_index[0], :, it.multi_index[1]]))
+                # Test rounding property
+                z_distribution = np.mean(z_hard, axis=-1)
+                z_max = np.max(z_distribution, axis=1)
+                p_max = np.max(logits_soft_plus_normalized, axis=1)
+                res = np.allclose(z_max, p_max, rtol=0.01)
+                self.assertTrue(res)
 
-            z_distribution = np.mean(z_hard, axis=-1)
-            z_max = np.max(z_distribution, axis=1)
-            p_max = np.max(logits_soft_plus_normalized, axis=1)
-            res = np.allclose(z_max, p_max, rtol=0.01)
-            self.assertTrue(res)
+                # Test zero temperature property
+                if temperature < 0.1:
+                    is_close_arr = np.isclose(z_samples.numpy(), z_hard)
+                    non_close_count = np.sum(is_close_arr == False)
+                    non_close_ratio = non_close_count / np.prod(is_close_arr.shape)
+                    self.assertTrue(100.0 * non_close_ratio < 1e-3)
 
 
 if __name__ == '__main__':

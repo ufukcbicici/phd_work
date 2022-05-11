@@ -58,6 +58,6 @@ class CigtGumbelSoftmax(tf.keras.layers.Layer):
         log_logits = tf.math.log(logits + eps)
         log_logits = tf.expand_dims(log_logits, axis=-1)
         gumbel_logits = log_logits + G_
-        gumbel_logits = gumbel_logits / temperature
-        z_samples = tf.nn.softmax(gumbel_logits, axis=1)
-        return z_samples
+        gumbel_logits_tempered = gumbel_logits / temperature
+        z_samples = tf.nn.softmax(gumbel_logits_tempered, axis=1)
+        return z_samples, gumbel_logits, gumbel_logits_tempered, log_logits, G_
