@@ -72,7 +72,7 @@ class CigtBatchNormTests(unittest.TestCase):
             momentum=momentum, epsilon=epsilon, name="cigt_probabilistic", start_moving_averages_from_zero=True,
             normalize_routing_matrix=False)
         cigt_probabilistic_normed_net, joint_probability = \
-            cigt_probabilistic_batch_normalization([op_layer_output, routing_matrix])
+            cigt_probabilistic_batch_normalization([op_layer_output, tf.cast(routing_matrix, tf.float32)])
         # cigt_probabilistic_masking_layer = CigtMaskingLayer()
         # cigt_probabilistic_normed_net = cigt_probabilistic_masking_layer([cigt_probabilistic_normed_net,
         #                                                                   routing_matrix])
@@ -215,7 +215,7 @@ class CigtBatchNormTests(unittest.TestCase):
             arr_route = shared_value[rid * self.ROUTE_WIDTH:(rid + 1) * self.ROUTE_WIDTH]
             conventional_vars[rid].assign(arr_route)
 
-    @unittest.skip
+    # @unittest.skip
     def test_cigt_batch_norm_layer(self):
         with tf.device("GPU"):
             momentum = 0.9
@@ -400,125 +400,125 @@ class CigtBatchNormTests(unittest.TestCase):
 
     # @unittest.skip
     def test_joint_probability_calculation_and_probabilistic_cigt_batch_norm(self):
-        momentum = 0.9
-        epsilon = 1e-5
-        cigt_probabilistic_batch_normalization_layer = CigtProbabilisticBatchNormalization(
-            momentum=momentum, epsilon=epsilon,
-            start_moving_averages_from_zero=False)
-        unmask_layer = CigtUnmaskingLayer()
-        mask_layer = CigtMaskingLayer()
+        with tf.device("GPU"):
+            momentum = 0.9
+            epsilon = 1e-5
 
-        experiment_count = 1000
-        input_shapes = [(128, 4, 4, 64), (128, 16, 16, 64),
-                        (125, 7, 7, 128), (120, 1, 1, 512), (125, 64), (128, 256)]
-        route_counts = [2, 4, 16, 32, 1]
-        matrix_types = ["one_hot", "probability"]
-        cartesian_product = Utilities.get_cartesian_product(list_of_lists=[input_shapes, route_counts, matrix_types])
-        # pbar = tqdm(cartesian_product)
-        for tpl in cartesian_product:
-            input_shape = tpl[0]
-            route_count = tpl[1]
-            matrix_type = tpl[2]
-            errors_dict = {}
-            print("Current Tuple: ({0},{1},{2})".format(input_shape, route_count, matrix_type))
-            # pbar.set_postfix({'Current Tuple': "({0},{1},{2})".format(input_shape, route_count, matrix_type)})
-            batch_size = input_shape[0]
-            channel_count = input_shape[-1]
-            channels_per_route = channel_count // route_count
-            i_x = tf.keras.Input(shape=input_shape[1:])
-            tf_routing_matrix = tf.keras.Input(shape=(route_count,))
-            cigt_probabilistic_batch_normalization = CigtProbabilisticBatchNormalization(
-                momentum=momentum, epsilon=epsilon, name="cigt_probabilistic")
-            normed_x, tf_p_s_c_given_ch_r = cigt_probabilistic_batch_normalization([i_x, tf_routing_matrix])
-            model = tf.keras.Model(inputs=[i_x, tf_routing_matrix], outputs={
-                "normed_x": normed_x, "tf_p_s_c_given_ch_r": tf_p_s_c_given_ch_r})
-            moving_mean = np.zeros(shape=(input_shape[-1],))
-            moving_var = np.zeros(shape=(input_shape[-1],))
-            for exp_id in tqdm(range(experiment_count)):
-                x_unscaled = np.random.uniform(size=input_shape)
-                route_activations = np.random.uniform(size=(batch_size, route_count))
-                # Assure that every route is selected always once, at least.
-                for ri in range(route_count):
-                    route_activations[ri, ri] = 2.0 * np.max(route_activations[ri])
-                # Convert activations to a routing matrix according to the matrix type.
-                if matrix_type == "one_hot":
-                    arg_max_indices = np.argmax(route_activations, axis=1)
-                    routing_matrix = np.zeros_like(route_activations)
-                    routing_matrix[np.arange(routing_matrix.shape[0]), arg_max_indices] = 1.0
-                else:
-                    normalizing_constants = np.sum(route_activations, axis=1)
-                    routing_matrix = route_activations * np.reciprocal(normalizing_constants)[:, np.newaxis]
-                x_ = mask_layer([x_unscaled, routing_matrix]).numpy()
-                # x_ = x_unscaled
+            experiment_count = 1000
+            input_shapes = [(128, 4, 4, 64), (128, 16, 16, 64),
+                            (125, 7, 7, 128), (120, 1, 1, 512), (125, 64), (128, 256)]
+            # input_shapes = [(128, 4, 4, 64), (125, 64), (128, 256)]
+            route_counts = [2, 4, 16, 32, 1]
+            # route_counts = [1]
+            matrix_types = ["one_hot", "probability"]
+            cartesian_product = Utilities.get_cartesian_product(list_of_lists=[input_shapes, route_counts, matrix_types])
+            # pbar = tqdm(cartesian_product)
+            for tpl in cartesian_product:
+                input_shape = tpl[0]
+                route_count = tpl[1]
+                matrix_type = tpl[2]
+                errors_dict = {}
+                print("Current Tuple: ({0},{1},{2})".format(input_shape, route_count, matrix_type))
+                # pbar.set_postfix({'Current Tuple': "({0},{1},{2})".format(input_shape, route_count, matrix_type)})
+                batch_size = input_shape[0]
+                channel_count = input_shape[-1]
+                channels_per_route = channel_count // route_count
+                i_x = tf.keras.Input(shape=input_shape[1:])
+                tf_routing_matrix = tf.keras.Input(shape=(route_count,))
+                cigt_probabilistic_batch_normalization = CigtProbabilisticBatchNormalization(
+                    momentum=momentum, epsilon=epsilon, name="cigt_probabilistic")
+                unmask_layer = CigtUnmaskingLayer()
+                mask_layer = CigtMaskingLayer()
+                normed_x, tf_p_s_c_given_ch_r = cigt_probabilistic_batch_normalization([i_x, tf_routing_matrix])
+                model = tf.keras.Model(inputs=[i_x, tf_routing_matrix], outputs={
+                    "normed_x": normed_x, "tf_p_s_c_given_ch_r": tf_p_s_c_given_ch_r})
+                moving_mean = np.zeros(shape=(input_shape[-1],))
+                moving_var = np.zeros(shape=(input_shape[-1],))
+                for exp_id in tqdm(range(experiment_count)):
+                    x_unscaled = np.random.uniform(size=input_shape)
+                    route_activations = np.random.uniform(size=(batch_size, route_count))
+                    # Assure that every route is selected always once, at least.
+                    for ri in range(route_count):
+                        route_activations[ri, ri] = 2.0 * np.max(route_activations[ri])
+                    # Convert activations to a routing matrix according to the matrix type.
+                    if matrix_type == "one_hot":
+                        arg_max_indices = np.argmax(route_activations, axis=1)
+                        routing_matrix = np.zeros_like(route_activations)
+                        routing_matrix[np.arange(routing_matrix.shape[0]), arg_max_indices] = 1.0
+                    else:
+                        normalizing_constants = np.sum(route_activations, axis=1)
+                        routing_matrix = route_activations * np.reciprocal(normalizing_constants)[:, np.newaxis]
+                    x_ = mask_layer([x_unscaled, routing_matrix]).numpy()
+                    # x_ = x_unscaled
 
-                route_selection_counts = np.sum(routing_matrix, axis=0)
-                assert np.all(route_selection_counts > 0.0)
+                    route_selection_counts = np.sum(routing_matrix, axis=0)
+                    assert np.all(route_selection_counts > 0.0)
 
-                model_output = model([x_, routing_matrix], training=True)
-                tf_x_hat = model_output["normed_x"].numpy()
-                # Joint probability calculation
-                routing_matrix_extended = np.repeat(routing_matrix, repeats=[channels_per_route] * route_count, axis=-1)
-                for _ in range(len(input_shape) - 2):
-                    routing_matrix_extended = np.expand_dims(routing_matrix_extended, axis=1)
-                p_s = (1.0 / batch_size) * np.ones_like(x_)
-                p_r_given_s = routing_matrix_extended
-                p_ch = (1.0 / channels_per_route) * np.ones_like(x_)
-                p_c = (1.0 / np.prod(input_shape[1:-1])) * np.ones_like(x_)
-                p_s_r_ch_c = p_s * p_r_given_s * p_ch * p_c
-                p_ch_r = np.sum(p_s_r_ch_c, axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
+                    model_output = model([x_, routing_matrix], training=True)
+                    tf_x_hat = model_output["normed_x"].numpy()
+                    # Joint probability calculation
+                    routing_matrix_extended = np.repeat(routing_matrix, repeats=[channels_per_route] * route_count, axis=-1)
+                    for _ in range(len(input_shape) - 2):
+                        routing_matrix_extended = np.expand_dims(routing_matrix_extended, axis=1)
+                    p_s = (1.0 / batch_size) * np.ones_like(x_)
+                    p_r_given_s = routing_matrix_extended
+                    p_ch = (1.0 / channels_per_route) * np.ones_like(x_)
+                    p_c = (1.0 / np.prod(input_shape[1:-1])) * np.ones_like(x_)
+                    p_s_r_ch_c = p_s * p_r_given_s * p_ch * p_c
+                    p_ch_r = np.sum(p_s_r_ch_c, axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
 
-                for _ in range(len(input_shape) - 1):
-                    p_ch_r = np.expand_dims(p_ch_r, axis=0)
-                p_s_c_given_ch_r = p_s_r_ch_c * np.reciprocal(p_ch_r)
-                self.compare_arrays(arr_A=model_output["tf_p_s_c_given_ch_r"].numpy(),
-                                    arr_B=p_s_r_ch_c, errors_dict=errors_dict,
-                                    comparison_name="joint_probability")
-                x_unscaled_2 = unmask_layer([x_, routing_matrix]).numpy()
-                mean_manual = np.sum(p_s_c_given_ch_r * x_unscaled_2,
-                                     axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
-                tf_mean_x = self.get_cigt_variable(model=model, var_name="batchMean")
-                self.compare_arrays(arr_A=tf_mean_x, arr_B=mean_manual, errors_dict=errors_dict,
-                                    comparison_name="training_mean")
-                for _ in range(len(input_shape) - 1):
-                    mean_manual = np.expand_dims(mean_manual, axis=0)
+                    for _ in range(len(input_shape) - 1):
+                        p_ch_r = np.expand_dims(p_ch_r, axis=0)
+                    p_s_c_given_ch_r = p_s_r_ch_c * np.reciprocal(p_ch_r)
+                    self.compare_arrays(arr_A=model_output["tf_p_s_c_given_ch_r"].numpy(),
+                                        arr_B=p_s_r_ch_c, errors_dict=errors_dict,
+                                        comparison_name="joint_probability")
+                    x_unscaled_2 = unmask_layer([x_, routing_matrix]).numpy()
+                    mean_manual = np.sum(p_s_c_given_ch_r * x_unscaled_2,
+                                         axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
+                    tf_mean_x = self.get_cigt_variable(model=model, var_name="batchMean")
+                    self.compare_arrays(arr_A=tf_mean_x, arr_B=mean_manual, errors_dict=errors_dict,
+                                        comparison_name="training_mean")
+                    for _ in range(len(input_shape) - 1):
+                        mean_manual = np.expand_dims(mean_manual, axis=0)
 
-                x_mean_zero = x_unscaled_2 - mean_manual
-                # self.assertTrue(np.allclose(model_output["zero_meaned"].numpy(), x_mean_zero))
-                var_manual = np.sum(p_s_c_given_ch_r * np.square(x_mean_zero),
-                                    axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
-                tf_variance_x = self.get_cigt_variable(model=model, var_name="batchVar")
-                self.compare_arrays(arr_A=tf_variance_x, arr_B=var_manual, errors_dict=errors_dict,
-                                    comparison_name="training_var")
-                for _ in range(len(input_shape) - 1):
-                    var_manual = np.expand_dims(var_manual, axis=0)
+                    x_mean_zero = x_unscaled_2 - mean_manual
+                    # self.assertTrue(np.allclose(model_output["zero_meaned"].numpy(), x_mean_zero))
+                    var_manual = np.sum(p_s_c_given_ch_r * np.square(x_mean_zero),
+                                        axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
+                    tf_variance_x = self.get_cigt_variable(model=model, var_name="batchVar")
+                    self.compare_arrays(arr_A=tf_variance_x, arr_B=var_manual, errors_dict=errors_dict,
+                                        comparison_name="training_var")
+                    for _ in range(len(input_shape) - 1):
+                        var_manual = np.expand_dims(var_manual, axis=0)
 
-                x_hat = x_mean_zero * np.reciprocal(np.sqrt(var_manual + 1e-5))
-                x_hat = mask_layer([x_hat, routing_matrix]).numpy()
-                self.compare_arrays(arr_A=tf_x_hat, arr_B=x_hat,
-                                    errors_dict=errors_dict, comparison_name="x_hat_comparison_training")
-                if exp_id == 0:
-                    moving_mean = mean_manual
-                    moving_var = var_manual
-                else:
-                    moving_mean = momentum * moving_mean + (1.0 - momentum) * mean_manual
-                    moving_var = momentum * moving_var + (1.0 - momentum) * var_manual
+                    x_hat = x_mean_zero * np.reciprocal(np.sqrt(var_manual + 1e-5))
+                    x_hat = mask_layer([x_hat, routing_matrix]).numpy()
+                    self.compare_arrays(arr_A=tf_x_hat, arr_B=x_hat,
+                                        errors_dict=errors_dict, comparison_name="x_hat_comparison_training")
+                    if exp_id == 0:
+                        moving_mean = mean_manual
+                        moving_var = var_manual
+                    else:
+                        moving_mean = momentum * moving_mean + (1.0 - momentum) * mean_manual
+                        moving_var = momentum * moving_var + (1.0 - momentum) * var_manual
 
-                # Inference mode
-                model_output = model([x_, routing_matrix], training=False)
-                x_unscaled_2 = unmask_layer([x_, routing_matrix]).numpy()
-                x_hat_inference = (x_unscaled_2 - moving_mean) * np.reciprocal(np.sqrt(moving_var + 1e-5))
-                x_hat_inference = mask_layer([x_hat_inference, routing_matrix]).numpy()
-                tf_x_hat_inference = model_output["normed_x"].numpy()
-                mu = np.squeeze(moving_mean)
-                sigma = np.squeeze(moving_var)
-                tf_mu = self.get_cigt_variable(model=model, var_name="popMean")
-                tf_sigma = self.get_cigt_variable(model=model, var_name="popVar")
-                self.compare_arrays(arr_A=mu, arr_B=tf_mu, errors_dict=errors_dict, comparison_name="popMean")
-                self.compare_arrays(arr_A=sigma, arr_B=tf_sigma, errors_dict=errors_dict, comparison_name="popVar")
-                self.compare_arrays(arr_A=x_hat_inference, arr_B=tf_x_hat_inference,
-                                    errors_dict=errors_dict, comparison_name="x_hat_comparison_inference")
-            for k, v_tpl in errors_dict.items():
-                print("Variable:{0} Max Diff={1} Element A={2} Element B={3}".format(k, v_tpl[0], v_tpl[1], v_tpl[2]))
+                    # Inference mode
+                    model_output = model([x_, routing_matrix], training=False)
+                    x_unscaled_2 = unmask_layer([x_, routing_matrix]).numpy()
+                    x_hat_inference = (x_unscaled_2 - moving_mean) * np.reciprocal(np.sqrt(moving_var + 1e-5))
+                    x_hat_inference = mask_layer([x_hat_inference, routing_matrix]).numpy()
+                    tf_x_hat_inference = model_output["normed_x"].numpy()
+                    mu = np.squeeze(moving_mean)
+                    sigma = np.squeeze(moving_var)
+                    tf_mu = self.get_cigt_variable(model=model, var_name="popMean")
+                    tf_sigma = self.get_cigt_variable(model=model, var_name="popVar")
+                    self.compare_arrays(arr_A=mu, arr_B=tf_mu, errors_dict=errors_dict, comparison_name="popMean")
+                    self.compare_arrays(arr_A=sigma, arr_B=tf_sigma, errors_dict=errors_dict, comparison_name="popVar")
+                    self.compare_arrays(arr_A=x_hat_inference, arr_B=tf_x_hat_inference,
+                                        errors_dict=errors_dict, comparison_name="x_hat_comparison_inference")
+                for k, v_tpl in errors_dict.items():
+                    print("Variable:{0} Max Diff={1} Element A={2} Element B={3}".format(k, v_tpl[0], v_tpl[1], v_tpl[2]))
 
 
 if __name__ == '__main__':
