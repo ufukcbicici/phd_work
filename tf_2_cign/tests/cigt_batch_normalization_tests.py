@@ -6,6 +6,7 @@ import tensorflow as tf
 from tf_2_cign.cigt.custom_layers.cigt_batch_normalization import CigtBatchNormalization
 from tf_2_cign.cigt.custom_layers.cigt_masking_layer import CigtMaskingLayer
 from tf_2_cign.cigt.custom_layers.cigt_probabilistic_batch_normalization import CigtProbabilisticBatchNormalization
+from tf_2_cign.cigt.custom_layers.cigt_unmasking_layer import CigtUnmaskingLayer
 from tf_2_cign.utilities.utilities import Utilities
 from tqdm import tqdm
 
@@ -68,12 +69,13 @@ class CigtBatchNormTests(unittest.TestCase):
         cigt_normed_net = cigt_masking_layer([cigt_normed_net, routing_matrix])
         # Probabilistic Cigt route
         cigt_probabilistic_batch_normalization = CigtProbabilisticBatchNormalization(
-            momentum=momentum, epsilon=epsilon, name="cigt_probabilistic", start_moving_averages_from_zero=True)
+            momentum=momentum, epsilon=epsilon, name="cigt_probabilistic", start_moving_averages_from_zero=True,
+            normalize_routing_matrix=False)
         cigt_probabilistic_normed_net, joint_probability = \
             cigt_probabilistic_batch_normalization([op_layer_output, routing_matrix])
-        cigt_probabilistic_masking_layer = CigtMaskingLayer()
-        cigt_probabilistic_normed_net = cigt_probabilistic_masking_layer([cigt_probabilistic_normed_net,
-                                                                          routing_matrix])
+        # cigt_probabilistic_masking_layer = CigtMaskingLayer()
+        # cigt_probabilistic_normed_net = cigt_probabilistic_masking_layer([cigt_probabilistic_normed_net,
+        #                                                                   routing_matrix])
 
         # A separate batch normalization operation for every route
         list_of_conventional_batch_norms = []
@@ -213,7 +215,7 @@ class CigtBatchNormTests(unittest.TestCase):
             arr_route = shared_value[rid * self.ROUTE_WIDTH:(rid + 1) * self.ROUTE_WIDTH]
             conventional_vars[rid].assign(arr_route)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cigt_batch_norm_layer(self):
         with tf.device("GPU"):
             momentum = 0.9
@@ -388,6 +390,7 @@ class CigtBatchNormTests(unittest.TestCase):
         is_true = np.allclose(arr_A, arr_B, atol=self.ABSOLUTE_ERROR_TOLERANCE, rtol=self.RELATIVE_ERROR_TOLERANCE)
         if not is_true:
             print("False!")
+        self.assertTrue(is_true)
         if comparison_name not in errors_dict:
             errors_dict[comparison_name] = (0.0, 0.0, 0.0)
         error_tpl = errors_dict[comparison_name]
@@ -402,11 +405,13 @@ class CigtBatchNormTests(unittest.TestCase):
         cigt_probabilistic_batch_normalization_layer = CigtProbabilisticBatchNormalization(
             momentum=momentum, epsilon=epsilon,
             start_moving_averages_from_zero=False)
+        unmask_layer = CigtUnmaskingLayer()
+        mask_layer = CigtMaskingLayer()
 
         experiment_count = 1000
         input_shapes = [(128, 4, 4, 64), (128, 16, 16, 64),
                         (125, 7, 7, 128), (120, 1, 1, 512), (125, 64), (128, 256)]
-        route_counts = [1, 2, 4, 16, 32]
+        route_counts = [2, 4, 16, 32, 1]
         matrix_types = ["one_hot", "probability"]
         cartesian_product = Utilities.get_cartesian_product(list_of_lists=[input_shapes, route_counts, matrix_types])
         # pbar = tqdm(cartesian_product)
@@ -430,7 +435,7 @@ class CigtBatchNormTests(unittest.TestCase):
             moving_mean = np.zeros(shape=(input_shape[-1],))
             moving_var = np.zeros(shape=(input_shape[-1],))
             for exp_id in tqdm(range(experiment_count)):
-                x_ = np.random.uniform(size=input_shape)
+                x_unscaled = np.random.uniform(size=input_shape)
                 route_activations = np.random.uniform(size=(batch_size, route_count))
                 # Assure that every route is selected always once, at least.
                 for ri in range(route_count):
@@ -443,6 +448,8 @@ class CigtBatchNormTests(unittest.TestCase):
                 else:
                     normalizing_constants = np.sum(route_activations, axis=1)
                     routing_matrix = route_activations * np.reciprocal(normalizing_constants)[:, np.newaxis]
+                x_ = mask_layer([x_unscaled, routing_matrix]).numpy()
+                # x_ = x_unscaled
 
                 route_selection_counts = np.sum(routing_matrix, axis=0)
                 assert np.all(route_selection_counts > 0.0)
@@ -466,15 +473,16 @@ class CigtBatchNormTests(unittest.TestCase):
                 self.compare_arrays(arr_A=model_output["tf_p_s_c_given_ch_r"].numpy(),
                                     arr_B=p_s_r_ch_c, errors_dict=errors_dict,
                                     comparison_name="joint_probability")
-
-                mean_manual = np.sum(p_s_c_given_ch_r * x_, axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
+                x_unscaled_2 = unmask_layer([x_, routing_matrix]).numpy()
+                mean_manual = np.sum(p_s_c_given_ch_r * x_unscaled_2,
+                                     axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
                 tf_mean_x = self.get_cigt_variable(model=model, var_name="batchMean")
                 self.compare_arrays(arr_A=tf_mean_x, arr_B=mean_manual, errors_dict=errors_dict,
                                     comparison_name="training_mean")
                 for _ in range(len(input_shape) - 1):
                     mean_manual = np.expand_dims(mean_manual, axis=0)
 
-                x_mean_zero = x_ - mean_manual
+                x_mean_zero = x_unscaled_2 - mean_manual
                 # self.assertTrue(np.allclose(model_output["zero_meaned"].numpy(), x_mean_zero))
                 var_manual = np.sum(p_s_c_given_ch_r * np.square(x_mean_zero),
                                     axis=tuple([i_ for i_ in range(len(input_shape) - 1)]))
@@ -485,6 +493,7 @@ class CigtBatchNormTests(unittest.TestCase):
                     var_manual = np.expand_dims(var_manual, axis=0)
 
                 x_hat = x_mean_zero * np.reciprocal(np.sqrt(var_manual + 1e-5))
+                x_hat = mask_layer([x_hat, routing_matrix]).numpy()
                 self.compare_arrays(arr_A=tf_x_hat, arr_B=x_hat,
                                     errors_dict=errors_dict, comparison_name="x_hat_comparison_training")
                 if exp_id == 0:
@@ -496,7 +505,9 @@ class CigtBatchNormTests(unittest.TestCase):
 
                 # Inference mode
                 model_output = model([x_, routing_matrix], training=False)
-                x_hat_inference = (x_ - moving_mean) * np.reciprocal(np.sqrt(moving_var + 1e-5))
+                x_unscaled_2 = unmask_layer([x_, routing_matrix]).numpy()
+                x_hat_inference = (x_unscaled_2 - moving_mean) * np.reciprocal(np.sqrt(moving_var + 1e-5))
+                x_hat_inference = mask_layer([x_hat_inference, routing_matrix]).numpy()
                 tf_x_hat_inference = model_output["normed_x"].numpy()
                 mu = np.squeeze(moving_mean)
                 sigma = np.squeeze(moving_var)

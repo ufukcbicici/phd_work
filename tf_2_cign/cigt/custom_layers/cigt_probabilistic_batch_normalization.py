@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 import time
 
+from tf_2_cign.cigt.custom_layers.cigt_masking_layer import CigtMaskingLayer
+from tf_2_cign.cigt.custom_layers.cigt_unmasking_layer import CigtUnmaskingLayer
 from tf_2_cign.custom_layers.masked_batch_norm import MaskedBatchNormalization
 from tf_2_cign.custom_layers.weighted_batch_norm import WeightedBatchNormalization
 from tf_2_cign.utilities.utilities import Utilities
@@ -11,7 +13,8 @@ from tf_2_cign.utilities.utilities import Utilities
 
 
 class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
-    def __init__(self, momentum, epsilon, node=None, name="", start_moving_averages_from_zero=False):
+    def __init__(self, momentum, epsilon, node=None, name="",
+                 start_moving_averages_from_zero=False, normalize_routing_matrix=True):
         super().__init__(momentum, node, name)
         # self.routingMatrix = node.routingMatrix
         self.epsilon = epsilon
@@ -19,6 +22,9 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
         self.batchVar = None
         # self.batchJointProbability = None
         self.startMovingAveragesFromZero = start_moving_averages_from_zero
+        self.normalizeRoutingMatrix = normalize_routing_matrix
+        self.unmaskLayer = CigtUnmaskingLayer()
+        self.maskLayer = CigtMaskingLayer()
 
     def build(self, input_shape):
         super().build(input_shape=input_shape)
@@ -75,8 +81,19 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
     # @tf.function
     def call(self, inputs, **kwargs):
         x_ = inputs[0]
-        routing_matrix = inputs[1]
+        routing_matrix_unnormed = inputs[1]
         is_training = kwargs["training"]
+
+        # Unscale the input
+        x_ = self.unmaskLayer([x_, routing_matrix_unnormed])
+
+        # Normalize the routing matrix
+        if self.normalizeRoutingMatrix:
+            normalizing_constants = tf.reduce_sum(routing_matrix_unnormed, axis=1, keepdims=True)
+            routing_matrix = routing_matrix_unnormed * tf.math.reciprocal_no_nan(normalizing_constants)
+        else:
+            routing_matrix = tf.identity(routing_matrix_unnormed)
+
         joint_probabilities_s_r_ch_c, marginal_probabilities_r_ch = self.calculate_joint_probabilities(
             x_=x_, routing_matrix=routing_matrix)
         for i in range(len(x_.get_shape()) - 1):
@@ -112,6 +129,7 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
                                              offset=self.beta,
                                              scale=self.gamma,
                                              variance_epsilon=1e-5)
+
         if is_training:
             with tf.control_dependencies([normed_x]):
                 if not self.startMovingAveragesFromZero:
@@ -128,4 +146,7 @@ class CigtProbabilisticBatchNormalization(WeightedBatchNormalization):
                 self.popVar.assign(value=new_pop_var)
         # return normed_x, mean_x, variance_x, weighted_x, \
         #        joint_probabilities_s_r_ch_c, marginal_probabilities_r_ch, zero_meaned
+
+        # Scale the input back to original
+        normed_x = self.maskLayer([normed_x, routing_matrix_unnormed])
         return normed_x, joint_probabilities_s_r_ch_c
