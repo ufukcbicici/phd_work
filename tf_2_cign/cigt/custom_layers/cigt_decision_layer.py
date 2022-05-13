@@ -7,13 +7,14 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 
 
 class CigtDecisionLayer(tf.keras.layers.Layer):
-    def __init__(self, node, decision_bn_momentum, next_block_path_count, class_count, ig_balance_coefficient):
+    def __init__(self, node, decision_bn_momentum, next_block_path_count, class_count, ig_balance_coefficient,
+                 from_logits):
         super().__init__()
         with tf.name_scope("Node_{0}".format(node.index)):
             with tf.name_scope("decision_layer"):
                 self.cignNode = node
                 self.nextBlockPathCount = next_block_path_count
-                self.infoGainLayer = InfoGainLayer(class_count=class_count)
+                self.infoGainLayer = InfoGainLayer(class_count=class_count, from_logits=from_logits)
                 self.decisionBnMomentum = decision_bn_momentum
                 # self.decisionBatchNorm = WeightedBatchNormalization(momentum=self.decisionBnMomentum, node=node)
                 # self.decisionBatchNorm = tf.keras.layers.BatchNormalization(momentum=self.decisionBnMomentum)
@@ -46,18 +47,3 @@ class CigtDecisionLayer(tf.keras.layers.Layer):
             self.infoGainLayer([activations, labels, temperature, self.balanceCoeff, ig_mask])
         return ig_value, activations, routing_probabilities
 
-        # ig_mask = inputs[1]
-        # labels = inputs[2]
-        # temperature = inputs[3]
-        #
-        # # Apply weighted batch norm to the h features
-        # h_net_normed = self.decisionBatchNorm([h_net, ig_mask])
-        # activations = self.decisionActivationsLayer(h_net_normed)
-        # ig_value = self.infoGainLayer([activations, labels, temperature, self.balanceCoeff, ig_mask])
-        # # Information gain based routing matrix
-        # ig_routing_matrix = tf.one_hot(tf.argmax(activations, axis=1), self.nodeDegree, dtype=tf.int32)
-        # mask_as_matrix = tf.expand_dims(ig_mask, axis=1)
-        # output_ig_routing_matrix = tf.cast(
-        #     tf.logical_and(tf.cast(ig_routing_matrix, dtype=tf.bool), tf.cast(mask_as_matrix, dtype=tf.bool)),
-        #     dtype=tf.int32)
-        # return h_net_normed, ig_value, output_ig_routing_matrix, activations

@@ -41,7 +41,8 @@ class LeNetCigtInnerBlock(tf.keras.layers.Layer):
                                                    decision_bn_momentum=self.bnMomentum,
                                                    next_block_path_count=next_block_path_count,
                                                    class_count=class_count,
-                                                   ig_balance_coefficient=ig_balance_coefficient)
+                                                   ig_balance_coefficient=ig_balance_coefficient,
+                                                   from_logits=True)
 
     def call(self, inputs, **kwargs):
         f_input = inputs[0]

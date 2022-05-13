@@ -7,9 +7,10 @@ from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
 
 class InfoGainLayer(tf.keras.layers.Layer):
-    def __init__(self, class_count):
+    def __init__(self, class_count, from_logits):
         super().__init__()
         self.classCount = tf.constant(class_count)
+        self.fromLogits = from_logits
 
     # @tf.function
     def call(self, inputs, **kwargs):
@@ -36,8 +37,11 @@ class InfoGainLayer(tf.keras.layers.Layer):
         joint_distribution = joint_distribution * tf.expand_dims(p_c_given_x, axis=2)
 
         # Calculate p(n|x,c) * p(x,c) = p(x,c,n). Note that p(n|x,c) = p(n|x) since we assume conditional independence
-        activations_with_temperature = activations / temperature
-        p_n_given_x = tf.nn.softmax(activations_with_temperature)
+        if self.fromLogits:
+            activations_with_temperature = activations / temperature
+            p_n_given_x = tf.nn.softmax(activations_with_temperature)
+        else:
+            p_n_given_x = tf.identity(activations)
         p_xcn = joint_distribution * tf.expand_dims(p_n_given_x, axis=1)
 
         # Calculate p(c,n)
