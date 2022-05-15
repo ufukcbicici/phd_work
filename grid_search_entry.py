@@ -9,6 +9,7 @@ from tf_2_cign.cigt.cigt import Cigt
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign import FashionCign
+from tf_2_cign.softmax_decay_algorithms.hyperbolic_decay_algorithm import HyperbolicDecayAlgorithm
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 from tf_2_cign.utilities.utilities import Utilities
 
@@ -43,9 +44,13 @@ if __name__ == "__main__":
     #                                                                       decision_dropout_probs])
 
     #
-    classification_dropout_probs = [0.15, 0.2, 0.3] * FashionNetConstants.experiment_factor
-    info_gain_balance_coeffs = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.5, 5.0]
-    decision_loss_coeffs = [0.5]
+    # classification_dropout_probs = [0.15, 0.2, 0.3] * FashionNetConstants.experiment_factor
+    # info_gain_balance_coeffs = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.5, 5.0]
+    # decision_loss_coeffs = [0.5]
+    classification_dropout_probs = [0.15]
+    info_gain_balance_coeffs = [1.0]
+    decision_loss_coeffs = [1.0]
+
     # 994887500405312|0.921634499430656|0.35|2.0|1.0|200
     # classification_dropout_probs = [0.05]
     cartesian_product = Utilities.get_cartesian_product(list_of_lists=[classification_dropout_probs,
@@ -55,12 +60,18 @@ if __name__ == "__main__":
     for tpl in cartesian_product:
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
                                      validation_size=0)
-        softmax_decay_controller = StepWiseDecayAlgorithm(
-            decay_name="Stepwise",
-            initial_value=FashionNetConstants.softmax_decay_initial,
-            decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
-            decay_period=FashionNetConstants.softmax_decay_period,
-            decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
+        # softmax_decay_controller = StepWiseDecayAlgorithm(
+        #     decay_name="Stepwise",
+        #     initial_value=FashionNetConstants.softmax_decay_initial,
+        #     decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
+        #     decay_period=FashionNetConstants.softmax_decay_period,
+        #     decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
+        softmax_decay_controller = HyperbolicDecayAlgorithm(
+            decay_name="Hyperbolic",
+            initial_value=25.0,
+            decay_min_limit=1e-10,
+            exponent=0.6)
+
         learning_rate_calculator = DiscreteParameter(name="lr_calculator",
                                                      value=0.01,
                                                      schedule=[(15000 + 12000, 0.005),
@@ -91,9 +102,9 @@ if __name__ == "__main__":
                                      path_counts=[2, 4],
                                      bn_momentum=0.9,
                                      warm_up_period=warm_up_period,
-                                     routing_strategy_name="Approximate_Training",
+                                     routing_strategy_name="Full_Training",
                                      run_id=run_id,
-                                     evaluation_period=10,
+                                     evaluation_period=1,
                                      measurement_start=25)
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)

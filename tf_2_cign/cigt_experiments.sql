@@ -1344,7 +1344,8 @@ ORDER BY TestAccuracy DESC
 --Experiments: Network Name:Lenet CIGT - Bayesian Optimization - [2,4]- [32,64,128] - [512,256] + Lr Initial Rate
 --Started at 5/5/2022
 --Started on: Tetam Tuna - cigt_logger.db
-SELECT AVG(TrainingAccuracy) AS TrainingAccuracy,
+SELECT logs_table.RunID,
+       AVG(TrainingAccuracy) AS TrainingAccuracy,
        AVG(TestAccuracy) AS TestAccuracy,
        A.Value AS ClassificationDropout,
        B.Value AS InformationGainBalanceCoefficient,

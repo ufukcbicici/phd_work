@@ -34,7 +34,7 @@ class DbLogger:
     # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
 
     # TETAM TUNA CIGT
-    log_db_path = "/cta/users/hmeral/phd_work/cigt_logger.db"
+    # log_db_path = "/cta/users/hmeral/phd_work/cigt_logger.db"
 
     # TETAM 1
     # log_db_path = "/cta/users/ucbicici/phd_work/dblogger.db"
@@ -53,13 +53,13 @@ class DbLogger:
     # log_db_path = "/home/ubicici/personal_stuff/phd_work/cigt_logger.db"
 
     # Docker
-    log_db_path = "/opt/project/cigt_logger.db"
+    # log_db_path = "/opt/project/cigt_logger.db"
 
     # Home
     # log_db_path = "D://phd_work//simple_tf//dblogger.db"
 
     # Home ASUS
-    # log_db_path = "C://Users//asus//Desktop//phd_work//dblogger.db"
+    log_db_path = "C://Users//asus//Desktop//phd_work//dblogger.db"
 
     # Idea GPU
     # log_db_path = "C://Users//ufuk.bicici.IDEATEKNOLOJI//Desktop//phd_work//simple_tf//dblogger.db"

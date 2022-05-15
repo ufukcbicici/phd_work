@@ -52,7 +52,8 @@ class LenetCigt(Cigt):
                                             bn_momentum=self.bnMomentum,
                                             next_block_path_count=self.pathCounts[block_id + 1],
                                             ig_balance_coefficient=self.informationGainBalanceCoeff,
-                                            class_count=self.classCount)
+                                            class_count=self.classCount,
+                                            routing_strategy=self.routingStrategyName)
             else:
                 block = LeNetCigtLeafBlock(node=curr_node,
                                            kernel_size=self.kernelSizes[block_id],
@@ -77,7 +78,7 @@ class LenetCigt(Cigt):
     def get_explanation_string(self):
         kv_rows = []
         explanation = ""
-        explanation = self.add_explanation(name_of_param="Lenet CIGT - Bayesian Optimization - [2,4]- [32,64,128] - [512,256] + Lr Initial Rate",
+        explanation = self.add_explanation(name_of_param="Lenet CIGT - Gumbel Softmax",
                                            value="Lenet CIGT - Decision ",
                                            explanation=explanation, kv_rows=kv_rows)
         explanation += super().get_explanation_string()

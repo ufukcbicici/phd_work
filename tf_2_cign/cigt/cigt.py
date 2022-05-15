@@ -10,6 +10,8 @@ from tf_2_cign.cigt.routing_strategy.approximate_training_strategy import Approx
 from tqdm import tqdm
 from collections import Counter
 
+from tf_2_cign.cigt.routing_strategy.full_training_strategy import FullTrainingStrategy
+
 
 class Cigt(tf.keras.Model):
     def __init__(self,
@@ -44,7 +46,10 @@ class Cigt(tf.keras.Model):
         self.numOfTrainingIterations = 0
         self.numOfTrainingEpochs = 0
         self.regularizationCoefficients = {}
-        if routing_strategy_name == "Approximate_Training":
+        self.routingStrategyName = routing_strategy_name
+        if self.routingStrategyName == "Full_Training":
+            self.routingStrategy = FullTrainingStrategy()
+        elif self.routingStrategyName == "Approximate_Training":
             self.routingStrategy = ApproximateTrainingStrategy()
         else:
             raise NotImplementedError()
@@ -320,9 +325,9 @@ class Cigt(tf.keras.Model):
                 t2 = time.time()
                 # Update metrics
                 self.update_metrics(results_dict=results_dict, labels=train_y)
-                # print("********** Epoch:{0} Iteration:{1} **********".format(epoch_id, self.numOfTrainingIterations))
+                print("********** Epoch:{0} Iteration:{1} **********".format(epoch_id, self.numOfTrainingIterations))
                 t3 = time.time()
-                # self.report_metrics()
+                self.report_metrics()
                 # run_id, iteration, dataset_type, routing_matrix, labels
                 # self.calculate_branch_statistics(
                 #     run_id=self.runId,
@@ -367,10 +372,12 @@ class Cigt(tf.keras.Model):
             if self.numOfTrainingEpochs % self.evaluationPeriod == 0 or self.numOfTrainingEpochs >= scoring_start_epoch:
                 # Train statistics
                 print("Epoch {0} Train Statistics".format(epoch_id))
-                training_accuracy = self.evaluate(x=train_dataset, epoch_id=epoch_id, dataset_type="training")
+                training_accuracy, training_info_gain_list = self.evaluate(
+                    x=train_dataset, epoch_id=epoch_id, dataset_type="training")
                 # Validation / Test statistics
                 print("Epoch {0} Test Statistics".format(epoch_id))
-                test_accuracy = self.evaluate(x=val_dataset, epoch_id=epoch_id, dataset_type="test")
+                test_accuracy, test_info_gain_list = self.evaluate(
+                    x=val_dataset, epoch_id=epoch_id, dataset_type="test")
                 if self.numOfTrainingEpochs >= scoring_start_epoch:
                     scores.append(test_accuracy)
                 DbLogger.write_into_table(
@@ -384,6 +391,18 @@ class Cigt(tf.keras.Model):
                            0.0,
                            0.0,
                            "XXX")], table=DbLogger.logsTable)
+                ig_rows = []
+                for block_id in range(len(self.pathCounts) - 1):
+                    ig_rows.append((self.runId,
+                                    self.numOfTrainingIterations,
+                                    "Training Block {0} Information Gain".format(block_id),
+                                    "{0}".format(training_info_gain_list[block_id])))
+                    ig_rows.append((self.runId,
+                                    self.numOfTrainingIterations,
+                                    "Test Block {0} Information Gain".format(block_id),
+                                    "{0}".format(test_info_gain_list[block_id])))
+                DbLogger.write_into_table(rows=ig_rows, table=DbLogger.runKvStore)
+
         kv_rows = []
         self.add_explanation(name_of_param="End Time", value=datetime.now(),
                              explanation="", kv_rows=kv_rows)
@@ -429,6 +448,12 @@ class Cigt(tf.keras.Model):
             self.update_metrics(results_dict=results_dict, labels=y_)
         self.report_metrics()
         accuracy = self.metricsDict["accuracy_metric"].result().numpy()
+        information_gain_results = []
+        for block_id, path_count in enumerate(self.pathCounts):
+            is_leaf = block_id == len(self.pathCounts) - 1
+            if is_leaf:
+                continue
+            information_gain_results.append(self.metricsDict["info_gain_loss_{0}".format(block_id)].result().numpy())
         list_of_labels = tf.concat(list_of_labels, axis=0)
         for idx_ in range(len(list_of_routing_probability_matrices)):
             list_of_routing_probability_matrices[idx_] = tf.concat(list_of_routing_probability_matrices[idx_], axis=0)
@@ -440,7 +465,7 @@ class Cigt(tf.keras.Model):
             labels=list_of_labels,
             routing_probability_matrices=list_of_routing_probability_matrices,
             write_to_db=True)
-        return accuracy
+        return accuracy, information_gain_results
 
     def add_explanation(self, name_of_param, value, explanation, kv_rows):
         explanation += "{0}:{1}\n".format(name_of_param, value)

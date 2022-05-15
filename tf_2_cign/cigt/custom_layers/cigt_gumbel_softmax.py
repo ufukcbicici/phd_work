@@ -52,7 +52,7 @@ class CigtGumbelSoftmax(tf.keras.layers.Layer):
         training = kwargs["training"]
 
         logits_shape = tf.shape(logits)
-        samples_shape = tf.concat([logits_shape[0], logits_shape[1], z_sample_count], axis=0)
+        samples_shape = tf.stack([logits_shape[0], logits_shape[1], z_sample_count], axis=0)
         U_ = tf.random.uniform(shape=samples_shape, minval=0.0, maxval=1.0)
         G_ = -tf.math.log(-tf.math.log(U_ + eps) + eps)
         log_logits = tf.math.log(logits + eps)
