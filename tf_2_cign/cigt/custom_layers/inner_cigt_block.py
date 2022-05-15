@@ -11,11 +11,12 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 class InnerCigtBlock(tf.keras.layers.Layer):
     def __init__(self, node, routing_strategy,
                  decision_drop_probability, decision_dim, bn_momentum,
-                 next_block_path_count, class_count, ig_balance_coefficient):
+                 next_block_path_count, class_count, ig_balance_coefficient, use_straight_through):
         super().__init__()
         self.node = node
         self.bnMomentum = bn_momentum
         self.routingStrategy = routing_strategy
+        self.useStraightThrough = use_straight_through
 
         # H operations
         self.cigtRouteAveragingLayer = CigtRouteAveragingLayer()
@@ -33,7 +34,8 @@ class InnerCigtBlock(tf.keras.layers.Layer):
                                                                     decision_bn_momentum=self.bnMomentum,
                                                                     next_block_path_count=next_block_path_count,
                                                                     class_count=class_count,
-                                                                    ig_balance_coefficient=ig_balance_coefficient)
+                                                                    ig_balance_coefficient=ig_balance_coefficient,
+                                                                    straight_through=self.useStraightThrough)
 
         elif self.routingStrategy == "Approximate_Training":
             self.cigtDecisionLayer = CigtDecisionLayer(node=node,
