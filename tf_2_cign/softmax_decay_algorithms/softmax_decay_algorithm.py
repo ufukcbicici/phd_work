@@ -11,5 +11,5 @@ class SoftmaxDecayAlgorithm:
     def get_value(self):
         pass
 
-    def get_explanation(self):
+    def get_explanation(self, network, explanation, kv_rows):
         pass

@@ -106,7 +106,8 @@ if __name__ == "__main__":
                                      run_id=run_id,
                                      evaluation_period=1,
                                      measurement_start=25,
-                                     use_straight_through=False)
+                                     use_straight_through=False,
+                                     optimizer_type="SGD")
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
         fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf, epochs=125)

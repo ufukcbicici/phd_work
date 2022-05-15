@@ -11,12 +11,14 @@ from tqdm import tqdm
 from collections import Counter
 
 from tf_2_cign.cigt.routing_strategy.full_training_strategy import FullTrainingStrategy
+from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
 
 
 class Cigt(tf.keras.Model):
     def __init__(self,
                  run_id,
                  batch_size, input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
+                 optimizer_type,
                  decision_loss_coeff, routing_strategy_name, use_straight_through, warm_up_period,
                  decision_drop_probability, classification_drop_probability,
                  decision_wd, classification_wd, evaluation_period, measurement_start,
@@ -29,6 +31,7 @@ class Cigt(tf.keras.Model):
         self.classCount = class_count
         self.inputDims = input_dims
         self.learningRateSchedule = learning_rate_schedule
+        self.optimizerType = optimizer_type
         self.decisionLossCoefficient = decision_loss_coeff
         self.softmaxDecayController = softmax_decay_controller
         self.evaluationPeriod = evaluation_period
@@ -59,13 +62,18 @@ class Cigt(tf.keras.Model):
         # self.inputs = tf.keras.Input(shape=input_dims, name="inputs")
         # self.labels = tf.keras.Input(shape=(), name="labels", dtype=tf.int32)
 
-    def get_sgd_optimizer(self):
+    def get_optimizer(self):
         boundaries = [tpl[0] for tpl in self.learningRateSchedule.schedule]
         values = [self.learningRateSchedule.initialValue]
         values.extend([tpl[1] for tpl in self.learningRateSchedule.schedule])
         learning_rate_scheduler_tf = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
             boundaries=boundaries, values=values)
-        optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
+        if self.optimizerType == "SGD":
+            optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate_scheduler_tf, momentum=0.9)
+        elif self.optimizer == "Adam":
+            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_scheduler_tf)
+        else:
+            raise NotImplementedError()
         return optimizer
 
     def build_network(self):
@@ -492,9 +500,25 @@ class Cigt(tf.keras.Model):
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="Warm Up Period", value=self.warmUpPeriod,
                                            explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Optimizer Type", value=self.optimizerType,
+                                           explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="Lr Settings",
                                            value=self.learningRateSchedule.get_explanation(),
                                            explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Initial Lr", value=self.learningRateSchedule.initialValue,
+                                           explanation=explanation, kv_rows=kv_rows)
+        for idx, tpl in enumerate(self.learningRateSchedule.schedule):
+            explanation = self.add_explanation(name_of_param="Lr Schedule {0} Step".format(idx),
+                                               value=tpl[0],
+                                               explanation=explanation,
+                                               kv_rows=kv_rows)
+            explanation = self.add_explanation(name_of_param="Lr Schedule {0} Lr Value".format(idx),
+                                               value=tpl[1],
+                                               explanation=explanation,
+                                               kv_rows=kv_rows)
+        explanation = self.softmaxDecayController.get_explanation(network=self,
+                                                                  explanation=explanation,
+                                                                  kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="Decision Loss Coeff", value=self.decisionLossCoefficient,
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="Batch Norm Decay", value=self.bnMomentum,

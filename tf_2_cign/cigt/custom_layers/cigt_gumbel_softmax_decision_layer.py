@@ -32,6 +32,7 @@ class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
         # Softplus, because the logits must be positive for Gumbel-Softmax to work correctly.
         ig_mask = tf.ones_like(labels)
         logits = tf.keras.activations.softplus(activations)
+        # logits = tf.keras.activations.softmax(activations)
         z_samples = self.gsLayer([logits, temperature, self.sampleCount], training=training)
         z_expected = tf.reduce_mean(z_samples, axis=-1)
         ig_value, _ = self.infoGainLayer([z_expected, labels, 1.0, self.balanceCoeff, ig_mask])

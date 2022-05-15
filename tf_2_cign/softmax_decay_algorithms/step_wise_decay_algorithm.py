@@ -24,10 +24,27 @@ class StepWiseDecayAlgorithm(SoftmaxDecayAlgorithm):
     def get_value(self):
         return self.decayingParameter.value
 
-    def get_explanation(self):
-        explanation = ""
-        explanation += "Softmax Decay Initial:{0}\n".format(self.initialValue)
-        explanation += "Softmax Decay Coefficient:{0}\n".format(self.decayCoefficient)
-        explanation += "Softmax Decay Period:{0}\n".format(self.decayPeriod)
-        explanation += "Softmax Min Limit:{0}\n".format(self.decayMinLimit)
+    def get_explanation(self, network, explanation, kv_rows):
+        explanation = network.add_explanation(name_of_param="Temperature Decay Algorithm",
+                                              value="StepWiseDecayAlgorithm",
+                                              explanation=explanation, kv_rows=kv_rows)
+        explanation = network.add_explanation(name_of_param="Temperature Initial",
+                                              value=self.initialValue,
+                                              explanation=explanation, kv_rows=kv_rows)
+        explanation = network.add_explanation(name_of_param="Temperature Decay Coefficient",
+                                              value=self.decayCoefficient,
+                                              explanation=explanation, kv_rows=kv_rows)
+        explanation = network.add_explanation(name_of_param="Temperature Decay Period",
+                                              value=self.decayPeriod,
+                                              explanation=explanation, kv_rows=kv_rows)
+        explanation = network.add_explanation(name_of_param="Temperature Decay Min Limit",
+                                              value=self.decayMinLimit,
+                                              explanation=explanation, kv_rows=kv_rows)
         return explanation
+
+        # explanation = ""
+        # explanation += "Softmax Decay Initial:{0}\n".format(self.initialValue)
+        # explanation += "Softmax Decay Coefficient:{0}\n".format(self.decayCoefficient)
+        # explanation += "Softmax Decay Period:{0}\n".format(self.decayPeriod)
+        # explanation += "Softmax Min Limit:{0}\n".format(self.decayMinLimit)
+        # return explanation

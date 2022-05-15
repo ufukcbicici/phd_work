@@ -13,13 +13,14 @@ class LenetCigt(Cigt):
     def __init__(self, run_id, batch_size, input_dims, filter_counts, kernel_sizes, hidden_layers,
                  decision_drop_probability, classification_drop_probability, decision_wd, classification_wd,
                  evaluation_period, measurement_start, decision_dimensions, class_count, information_gain_balance_coeff,
-                 softmax_decay_controller, learning_rate_schedule, decision_loss_coeff, path_counts, bn_momentum,
-                 warm_up_period, routing_strategy_name, use_straight_through, *args, **kwargs):
+                 softmax_decay_controller, learning_rate_schedule, optimizer_type, decision_loss_coeff, path_counts,
+                 bn_momentum, warm_up_period, routing_strategy_name, use_straight_through, *args, **kwargs):
 
         super().__init__(run_id, batch_size, input_dims, class_count, path_counts, softmax_decay_controller,
-                         learning_rate_schedule, decision_loss_coeff, routing_strategy_name, use_straight_through,
-                         warm_up_period, decision_drop_probability, classification_drop_probability, decision_wd,
-                         classification_wd, evaluation_period, measurement_start, *args, **kwargs)
+                         learning_rate_schedule, optimizer_type, decision_loss_coeff, routing_strategy_name,
+                         use_straight_through, warm_up_period, decision_drop_probability,
+                         classification_drop_probability, decision_wd, classification_wd, evaluation_period,
+                         measurement_start, *args, **kwargs)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers
@@ -32,7 +33,7 @@ class LenetCigt(Cigt):
         self.build_network()
         # self.dummyBlock = None
         # self.calculate_regularization_coefficients()
-        self.optimizer = self.get_sgd_optimizer()
+        self.optimizer = self.get_optimizer()
 
     def build_network(self):
         self.cigtBlocks = []
