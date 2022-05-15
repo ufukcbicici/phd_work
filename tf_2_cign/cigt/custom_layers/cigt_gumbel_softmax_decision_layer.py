@@ -10,13 +10,14 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 
 class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
     def __init__(self, node, decision_bn_momentum, next_block_path_count, class_count, ig_balance_coefficient,
-                 straight_through, sample_count=250):
+                 straight_through, decision_non_linearity, sample_count=250):
         super().__init__(node, decision_bn_momentum, next_block_path_count,
                          class_count, ig_balance_coefficient, from_logits=False)
         # self.softPlusLayer = tf.keras.activations.softplus()
         self.gsLayer = CigtGumbelSoftmax()
         self.straightThrough = straight_through
         self.sampleCount = sample_count
+        self.decisionNonLinearity = decision_non_linearity
 
 #     # @tf.function
     def call(self, inputs, **kwargs):
@@ -31,7 +32,14 @@ class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
         activations = self.decisionActivationsLayer(h_net_normed)
         # Softplus, because the logits must be positive for Gumbel-Softmax to work correctly.
         ig_mask = tf.ones_like(labels)
-        logits = tf.keras.activations.softplus(activations)
+        if self.decisionNonLinearity == "Softplus":
+            # tf.print("Softplus")
+            logits = tf.keras.activations.softplus(activations)
+        elif self.decisionNonLinearity == "Softmax":
+            # tf.print("Softmax")
+            logits = tf.keras.activations.softmax(activations)
+        else:
+            raise NotImplementedError()
         # logits = tf.keras.activations.softmax(activations)
         z_samples = self.gsLayer([logits, temperature, self.sampleCount], training=training)
         z_expected = tf.reduce_mean(z_samples, axis=-1)

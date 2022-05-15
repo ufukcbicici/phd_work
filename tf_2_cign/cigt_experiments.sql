@@ -1394,3 +1394,17 @@ WHERE run_parameters.Parameter = "Path Counts" AND
       logs_table.Epoch >= 115
 GROUP BY logs_table.RunID
 ORDER BY TestAccuracy DESC
+
+--Experiments: Network Name:"Lenet CIGT - Gumbel Softmax" - Bayesian Optimization
+--Started at 15/5/2022
+--Started on: Tetam - cigt_logger.db
+
+--decision_non_linearity="Softplus",
+--optimizer_type="SGD",
+--use_straight_through=True
+
+--X = classification_dropout_probability
+--Y = information_gain_balance_coefficient
+--Z = decision_loss_coefficient
+--W = lr_initial_rate
+--U = hyperbolic_exponent

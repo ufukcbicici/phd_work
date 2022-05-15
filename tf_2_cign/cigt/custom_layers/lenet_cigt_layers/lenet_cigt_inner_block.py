@@ -11,11 +11,13 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 class LeNetCigtInnerBlock(InnerCigtBlock):
     def __init__(self, node, kernel_size, num_of_filters, strides, activation, use_bias, padding,
                  decision_drop_probability, decision_dim, bn_momentum, next_block_path_count, class_count,
-                 ig_balance_coefficient, routing_strategy, use_straight_through):
+                 ig_balance_coefficient, routing_strategy, use_straight_through, decision_non_linearity):
 
         # F operations
+
         super().__init__(node, routing_strategy, decision_drop_probability, decision_dim, bn_momentum,
-                         next_block_path_count, class_count, ig_balance_coefficient, use_straight_through)
+                         next_block_path_count, class_count, ig_balance_coefficient, use_straight_through,
+                         decision_non_linearity)
         self.convLayer = CigtConvLayer(kernel_size=kernel_size,
                                        num_of_filters=num_of_filters,
                                        strides=strides,

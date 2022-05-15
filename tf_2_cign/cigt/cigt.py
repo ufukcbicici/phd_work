@@ -18,7 +18,7 @@ class Cigt(tf.keras.Model):
     def __init__(self,
                  run_id,
                  batch_size, input_dims, class_count, path_counts, softmax_decay_controller, learning_rate_schedule,
-                 optimizer_type,
+                 optimizer_type, decision_non_linearity,
                  decision_loss_coeff, routing_strategy_name, use_straight_through, warm_up_period,
                  decision_drop_probability, classification_drop_probability,
                  decision_wd, classification_wd, evaluation_period, measurement_start,
@@ -34,6 +34,7 @@ class Cigt(tf.keras.Model):
         self.optimizerType = optimizer_type
         self.decisionLossCoefficient = decision_loss_coeff
         self.softmaxDecayController = softmax_decay_controller
+        self.decisionNonLinearity = decision_non_linearity
         self.evaluationPeriod = evaluation_period
         self.measurementStart = measurement_start
         self.dagObject = Dag()
@@ -497,6 +498,8 @@ class Cigt(tf.keras.Model):
         explanation = self.add_explanation(name_of_param="Routing Strategy", value=self.routingStrategy.__class__,
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="Use Straight Through", value=self.useStraightThrough,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Decision Nonlinearity", value=self.decisionNonLinearity,
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="Warm Up Period", value=self.warmUpPeriod,
                                            explanation=explanation, kv_rows=kv_rows)

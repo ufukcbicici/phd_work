@@ -11,6 +11,7 @@ from tf_2_cign.cigt.cigt import Cigt
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.fashion_net.fashion_cign import FashionCign
+from tf_2_cign.softmax_decay_algorithms.hyperbolic_decay_algorithm import HyperbolicDecayAlgorithm
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 from tf_2_cign.utilities.utilities import Utilities
 
@@ -23,13 +24,15 @@ optimization_bounds_continuous = {
     "classification_dropout_probability": (0.0, 0.5),
     "information_gain_balance_coefficient": (1.0, 10.0),
     "decision_loss_coefficient": (0.01, 1.0),
-    "lr_initial_rate": (0.0, 0.05)
+    "lr_initial_rate": (0.0, 0.05),
+    "hyperbolic_exponent": (0.0, 1.0)
 }
 
 optimization_bounds_discrete = {
     "classification_dropout_probability": (0.0, 1000.0),
     "information_gain_balance_coefficient": (0.0, 1000.0),
-    "decision_loss_coefficient": (0.0, 1000.0)
+    "decision_loss_coefficient": (0.0, 1000.0),
+
 }
 
 discrete_values = {
@@ -44,16 +47,19 @@ discrete_values = {
 def cigt_test_function(classification_dropout_probability,
                        information_gain_balance_coefficient,
                        decision_loss_coefficient,
-                       lr_initial_rate):
+                       lr_initial_rate,
+                       hyperbolic_exponent):
     X = classification_dropout_probability
     Y = information_gain_balance_coefficient
     Z = decision_loss_coefficient
     W = lr_initial_rate
+    U = hyperbolic_exponent
 
     print("classification_dropout_probability={0}".format(classification_dropout_probability))
     print("information_gain_balance_coefficient={0}".format(information_gain_balance_coefficient))
     print("decision_loss_coefficient={0}".format(decision_loss_coefficient))
     print("lr_initial_rate={0}".format(lr_initial_rate))
+    print("hyperbolic_exponent={0}".format(hyperbolic_exponent))
     #
     # dX = X - 0.25
     # dY = Y - 5.5
@@ -62,11 +68,16 @@ def cigt_test_function(classification_dropout_probability,
     # score = -(dX * dX + dY * dY * dZ * dZ)
 
     fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
-    softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
-                                                      initial_value=FashionNetConstants.softmax_decay_initial,
-                                                      decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
-                                                      decay_period=FashionNetConstants.softmax_decay_period,
-                                                      decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
+    # softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
+    #                                                   initial_value=FashionNetConstants.softmax_decay_initial,
+    #                                                   decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
+    #                                                   decay_period=FashionNetConstants.softmax_decay_period,
+    #                                                   decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
+    softmax_decay_controller = HyperbolicDecayAlgorithm(
+        decay_name="Hyperbolic",
+        initial_value=25.0,
+        decay_min_limit=0.1,
+        exponent=U)
     learning_rate_calculator = DiscreteParameter(name="lr_calculator",
                                                  value=W,
                                                  schedule=[(15000 + 12000, (1.0 / 2.0) * W),
@@ -94,10 +105,13 @@ def cigt_test_function(classification_dropout_probability,
                                  path_counts=[2, 4],
                                  bn_momentum=0.9,
                                  warm_up_period=25,
-                                 routing_strategy_name="Approximate_Training",
+                                 routing_strategy_name="Full_Training",
                                  run_id=run_id,
                                  evaluation_period=10,
-                                 measurement_start=25)
+                                 measurement_start=25,
+                                 decision_non_linearity="Softplus",
+                                 optimizer_type="SGD",
+                                 use_straight_through=True)
 
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
@@ -140,7 +154,7 @@ def optimize_with_bayesian_optimization():
         verbose=10
     )
 
-    logger = JSONLogger(path="bo_logs_with_lr_optimization.json")
+    logger = JSONLogger(path="bo_gumbel_softmax.json")
     optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
 
     optimizer.maximize(
