@@ -28,13 +28,13 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # TETAM CIGT
-    log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
+    # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
 
     # TETAM CIGT 2
     # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
 
     # TETAM TUNA CIGT
-    # log_db_path = "/cta/users/hmeral/phd_work/cigt_logger.db"
+    log_db_path = "/cta/users/hmeral/phd_work/cigt_logger.db"
 
     # TETAM 1
     # log_db_path = "/cta/users/ucbicici/phd_work/dblogger.db"
