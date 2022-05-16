@@ -1551,3 +1551,5 @@ WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Gumbel Softmax with Straight
 AND logs_table.Epoch >= 115
 GROUP BY logs_table.RunId
 ORDER BY TestAccuracy DESC
+
+--DENEME DENEME
