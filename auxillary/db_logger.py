@@ -89,8 +89,10 @@ class DbLogger:
     # log_db_path = "/truba/home/seberger/main/repo/phd_work/cigt_logger.db"
 
     # Paperspace
-    log_db_path = "/notebooks/cigt_logger.db"
+    # log_db_path = "/notebooks/cigt_logger.db"
 
+    # Blackshark Desktop
+    log_db_path = "/home/ubicici/personal_stuff/phd_work2/phd_work/cigt_logger.db"
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}

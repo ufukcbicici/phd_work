@@ -1443,6 +1443,8 @@ GROUP BY logs_table.RunId
 ORDER BY TestAccuracy DESC
 
 
+SELECT * FROM run_kv_store WHERE Key LIKE "%Information Gain%"
+SELECT * FROM run_kv_store WHERE RunID = 1 AND Key LIKE "%Information Gain%" OR Key LIKE "%Path Distributions%";
 --Experiments: Network Name:"Lenet CIGT - Gumbel Softmax - Bayesian Optimization
 --Started at 15/5/2022
 --Started on: Tetam Tuna - cigt_logger.db
@@ -1553,3 +1555,99 @@ GROUP BY logs_table.RunId
 ORDER BY TestAccuracy DESC
 
 --DENEME DENEME
+
+--Experiments: Network Name:"Lenet CIGT - Gumbel Softmax - Bayesian Optimization
+--Started at 16/5/2022
+--Started on: Paperspace Phd-1 - cigt_logger.db
+
+--  decision_non_linearity="Softmax",
+--  optimizer_type="SGD",
+--  use_straight_through=False
+
+--X = classification_dropout_probability
+--Y = information_gain_balance_coefficient
+--Z = decision_loss_coefficient
+--W = lr_initial_rate
+--U = hyperbolic_exponent
+
+SELECT logs_table.RunId,
+       AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       MIN(A.Value) AS ClassificationDropoutMin,
+       MAX(A.Value) AS ClassificationDropoutMax,
+       MIN(B.Value) AS InformationGainBalanceCoefficientMin,
+       MAX(B.Value) AS InformationGainBalanceCoefficientMax,
+       MIN(C.Value) AS DecisionLossCoefficientMin,
+       MAX(C.Value) AS DecisionLossCoefficientMax,
+       MIN(D.Value) AS HyperbolicExponentMin,
+       MAX(D.Value) AS HyperbolicExponentMax,
+       MIN(E.Value) AS InitialLrMin,
+       MAX(E.Value) AS InitialLrMax,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Dropout") AS A ON
+    logs_table.RunID = A.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Information Gain Balance Coefficient") AS B ON
+    logs_table.RunID = B.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Loss Coeff") AS C ON
+    logs_table.RunID = C.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Temperature Exponent") AS D ON
+    logs_table.RunID = D.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Initial Lr") AS E ON
+    logs_table.RunID = E.RunID
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_meta_data ON
+logs_table.RunId = run_meta_data.RunId
+WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Gumbel Softmax%")
+AND logs_table.Epoch >= 115
+GROUP BY logs_table.RunId
+ORDER BY TestAccuracy DESC
+
+
+
+--Experiments: Network Name:"Lenet CIGT - Gumbel Softmax - Bayesian Optimization
+--Started at 16/5/2022
+--Started on: Blackshark Desktop - cigt_logger.db
+
+--  decision_non_linearity="Softplus",
+--  optimizer_type="SGD",
+--  use_straight_through=False)
+
+--X = classification_dropout_probability
+--Y = information_gain_balance_coefficient
+--Z = decision_loss_coefficient
+--W = lr_initial_rate
+--U = hyperbolic_exponent
+
+SELECT logs_table.RunId,
+       AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       MIN(A.Value) AS ClassificationDropoutMin,
+       MAX(A.Value) AS ClassificationDropoutMax,
+       MIN(B.Value) AS InformationGainBalanceCoefficientMin,
+       MAX(B.Value) AS InformationGainBalanceCoefficientMax,
+       MIN(C.Value) AS DecisionLossCoefficientMin,
+       MAX(C.Value) AS DecisionLossCoefficientMax,
+       MIN(D.Value) AS HyperbolicExponentMin,
+       MAX(D.Value) AS HyperbolicExponentMax,
+       MIN(E.Value) AS InitialLrMin,
+       MAX(E.Value) AS InitialLrMax,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Dropout") AS A ON
+    logs_table.RunID = A.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Information Gain Balance Coefficient") AS B ON
+    logs_table.RunID = B.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Loss Coeff") AS C ON
+    logs_table.RunID = C.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Temperature Exponent") AS D ON
+    logs_table.RunID = D.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Initial Lr") AS E ON
+    logs_table.RunID = E.RunID
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_meta_data ON
+logs_table.RunId = run_meta_data.RunId
+WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Gumbel Softmax%")
+AND logs_table.Epoch >= 115
+GROUP BY logs_table.RunId
+ORDER BY TestAccuracy DESC

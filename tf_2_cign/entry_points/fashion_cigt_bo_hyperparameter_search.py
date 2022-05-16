@@ -109,7 +109,7 @@ def cigt_test_function(classification_dropout_probability,
                                  run_id=run_id,
                                  evaluation_period=10,
                                  measurement_start=25,
-                                 decision_non_linearity="Softmax",
+                                 decision_non_linearity="Softplus",
                                  optimizer_type="SGD",
                                  use_straight_through=False)
 
