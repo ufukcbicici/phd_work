@@ -111,7 +111,7 @@ def cigt_test_function(classification_dropout_probability,
                                  measurement_start=25,
                                  decision_non_linearity="Softmax",
                                  optimizer_type="SGD",
-                                 use_straight_through=True)
+                                 use_straight_through=False)
 
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
