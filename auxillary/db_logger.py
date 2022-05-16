@@ -34,7 +34,7 @@ class DbLogger:
     # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
 
     # TETAM TUNA CIGT
-    log_db_path = "/cta/users/hmeral/phd_work/cigt_logger.db"
+    # log_db_path = "/cta/users/hmeral/phd_work/cigt_logger.db"
 
     # TETAM 1
     # log_db_path = "/cta/users/ucbicici/phd_work/dblogger.db"
@@ -87,6 +87,9 @@ class DbLogger:
 
     # TRUBA MY
     # log_db_path = "/truba/home/seberger/main/repo/phd_work/cigt_logger.db"
+
+    # Paperspace
+    log_db_path = "/notebooks/cigt_logger.db"
 
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
