@@ -48,8 +48,8 @@ if __name__ == "__main__":
     # info_gain_balance_coeffs = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.5, 5.0]
     # decision_loss_coeffs = [0.5]
     classification_dropout_probs = [0.15]
-    info_gain_balance_coeffs = [1.0]
-    decision_loss_coeffs = [1.0]
+    info_gain_balance_coeffs = [1.5]
+    decision_loss_coeffs = [0.5]
 
     # 994887500405312|0.921634499430656|0.35|2.0|1.0|200
     # classification_dropout_probs = [0.05]
@@ -60,17 +60,17 @@ if __name__ == "__main__":
     for tpl in cartesian_product:
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
                                      validation_size=0)
-        # softmax_decay_controller = StepWiseDecayAlgorithm(
-        #     decay_name="Stepwise",
-        #     initial_value=FashionNetConstants.softmax_decay_initial,
-        #     decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
-        #     decay_period=FashionNetConstants.softmax_decay_period,
-        #     decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
-        softmax_decay_controller = HyperbolicDecayAlgorithm(
-            decay_name="Hyperbolic",
-            initial_value=25.0,
-            decay_min_limit=1e-10,
-            exponent=0.6)
+        softmax_decay_controller = StepWiseDecayAlgorithm(
+            decay_name="Stepwise",
+            initial_value=FashionNetConstants.softmax_decay_initial,
+            decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
+            decay_period=FashionNetConstants.softmax_decay_period,
+            decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
+        # softmax_decay_controller = HyperbolicDecayAlgorithm(
+        #     decay_name="Hyperbolic",
+        #     initial_value=25.0,
+        #     decay_min_limit=1e-10,
+        #     exponent=0.6)
 
         learning_rate_calculator = DiscreteParameter(name="lr_calculator",
                                                      value=0.01,
@@ -102,13 +102,14 @@ if __name__ == "__main__":
                                      path_counts=[2, 4],
                                      bn_momentum=0.9,
                                      warm_up_period=warm_up_period,
-                                     routing_strategy_name="Full_Training",
+                                     routing_strategy_name="Approximate_Training",
                                      run_id=run_id,
                                      evaluation_period=1,
                                      measurement_start=25,
                                      use_straight_through=False,
                                      optimizer_type="SGD",
-                                     decision_non_linearity="Softplus")
+                                     decision_non_linearity="Softplus",
+                                     save_model=True)
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
         fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf, epochs=125)

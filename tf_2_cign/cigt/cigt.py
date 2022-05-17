@@ -1,3 +1,5 @@
+import os.path
+
 import tensorflow as tf
 import numpy as np
 import time
@@ -21,7 +23,7 @@ class Cigt(tf.keras.Model):
                  optimizer_type, decision_non_linearity,
                  decision_loss_coeff, routing_strategy_name, use_straight_through, warm_up_period,
                  decision_drop_probability, classification_drop_probability,
-                 decision_wd, classification_wd, evaluation_period, measurement_start,
+                 decision_wd, classification_wd, evaluation_period, measurement_start, save_model,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.runId = run_id
@@ -47,6 +49,7 @@ class Cigt(tf.keras.Model):
         self.warmUpPeriod = warm_up_period
         self.warmUpFinalIteration = None
         self.isInWarmUp = True
+        self.saveModel = save_model
         self.numOfTrainingIterations = 0
         self.numOfTrainingEpochs = 0
         self.regularizationCoefficients = {}
@@ -417,6 +420,13 @@ class Cigt(tf.keras.Model):
         self.add_explanation(name_of_param="End Time", value=datetime.now(),
                              explanation="", kv_rows=kv_rows)
         DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
+
+        if self.saveModel:
+            weights_folder_path = os.path.join(os.path.dirname(__file__), "saved_models", "weights_{0}".format(
+                self.runId))
+            os.mkdir(path=weights_folder_path)
+            self.save_weights(filepath=os.path.join(weights_folder_path, "fully_trained_weights"))
+
         print(scores)
         print(scores[-10:])
         mean_score = np.mean(np.array(scores[-10:]))

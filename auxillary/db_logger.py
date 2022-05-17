@@ -28,7 +28,7 @@ class DbLogger:
     # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
 
     # TETAM CIGT
-    log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
+    # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
 
     # TETAM CIGT 2
     # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
@@ -92,7 +92,7 @@ class DbLogger:
     # log_db_path = "/notebooks/cigt_logger.db"
 
     # Blackshark Desktop
-    # log_db_path = "/home/ubicici/personal_stuff/phd_work2/phd_work/cigt_logger.db"
+    log_db_path = "/home/ubicici/personal_stuff/phd_work2/phd_work/cigt_logger.db"
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}
