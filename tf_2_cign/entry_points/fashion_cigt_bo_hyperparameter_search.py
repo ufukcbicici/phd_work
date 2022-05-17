@@ -111,7 +111,7 @@ def cigt_test_function(classification_dropout_probability,
                                  measurement_start=25,
                                  decision_non_linearity="Softplus",
                                  optimizer_type="SGD",
-                                 use_straight_through=False)
+                                 use_straight_through=True)
 
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
@@ -154,12 +154,13 @@ def optimize_with_bayesian_optimization():
         verbose=10
     )
 
-    logger = JSONLogger(path="bo_gumbel_softmax.json")
+    logger = JSONLogger(path="bo_gumbel_softmax_v2.json")
     optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
 
+    load_logs(optimizer, logs=["bo_gumbel_softmax.json"])
     optimizer.maximize(
         n_iter=300,
-        init_points=100,
+        init_points=42,
         acq="ei",
         xi=0.01)
 
@@ -171,13 +172,14 @@ def optimize_with_discretized_bayesian_optimization():
         verbose=10
     )
 
-    logger = JSONLogger(path="bo_logs_discrete.json")
-    optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
-
-    optimizer.maximize(
-        n_iter=300,
-        init_points=100,
-        acq="ei",
-        xi=0.01)
+    # logger = JSONLogger(path="bo_logs_discrete.json")
+    # optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
+    #
+    # load_logs(optimizer, logs=["./logs.json"]);
+    # optimizer.maximize(
+    #     n_iter=300,
+    #     init_points=100,
+    #     acq="ei",
+    #     xi=0.01)
 
     print("X")
