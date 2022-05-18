@@ -23,43 +23,43 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 optimization_bounds_continuous = {
     "classification_dropout_probability": (0.0, 0.5),
     "information_gain_balance_coefficient": (1.0, 10.0),
-    "decision_loss_coefficient": (0.01, 1.0),
-    "lr_initial_rate": (0.0, 0.05),
-    "hyperbolic_exponent": (0.0, 1.0)
+    "decision_loss_coefficient": (0.01, 1.0)
+    # "lr_initial_rate": (0.0, 0.05),
+    # "hyperbolic_exponent": (0.0, 1.0)
 }
 
-optimization_bounds_discrete = {
-    "classification_dropout_probability": (0.0, 1000.0),
-    "information_gain_balance_coefficient": (0.0, 1000.0),
-    "decision_loss_coefficient": (0.0, 1000.0),
-
-}
-
-discrete_values = {
-    "classification_dropout_probability": [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5],
-    "information_gain_balance_coefficient": [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0,
-                                             8.5, 9.0, 9.5, 10.0],
-    "decision_loss_coefficient": [0.0, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
-                                  0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
-}
+# optimization_bounds_discrete = {
+#     "classification_dropout_probability": (0.0, 1000.0),
+#     "information_gain_balance_coefficient": (0.0, 1000.0),
+#     "decision_loss_coefficient": (0.0, 1000.0),
+#
+# }
+#
+# discrete_values = {
+#     "classification_dropout_probability": [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5],
+#     "information_gain_balance_coefficient": [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0,
+#                                              8.5, 9.0, 9.5, 10.0],
+#     "decision_loss_coefficient": [0.0, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
+#                                   0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
+# }
 
 
 def cigt_test_function(classification_dropout_probability,
                        information_gain_balance_coefficient,
-                       decision_loss_coefficient,
-                       lr_initial_rate,
-                       hyperbolic_exponent):
+                       decision_loss_coefficient):
+                       # lr_initial_rate,
+                       # hyperbolic_exponent):
     X = classification_dropout_probability
     Y = information_gain_balance_coefficient
     Z = decision_loss_coefficient
-    W = lr_initial_rate
-    U = hyperbolic_exponent
+    W = 0.01
+    # U = hyperbolic_exponent
 
     print("classification_dropout_probability={0}".format(classification_dropout_probability))
     print("information_gain_balance_coefficient={0}".format(information_gain_balance_coefficient))
     print("decision_loss_coefficient={0}".format(decision_loss_coefficient))
-    print("lr_initial_rate={0}".format(lr_initial_rate))
-    print("hyperbolic_exponent={0}".format(hyperbolic_exponent))
+    # print("lr_initial_rate={0}".format(lr_initial_rate))
+    # print("hyperbolic_exponent={0}".format(hyperbolic_exponent))
     #
     # dX = X - 0.25
     # dY = Y - 5.5
@@ -68,16 +68,16 @@ def cigt_test_function(classification_dropout_probability,
     # score = -(dX * dX + dY * dY * dZ * dZ)
 
     fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
-    # softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
-    #                                                   initial_value=FashionNetConstants.softmax_decay_initial,
-    #                                                   decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
-    #                                                   decay_period=FashionNetConstants.softmax_decay_period,
-    #                                                   decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
-    softmax_decay_controller = HyperbolicDecayAlgorithm(
-        decay_name="Hyperbolic",
-        initial_value=25.0,
-        decay_min_limit=0.1,
-        exponent=U)
+    softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
+                                                      initial_value=FashionNetConstants.softmax_decay_initial,
+                                                      decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
+                                                      decay_period=FashionNetConstants.softmax_decay_period,
+                                                      decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
+    # softmax_decay_controller = HyperbolicDecayAlgorithm(
+    #     decay_name="Hyperbolic",
+    #     initial_value=25.0,
+    #     decay_min_limit=0.1,
+    #     exponent=U)
     learning_rate_calculator = DiscreteParameter(name="lr_calculator",
                                                  value=W,
                                                  schedule=[(15000 + 12000, (1.0 / 2.0) * W),
@@ -109,9 +109,10 @@ def cigt_test_function(classification_dropout_probability,
                                  run_id=run_id,
                                  evaluation_period=10,
                                  measurement_start=25,
-                                 decision_non_linearity="Softplus",
+                                 use_straight_through=True,
                                  optimizer_type="SGD",
-                                 use_straight_through=True)
+                                 decision_non_linearity="Softmax",
+                                 save_model=True)
 
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
@@ -121,30 +122,30 @@ def cigt_test_function(classification_dropout_probability,
     return score
 
 
-def cigt_test_function_discretized(classification_dropout_probability,
-                                   information_gain_balance_coefficient,
-                                   decision_loss_coefficient):
-    X = Utilities.discretize_value(sampled_value=classification_dropout_probability,
-                                   interval_start=optimization_bounds_discrete["classification_dropout_probability"][0],
-                                   interval_end=optimization_bounds_discrete["classification_dropout_probability"][1],
-                                   discrete_values=discrete_values["classification_dropout_probability"])
-    Y = Utilities.discretize_value(sampled_value=information_gain_balance_coefficient,
-                                   interval_start=optimization_bounds_discrete[
-                                       "information_gain_balance_coefficient"][0],
-                                   interval_end=optimization_bounds_discrete["information_gain_balance_coefficient"][1],
-                                   discrete_values=discrete_values["information_gain_balance_coefficient"])
-    Z = Utilities.discretize_value(sampled_value=decision_loss_coefficient,
-                                   interval_start=optimization_bounds_discrete[
-                                       "decision_loss_coefficient"][0],
-                                   interval_end=optimization_bounds_discrete["decision_loss_coefficient"][1],
-                                   discrete_values=discrete_values["decision_loss_coefficient"])
-
-    dX = -(X - 0.35) ** 2 + np.random.normal(loc=0.0, scale=0.1)
-    dY = -(Y - 0.2) ** 2 + np.random.normal(loc=0.0, scale=0.1)
-    dZ = -(Z - 0.5) ** 2 + np.random.normal(loc=0.0, scale=0.1)
-
-    score = dX + dY + dZ
-    return score
+# def cigt_test_function_discretized(classification_dropout_probability,
+#                                    information_gain_balance_coefficient,
+#                                    decision_loss_coefficient):
+#     X = Utilities.discretize_value(sampled_value=classification_dropout_probability,
+#                                    interval_start=optimization_bounds_discrete["classification_dropout_probability"][0],
+#                                    interval_end=optimization_bounds_discrete["classification_dropout_probability"][1],
+#                                    discrete_values=discrete_values["classification_dropout_probability"])
+#     Y = Utilities.discretize_value(sampled_value=information_gain_balance_coefficient,
+#                                    interval_start=optimization_bounds_discrete[
+#                                        "information_gain_balance_coefficient"][0],
+#                                    interval_end=optimization_bounds_discrete["information_gain_balance_coefficient"][1],
+#                                    discrete_values=discrete_values["information_gain_balance_coefficient"])
+#     Z = Utilities.discretize_value(sampled_value=decision_loss_coefficient,
+#                                    interval_start=optimization_bounds_discrete[
+#                                        "decision_loss_coefficient"][0],
+#                                    interval_end=optimization_bounds_discrete["decision_loss_coefficient"][1],
+#                                    discrete_values=discrete_values["decision_loss_coefficient"])
+#
+#     dX = -(X - 0.35) ** 2 + np.random.normal(loc=0.0, scale=0.1)
+#     dY = -(Y - 0.2) ** 2 + np.random.normal(loc=0.0, scale=0.1)
+#     dZ = -(Z - 0.5) ** 2 + np.random.normal(loc=0.0, scale=0.1)
+#
+#     score = dX + dY + dZ
+#     return score
 
 
 def optimize_with_bayesian_optimization():
@@ -154,32 +155,32 @@ def optimize_with_bayesian_optimization():
         verbose=10
     )
 
-    logger = JSONLogger(path="bo_gumbel_softmax_v2.json")
+    logger = JSONLogger(path="bo_gs_mean_z_for_routing_softmax_str_through.json")
     optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
 
-    load_logs(optimizer, logs=["bo_gumbel_softmax.json"])
+    # load_logs(optimizer, logs=["bo_gumbel_softmax.json"])
     optimizer.maximize(
         n_iter=300,
-        init_points=42,
+        init_points=100,
         acq="ei",
         xi=0.01)
 
 
-def optimize_with_discretized_bayesian_optimization():
-    optimizer = BayesianOptimization(
-        f=cigt_test_function_discretized,
-        pbounds=optimization_bounds_discrete,
-        verbose=10
-    )
-
-    # logger = JSONLogger(path="bo_logs_discrete.json")
-    # optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
-    #
-    # load_logs(optimizer, logs=["./logs.json"]);
-    # optimizer.maximize(
-    #     n_iter=300,
-    #     init_points=100,
-    #     acq="ei",
-    #     xi=0.01)
-
-    print("X")
+# def optimize_with_discretized_bayesian_optimization():
+#     optimizer = BayesianOptimization(
+#         f=cigt_test_function_discretized,
+#         pbounds=optimization_bounds_discrete,
+#         verbose=10
+#     )
+#
+#     # logger = JSONLogger(path="bo_logs_discrete.json")
+#     # optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
+#     #
+#     # load_logs(optimizer, logs=["./logs.json"]);
+#     # optimizer.maximize(
+#     #     n_iter=300,
+#     #     init_points=100,
+#     #     acq="ei",
+#     #     xi=0.01)
+#
+#     print("X")
