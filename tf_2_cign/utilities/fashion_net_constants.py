@@ -13,9 +13,9 @@ class FashionNetConstants:
     classification_wd = 0.0
     decision_wd = 0.0
     softmax_decay_initial = 25.0
-    softmax_decay_coefficient = 0.999
-    softmax_decay_period = 2
-    softmax_decay_min_limit = 0.001
+    softmax_decay_coefficient = 0.9999
+    softmax_decay_period = 1
+    softmax_decay_min_limit = 0.1
     softmax_decay_controllers = {}
     information_gain_balance_coeff = 1.0
 

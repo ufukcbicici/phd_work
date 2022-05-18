@@ -82,7 +82,7 @@ class LenetCigt(Cigt):
     def get_explanation_string(self):
         kv_rows = []
         explanation = ""
-        explanation = self.add_explanation(name_of_param="Lenet CIGT - Gumbel Softmax",
+        explanation = self.add_explanation(name_of_param="Lenet CIGT - Gumbel Softmax with E[Z] based routing",
                                            value="Lenet CIGT - Decision ",
                                            explanation=explanation, kv_rows=kv_rows)
         explanation += super().get_explanation_string()

@@ -48,8 +48,8 @@ if __name__ == "__main__":
     # info_gain_balance_coeffs = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.5, 5.0]
     # decision_loss_coeffs = [0.5]
     classification_dropout_probs = [0.15]
-    info_gain_balance_coeffs = [1.5]
-    decision_loss_coeffs = [0.5]
+    info_gain_balance_coeffs = [1.0]
+    decision_loss_coeffs = [1.0]
 
     # 994887500405312|0.921634499430656|0.35|2.0|1.0|200
     # classification_dropout_probs = [0.05]
@@ -102,13 +102,13 @@ if __name__ == "__main__":
                                      path_counts=[2, 4],
                                      bn_momentum=0.9,
                                      warm_up_period=warm_up_period,
-                                     routing_strategy_name="Approximate_Training",
+                                     routing_strategy_name="Full_Training",
                                      run_id=run_id,
                                      evaluation_period=1,
                                      measurement_start=25,
-                                     use_straight_through=False,
+                                     use_straight_through=True,
                                      optimizer_type="SGD",
-                                     decision_non_linearity="Softplus",
+                                     decision_non_linearity="Softmax",
                                      save_model=True)
         explanation = fashion_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)

@@ -10,7 +10,7 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 
 class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
     def __init__(self, node, decision_bn_momentum, next_block_path_count, class_count, ig_balance_coefficient,
-                 straight_through, decision_non_linearity, sample_count=250):
+                 straight_through, decision_non_linearity, sample_count=1000):
         super().__init__(node, decision_bn_momentum, next_block_path_count,
                          class_count, ig_balance_coefficient, from_logits=False)
         # self.softPlusLayer = tf.keras.activations.softplus()
@@ -44,8 +44,7 @@ class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
         z_samples = self.gsLayer([logits, temperature, self.sampleCount], training=training)
         z_expected = tf.reduce_mean(z_samples, axis=-1)
         ig_value, _ = self.infoGainLayer([z_expected, labels, 1.0, self.balanceCoeff, ig_mask])
-        routing_probabilities = self.gsLayer([logits, temperature, 1], training=training)
-        routing_probabilities = tf.squeeze(routing_probabilities)
+        routing_probabilities = z_expected
         path_count = tf.shape(routing_probabilities)[1]
         if self.straightThrough:
             tf.print("Straight Through!")
@@ -54,6 +53,11 @@ class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
             y = tf.stop_gradient(y_hard - y) + y
             routing_probabilities = y
         return ig_value, z_expected, routing_probabilities
+
+        # routing_probabilities = self.gsLayer([logits, temperature, 1], training=training)
+        # routing_probabilities = tf.squeeze(routing_probabilities)
+
+        # return ig_value, z_expected, routing_probabilities
 
 
     # # @tf.function
