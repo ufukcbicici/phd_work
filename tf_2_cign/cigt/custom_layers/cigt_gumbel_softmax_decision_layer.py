@@ -47,7 +47,7 @@ class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
         routing_probabilities = z_expected
         path_count = tf.shape(routing_probabilities)[1]
         if self.straightThrough:
-            tf.print("Straight Through!")
+            # tf.print("Straight Through!")
             y = tf.identity(routing_probabilities)
             y_hard = tf.one_hot(tf.argmax(y, axis=1), path_count, dtype=tf.float32)
             y = tf.stop_gradient(y_hard - y) + y
