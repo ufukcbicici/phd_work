@@ -1749,16 +1749,11 @@ ORDER BY TestAccuracy DESC
 SELECT logs_table.RunId,
        AVG(TrainingAccuracy) AS TrainingAccuracy,
        AVG(TestAccuracy) AS TestAccuracy,
-       MIN(A.Value) AS ClassificationDropoutMin,
-       MAX(A.Value) AS ClassificationDropoutMax,
-       MIN(B.Value) AS InformationGainBalanceCoefficientMin,
-       MAX(B.Value) AS InformationGainBalanceCoefficientMax,
-       MIN(C.Value) AS DecisionLossCoefficientMin,
-       MAX(C.Value) AS DecisionLossCoefficientMax,
-       MIN(D.Value) AS HyperbolicExponentMin,
-       MAX(D.Value) AS HyperbolicExponentMax,
-       MIN(E.Value) AS InitialLrMin,
-       MAX(E.Value) AS InitialLrMax,
+       AVG(A.Value) AS ClassificationDropout,
+       AVG(B.Value) AS InformationGainBalanceCoefficient,
+       AVG(C.Value) AS DecisionLossCoefficient,
+       AVG(D.Value) AS TemperatureDecayCoefficient,
+       AVG(E.Value) AS InitialLr,
        COUNT(1) AS CNT
 FROM logs_table
     LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Dropout") AS A ON
@@ -1767,16 +1762,99 @@ FROM logs_table
     logs_table.RunID = B.RunID
     LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Loss Coeff") AS C ON
     logs_table.RunID = C.RunID
-    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Temperature Exponent") AS D ON
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Temperature Decay Coefficient") AS D ON
     logs_table.RunID = D.RunID
     LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Initial Lr") AS E ON
     logs_table.RunID = E.RunID
     LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Use Straight Through") AS F ON
     logs_table.RunID = F.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Nonlinearity") AS G ON
+    logs_table.RunID = G.RunID
+
 WHERE logs_table.RunID IN
 (SELECT logs_table.RunId FROM logs_table LEFT JOIN run_meta_data ON
 logs_table.RunId = run_meta_data.RunId
 WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Gumbel Softmax with E[Z] based routing - Softmax and Straight Through Bayesian Optimization%")
-AND logs_table.Epoch >= 115 AND F.Value = "True"
+AND logs_table.Epoch >= 115 AND F.Value = "True" AND G.Value = "Softmax"
+GROUP BY logs_table.RunId
+ORDER BY TestAccuracy DESC
+
+
+
+--Experiments: Network Name:"Lenet CIGT - Gumbel Softmax with E[Z] based routing - Softmax and Straight Through Bayesian Optimization - Optimizing Lr Initial Rate and Temperature Decay Rate"
+--Started at 23/5/2022
+--Started on: TETAM - cigt_logger.db
+
+
+SELECT logs_table.RunId,
+       AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       AVG(A.Value) AS ClassificationDropout,
+       AVG(B.Value) AS InformationGainBalanceCoefficient,
+       AVG(C.Value) AS DecisionLossCoefficient,
+       AVG(D.Value) AS TemperatureDecayCoefficient,
+       AVG(E.Value) AS InitialLr,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Dropout") AS A ON
+    logs_table.RunID = A.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Information Gain Balance Coefficient") AS B ON
+    logs_table.RunID = B.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Loss Coeff") AS C ON
+    logs_table.RunID = C.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Temperature Decay Coefficient") AS D ON
+    logs_table.RunID = D.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Initial Lr") AS E ON
+    logs_table.RunID = E.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Use Straight Through") AS F ON
+    logs_table.RunID = F.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Nonlinearity") AS G ON
+    logs_table.RunID = G.RunID
+
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_meta_data ON
+logs_table.RunId = run_meta_data.RunId
+WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Gumbel Softmax with E[Z] based routing - Softmax and Straight Through Bayesian Optimization - Optimizing Lr Initial Rate and Temperature Decay Rate%")
+AND logs_table.Epoch >= 115 AND F.Value = "True" AND G.Value = "Softmax"
+GROUP BY logs_table.RunId
+ORDER BY TestAccuracy DESC
+
+
+
+--Experiments: Network Name:"Lenet CIGT - Gumbel Softmax with E[Z] based routing - Softmax and Straight Through Bayesian Optimization - Optimizing Temperature Decay Rate - Lr is 0.01"
+--Started at 23/5/2022
+--Started on: TETAM Tuna - cigt_logger.db
+
+
+SELECT logs_table.RunId,
+       AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       AVG(A.Value) AS ClassificationDropout,
+       AVG(B.Value) AS InformationGainBalanceCoefficient,
+       AVG(C.Value) AS DecisionLossCoefficient,
+       AVG(D.Value) AS TemperatureDecayCoefficient,
+       AVG(E.Value) AS InitialLr,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Dropout") AS A ON
+    logs_table.RunID = A.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Information Gain Balance Coefficient") AS B ON
+    logs_table.RunID = B.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Loss Coeff") AS C ON
+    logs_table.RunID = C.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Temperature Decay Coefficient") AS D ON
+    logs_table.RunID = D.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Initial Lr") AS E ON
+    logs_table.RunID = E.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Use Straight Through") AS F ON
+    logs_table.RunID = F.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Nonlinearity") AS G ON
+    logs_table.RunID = G.RunID
+
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_meta_data ON
+logs_table.RunId = run_meta_data.RunId
+WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Gumbel Softmax with E[Z] based routing - Softmax and Straight Through Bayesian Optimization - Optimizing Temperature Decay Rate - Lr is 0.01%")
+AND logs_table.Epoch >= 115 AND F.Value = "True" AND G.Value = "Softmax"
 GROUP BY logs_table.RunId
 ORDER BY TestAccuracy DESC
