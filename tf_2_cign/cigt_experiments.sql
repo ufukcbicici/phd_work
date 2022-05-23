@@ -1290,7 +1290,7 @@ ORDER BY TestAccuracy DESC
 
 
 
---Experiments: Network Name:Lenet CIGT - IG Balance Optimization-2
+--Experiments: Network Name:Lenet CIGT - Dropout Optimization-2
 --Started at 4/5/2022
 --Started on: TETAM - cigt_logger.db
 
@@ -1339,7 +1339,36 @@ WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Dropout Optimization-2%") AN
 GROUP BY logs_table.RunID
 ORDER BY TestAccuracy DESC
 
+SELECT logs_table.RunId,
+       AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       MIN(A.Value) AS ClassificationDropoutMin,
+       MAX(A.Value) AS ClassificationDropoutMax,
+       MIN(B.Value) AS InformationGainBalanceCoefficientMin,
+       MAX(B.Value) AS InformationGainBalanceCoefficientMax,
+       MIN(C.Value) AS DecisionLossCoefficientMin,
+       MAX(C.Value) AS DecisionLossCoefficientMax,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Dropout") AS A ON
+    logs_table.RunID = A.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Information Gain Balance Coefficient") AS B ON
+    logs_table.RunID = B.RunID
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Decision Loss Coeff") AS C ON
+    logs_table.RunID = C.RunID
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_meta_data ON
+logs_table.RunId = run_meta_data.RunId
+WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Dropout Optimization-2%") AND logs_table.Epoch >= 115
+GROUP BY logs_table.RunID
+ORDER BY TestAccuracy DESC
 
+
+SELECT * FROM run_kv_store WHERE
+run_kv_store.RunID IN (SELECT run_kv_store.RunId FROM run_kv_store LEFT JOIN run_meta_data ON
+run_kv_store.RunId = run_meta_data.RunId
+WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Dropout Optimization-2%")
+AND Value = "Counter()"
 
 --Experiments: Network Name:Lenet CIGT - Bayesian Optimization - [2,4]- [32,64,128] - [512,256] + Lr Initial Rate
 --Started at 5/5/2022

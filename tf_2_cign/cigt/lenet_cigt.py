@@ -15,13 +15,13 @@ class LenetCigt(Cigt):
                  evaluation_period, measurement_start, decision_dimensions, class_count, information_gain_balance_coeff,
                  softmax_decay_controller, learning_rate_schedule, optimizer_type, decision_non_linearity,
                  decision_loss_coeff, path_counts, bn_momentum, warm_up_period, routing_strategy_name,
-                 use_straight_through, save_model, *args, **kwargs):
+                 use_straight_through, save_model, model_definition, *args, **kwargs):
 
         super().__init__(run_id, batch_size, input_dims, class_count, path_counts, softmax_decay_controller,
                          learning_rate_schedule, optimizer_type, decision_non_linearity, decision_loss_coeff,
                          routing_strategy_name, use_straight_through, warm_up_period, decision_drop_probability,
                          classification_drop_probability, decision_wd, classification_wd, evaluation_period,
-                         measurement_start, save_model, *args, **kwargs)
+                         measurement_start, save_model, model_definition, *args, **kwargs)
         self.filterCounts = filter_counts
         self.kernelSizes = kernel_sizes
         self.hiddenLayers = hidden_layers
@@ -82,9 +82,6 @@ class LenetCigt(Cigt):
     def get_explanation_string(self):
         kv_rows = []
         explanation = ""
-        explanation = self.add_explanation(name_of_param="Lenet CIGT - Gumbel Softmax with E[Z] based routing - Softmax and Straight Through Bayesian Optimization",
-                                           value="Lenet CIGT - Decision ",
-                                           explanation=explanation, kv_rows=kv_rows)
         explanation += super().get_explanation_string()
         explanation = self.add_explanation(name_of_param="Filter Counts", value=self.filterCounts,
                                            explanation=explanation, kv_rows=kv_rows)

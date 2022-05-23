@@ -24,6 +24,7 @@ class Cigt(tf.keras.Model):
                  decision_loss_coeff, routing_strategy_name, use_straight_through, warm_up_period,
                  decision_drop_probability, classification_drop_probability,
                  decision_wd, classification_wd, evaluation_period, measurement_start, save_model,
+                 model_definition,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.runId = run_id
@@ -50,6 +51,7 @@ class Cigt(tf.keras.Model):
         self.warmUpFinalIteration = None
         self.isInWarmUp = True
         self.saveModel = save_model
+        self.modelDefinition = model_definition
         self.numOfTrainingIterations = 0
         self.numOfTrainingEpochs = 0
         self.regularizationCoefficients = {}
@@ -495,12 +497,9 @@ class Cigt(tf.keras.Model):
     def get_explanation_string(self):
         kv_rows = []
         explanation = ""
-
-        # total_param_count = 0
-        # for v in self.trainable_variables:
-        #     total_param_count += np.prod(v.get_shape().as_list())
-        # explanation = self.add_explanation(name_of_param="Num Of Variables", value=total_param_count,
-        #                                    explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Model Definition",
+                                           value=self.modelDefinition,
+                                           explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="Batch Size", value=self.batchSize,
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="Path Counts", value=self.pathCounts,

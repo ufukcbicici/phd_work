@@ -18,81 +18,30 @@ class DbLogger:
     threshold_optimization = "threshold_optimization_f1_metrics"
     sample_wise_table = "sample_wise_results"
 
-    # DGX DB 1
-    # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger.db"
+    dgx_db_1 = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger.db"
+    dgx_db_2 = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger2.db"
+    dgx_db_3 = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
+    tetam_cigt = "/cta/users/ucbicici/phd_work/cigt_logger.db"
+    tetam_cigt_2 = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
+    tetam_tuna_cigt = "/cta/users/hmeral/phd_work/cigt_logger.db"
+    tetam_1 = "/cta/users/ucbicici/phd_work/dblogger.db"
+    tetam_2 = "/cta/users/ucbicici/phd_work/dblogger2.db"
+    tetam_3 = "/cta/users/ucbicici/phd_work/dblogger3.db"
+    okul = "C://Users//munu_.DESKTOP-5DFQOJ6//phd_work//dblogger.db"
+    docker = "/opt/project/cigt_logger.db"
+    home_monster = "D://phd_work//simple_tf//dblogger.db"
+    home_asus = "C://Users//asus//Desktop//phd_work//dblogger.db"
+    truba_1 = "/truba_scratch/ubicici/PHD/simple_tf/dblogger_cign.db"
+    truba_2 = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2_cign.db"
+    truba_3 = "/truba_scratch/ubicici/PHD/simple_tf/dblogger3_cign.db"
+    truba_4 = "/truba_scratch/ubicici/PHD/simple_tf/dblogger4_cign.db"
+    truba_5 = "/truba_scratch/ubicici/PHD/simple_tf/dblogger5_cign.db"
+    truba_6 = "/truba_scratch/ubicici/PHD/simple_tf/dblogger6_cign.db"
+    truba_sigma = "/truba/home/seberger/main/repo/phd_work/cigt_logger.db"
+    paperspace = "/notebooks/cigt_logger.db"
+    blackshark_desktop = "/home/ubicici/personal_stuff/phd_work2/phd_work/cigt_logger.db"
 
-    # DGX DB 2
-    # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger2.db"
-
-    # DGX DB 3
-    # log_db_path = "/raid/users/ucbicici/Code/phd_work/simple_tf/dblogger3.db"
-
-    # TETAM CIGT
-    # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger.db"
-
-    # TETAM CIGT 2
-    # log_db_path = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
-
-    # TETAM TUNA CIGT
-    # log_db_path = "/cta/users/hmeral/phd_work/cigt_logger.db"
-
-    # TETAM 1
-    # log_db_path = "/cta/users/ucbicici/phd_work/dblogger.db"
-
-    # TETAM 2
-    # log_db_path = "/cta/users/ucbicici/phd_work/dblogger2.db"
-
-    # TETAM 3
-    # log_db_path = "/cta/users/ucbicici/phd_work/dblogger3.db"
-
-    # Lab
-    # log_db_path = "C://Users//munu_.DESKTOP-5DFQOJ6//phd_work//dblogger.db"
-    # C:\Users\munu_.DESKTOP-5DFQOJ6\phd_work
-
-    # Linux-1
-    # log_db_path = "/home/ubicici/personal_stuff/phd_work/cigt_logger.db"
-
-    # Docker
-    # log_db_path = "/opt/project/cigt_logger.db"
-
-    # Home
-    # log_db_path = "D://phd_work//simple_tf//dblogger.db"
-
-    # Home ASUS
-    # log_db_path = "C://Users//asus//Desktop//phd_work//dblogger.db"
-
-    # Idea GPU
-    # log_db_path = "C://Users//ufuk.bicici.IDEATEKNOLOJI//Desktop//phd_work//simple_tf//dblogger.db"
-
-    # Idea
-    # log_db_path = "C://Users//ufuk.bicici//Desktop//PHD//phd_work//simple_tf//bnnlogger.db"
-
-    # TRUBA 1
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger_cign.db"
-
-    # TRUBA 2
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger2_cign.db"
-
-    # TRUBA 3
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger3_cign.db"
-
-    # TRUBA 4
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger4_cign.db"
-
-    # TRUBA 5
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger5_cign.db"
-
-    # TRUBA 6
-    # log_db_path = "/truba_scratch/ubicici/PHD/simple_tf/dblogger6_cign.db"
-
-    # TRUBA MY
-    # log_db_path = "/truba/home/seberger/main/repo/phd_work/cigt_logger.db"
-
-    # Paperspace
-    # log_db_path = "/notebooks/cigt_logger.db"
-
-    # Blackshark Desktop
-    log_db_path = "/home/ubicici/personal_stuff/phd_work2/phd_work/cigt_logger.db"
+    log_db_path = None
 
     logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     loggersDict = {}
