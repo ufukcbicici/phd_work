@@ -3,6 +3,7 @@ import tensorflow as tf
 from tf_2_cign.cigt.custom_layers.cigt_conv_layer import CigtConvLayer
 from tf_2_cign.cigt.custom_layers.cigt_decision_layer import CigtDecisionLayer
 from tf_2_cign.cigt.custom_layers.cigt_gumbel_softmax_decision_layer import CigtGumbelSoftmaxDecisionLayer
+from tf_2_cign.cigt.custom_layers.cigt_random_decision_layer import CigtRandomDecisionLayer
 from tf_2_cign.cigt.custom_layers.cigt_route_averaging_layer import CigtRouteAveragingLayer
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
@@ -47,9 +48,15 @@ class InnerCigtBlock(tf.keras.layers.Layer):
                                                        class_count=class_count,
                                                        ig_balance_coefficient=ig_balance_coefficient,
                                                        from_logits=True)
+        elif self.routingStrategy == "Random_Routing":
+            self.cigtDecisionLayer = CigtRandomDecisionLayer(node=node,
+                                                             decision_bn_momentum=self.bnMomentum,
+                                                             next_block_path_count=next_block_path_count,
+                                                             class_count=class_count,
+                                                             ig_balance_coefficient=ig_balance_coefficient)
+
         else:
             raise NotImplementedError()
 
     def call(self, inputs, **kwargs):
         pass
-
