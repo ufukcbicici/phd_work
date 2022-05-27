@@ -39,7 +39,7 @@ class DbLogger:
     truba_6 = "/truba_scratch/ubicici/PHD/simple_tf/dblogger6_cign.db"
     truba_sigma = "/truba/home/seberger/main/repo/phd_work/cigt_logger.db"
     paperspace = "/notebooks/cigt_logger.db"
-    blackshark_desktop = "/home/ubicici/personal_stuff/phd_work2/phd_work/cigt_logger.db"
+    blackshark_desktop = "/home/ubicici/personal_stuff/phd_work/dblogger.db"
 
     log_db_path = None
 
