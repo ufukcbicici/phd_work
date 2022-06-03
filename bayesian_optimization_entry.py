@@ -4,6 +4,8 @@ import tensorflow as tf
 
 from auxillary.db_logger import DbLogger
 from tf_2_cign.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
+from tf_2_cign.bayesian_optimizers.fmnist_gumbel_softmax_only_dropout_optimizer import \
+    FmnistGumbelSoftmaxOnlyDropoutOptimizer
 from tf_2_cign.bayesian_optimizers.fmnist_gumbel_softmax_optimizer_with_decay_rate import \
     FmnistGumbelSoftmaxOptimizerWithDecayRate
 from tf_2_cign.bayesian_optimizers.fmnist_gumbel_softmax_optimizer_with_lr_decay_rate \
@@ -22,7 +24,9 @@ if __name__ == "__main__":
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
     DbLogger.log_db_path = DbLogger.blackshark_desktop
-    bayesian_optimizer = FmnistGumbelSoftmaxVanilla(init_points=100, n_iter=300, xi=0.01)
+    bayesian_optimizer = FmnistGumbelSoftmaxOnlyDropoutOptimizer(init_points=100, n_iter=300, xi=0.01,
+                                                                 ig_balance_coeff=3.7233209862205525,
+                                                                 d_loss_coeff=0.7564802988471849)
     bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
-                           log_file_name="bo_gumbel_softmax_mean_z_vanilla")
+                           log_file_name="bo_gumbel_softmax_mean_z_only_dropout")
 
