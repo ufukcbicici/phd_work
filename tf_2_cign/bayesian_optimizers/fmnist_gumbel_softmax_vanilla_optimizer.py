@@ -11,7 +11,7 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 
 
-class FmnistGumbelSoftmaxVanilla(BayesianOptimizer):
+class FmnistGumbelSoftmaxVanillaOptimizer(BayesianOptimizer):
     def __init__(self, xi, init_points, n_iter):
         super().__init__(xi, init_points, n_iter)
         self.optimization_bounds_continuous = {

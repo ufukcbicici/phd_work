@@ -12,6 +12,7 @@ from tf_2_cign.cigt.routing_strategy.approximate_training_strategy import Approx
 from tqdm import tqdm
 from collections import Counter
 
+from tf_2_cign.cigt.routing_strategy.enforced_routing_strategy import EnforcedRoutingStrategy
 from tf_2_cign.cigt.routing_strategy.full_training_strategy import FullTrainingStrategy
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
 
@@ -42,6 +43,8 @@ class Cigt(tf.keras.Model):
         self.measurementStart = measurement_start
         self.dagObject = Dag()
         self.cigtBlocks = []
+        self.enforcedRoutingDecisions = tf.Variable(
+            tf.zeros(shape=(self.batchSize, len(self.pathCounts) - 1), dtype=tf.int32), trainable=False)
         self.rootNode = None
         self.decisionDropProbability = decision_drop_probability
         self.classificationDropProbability = classification_drop_probability
@@ -59,8 +62,10 @@ class Cigt(tf.keras.Model):
         self.useStraightThrough = use_straight_through
         if self.routingStrategyName == "Full_Training":
             self.routingStrategy = FullTrainingStrategy()
-        elif self.routingStrategyName == "Approximate_Training" or "Random_Routing":
+        elif self.routingStrategyName == "Approximate_Training" or self.routingStrategyName == "Random_Routing":
             self.routingStrategy = ApproximateTrainingStrategy()
+        elif self.routingStrategyName == "Enforced_Routing":
+            self.routingStrategy = EnforcedRoutingStrategy(enforced_decision_vectors=self.enforcedRoutingDecisions)
         else:
             raise NotImplementedError()
         self.metricsDict = {}
@@ -106,7 +111,7 @@ class Cigt(tf.keras.Model):
                 self.rootNode = node
             last_block = node
 
-    @tf.function
+    # @tf.function
     def call(self, inputs, **kwargs):
         x = inputs[0]
         y = inputs[1]
@@ -143,7 +148,8 @@ class Cigt(tf.keras.Model):
                 # Keep track of the results.
                 information_gain_values.append(ig_value)
                 # Build the routing matrix for the next block
-                routing_matrix = self.routingStrategy([routing_probabilities, is_warm_up], training=is_training)
+                routing_matrix = self.routingStrategy([routing_probabilities, is_warm_up, block_id],
+                                                      training=is_training)
                 list_of_routing_matrices.append(routing_matrix)
                 # Last block
             else:
@@ -301,6 +307,8 @@ class Cigt(tf.keras.Model):
             workers=1,
             use_multiprocessing=False):
 
+        # Enforced routing is not defined for training.
+        assert self.routingStrategy != "Enforced_Routing"
         self.numOfTrainingIterations = 0
         self.numOfTrainingEpochs = 0
         scoring_start_epoch = epochs - self.measurementStart
@@ -460,7 +468,9 @@ class Cigt(tf.keras.Model):
             list_of_routing_probability_matrices.append([])
 
         for x_, y_ in tqdm(dataset):
-            results_dict = self.call(inputs=[x_, y_, tf.convert_to_tensor(1.0), tf.convert_to_tensor(self.isInWarmUp)],
+            results_dict = self.call(inputs=[x_, y_,
+                                             tf.convert_to_tensor(1.0),
+                                             tf.convert_to_tensor(self.isInWarmUp)],
                                      training=False)
             list_of_labels.append(y_)
             assert len(results_dict["routing_probabilities"]) == len(list_of_routing_probability_matrices)
@@ -488,6 +498,21 @@ class Cigt(tf.keras.Model):
             routing_probability_matrices=list_of_routing_probability_matrices,
             write_to_db=True)
         return accuracy, information_gain_results
+
+    def load_weights(self,
+                     filepath,
+                     by_name=False,
+                     skip_mismatch=False,
+                     options=None):
+        # Unfortunately, we need to call the network once with forward pass so that the weights are generated.
+        # We run a dummy forward pass with the correct input size and types.
+        dummy_x = tf.convert_to_tensor(np.random.uniform(size=(self.batchSize, *self.inputDims)))
+        dummy_y = tf.convert_to_tensor(np.random.randint(low=0, high=self.classCount, size=(self.batchSize, )))
+        dummy_temperature = tf.convert_to_tensor(1.0)
+        dummy_is_warm_up = tf.convert_to_tensor(False)
+        self.call(inputs=[dummy_x, dummy_y, dummy_temperature, dummy_is_warm_up], training=False)
+        super().load_weights(filepath=filepath)
+        print("X")
 
     def add_explanation(self, name_of_param, value, explanation, kv_rows):
         explanation += "{0}:{1}\n".format(name_of_param, value)

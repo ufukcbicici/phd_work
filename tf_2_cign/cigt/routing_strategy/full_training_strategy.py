@@ -11,6 +11,7 @@ class FullTrainingStrategy(RoutingStrategy):
     def call(self, inputs, **kwargs):
         soft_routing_matrix = inputs[0]
         is_warm_up = inputs[1]
+        block_id = inputs[2]
         training = kwargs["training"]
 
         path_count = tf.shape(soft_routing_matrix)[1]
