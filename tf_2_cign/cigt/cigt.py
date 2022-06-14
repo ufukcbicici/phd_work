@@ -59,7 +59,7 @@ class Cigt(tf.keras.Model):
         self.useStraightThrough = use_straight_through
         if self.routingStrategyName == "Full_Training":
             self.routingStrategy = FullTrainingStrategy()
-        elif self.routingStrategyName == "Approximate_Training" or "Random_Routing":
+        elif self.routingStrategyName == "Approximate_Training" or self.routingStrategyName == "Random_Routing":
             self.routingStrategy = ApproximateTrainingStrategy()
         else:
             raise NotImplementedError()
