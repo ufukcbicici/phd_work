@@ -11,6 +11,9 @@ from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 from tf_2_cign.utilities.utilities import Utilities
 
 
+# def prepare_routing_configurations_score_table():
+
+
 def run():
     X = 0.15
     Y = 3.7233209862205525  # kwargs["information_gain_balance_coefficient"]
@@ -85,6 +88,8 @@ def run():
 
         decision_arrays = [[0, 1] for _ in range(len(fashion_cigt.pathCounts) - 1)]
         decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
+        # decision_combinations = set([tuple(sorted(arr)) for arr in decision_combinations])
+
         combinations_y_dict = {}
         combinations_y_hat_dict = {}
         for decision_combination in decision_combinations:
@@ -102,6 +107,7 @@ def run():
                                                          tf.convert_to_tensor(False)], training=False)
                 combinations_y_dict[decision_combination].append(y_)
                 combinations_y_hat_dict[decision_combination].append(results_dict["logits"])
+
             combinations_y_dict[decision_combination] = np.concatenate(combinations_y_dict[decision_combination],
                                                                        axis=0)
             combinations_y_hat_dict[decision_combination] = np.concatenate(combinations_y_hat_dict[
