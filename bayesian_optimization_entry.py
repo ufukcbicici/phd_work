@@ -3,16 +3,7 @@ import os.path
 import tensorflow as tf
 
 from auxillary.db_logger import DbLogger
-from tf_2_cign.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
-from tf_2_cign.bayesian_optimizers.fmnist_gumbel_softmax_only_dropout_optimizer import \
-    FmnistGumbelSoftmaxOnlyDropoutOptimizer
-from tf_2_cign.bayesian_optimizers.fmnist_gumbel_softmax_optimizer_with_decay_rate import \
-    FmnistGumbelSoftmaxOptimizerWithDecayRate
-from tf_2_cign.bayesian_optimizers.fmnist_gumbel_softmax_optimizer_with_lr_decay_rate \
-    import FmnistGumbelSoftmaxOptimizerWithLrDecayRate
-from tf_2_cign.bayesian_optimizers.fmnist_gumbel_softmax_vanilla_optimizer import FmnistGumbelSoftmaxVanillaOptimizer
-from tf_2_cign.bayesian_optimizers.fmnist_random_routing_optimizer import FmnistRandomRoutingOptimizer
-from tf_2_cign.entry_points.fashion_cigt_bo_hyperparameter_search import optimize_with_bayesian_optimization
+from tf_2_cign.cigt.bayesian_optimizers.fashion_mnist_lenet_threshold_optimizer import FashionMnistLenetThresholdOptimizer
 
 # from auxillary.db_logger import DbLogger
 # from auxillary.general_utility_funcs import UtilityFuncs
@@ -31,6 +22,10 @@ if __name__ == "__main__":
     #                        log_file_name="bo_gumbel_softmax_mean_z_only_dropout")
 
     DbLogger.log_db_path = DbLogger.home_asus
-    bayesian_optimizer = FmnistGumbelSoftmaxVanillaOptimizer(init_points=100, n_iter=300, xi=0.01)
+    # bayesian_optimizer = FmnistGumbelSoftmaxVanillaOptimizer(init_points=100, n_iter=300, xi=0.01)
+    # bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
+    #                        log_file_name="bo_gumbel_softmax_mean_z_vanilla")
+    bayesian_optimizer = FashionMnistLenetThresholdOptimizer(
+        init_points=300, n_iter=700, xi=0.01, model_id=424)
     bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
-                           log_file_name="bo_gumbel_softmax_mean_z_vanilla")
+                           log_file_name="fmnist_multipath_optimization")

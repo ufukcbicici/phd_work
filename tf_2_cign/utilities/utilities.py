@@ -8,6 +8,8 @@ class Utilities:
     def __init__(self):
         pass
 
+    INFO_GAIN_LOG_EPSILON = 1e-30
+
     @staticmethod
     def calculate_mac_of_computation(num_of_input_channels,
                                      height_of_input_map,
@@ -208,3 +210,13 @@ class Utilities:
     def concatenate_dict_of_arrays(dict_, axis):
         for k in dict_.keys():
             dict_[k] = np.concatenate(dict_[k], axis=axis)
+
+    @staticmethod
+    def calculate_entropies(prob_distributions):
+        log_prob = np.log(prob_distributions + Utilities.INFO_GAIN_LOG_EPSILON)
+        # is_inf = tf.is_inf(log_prob)
+        # zero_tensor = tf.zeros_like(log_prob)
+        # log_prob = tf.where(is_inf, x=zero_tensor, y=log_prob)
+        prob_log_prob = prob_distributions * log_prob
+        entropies = -1.0 * np.sum(prob_log_prob, axis=1)
+        return entropies

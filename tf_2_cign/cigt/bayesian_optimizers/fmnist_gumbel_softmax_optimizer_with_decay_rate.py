@@ -2,7 +2,7 @@ import tensorflow as tf
 
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
-from tf_2_cign.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
+from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
 
 # Hyper-parameters
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
@@ -11,20 +11,35 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 
 
-class FmnistRandomRoutingOptimizer(BayesianOptimizer):
+class FmnistGumbelSoftmaxOptimizerWithDecayRate(BayesianOptimizer):
     def __init__(self, xi, init_points, n_iter):
         super().__init__(xi, init_points, n_iter)
         self.optimization_bounds_continuous = {
-            "classification_dropout_probability": (0.0, 0.5)
+            "classification_dropout_probability": (0.0, 0.5),
+            "information_gain_balance_coefficient": (1.0, 10.0),
+            "decision_loss_coefficient": (0.01, 1.0),
+            "temperature_decay_rate": (0.9998, 0.99995)
         }
 
     def cost_function(self, **kwargs):
         # lr_initial_rate,
         # hyperbolic_exponent):
         X = kwargs["classification_dropout_probability"]
+        Y = kwargs["information_gain_balance_coefficient"]
+        Z = kwargs["decision_loss_coefficient"]
         W = 0.01
+        U = kwargs["temperature_decay_rate"]
 
         print("classification_dropout_probability={0}".format(kwargs["classification_dropout_probability"]))
+        print("information_gain_balance_coefficient={0}".format(kwargs["information_gain_balance_coefficient"]))
+        print("decision_loss_coefficient={0}".format(kwargs["decision_loss_coefficient"]))
+        # print("lr_initial_rate={0}".format(kwargs["lr_initial_rate"]))
+        print("temperature_decay_rate={0}".format(kwargs["temperature_decay_rate"]))
+
+        FashionNetConstants.softmax_decay_initial = 25.0
+        FashionNetConstants.softmax_decay_coefficient = U
+        FashionNetConstants.softmax_decay_period = 1
+        FashionNetConstants.softmax_decay_min_limit = 0.01
 
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
         softmax_decay_controller = StepWiseDecayAlgorithm(
@@ -54,14 +69,14 @@ class FmnistRandomRoutingOptimizer(BayesianOptimizer):
                                      classification_wd=0.0,
                                      decision_dimensions=[128, 128],
                                      class_count=10,
-                                     information_gain_balance_coeff=1.0,
+                                     information_gain_balance_coeff=Y,
                                      softmax_decay_controller=softmax_decay_controller,
                                      learning_rate_schedule=learning_rate_calculator,
-                                     decision_loss_coeff=0.0,
+                                     decision_loss_coeff=Z,
                                      path_counts=[2, 4],
                                      bn_momentum=0.9,
                                      warm_up_period=25,
-                                     routing_strategy_name="Random_Routing",
+                                     routing_strategy_name="Full_Training",
                                      run_id=run_id,
                                      evaluation_period=10,
                                      measurement_start=25,
@@ -69,7 +84,9 @@ class FmnistRandomRoutingOptimizer(BayesianOptimizer):
                                      optimizer_type="SGD",
                                      decision_non_linearity="Softmax",
                                      save_model=True,
-                                     model_definition="Lenet CIGT - Random Routing")
+                                     model_definition="Lenet CIGT - Gumbel Softmax with E[Z] based routing - "
+                                                      "Softmax and Straight Through Bayesian Optimization - "
+                                                      "Optimizing Temperature Decay Rate - Lr is 0.01")
 
             explanation = fashion_cigt.get_explanation_string()
             DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)

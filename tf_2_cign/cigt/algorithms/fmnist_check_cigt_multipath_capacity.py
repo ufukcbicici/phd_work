@@ -10,7 +10,6 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 from tf_2_cign.utilities.utilities import Utilities
 
-
 # def prepare_routing_configurations_score_table():
 INFO_GAIN_LOG_EPSILON = 1e-30
 
@@ -86,14 +85,14 @@ def run():
         fashion_cigt.load_weights(filepath=os.path.join(weights_folder_path, "fully_trained_weights"))
         fashion_cigt.isInWarmUp = False
         # Check that we have the correct accuracy
-        # training_accuracy, training_info_gain_list = fashion_cigt.evaluate(
-        #     x=fashion_mnist.trainDataTf, epoch_id=0, dataset_type="training")
-        # test_accuracy, test_info_gain_list = fashion_cigt.evaluate(
-        #     x=fashion_mnist.testDataTf, epoch_id=0, dataset_type="test")
-        # 424
+        training_accuracy, training_info_gain_list = fashion_cigt.evaluate(
+            x=fashion_mnist.trainDataTf, epoch_id=0, dataset_type="training")
+        test_accuracy, test_info_gain_list = fashion_cigt.evaluate(
+            x=fashion_mnist.testDataTf, epoch_id=0, dataset_type="test")
+        # # 424
         # assert np.isclose(training_accuracy, 0.9960416674613952)
         # assert np.isclose(test_accuracy, 0.9217900037765503)
-        # 562
+        # # 562
         # assert np.isclose(training_accuracy, 0.9954750001430511)
         # assert np.isclose(test_accuracy, 0.922029995918274)
 
@@ -139,7 +138,6 @@ def run():
                 combinations_routing_entropies_dict[decision_combination].append(
                     calculate_entropies(combinations_routing_probabilities_dict[decision_combination][i_])
                 )
-
 
         y_matrix = np.stack(list(combinations_y_dict.values()), axis=1)
         y_avg = np.mean(y_matrix, axis=1).astype(dtype=y_matrix.dtype)
