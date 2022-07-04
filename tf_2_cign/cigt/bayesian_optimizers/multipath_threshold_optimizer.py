@@ -1,4 +1,6 @@
 import numpy as np
+from sklearn.model_selection import train_test_split
+
 from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
 
 # Hyper-parameters
@@ -17,7 +19,25 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         for idx, arr in enumerate(probabilities_arr):
             self.maxEntropies.append(-np.log(1.0 / arr.shape[0]))
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
-        print("X")
+        self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
+
+    def prepare_val_test_sets(self):
+        total_sample_count = set()
+        for ll in self.routingProbabilities.values():
+            for arr in ll:
+                total_sample_count.add(arr.shape[0])
+        for arr in self.routingEntropies:
+            total_sample_count.add(arr.shape[0])
+        for arr in self.logits:
+            total_sample_count.add(arr.shape[0])
+        for arr in self.groundTruths:
+            total_sample_count.add(arr.shape[0])
+        assert len(total_sample_count) == 1
+        total_sample_count = list(total_sample_count)[0]
+        val_sample_count = int(total_sample_count * self.valRatio)
+        indices = np.arange(total_sample_count)
+        val_indices, test_indices = train_test_split(indices, train_size=val_sample_count)
+        return total_sample_count, val_indices, test_indices
 
     def get_model_outputs(self):
         return {}, {}, {}, {}
