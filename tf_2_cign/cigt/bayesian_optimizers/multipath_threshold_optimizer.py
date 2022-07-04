@@ -17,7 +17,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         self.maxEntropies = []
         self.optimization_bounds_continuous = {}
         for idx, arr in enumerate(probabilities_arr):
-            self.maxEntropies.append(-np.log(1.0 / arr.shape[0]))
+            num_of_routes = arr.shape[1]
+            self.maxEntropies.append(-np.log(1.0 / num_of_routes))
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
 
@@ -26,11 +27,12 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         for ll in self.routingProbabilities.values():
             for arr in ll:
                 total_sample_count.add(arr.shape[0])
-        for arr in self.routingEntropies:
+        for ll in self.routingEntropies.values():
+            for arr in ll:
+                total_sample_count.add(arr.shape[0])
+        for arr in self.logits.values():
             total_sample_count.add(arr.shape[0])
-        for arr in self.logits:
-            total_sample_count.add(arr.shape[0])
-        for arr in self.groundTruths:
+        for arr in self.groundTruths.values():
             total_sample_count.add(arr.shape[0])
         assert len(total_sample_count) == 1
         total_sample_count = list(total_sample_count)[0]

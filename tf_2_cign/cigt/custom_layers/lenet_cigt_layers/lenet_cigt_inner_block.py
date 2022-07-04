@@ -10,14 +10,17 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 
 class LeNetCigtInnerBlock(InnerCigtBlock):
     def __init__(self, node, kernel_size, num_of_filters, strides, activation, use_bias, padding,
-                 decision_drop_probability, decision_dim, bn_momentum, next_block_path_count, class_count,
-                 ig_balance_coefficient, routing_strategy, use_straight_through, decision_non_linearity):
+                 decision_drop_probability, decision_dim, bn_momentum, this_block_path_count, next_block_path_count,
+                 class_count, ig_balance_coefficient, routing_strategy, use_straight_through, decision_non_linearity):
 
         # F operations
 
+        # super().__init__(node, routing_strategy, decision_drop_probability, decision_dim, bn_momentum,
+        #                  next_block_path_count, class_count, ig_balance_coefficient, use_straight_through,
+        #                  decision_non_linearity)
         super().__init__(node, routing_strategy, decision_drop_probability, decision_dim, bn_momentum,
-                         next_block_path_count, class_count, ig_balance_coefficient, use_straight_through,
-                         decision_non_linearity)
+                         this_block_path_count, next_block_path_count, class_count, ig_balance_coefficient,
+                         use_straight_through, decision_non_linearity)
         self.convLayer = CigtConvLayer(kernel_size=kernel_size,
                                        num_of_filters=num_of_filters,
                                        strides=strides,
@@ -25,6 +28,7 @@ class LeNetCigtInnerBlock(InnerCigtBlock):
                                        activation=activation,
                                        use_bias=use_bias,
                                        padding=padding,
+                                       path_count=self.thisBlockPathCount,
                                        name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
         self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
 
