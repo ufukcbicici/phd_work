@@ -21,8 +21,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
 
-    def prepare_val_test_sets(self, total_sample_count):
-        total_sample_count.totalSampleCount = set()
+    def prepare_val_test_sets(self):
+        total_sample_count = set()
         for ll in self.routingProbabilities.values():
             for arr in ll:
                 total_sample_count.add(arr.shape[0])
