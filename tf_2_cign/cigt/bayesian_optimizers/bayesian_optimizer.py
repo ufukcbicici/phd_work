@@ -25,12 +25,11 @@ from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWis
 
 
 class BayesianOptimizer:
-    def __init__(self, xi, init_points, n_iter, val_ratio):
+    def __init__(self, xi, init_points, n_iter):
         self.optimization_bounds_continuous = None
         self.xi = xi
         self.init_points = init_points
         self.n_iter = n_iter
-        self.val_ratio = val_ratio
 
     def get_old_and_new_log_file_names(self, log_file_root_path, log_file_name):
         relevant_files = []
