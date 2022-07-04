@@ -14,8 +14,8 @@ from tf_2_cign.utilities.utilities import Utilities
 
 class FashionMnistLenetThresholdOptimizer(MultipathThresholdOptimizer):
     def __init__(self, xi, init_points, n_iter,
-                 model_id):
-        super().__init__(xi, init_points, n_iter, model_id)
+                 model_id, val_ratio):
+        super().__init__(xi, init_points, n_iter, model_id, val_ratio)
 
     def get_model_outputs(self):
         X = 0.15

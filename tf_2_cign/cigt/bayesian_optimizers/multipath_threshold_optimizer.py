@@ -6,9 +6,10 @@ from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimi
 
 class MultipathThresholdOptimizer(BayesianOptimizer):
     def __init__(self, xi, init_points, n_iter,
-                 model_id):
+                 model_id, val_ratio):
         super().__init__(xi, init_points, n_iter)
         self.modelId = model_id
+        self.valRatio = val_ratio
         self.routingProbabilities, self.routingEntropies, self.logits, self.groundTruths = self.get_model_outputs()
         probabilities_arr = list(self.routingProbabilities.values())[0]
         self.maxEntropies = []
