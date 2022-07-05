@@ -52,6 +52,7 @@ class LenetCigt(Cigt):
                                             decision_drop_probability=self.decisionDropProbability,
                                             decision_dim=self.decisionDimensions[block_id],
                                             bn_momentum=self.bnMomentum,
+                                            this_block_path_count=self.pathCounts[block_id],
                                             next_block_path_count=self.pathCounts[block_id + 1],
                                             ig_balance_coefficient=self.informationGainBalanceCoeff,
                                             class_count=self.classCount,
@@ -68,7 +69,8 @@ class LenetCigt(Cigt):
                                            use_bias=True,
                                            padding="same",
                                            strides=(1, 1),
-                                           class_count=self.classCount)
+                                           class_count=self.classCount,
+                                           this_block_path_count=self.pathCounts[block_id])
             self.cigtBlocks.append(block)
             if curr_node.isLeaf:
                 curr_node = self.dagObject.children(node=curr_node)
