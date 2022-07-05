@@ -41,6 +41,7 @@ class LenetCigt(Cigt):
         super(LenetCigt, self).build_network()
         curr_node = self.rootNode
         for block_id, path_count in enumerate(self.pathCounts):
+            prev_block_path_count = 1 if block_id == 0 else self.pathCounts[block_id - 1]
             if block_id < len(self.pathCounts) - 1:
                 block = LeNetCigtInnerBlock(node=curr_node,
                                             kernel_size=self.kernelSizes[block_id],
@@ -52,6 +53,7 @@ class LenetCigt(Cigt):
                                             decision_drop_probability=self.decisionDropProbability,
                                             decision_dim=self.decisionDimensions[block_id],
                                             bn_momentum=self.bnMomentum,
+                                            prev_block_path_count=prev_block_path_count,
                                             this_block_path_count=self.pathCounts[block_id],
                                             next_block_path_count=self.pathCounts[block_id + 1],
                                             ig_balance_coefficient=self.informationGainBalanceCoeff,
@@ -70,6 +72,7 @@ class LenetCigt(Cigt):
                                            padding="same",
                                            strides=(1, 1),
                                            class_count=self.classCount,
+                                           prev_block_path_count=prev_block_path_count,
                                            this_block_path_count=self.pathCounts[block_id])
             self.cigtBlocks.append(block)
             if curr_node.isLeaf:

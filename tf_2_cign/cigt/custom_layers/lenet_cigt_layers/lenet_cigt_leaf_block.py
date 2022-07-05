@@ -8,11 +8,13 @@ from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
 class LeNetCigtLeafBlock(tf.keras.layers.Layer):
     def __init__(self, node, kernel_size, num_of_filters, strides, activation, hidden_layer_dims,
+                 prev_block_path_count,
                  this_block_path_count,
                  classification_dropout_prob, class_count,
                  use_bias=True, padding="same"):
         super().__init__()
         self.node = node
+        self.prevBlockPathCount = prev_block_path_count
         self.thisBlockPathCount = this_block_path_count
         # F Operations - Conv layer
         if num_of_filters is not None and kernel_size is not None:
@@ -23,7 +25,8 @@ class LeNetCigtLeafBlock(tf.keras.layers.Layer):
                                            activation=activation,
                                            use_bias=use_bias,
                                            padding=padding,
-                                           path_count=self.thisBlockPathCount,
+                                           input_path_count=self.thisBlockPathCount,
+                                           output_path_count=self.thisBlockPathCount,
                                            name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
             self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
         else:
