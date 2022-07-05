@@ -22,12 +22,14 @@ class CigtConvLayer(CignConvLayer):
     #     super(CigtConvLayer, self).build(tensor_shape)
 
     def build(self, input_shape):
-        assert len(input_shape.as_list()) == 4
+        assert len(input_shape) == 2
+        tensor_shape = input_shape[0]
+        assert len(tensor_shape.as_list()) == 4
         assert self.strides[0] == self.strides[1]
         # shape = [filter_size, filter_size, in_filters, out_filters]
-        num_of_input_channels = int(input_shape.as_list()[3] / self.inputPathCount)
-        height_of_input_map = input_shape.as_list()[2]
-        width_of_input_map = input_shape.as_list()[1]
+        num_of_input_channels = int(tensor_shape.as_list()[3] / self.inputPathCount)
+        height_of_input_map = tensor_shape.as_list()[2]
+        width_of_input_map = tensor_shape.as_list()[1]
         height_of_filter = self.kernelSize
         width_of_filter = self.kernelSize
         num_of_output_channels = int(self.numOfFilters / self.outputPathCount)

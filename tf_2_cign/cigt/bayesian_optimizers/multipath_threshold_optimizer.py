@@ -4,6 +4,7 @@ from sklearn.model_selection import train_test_split
 from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
 
 # Hyper-parameters
+from tf_2_cign.utilities.utilities import Utilities
 
 
 class MultipathThresholdOptimizer(BayesianOptimizer):
@@ -16,11 +17,56 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         probabilities_arr = list(self.routingProbabilities.values())[0]
         self.maxEntropies = []
         self.optimization_bounds_continuous = {}
+        self.routingBlocksCount = 0
         for idx, arr in enumerate(probabilities_arr):
+            self.routingBlocksCount += 1
             num_of_routes = arr.shape[1]
             self.maxEntropies.append(-np.log(1.0 / num_of_routes))
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
+
+    # Calculate entropies per level and per decision. The list by itself represents the levels.
+    # Each element of the list is a numpy array, whose second and larger dimensions represent the
+    # decisions taken in previous levels.
+    def prepare_entropies_per_level_and_decision(self):
+        decision_arrays = [[0, 1] for _ in range(self.routingBlocksCount)]
+        decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
+        list_of_entropies_per_level = []
+
+        for block_id in range(self.routingBlocksCount):
+            num_of_decision_dimensions = 2 ** block_id
+            entropy_array = np.zeros(shape=(self.totalSampleCount, num_of_decision_dimensions))
+            list_of_entropies_per_level.append(entropy_array)
+
+            all_previous_combinations = Utilities.get_cartesian_product(
+                [[0, 1] for _ in range(block_id)])
+            for previous_combination in all_previous_combinations:
+                valid_combinations = []
+                for combination in decision_combinations:
+                    if combination[0:block_id] == previous_combination:
+                        valid_combinations.append(combination)
+                valid_probability_arrays = []
+                valid_entropy_arrays = []
+                for valid_combination in valid_combinations:
+                    probability_array = self.routingProbabilities[valid_combination][block_id]
+                    entropy_array = self.routingEntropies[valid_combination][block_id]
+                    valid_probability_arrays.append(probability_array)
+                    valid_entropy_arrays.append(entropy_array)
+
+                # Assert that the result of same action sequences are always equal.
+                for i_ in range(len(valid_probability_arrays) - 1):
+                    assert np.allclose(valid_probability_arrays[i_], valid_probability_arrays[i_ + 1])
+                for i_ in range(len(valid_entropy_arrays) - 1):
+                    assert np.allclose(valid_entropy_arrays[i_], valid_entropy_arrays[i_ + 1])
+
+                valid_entropies_matrix = np.stack(valid_entropy_arrays, axis=1)
+                valid_entropy_arr = np.mean(valid_entropies_matrix, axis=1)
+                if len(all_previous_combinations) == 0:
+                    list_of_entropies_per_level[block_id][:, 0] = valid_entropy_arr
+                else:
+                    combination_coord = int("".join(str(ele) for ele in previous_combination), 2)
+                    list_of_entropies_per_level[block_id][:, combination_coord] = valid_entropy_arr
+        return list_of_entropies_per_level
 
     def prepare_val_test_sets(self):
         total_sample_count = set()
@@ -44,7 +90,30 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
     def get_model_outputs(self):
         return {}, {}, {}, {}
 
+    def get_metrics(self, indices, thresholds):
+        selections_arr = np.array(len(indices), self.routingBlocksCount)
+        for level in range(self.routingBlocksCount):
+            threshold = thresholds[thresholds]
+            all_previous_combinations = Utilities.get_cartesian_product(
+                [[0, 1] for _ in range(level)])
+
+
+
+
+
     def cost_function(self, **kwargs):
+        thresholds = []
+        for level in range(self.routingBlocksCount):
+            thresholds.append(kwargs["entropy_block_{0}".format(level)])
+
+
+        # X = kwargs["classification_dropout_probability"]
+        # Y = self.information_gain_balance_coefficient # kwargs["information_gain_balance_coefficient"]
+        # Z = self.decision_loss_coefficient # kwargs["decision_loss_coefficient"]
+        # W = 0.01
+
+
+
         return 0
         # # lr_initial_rate,
         # # hyperbolic_exponent):

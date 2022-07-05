@@ -21,8 +21,10 @@ class CigtDenseLayer(CignDenseLayer):
     #     super(CigtDenseLayer, self).build(input_shape=tensor_shape)
 
     def build(self, input_shape):
-        assert len(input_shape.as_list()) == 2
-        num_of_input_channels = int(input_shape[1] / self.inputPathCount)
+        assert len(input_shape) == 2
+        tensor_shape = input_shape[0]
+        assert len(tensor_shape.as_list()) == 2
+        num_of_input_channels = int(tensor_shape[1] / self.inputPathCount)
         num_of_output_channels = int(self.outputDim / self.outputPathCount)
         cost = Utilities.calculate_mac_of_computation(num_of_input_channels=num_of_input_channels,
                                                       height_of_input_map=1,

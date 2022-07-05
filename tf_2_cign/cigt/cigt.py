@@ -42,6 +42,7 @@ class Cigt(tf.keras.Model):
         self.evaluationPeriod = evaluation_period
         self.measurementStart = measurement_start
         self.dagObject = Dag()
+        self.cigtNodes = []
         self.cigtBlocks = []
         self.enforcedRoutingDecisions = tf.Variable(
             tf.zeros(shape=(self.batchSize, len(self.pathCounts) - 1), dtype=tf.int32), trainable=False)
@@ -53,6 +54,7 @@ class Cigt(tf.keras.Model):
         self.warmUpPeriod = warm_up_period
         self.warmUpFinalIteration = None
         self.isInWarmUp = True
+        self.totalMacCost = None
         self.saveModel = save_model
         self.modelDefinition = model_definition
         self.numOfTrainingIterations = 0
@@ -110,6 +112,7 @@ class Cigt(tf.keras.Model):
             else:
                 self.rootNode = node
             last_block = node
+            self.cigtNodes.append(node)
 
     @tf.function
     def call(self, inputs, **kwargs):
@@ -366,6 +369,9 @@ class Cigt(tf.keras.Model):
                         total_param_count += np.prod(v.get_shape().as_list())
                     self.add_explanation(name_of_param="Num Of Variables", value=total_param_count,
                                          explanation="", kv_rows=kv_rows)
+                    self.calculate_total_macs()
+                    self.add_explanation(name_of_param="Total Mac Cost", value=self.totalMacCost,
+                                         explanation="", kv_rows=kv_rows)
                     DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
 
                 self.numOfTrainingIterations += 1
@@ -511,8 +517,8 @@ class Cigt(tf.keras.Model):
         dummy_temperature = tf.convert_to_tensor(1.0)
         dummy_is_warm_up = tf.convert_to_tensor(False)
         self.call(inputs=[dummy_x, dummy_y, dummy_temperature, dummy_is_warm_up], training=False)
+        self.calculate_total_macs()
         super().load_weights(filepath=filepath)
-        print("X")
 
     def add_explanation(self, name_of_param, value, explanation, kv_rows):
         explanation += "{0}:{1}\n".format(name_of_param, value)
@@ -575,3 +581,9 @@ class Cigt(tf.keras.Model):
                                            explanation=explanation, kv_rows=kv_rows)
         DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         return explanation
+
+    def calculate_total_macs(self):
+        for node in self.cigtNodes:
+            assert node.macCost > 0 and len(node.opMacCostsDict) > 0
+        self.totalMacCost = sum([node.macCost for node in self.cigtNodes])
+

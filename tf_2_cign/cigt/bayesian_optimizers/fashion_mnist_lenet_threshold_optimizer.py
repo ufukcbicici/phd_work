@@ -139,22 +139,6 @@ class FashionMnistLenetThresholdOptimizer(MultipathThresholdOptimizer):
             best_accuracy = np.mean(correct_vec > 0.0)
             print("best_accuracy={0}".format(best_accuracy))
 
-            # Assert for consistency of routing distributions.
-            for block_id in range(len(fashion_cigt.pathCounts) - 1):
-                all_previous_combinations = Utilities.get_cartesian_product(
-                    [[0, 1] for _ in range(block_id)])
-                for previous_combination in all_previous_combinations:
-                    valid_combinations = []
-                    for combination in decision_combinations:
-                        if combination[0:block_id] == previous_combination:
-                            valid_combinations.append(combination)
-                    valid_arrays = []
-                    for valid_combination in valid_combinations:
-                        arr = combinations_routing_probabilities_dict[valid_combination][block_id]
-                        valid_arrays.append(arr)
-                    for i_ in range(len(valid_arrays) - 1):
-                        assert np.allclose(valid_arrays[i_], valid_arrays[i_ + 1])
-
         res_tuple = (combinations_routing_probabilities_dict, combinations_routing_entropies_dict,
                      combinations_y_hat_dict, combinations_y_dict)
         return res_tuple

@@ -84,6 +84,16 @@ class LenetCigt(Cigt):
                 curr_node = curr_node[0]
         # self.build(input_shape=[(self.batchSize, *self.inputDims), (self.batchSize, )])
 
+    def calculate_total_macs(self):
+        leaf_node = self.cigtNodes[-1]
+        loss_layer_cost = leaf_node.opMacCostsDict[self.cigtBlocks[-1].lossLayer.opName]
+        routed_loss_layer_cost = loss_layer_cost / self.pathCounts[-1]
+        leaf_node.macCost -= loss_layer_cost
+        leaf_node.macCost += routed_loss_layer_cost
+        leaf_node.opMacCostsDict[self.cigtBlocks[-1].lossLayer.opName] = routed_loss_layer_cost
+        super(LenetCigt, self).calculate_total_macs()
+
+
     def get_explanation_string(self):
         kv_rows = []
         explanation = ""

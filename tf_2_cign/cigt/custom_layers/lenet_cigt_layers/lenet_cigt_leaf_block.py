@@ -25,7 +25,7 @@ class LeNetCigtLeafBlock(tf.keras.layers.Layer):
                                            activation=activation,
                                            use_bias=use_bias,
                                            padding=padding,
-                                           input_path_count=self.thisBlockPathCount,
+                                           input_path_count=self.prevBlockPathCount,
                                            output_path_count=self.thisBlockPathCount,
                                            name="Lenet_Cigt_Node_{0}_Conv".format(self.node.index))
             self.maxPoolLayer = tf.keras.layers.MaxPool2D(pool_size=2, strides=2, padding="same")
@@ -44,13 +44,20 @@ class LeNetCigtLeafBlock(tf.keras.layers.Layer):
                                       activation="relu",
                                       node=node,
                                       use_bias=True,
-                                      path_count=self.thisBlockPathCount,
+                                      input_path_count=self.thisBlockPathCount,
+                                      output_path_count=self.thisBlockPathCount,
                                       name="Lenet_Cigt_Node_{0}_fc".format(self.node.index))
             self.hiddenLayers.append(fc_layer)
             dropout_layer = tf.keras.layers.Dropout(rate=self.classificationDropoutProb)
             self.dropoutLayers.append(dropout_layer)
         self.lossLayer = CignDenseLayer(output_dim=class_count, activation=None, node=node, use_bias=True,
                                         name="loss_layer")
+        # # Amend the cost for routing
+        # cost = self.node.opMacCostsDict[self.lossLayer.opName]
+        # self.node.macCost -= cost
+        # routed_cost = cost / self.thisBlockPathCount
+        # self.node.opMacCostsDict[self.lossLayer.opName] = routed_cost
+        # self.node.macCost += routed_cost
 
     # @tf.function
     def call(self, inputs, **kwargs):
