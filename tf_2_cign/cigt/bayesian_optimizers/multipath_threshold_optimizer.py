@@ -25,7 +25,6 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
         self.listOfEntropiesPerLevel = self.prepare_entropies_per_level_and_decision()
-        print("X")
 
     # Calculate entropies per level and per decision. The list by itself represents the levels.
     # Each element of the list is a numpy array, whose second and larger dimensions represent the
@@ -63,7 +62,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
 
                 valid_entropies_matrix = np.stack(valid_entropy_arrays, axis=1)
                 valid_entropy_arr = np.mean(valid_entropies_matrix, axis=1)
-                if len(all_previous_combinations) == 0:
+                if len(all_previous_combinations) == 1:
+                    assert all_previous_combinations[0] == ()
                     list_of_entropies_per_level[block_id][:, 0] = valid_entropy_arr
                 else:
                     combination_coord = int("".join(str(ele) for ele in previous_combination), 2)
