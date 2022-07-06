@@ -24,6 +24,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             self.maxEntropies.append(-np.log(1.0 / num_of_routes))
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
+        self.listOfEntropiesPerLevel = self.prepare_entropies_per_level_and_decision()
+        print("X")
 
     # Calculate entropies per level and per decision. The list by itself represents the levels.
     # Each element of the list is a numpy array, whose second and larger dimensions represent the
