@@ -93,28 +93,26 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         return {}, {}, {}, {}
 
     def get_metrics(self, indices, thresholds):
-        selections_arr = np.array(len(indices), self.routingBlocksCount)
+        selections_arr = np.zeros(len(indices), self.routingBlocksCount)
+        selections_arr[:] = np.nan
         for level in range(self.routingBlocksCount):
             threshold = thresholds[thresholds]
-            all_previous_combinations = Utilities.get_cartesian_product(
-                [[0, 1] for _ in range(level)])
-
-
-
-
+            if level == 0:
+                curr_entropies = self.listOfEntropiesPerLevel[level][0]
+            # else:
+            #     curr_entropies
+            # all_previous_combinations = Utilities.get_cartesian_product(
+            #     [[0, 1] for _ in range(level)])
 
     def cost_function(self, **kwargs):
         thresholds = []
         for level in range(self.routingBlocksCount):
             thresholds.append(kwargs["entropy_block_{0}".format(level)])
 
-
         # X = kwargs["classification_dropout_probability"]
         # Y = self.information_gain_balance_coefficient # kwargs["information_gain_balance_coefficient"]
         # Z = self.decision_loss_coefficient # kwargs["decision_loss_coefficient"]
         # W = 0.01
-
-
 
         return 0
         # # lr_initial_rate,
