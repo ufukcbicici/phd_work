@@ -139,5 +139,5 @@ class FashionMnistLenetThresholdOptimizer(MultipathThresholdOptimizer):
             print("best_accuracy={0}".format(best_accuracy))
 
         res_tuple = (combinations_routing_probabilities_dict, combinations_routing_entropies_dict,
-                     combinations_y_hat_dict, combinations_y_dict)
+                     combinations_y_hat_dict, combinations_y_dict, training_accuracy, test_accuracy)
         return res_tuple

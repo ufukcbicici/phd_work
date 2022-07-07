@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 
+from auxillary.db_logger import DbLogger
 from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
 
 # Hyper-parameters
@@ -15,7 +16,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         self.modelId = model_id
         self.valRatio = val_ratio
         self.accuracyMacBalanceCoeff = accuracy_mac_balance_coeff
-        self.routingProbabilities, self.routingEntropies, self.logits, self.groundTruths = self.get_model_outputs()
+        self.routingProbabilities, self.routingEntropies, self.logits, self.groundTruths,\
+            self.fullTrainingAccuracy, self.fullTestAccuracy = self.get_model_outputs()
         probabilities_arr = list(self.routingProbabilities.values())[0]
         self.maxEntropies = []
         self.optimization_bounds_continuous = {}
@@ -27,7 +29,22 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
         self.listOfEntropiesPerLevel = self.prepare_entropies_per_level_and_decision()
-        self.routingCorrectnessDict, self.routingMacDict = self.get_correctness_and_mac_dicts()
+        self.routingCorrectnessDict, self.routingMacDict, self.valBaseAccuracy, self.testBaseAccuracy \
+            = self.get_correctness_and_mac_dicts()
+        self.runId = DbLogger.get_run_id()
+        kv_rows = [(self.runId, "Validation Sample Count", "{0}".format(len(self.valIndices))),
+                   (self.runId, "Test Sample Count", "{0}".format(len(self.testIndices))),
+                   (self.runId, "Validation Base Accuracy", "{0}".format(len(self.valBaseAccuracy))),
+                   (self.runId, "Test Base Accuracy", "{0}".format(len(self.testBaseAccuracy))),
+                   (self.runId, "Full Test Accuracy", "{0}".format(self.fullTestAccuracy)),
+                   (self.runId, "xi", "{0}".format(self.xi)),
+                   (self.runId, "init_points", "{0}".format(self.init_points)),
+                   (self.runId, "n_iter", "{0}".format(self.n_iter)),
+                   (self.runId, "accuracyMacBalanceCoeff", "{0}".format(self.accuracyMacBalanceCoeff)),
+                   (self.runId, "modelId", "{0}".format(self.modelId)),
+                   (self.runId, "Base Mac", "{0}".format(self.routingMacDict[(0, 0)]))
+                   ]
+        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
 
     # Calculate entropies per level and per decision. The list by itself represents the levels.
     # Each element of the list is a numpy array, whose second and larger dimensions represent the
@@ -96,7 +113,18 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 logits = self.logits[decision_combination][idx]
                 estimated_label = np.argmax(logits)
                 correctness_dict[decision_combination].append(int(correct_label == estimated_label))
-        return correctness_dict, mac_dict
+
+        val_ground_truths = self.groundTruths[(0, 0)][self.valIndices]
+        val_logits = self.logits[(0, 0)][self.valIndices]
+        val_estimated_labels = np.argmax(val_logits, axis=1)
+        val_base_accuracy = np.mean(val_ground_truths == val_estimated_labels)
+
+        test_ground_truths = self.groundTruths[(0, 0)][self.testIndices]
+        test_logits = self.logits[(0, 0)][self.testIndices]
+        test_estimated_labels = np.argmax(test_logits, axis=1)
+        test_base_accuracy = np.mean(test_ground_truths == test_estimated_labels)
+
+        return correctness_dict, mac_dict, val_base_accuracy, test_base_accuracy
 
     def prepare_val_test_sets(self):
         total_sample_count = set()
@@ -118,7 +146,7 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         return total_sample_count, val_indices, test_indices
 
     def get_model_outputs(self):
-        return {}, {}, {}, {}
+        return {}, {}, {}, {}, 0.0, 0.0
 
     def get_metrics(self, indices, thresholds):
         selections_arr = np.zeros(shape=(len(indices), self.routingBlocksCount), dtype=np.int32)
@@ -159,4 +187,10 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             self.get_metrics(indices=self.valIndices, thresholds=thresholds)
         test_score, test_accuracy, test_mac_overload_percentage = \
             self.get_metrics(indices=self.testIndices, thresholds=thresholds)
+        print("************************************************************************************************")
+        print("val_score:{0} val_accuracy:{1} val_mac_overload_percentage:{2}".format(val_score, val_accuracy,
+                                                                                      val_mac_overload_percentage))
+        print("test_score:{0} test_accuracy:{1} test_mac_overload_percentage:{2}".format(test_score, test_accuracy,
+                                                                                         test_mac_overload_percentage))
+        print("************************************************************************************************")
         return val_score
