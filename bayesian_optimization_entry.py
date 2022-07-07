@@ -21,7 +21,7 @@ if __name__ == "__main__":
     # bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
     #                        log_file_name="bo_gumbel_softmax_mean_z_only_dropout")
 
-    DbLogger.log_db_path = DbLogger.blackshark_desktop
+    DbLogger.log_db_path = DbLogger.home_asus
     # bayesian_optimizer = FmnistGumbelSoftmaxVanillaOptimizer(init_points=100, n_iter=300, xi=0.01)
     # bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
     #                        log_file_name="bo_gumbel_softmax_mean_z_vanilla")

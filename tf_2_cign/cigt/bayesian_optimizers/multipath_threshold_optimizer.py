@@ -98,7 +98,12 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         for level in range(self.routingBlocksCount):
             threshold = thresholds[thresholds]
             if level == 0:
-                curr_entropies = self.listOfEntropiesPerLevel[level][0]
+                curr_entropies = self.listOfEntropiesPerLevel[level][indices][0]
+            else:
+                selection_coords = np.apply_along_axis(func1d=lambda r: int("".join(str(ele) for ele in r), 2),
+                                                       axis=1, arr=selections_arr[:, 0:level])
+                curr_entropies = self.listOfEntropiesPerLevel[level][indices][np.arange(len(indices)), selection_coords]
+
             # else:
             #     curr_entropies
             # all_previous_combinations = Utilities.get_cartesian_product(
