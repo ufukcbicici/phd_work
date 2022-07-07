@@ -8,12 +8,13 @@ from tf_2_cign.utilities.utilities import Utilities
 
 
 class MultipathThresholdOptimizer(BayesianOptimizer):
-    def __init__(self, xi, init_points, n_iter,
+    def __init__(self, xi, init_points, n_iter, accuracy_mac_balance_coeff,
                  model_id, val_ratio):
         super().__init__(xi, init_points, n_iter)
         self.model = None
         self.modelId = model_id
         self.valRatio = val_ratio
+        self.accuracyMacBalanceCoeff = accuracy_mac_balance_coeff
         self.routingProbabilities, self.routingEntropies, self.logits, self.groundTruths = self.get_model_outputs()
         probabilities_arr = list(self.routingProbabilities.values())[0]
         self.maxEntropies = []
@@ -26,8 +27,7 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
         self.listOfEntropiesPerLevel = self.prepare_entropies_per_level_and_decision()
-        self.routingCorrectnessDict = {}
-
+        self.routingCorrectnessDict, self.routingMacDict = self.get_correctness_and_mac_dicts()
 
     # Calculate entropies per level and per decision. The list by itself represents the levels.
     # Each element of the list is a numpy array, whose second and larger dimensions represent the
@@ -83,7 +83,7 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             # Get the mac cost for this routing combination.
             combination_mac_cost = self.model.cigtNodes[0].macCost
             for idx, decision in enumerate(decision_combination):
-                level_mac_cost = self.model.cigtNodes[idx].macCost
+                level_mac_cost = self.model.cigtNodes[idx + 1].macCost
                 if decision == 0:
                     combination_mac_cost += level_mac_cost
                 else:
@@ -96,7 +96,7 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 logits = self.logits[decision_combination][idx]
                 estimated_label = np.argmax(logits)
                 correctness_dict[decision_combination].append(int(correct_label == estimated_label))
-        return correctness_dict
+        return correctness_dict, mac_dict
 
     def prepare_val_test_sets(self):
         total_sample_count = set()
@@ -133,89 +133,30 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 curr_entropies = self.listOfEntropiesPerLevel[level][indices][np.arange(len(indices)), selection_coords]
             this_level_selections = np.array(curr_entropies >= threshold, dtype=np.int32)
             selections_arr[:, level] = this_level_selections
-
-
+        # Get accuracy and mac results
+        correct_list = []
+        mac_ratio_list = []
+        smallest_mac = np.min(list(self.routingMacDict.values()))
+        for ii, si in enumerate(indices):
+            selection_trajectory = tuple(selections_arr[ii, :])
+            is_correct = self.routingCorrectnessDict[selection_trajectory][si]
+            correct_list.append(is_correct)
+            selection_mac_ratio = self.routingMacDict[selection_trajectory] / smallest_mac
+            mac_ratio_list.append(selection_mac_ratio)
+        accuracy = np.mean(correct_list)
+        avg_mac_ratio = np.mean(mac_ratio_list)
+        accuracy_component = self.accuracyMacBalanceCoeff * accuracy
+        mac_component = (1.0 - self.accuracyMacBalanceCoeff) * (avg_mac_ratio - 1.0)
+        score = accuracy_component - mac_component
+        return score, accuracy, (avg_mac_ratio - 1.0) * 100.0
 
     def cost_function(self, **kwargs):
         thresholds = []
         for level in range(self.routingBlocksCount):
             thresholds.append(kwargs["entropy_block_{0}".format(level)])
 
-        self.get_metrics(indices=self.valIndices, thresholds=thresholds)
-        self.get_metrics(indices=self.testIndices, thresholds=thresholds)
-
-
-        # X = kwargs["classification_dropout_probability"]
-        # Y = self.information_gain_balance_coefficient # kwargs["information_gain_balance_coefficient"]
-        # Z = self.decision_loss_coefficient # kwargs["decision_loss_coefficient"]
-        # W = 0.01
-
-        return 0
-        # # lr_initial_rate,
-        # # hyperbolic_exponent):
-        # X = kwargs["classification_dropout_probability"]
-        # Y = kwargs["information_gain_balance_coefficient"]
-        # Z = kwargs["decision_loss_coefficient"]
-        # W = 0.01
-        #
-        # print("classification_dropout_probability={0}".format(kwargs["classification_dropout_probability"]))
-        # print("information_gain_balance_coefficient={0}".format(kwargs["information_gain_balance_coefficient"]))
-        # print("decision_loss_coefficient={0}".format(kwargs["decision_loss_coefficient"]))
-        # # print("lr_initial_rate={0}".format(kwargs["lr_initial_rate"]))
-        #
-        # FashionNetConstants.softmax_decay_initial = 25.0
-        # FashionNetConstants.softmax_decay_coefficient = 0.9999
-        # FashionNetConstants.softmax_decay_period = 1
-        # FashionNetConstants.softmax_decay_min_limit = 0.1
-        #
-        # fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
-        # softmax_decay_controller = StepWiseDecayAlgorithm(
-        #     decay_name="Stepwise",
-        #     initial_value=FashionNetConstants.softmax_decay_initial,
-        #     decay_coefficient=FashionNetConstants.softmax_decay_coefficient,
-        #     decay_period=FashionNetConstants.softmax_decay_period,
-        #     decay_min_limit=FashionNetConstants.softmax_decay_min_limit)
-        #
-        # learning_rate_calculator = DiscreteParameter(name="lr_calculator",
-        #                                              value=W,
-        #                                              schedule=[(15000 + 12000, (1.0 / 2.0) * W),
-        #                                                        (30000 + 12000, (1.0 / 4.0) * W),
-        #                                                        (40000 + 12000, (1.0 / 40.0) * W)])
-        # print(learning_rate_calculator)
-        #
-        # with tf.device("GPU"):
-        #     run_id = DbLogger.get_run_id()
-        #     fashion_cigt = LenetCigt(batch_size=125,
-        #                              input_dims=(28, 28, 1),
-        #                              filter_counts=[32, 64, 128],
-        #                              kernel_sizes=[5, 5, 1],
-        #                              hidden_layers=[512, 256],
-        #                              decision_drop_probability=0.0,
-        #                              classification_drop_probability=X,
-        #                              decision_wd=0.0,
-        #                              classification_wd=0.0,
-        #                              decision_dimensions=[128, 128],
-        #                              class_count=10,
-        #                              information_gain_balance_coeff=Y,
-        #                              softmax_decay_controller=softmax_decay_controller,
-        #                              learning_rate_schedule=learning_rate_calculator,
-        #                              decision_loss_coeff=Z,
-        #                              path_counts=[2, 4],
-        #                              bn_momentum=0.9,
-        #                              warm_up_period=25,
-        #                              routing_strategy_name="Full_Training",
-        #                              run_id=run_id,
-        #                              evaluation_period=10,
-        #                              measurement_start=25,
-        #                              use_straight_through=True,
-        #                              optimizer_type="SGD",
-        #                              decision_non_linearity="Softmax",
-        #                              save_model=True,
-        #                              model_definition="Lenet CIGT - Gumbel Softmax with E[Z] based routing - Softmax and Straight Through Bayesian Optimization")
-        #
-        #     explanation = fashion_cigt.get_explanation_string()
-        #     DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
-        #     score = fashion_cigt.fit(x=fashion_mnist.trainDataTf, validation_data=fashion_mnist.testDataTf,
-        #                              epochs=FashionNetConstants.epoch_count)
-        #
-        # return score
+        val_score, val_accuracy, val_mac_overload_percentage = \
+            self.get_metrics(indices=self.valIndices, thresholds=thresholds)
+        test_score, test_accuracy, test_mac_overload_percentage = \
+            self.get_metrics(indices=self.testIndices, thresholds=thresholds)
+        return val_score
