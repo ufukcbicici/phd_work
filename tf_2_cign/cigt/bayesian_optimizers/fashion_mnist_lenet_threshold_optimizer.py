@@ -45,47 +45,47 @@ class FashionMnistLenetThresholdOptimizer(MultipathThresholdOptimizer):
 
         with tf.device("GPU"):
             run_id = DbLogger.get_run_id()
-            fashion_cigt = LenetCigt(batch_size=125,
-                                     input_dims=(28, 28, 1),
-                                     filter_counts=[32, 64, 128],
-                                     kernel_sizes=[5, 5, 1],
-                                     hidden_layers=[512, 256],
-                                     decision_drop_probability=0.0,
-                                     classification_drop_probability=X,
-                                     decision_wd=0.0,
-                                     classification_wd=0.0,
-                                     decision_dimensions=[128, 128],
-                                     class_count=10,
-                                     information_gain_balance_coeff=Y,
-                                     softmax_decay_controller=softmax_decay_controller,
-                                     learning_rate_schedule=learning_rate_calculator,
-                                     decision_loss_coeff=Z,
-                                     path_counts=[2, 4],
-                                     bn_momentum=0.9,
-                                     warm_up_period=25,
-                                     routing_strategy_name="Enforced_Routing",
-                                     run_id=run_id,
-                                     evaluation_period=10,
-                                     measurement_start=25,
-                                     use_straight_through=True,
-                                     optimizer_type="SGD",
-                                     decision_non_linearity="Softmax",
-                                     save_model=True,
-                                     model_definition="Enforced Routing")
+            self.model = LenetCigt(batch_size=125,
+                                   input_dims=(28, 28, 1),
+                                   filter_counts=[32, 64, 128],
+                                   kernel_sizes=[5, 5, 1],
+                                   hidden_layers=[512, 256],
+                                   decision_drop_probability=0.0,
+                                   classification_drop_probability=X,
+                                   decision_wd=0.0,
+                                   classification_wd=0.0,
+                                   decision_dimensions=[128, 128],
+                                   class_count=10,
+                                   information_gain_balance_coeff=Y,
+                                   softmax_decay_controller=softmax_decay_controller,
+                                   learning_rate_schedule=learning_rate_calculator,
+                                   decision_loss_coeff=Z,
+                                   path_counts=[2, 4],
+                                   bn_momentum=0.9,
+                                   warm_up_period=25,
+                                   routing_strategy_name="Enforced_Routing",
+                                   run_id=run_id,
+                                   evaluation_period=10,
+                                   measurement_start=25,
+                                   use_straight_through=True,
+                                   optimizer_type="SGD",
+                                   decision_non_linearity="Softmax",
+                                   save_model=True,
+                                   model_definition="Enforced Routing")
             weights_folder_path = os.path.join(os.path.dirname(__file__), "..", "saved_models",
                                                "weights_{0}".format(self.modelId))
-            fashion_cigt.load_weights(filepath=os.path.join(weights_folder_path, "fully_trained_weights"))
-            fashion_cigt.isInWarmUp = False
+            self.model.load_weights(filepath=os.path.join(weights_folder_path, "fully_trained_weights"))
+            self.model.isInWarmUp = False
 
             # Check that we have the correct accuracy
-            training_accuracy, training_info_gain_list = fashion_cigt.evaluate(
+            training_accuracy, training_info_gain_list = self.model.evaluate(
                 x=fashion_mnist.trainDataTf, epoch_id=0, dataset_type="training")
             print("Training Accuracy:{0}".format(training_accuracy))
-            test_accuracy, test_info_gain_list = fashion_cigt.evaluate(
+            test_accuracy, test_info_gain_list = self.model.evaluate(
                 x=fashion_mnist.testDataTf, epoch_id=0, dataset_type="test")
             print("Test Accuracy:{0}".format(test_accuracy))
 
-            decision_arrays = [[0, 1] for _ in range(len(fashion_cigt.pathCounts) - 1)]
+            decision_arrays = [[0, 1] for _ in range(len(self.model.pathCounts) - 1)]
             decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
             # decision_combinations = set([tuple(sorted(arr)) for arr in decision_combinations])
 
@@ -95,23 +95,23 @@ class FashionMnistLenetThresholdOptimizer(MultipathThresholdOptimizer):
             combinations_routing_entropies_dict = {}
 
             for decision_combination in decision_combinations:
-                enforced_decision_arr = np.zeros(shape=(fashion_cigt.batchSize, len(fashion_cigt.pathCounts) - 1),
+                enforced_decision_arr = np.zeros(shape=(self.model.batchSize, len(self.model.pathCounts) - 1),
                                                  dtype=np.int32)
                 combinations_y_dict[decision_combination] = []
                 combinations_y_hat_dict[decision_combination] = []
                 combinations_routing_probabilities_dict[decision_combination] = []
                 combinations_routing_entropies_dict[decision_combination] = []
 
-                for _ in range(len(fashion_cigt.pathCounts) - 1):
+                for _ in range(len(self.model.pathCounts) - 1):
                     combinations_routing_probabilities_dict[decision_combination].append([])
 
                 for idx, val in enumerate(decision_combination):
                     enforced_decision_arr[:, idx] = val
-                fashion_cigt.enforcedRoutingDecisions.assign(enforced_decision_arr)
+                self.model.enforcedRoutingDecisions.assign(enforced_decision_arr)
                 for x_, y_ in fashion_mnist.testDataTf:
-                    results_dict = fashion_cigt.call(inputs=[x_, y_,
-                                                             tf.convert_to_tensor(1.0),
-                                                             tf.convert_to_tensor(False)], training=False)
+                    results_dict = self.model.call(inputs=[x_, y_,
+                                                           tf.convert_to_tensor(1.0),
+                                                           tf.convert_to_tensor(False)], training=False)
                     combinations_y_dict[decision_combination].append(y_.numpy())
                     combinations_y_hat_dict[decision_combination].append(results_dict["logits"].numpy())
                     for i_, arr in enumerate(results_dict["routing_probabilities"]):

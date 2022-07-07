@@ -11,6 +11,7 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
     def __init__(self, xi, init_points, n_iter,
                  model_id, val_ratio):
         super().__init__(xi, init_points, n_iter)
+        self.model = None
         self.modelId = model_id
         self.valRatio = val_ratio
         self.routingProbabilities, self.routingEntropies, self.logits, self.groundTruths = self.get_model_outputs()
@@ -25,6 +26,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
         self.listOfEntropiesPerLevel = self.prepare_entropies_per_level_and_decision()
+        self.routingCorrectnessDict = {}
+
 
     # Calculate entropies per level and per decision. The list by itself represents the levels.
     # Each element of the list is a numpy array, whose second and larger dimensions represent the
@@ -70,6 +73,31 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                     list_of_entropies_per_level[block_id][:, combination_coord] = valid_entropy_arr
         return list_of_entropies_per_level
 
+    def get_correctness_and_mac_dicts(self):
+        correctness_dict = {}
+        mac_dict = {}
+        decision_arrays = [[0, 1] for _ in range(self.routingBlocksCount)]
+        decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
+        for decision_combination in decision_combinations:
+            correctness_dict[decision_combination] = []
+            # Get the mac cost for this routing combination.
+            combination_mac_cost = self.model.cigtNodes[0].macCost
+            for idx, decision in enumerate(decision_combination):
+                level_mac_cost = self.model.cigtNodes[idx].macCost
+                if decision == 0:
+                    combination_mac_cost += level_mac_cost
+                else:
+                    combination_mac_cost += self.model.pathCounts[idx + 1] * level_mac_cost
+            mac_dict[decision_combination] = combination_mac_cost
+
+            # Get correctness vectors.
+            for idx in range(self.totalSampleCount):
+                correct_label = self.groundTruths[decision_combination][idx]
+                logits = self.logits[decision_combination][idx]
+                estimated_label = np.argmax(logits)
+                correctness_dict[decision_combination].append(int(correct_label == estimated_label))
+        return correctness_dict
+
     def prepare_val_test_sets(self):
         total_sample_count = set()
         for ll in self.routingProbabilities.values():
@@ -93,26 +121,29 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         return {}, {}, {}, {}
 
     def get_metrics(self, indices, thresholds):
-        selections_arr = np.zeros(len(indices), self.routingBlocksCount)
-        selections_arr[:] = np.nan
+        selections_arr = np.zeros(shape=(len(indices), self.routingBlocksCount), dtype=np.int32)
+        selections_arr[:] = -10000
         for level in range(self.routingBlocksCount):
-            threshold = thresholds[thresholds]
+            threshold = thresholds[level]
             if level == 0:
-                curr_entropies = self.listOfEntropiesPerLevel[level][indices][0]
+                curr_entropies = self.listOfEntropiesPerLevel[level][indices][:, 0]
             else:
                 selection_coords = np.apply_along_axis(func1d=lambda r: int("".join(str(ele) for ele in r), 2),
                                                        axis=1, arr=selections_arr[:, 0:level])
                 curr_entropies = self.listOfEntropiesPerLevel[level][indices][np.arange(len(indices)), selection_coords]
+            this_level_selections = np.array(curr_entropies >= threshold, dtype=np.int32)
+            selections_arr[:, level] = this_level_selections
 
-            # else:
-            #     curr_entropies
-            # all_previous_combinations = Utilities.get_cartesian_product(
-            #     [[0, 1] for _ in range(level)])
+
 
     def cost_function(self, **kwargs):
         thresholds = []
         for level in range(self.routingBlocksCount):
             thresholds.append(kwargs["entropy_block_{0}".format(level)])
+
+        self.get_metrics(indices=self.valIndices, thresholds=thresholds)
+        self.get_metrics(indices=self.testIndices, thresholds=thresholds)
+
 
         # X = kwargs["classification_dropout_probability"]
         # Y = self.information_gain_balance_coefficient # kwargs["information_gain_balance_coefficient"]
