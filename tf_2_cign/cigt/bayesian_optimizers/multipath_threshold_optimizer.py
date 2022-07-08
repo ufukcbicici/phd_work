@@ -1,11 +1,24 @@
 import numpy as np
+from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
 
 # Hyper-parameters
 from tf_2_cign.utilities.utilities import Utilities
+
+
+@dataclass
+class SearchStatus:
+    level: int
+    curr_index: int
+    accuracy: float
+    mac: float
+    sample_count: int
+    sample_configurations: Dict[int, tuple]
+    entropy_orderings: List[List[tuple]]
 
 
 class MultipathThresholdOptimizer(BayesianOptimizer):
@@ -16,8 +29,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         self.modelId = model_id
         self.valRatio = val_ratio
         self.accuracyMacBalanceCoeff = accuracy_mac_balance_coeff
-        self.routingProbabilities, self.routingEntropies, self.logits, self.groundTruths,\
-            self.fullTrainingAccuracy, self.fullTestAccuracy = self.get_model_outputs()
+        self.routingProbabilities, self.routingEntropies, self.logits, self.groundTruths, \
+        self.fullTrainingAccuracy, self.fullTestAccuracy = self.get_model_outputs()
         probabilities_arr = list(self.routingProbabilities.values())[0]
         self.maxEntropies = []
         self.optimization_bounds_continuous = {}
@@ -34,8 +47,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         self.runId = DbLogger.get_run_id()
         kv_rows = [(self.runId, "Validation Sample Count", "{0}".format(len(self.valIndices))),
                    (self.runId, "Test Sample Count", "{0}".format(len(self.testIndices))),
-                   (self.runId, "Validation Base Accuracy", "{0}".format(len(self.valBaseAccuracy))),
-                   (self.runId, "Test Base Accuracy", "{0}".format(len(self.testBaseAccuracy))),
+                   (self.runId, "Validation Base Accuracy", "{0}".format(self.valBaseAccuracy)),
+                   (self.runId, "Test Base Accuracy", "{0}".format(self.testBaseAccuracy)),
                    (self.runId, "Full Test Accuracy", "{0}".format(self.fullTestAccuracy)),
                    (self.runId, "xi", "{0}".format(self.xi)),
                    (self.runId, "init_points", "{0}".format(self.init_points)),
@@ -176,7 +189,7 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         accuracy_component = self.accuracyMacBalanceCoeff * accuracy
         mac_component = (1.0 - self.accuracyMacBalanceCoeff) * (avg_mac_ratio - 1.0)
         score = accuracy_component - mac_component
-        return score, accuracy, (avg_mac_ratio - 1.0) * 100.0
+        return np.asscalar(score), np.asscalar(accuracy), np.asscalar(avg_mac_ratio)
 
     def cost_function(self, **kwargs):
         thresholds = []
@@ -194,3 +207,128 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                                                                                          test_mac_overload_percentage))
         print("************************************************************************************************")
         return val_score
+
+    def change_statistics_for_single_sample(self, indices, route_array, entropy_array, level, sample_index):
+        # base_mac = self.routingMacDict[(0, 0)]
+        # curr_valid_count = len(indices) * acc
+        # curr_total_mac = len(indices) * mac
+
+        # Set all routes for higher levels to zero
+        if level < route_array.shape[1] - 1:
+            route_array[:, level:] = 0
+        # Set the level decision for this sample to one.
+        assert route_array[sample_index, level] == 0
+        route_array[sample_index, level] = 1
+
+        # curr_sample_route = route_array[sample_index, :]
+        # assert curr_sample_route[level] == 0
+        # old_route = tuple(curr_sample_route)
+        # curr_sample_route[level] = 1
+        # new_route = tuple(curr_sample_route)
+
+        # # Get accuracy and mac wrt old route
+        # old_accuracy = self.routingCorrectnessDict[old_route][sample_index]
+        # old_sample_mac = self.routingMacDict[old_route] / base_mac
+        # # Get accuracy and mac wrt new route
+        # new_accuracy = self.routingCorrectnessDict[new_route][sample_index]
+        # new_sample_mac = self.routingMacDict[new_route] / base_mac
+        # new_valid_count = curr_valid_count - old_accuracy + new_accuracy
+        # new_total_mac = curr_total_mac - old_sample_mac + new_sample_mac
+        # new_acc = new_valid_count / len(indices)
+        # new_mac = new_total_mac / len(indices)
+
+        # Re-sort following levels according to changing entropies (for levels smaller than route_array.shape[1] - 1)
+
+        #
+        #
+        return 0, 0
+
+    def run_brute_force(self, first_block_index, indices):
+        set_of_accuracies_macs = set()
+        route_array = np.zeros(shape=(len(indices), self.routingBlocksCount), dtype=np.int32)
+        entropy_array = []
+        for jdx in range(self.routingBlocksCount):
+            entropy_arr = self.routingEntropies[(0, 0)][jdx][indices]
+            entropy_arr_with_indices = [tpl for tpl in zip(indices, entropy_arr)]
+            entropy_arr_with_indices = sorted(entropy_arr_with_indices, key=lambda tpl: tpl[1])
+            entropy_arr_with_indices = np.array(entropy_arr_with_indices, dtype=[("sample_index", int),
+                                                                                 ("entropy", float)])
+            entropy_array.append(entropy_arr_with_indices)
+        entropy_array = np.stack(entropy_array, axis=0)
+
+        # Base statistics when every sample just follows a single path
+        curr_score, curr_accuracy, curr_mac = self.get_metrics(indices=indices, thresholds=[np.inf, np.inf])
+        # set_of_accuracies_macs.add((curr_accuracy, curr_mac))
+
+        # Set the decisions of the first block first.
+        for fbi in range(first_block_index):
+            tpl = entropy_array[0][fbi]
+            sample_index = tpl[0]
+            curr_accuracy, curr_mac = self.change_statistics_for_single_sample(indices=indices,
+                                                                               route_array=route_array,
+                                                                               entropy_array=entropy_array,
+                                                                               level=0,
+                                                                               sample_index=sample_index)
+        set_of_accuracies_macs.add((curr_accuracy, curr_mac))
+
+        # Start the search
+        combs = [list(range(len(indices))) for _ in range(self.routingBlocksCount - 1)]
+        combs = Utilities.get_cartesian_product(list_of_lists=combs)
+        for comb in combs:
+            comb
+
+
+        # Prepare status data for each level
+        # for level in range(self.routingBlocksCount):
+        #     if level == 0:
+        #         route_a
+
+        # decision_arrays = [list(range(len(indices))) for _ in range(self.routingBlocksCount - 1)]
+        # decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
+        # sample_configurations = {}
+        # for ii in indices:
+        #     sample_configurations[ii] = tuple([0 for _ in range(self.routingBlocksCount)])
+
+        # Entropy ordering
+
+    def apply_brute_force_solution(self, indices):
+        if indices is None:
+            indices = np.arange(self.totalSampleCount)
+        # # Step 0: Enumerate all possible configurations. A configuration (i_0, i_1, ..., i_(n-1)) means
+        # # when we have the scale of entropies at each level, we have just passed the i_0. bin at level 0, i_1. bin
+        # # at level 1 and etc. Note that when step to the next bin at level i_j, all bins at higher levels (j+1, j+2,
+        # # ..., n-1) do change.
+        # decision_arrays = [list(range(len(indices))) for _ in range(self.routingBlocksCount - 1)]
+        # decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
+        # # Step 1: A search status for every level
+        # search_status_list = []
+        # for idx in range(self.routingBlocksCount):
+        #     score, accuracy, mac = self.get_metrics(indices=indices, thresholds=[np.inf, np.inf])
+        #     score = np.asscalar(score)
+        #     accuracy = np.asscalar(accuracy)
+        #     mac = np.asscalar(mac)
+        #
+        #
+        #
+        #
+        #
+        #     search_status = SearchStatus(accuracy=accuracy, mac=mac, sample_count=len(indices),
+        #                                  sample_configurations=sample_configurations,
+        #                                  entropy_orderings=entropy_orderings)
+        #     search_status_list.append(search_status)
+
+        for outer_index in range(len(indices)):
+            self.run_brute_force(first_block_index=outer_index, indices=indices)
+            # for inner_combination in decision_combinations:
+            #     routing_combination = tuple([outer_index, *inner_combination])
+
+            #     print("X")
+            #
+            # print("X")
+
+# @dataclass
+# class SearchStatus:
+#     accuracy: float
+#     mac: float
+#     sample_count: int
+#     sample_configurations: List[List[tuple]]
