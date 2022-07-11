@@ -41,9 +41,10 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
             self.maxEntropies.append(-np.log(1.0 / num_of_routes))
             self.optimization_bounds_continuous["entropy_block_{0}".format(idx)] = (0.0, self.maxEntropies[idx])
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
-        self.listOfEntropiesPerLevel = self.prepare_entropies_per_level_and_decision()
-        self.routingCorrectnessDict, self.routingMacDict, self.valBaseAccuracy, self.testBaseAccuracy \
-            = self.get_correctness_and_mac_dicts()
+        self.listOfEntropiesPerLevel, self.fullEntropyArray = self.prepare_entropies_per_level_and_decision()
+        self.routingCorrectnessDict, self.routingMacDict, self.valBaseAccuracy, \
+            self.testBaseAccuracy, self.fullAccuracyArray = self.get_correctness_and_mac_dicts()
+        self.reformat_arrays()
         self.runId = DbLogger.get_run_id()
         kv_rows = [(self.runId, "Validation Sample Count", "{0}".format(len(self.valIndices))),
                    (self.runId, "Test Sample Count", "{0}".format(len(self.testIndices))),
@@ -66,6 +67,8 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         decision_arrays = [[0, 1] for _ in range(self.routingBlocksCount)]
         decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
         list_of_entropies_per_level = []
+        ent_arr_shape = (self.totalSampleCount, *[2 for _ in range(self.routingBlocksCount)], self.routingBlocksCount)
+        full_entropy_array = np.zeros(shape=ent_arr_shape, dtype=np.float)
 
         for block_id in range(self.routingBlocksCount):
             num_of_decision_dimensions = 2 ** block_id
@@ -101,9 +104,21 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 else:
                     combination_coord = int("".join(str(ele) for ele in previous_combination), 2)
                     list_of_entropies_per_level[block_id][:, combination_coord] = valid_entropy_arr
-        return list_of_entropies_per_level
+
+        # for sample_id in range(self.totalSampleCount):
+        for combination in decision_combinations:
+            for block_id in range(self.routingBlocksCount):
+                e_array = self.routingEntropies[combination][block_id]
+                index_arrays = [list(range(self.totalSampleCount))]
+                for i_ in combination:
+                    index_arrays.append([i_] * self.totalSampleCount)
+                index_arrays.append([block_id] * self.totalSampleCount)
+                full_entropy_array[index_arrays] = e_array
+        return list_of_entropies_per_level, full_entropy_array
 
     def get_correctness_and_mac_dicts(self):
+        acc_arr_shape = (self.totalSampleCount, *[2 for _ in range(self.routingBlocksCount)])
+        full_accuracy_array = np.zeros(shape=acc_arr_shape, dtype=np.float)
         correctness_dict = {}
         mac_dict = {}
         decision_arrays = [[0, 1] for _ in range(self.routingBlocksCount)]
@@ -126,6 +141,10 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 logits = self.logits[decision_combination][idx]
                 estimated_label = np.argmax(logits)
                 correctness_dict[decision_combination].append(int(correct_label == estimated_label))
+            index_arrays = [list(range(self.totalSampleCount))]
+            for i_ in decision_combination:
+                index_arrays.append([i_] * self.totalSampleCount)
+            full_accuracy_array[index_arrays] = correctness_dict[decision_combination]
 
         val_ground_truths = self.groundTruths[(0, 0)][self.valIndices]
         val_logits = self.logits[(0, 0)][self.valIndices]
@@ -137,7 +156,18 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         test_estimated_labels = np.argmax(test_logits, axis=1)
         test_base_accuracy = np.mean(test_ground_truths == test_estimated_labels)
 
-        return correctness_dict, mac_dict, val_base_accuracy, test_base_accuracy
+        return correctness_dict, mac_dict, val_base_accuracy, test_base_accuracy, full_accuracy_array
+
+    def reformat_arrays(self):
+        # Accuracy array
+        acc_arr_shape = (self.totalSampleCount, *[2 for _ in range(self.routingBlocksCount)])
+        accuracy_array = np.zeros(shape=acc_arr_shape, dtype=np.float)
+        # Entropy array
+        ent_arr_shape = (self.totalSampleCount, *[2 for _ in range(self.routingBlocksCount)], self.routingBlocksCount)
+        entropy_array = np.zeros(shape=ent_arr_shape, dtype=np.float)
+        print("X")
+
+        # for ll in range(self.routingBlocksCount):
 
     def prepare_val_test_sets(self):
         total_sample_count = set()
@@ -255,28 +285,27 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                                                                                  ("entropy", float)])
             entropy_array.append(entropy_arr_with_indices)
         entropy_array = np.stack(entropy_array, axis=0)
-
-        # Base statistics when every sample just follows a single path
-        curr_score, curr_accuracy, curr_mac = self.get_metrics(indices=indices, thresholds=[np.inf, np.inf])
+        #
+        # # Base statistics when every sample just follows a single path
+        # curr_score, curr_accuracy, curr_mac = self.get_metrics(indices=indices, thresholds=[np.inf, np.inf])
+        # # set_of_accuracies_macs.add((curr_accuracy, curr_mac))
+        #
+        # # Set the decisions of the first block first.
+        # for fbi in range(first_block_index):
+        #     tpl = entropy_array[0][fbi]
+        #     sample_index = tpl[0]
+        #     curr_accuracy, curr_mac = self.change_statistics_for_single_sample(indices=indices,
+        #                                                                        route_array=route_array,
+        #                                                                        entropy_array=entropy_array,
+        #                                                                        level=0,
+        #                                                                        sample_index=sample_index)
         # set_of_accuracies_macs.add((curr_accuracy, curr_mac))
-
-        # Set the decisions of the first block first.
-        for fbi in range(first_block_index):
-            tpl = entropy_array[0][fbi]
-            sample_index = tpl[0]
-            curr_accuracy, curr_mac = self.change_statistics_for_single_sample(indices=indices,
-                                                                               route_array=route_array,
-                                                                               entropy_array=entropy_array,
-                                                                               level=0,
-                                                                               sample_index=sample_index)
-        set_of_accuracies_macs.add((curr_accuracy, curr_mac))
-
-        # Start the search
-        combs = [list(range(len(indices))) for _ in range(self.routingBlocksCount - 1)]
-        combs = Utilities.get_cartesian_product(list_of_lists=combs)
-        for comb in combs:
-            comb
-
+        #
+        # # Start the search
+        # combs = [list(range(len(indices))) for _ in range(self.routingBlocksCount - 1)]
+        # combs = Utilities.get_cartesian_product(list_of_lists=combs)
+        # for comb in combs:
+        #     comb
 
         # Prepare status data for each level
         # for level in range(self.routingBlocksCount):
