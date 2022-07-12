@@ -1,7 +1,9 @@
 import numpy as np
+import itertools
 from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from tqdm import tqdm
 
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
@@ -248,38 +250,9 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         accuracy = np.mean(accuracy_arr)
 
         # Get mac selections
-
-
-        print("X")
-
-
-        # selections_arr[:] = -10000
-        # for level in range(self.routingBlocksCount):
-        #     threshold = thresholds[level]
-        #     if level == 0:
-        #         curr_entropies = self.listOfEntropiesPerLevel[level][indices][:, 0]
-        #     else:
-        #         selection_coords = np.apply_along_axis(func1d=lambda r: int("".join(str(ele) for ele in r), 2),
-        #                                                axis=1, arr=selections_arr[:, 0:level])
-        #         curr_entropies = self.listOfEntropiesPerLevel[level][indices][np.arange(len(indices)), selection_coords]
-        #     this_level_selections = np.array(curr_entropies >= threshold, dtype=np.int32)
-        #     selections_arr[:, level] = this_level_selections
-        # # Get accuracy and mac results
-        # correct_list = []
-        # mac_ratio_list = []
-        # smallest_mac = np.min(list(self.routingMacDict.values()))
-        # for ii, si in enumerate(indices):
-        #     selection_trajectory = tuple(selections_arr[ii, :])
-        #     is_correct = self.routingCorrectnessDict[selection_trajectory][si]
-        #     correct_list.append(is_correct)
-        #     selection_mac_ratio = self.routingMacDict[selection_trajectory] / smallest_mac
-        #     mac_ratio_list.append(selection_mac_ratio)
-        # accuracy = np.mean(correct_list)
-        # avg_mac_ratio = np.mean(mac_ratio_list)
-        # accuracy_component = self.accuracyMacBalanceCoeff * accuracy
-        # mac_component = (1.0 - self.accuracyMacBalanceCoeff) * (avg_mac_ratio - 1.0)
-        # score = accuracy_component - mac_component
-        # return np.asscalar(score), np.asscalar(accuracy), np.asscalar(avg_mac_ratio)
+        mac_array = self.fullMacArray[selections_arr] * (1.0 / self.fullMacArray[0, 0])
+        average_mac = np.mean(mac_array)
+        return accuracy, average_mac, accuracy_arr, mac_array
 
     def cost_function(self, **kwargs):
         thresholds = []
@@ -298,126 +271,78 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         print("************************************************************************************************")
         return val_score
 
-    # def change_statistics_for_single_sample(self, indices, route_array, entropy_array, level, sample_index):
-    #     # base_mac = self.routingMacDict[(0, 0)]
-    #     # curr_valid_count = len(indices) * acc
-    #     # curr_total_mac = len(indices) * mac
-    #
-    #     # Set all routes for higher levels to zero
-    #     if level < route_array.shape[1] - 1:
-    #         route_array[:, level:] = 0
-    #     # Set the level decision for this sample to one.
-    #     assert route_array[sample_index, level] == 0
-    #     route_array[sample_index, level] = 1
-    #
-    #     # curr_sample_route = route_array[sample_index, :]
-    #     # assert curr_sample_route[level] == 0
-    #     # old_route = tuple(curr_sample_route)
-    #     # curr_sample_route[level] = 1
-    #     # new_route = tuple(curr_sample_route)
-    #
-    #     # # Get accuracy and mac wrt old route
-    #     # old_accuracy = self.routingCorrectnessDict[old_route][sample_index]
-    #     # old_sample_mac = self.routingMacDict[old_route] / base_mac
-    #     # # Get accuracy and mac wrt new route
-    #     # new_accuracy = self.routingCorrectnessDict[new_route][sample_index]
-    #     # new_sample_mac = self.routingMacDict[new_route] / base_mac
-    #     # new_valid_count = curr_valid_count - old_accuracy + new_accuracy
-    #     # new_total_mac = curr_total_mac - old_sample_mac + new_sample_mac
-    #     # new_acc = new_valid_count / len(indices)
-    #     # new_mac = new_total_mac / len(indices)
-    #
-    #     # Re-sort following levels according to changing entropies (for levels smaller than route_array.shape[1] - 1)
-    #
-    #     #
-    #     #
-    #     return 0, 0
-    #
-    # def run_brute_force(self, first_block_index, indices):
-    #     set_of_accuracies_macs = set()
-    #     route_array = np.zeros(shape=(len(indices), self.routingBlocksCount), dtype=np.int32)
-    #     entropy_array = []
-    #     for jdx in range(self.routingBlocksCount):
-    #         entropy_arr = self.routingEntropies[(0, 0)][jdx][indices]
-    #         entropy_arr_with_indices = [tpl for tpl in zip(indices, entropy_arr)]
-    #         entropy_arr_with_indices = sorted(entropy_arr_with_indices, key=lambda tpl: tpl[1])
-    #         entropy_arr_with_indices = np.array(entropy_arr_with_indices, dtype=[("sample_index", int),
-    #                                                                              ("entropy", float)])
-    #         entropy_array.append(entropy_arr_with_indices)
-    #     entropy_array = np.stack(entropy_array, axis=1)
-    #
-    #     # curr_score, curr_accuracy, curr_mac = self.get_metrics(indices=indices,
-    #     #                                                        thresholds=[np.inf] * self.routingBlocksCount)
-    #     # Start the search
-    #     combs = [[first_block_index]]
-    #     combs.extend([list(range(len(indices) + 1)) for _ in range(self.routingBlocksCount - 1)])
-    #     combs = Utilities.get_cartesian_product(list_of_lists=combs)
-    #     last_combination = [first_block_index]
-    #     last_combination.extend([0] * (self.routingBlocksCount-1))
-    #     last_combination[-1] = -1
-    #     last_combination = tuple(last_combination)
-    #     for comb in combs:
-    #         active_block_id = np.asscalar(np.argmax(np.equal(comb, last_combination) == False))
-    #         if comb[active_block_id] == 0:
-    #             first_comb = [first_block_index]
-    #             first_comb.extend([0] * (self.routingBlocksCount - 1))
-    #             assert comb == tuple(first_comb)
-    #         else:
-    #             # Set the current sample's current routing block to one.
-    #             tpl = entropy_array[comb[active_block_id] - 1, active_block_id]
-    #             sample_id, entropy_threshold = tpl
-    #             route_array[sample_id, active_block_id] = 1
-    #             # Set all routes with block id larger than the current one to zero.
-    #             route_array[:, (active_block_id + 1):] = 0
-    #             # Update the entropy of the current sample at higher levels
-    #             for ll in range(active_block_id + 1, self.routingBlocksCount):
-    #                 self.fullEntropyArray[sample_id, ]
-    #
-    #
-    #
-    #         # else:
-    #         # indices_of_active_level_set_to_1 = entropy_array[:comb[active_block_id], active_block_id]
-    #         # print("X")
-    #         # Set all layers larger than to this to 0.
-    #         # route_array[:, (changed_index + 1):] = 0
-    #         # # Change the routing behavior of the current sample for the current level
-    #         # curr_sample_index = entropy_array[comb[changed_index], changed_index]
-    #
-    #         last_combination = comb
-    #     #
-    #     # # Base statistics when every sample just follows a single path
-    #     # curr_score, curr_accuracy, curr_mac = self.get_metrics(indices=indices, thresholds=[np.inf, np.inf])
-    #     # # set_of_accuracies_macs.add((curr_accuracy, curr_mac))
-    #     #
-    #     # # Set the decisions of the first block first.
-    #     # for fbi in range(first_block_index):
-    #     #     tpl = entropy_array[0][fbi]
-    #     #     sample_index = tpl[0]
-    #     #     curr_accuracy, curr_mac = self.change_statistics_for_single_sample(indices=indices,
-    #     #                                                                        route_array=route_array,
-    #     #                                                                        entropy_array=entropy_array,
-    #     #                                                                        level=0,
-    #     #                                                                        sample_index=sample_index)
-    #     # set_of_accuracies_macs.add((curr_accuracy, curr_mac))
-    #     #
-    #     # # Start the search
-    #     # combs = [list(range(len(indices))) for _ in range(self.routingBlocksCount - 1)]
-    #     # combs = Utilities.get_cartesian_product(list_of_lists=combs)
-    #     # for comb in combs:
-    #     #     comb
-    #
-    #     # Prepare status data for each level
-    #     # for level in range(self.routingBlocksCount):
-    #     #     if level == 0:
-    #     #         route_a
-    #
-    #     # decision_arrays = [list(range(len(indices))) for _ in range(self.routingBlocksCount - 1)]
-    #     # decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
-    #     # sample_configurations = {}
-    #     # for ii in indices:
-    #     #     sample_configurations[ii] = tuple([0 for _ in range(self.routingBlocksCount)])
-    #
-    #     # Entropy ordering
+    def work_on_threshold_batch(self, run_id, original_run_id, indices, threshold_combinations):
+        rows = []
+        for threshold_combination in tqdm(threshold_combinations):
+            affected_indices = threshold_combination[-1][1]
+            curr_thresholds = []
+            curr_thresholds.extend(threshold_combination[:-1])
+            curr_thresholds.append(threshold_combination[-1][0])
+            curr_thresholds = tuple(curr_thresholds)
+            accuracy, mean_mac, _, _ = self.get_metrics_v2(indices=indices, thresholds=curr_thresholds)
+            row = [run_id, original_run_id]
+            row.extend(curr_thresholds)
+            row.extend([-1.0 for _ in range(4 - self.routingBlocksCount)])
+            row.extend([accuracy, mean_mac])
+            rows.append(row)
+        return rows
+
+    def work_on_threshold_batch_v2(self, run_id, original_run_id, indices, threshold_combinations):
+        rows = []
+        current_accuracy_array = np.zeros(shape=(self.totalSampleCount,), dtype=np.int32)
+        current_mac_array = np.zeros(shape=(self.totalSampleCount,), dtype=np.float)
+        last_combination = None
+        accuracy = -1
+        mean_mac = -1
+        for threshold_id, threshold_combination in tqdm(enumerate(threshold_combinations)):
+            affected_indices = threshold_combination[-1][1]
+            curr_thresholds = []
+            curr_thresholds.extend(threshold_combination[:-1])
+            curr_thresholds.append(threshold_combination[-1][0])
+            curr_thresholds = tuple(curr_thresholds)
+            # A change in upper levels
+            if len(affected_indices) == 0:
+                if last_combination is not None:
+                    active_block_id = np.asscalar(np.argmax(np.equal(threshold_combination, last_combination) == False))
+                    assert active_block_id < self.routingBlocksCount - 1
+                accuracy, mean_mac, accuracy_arr, mac_array = self.get_metrics_v2(indices=indices,
+                                                                                  thresholds=curr_thresholds)
+                current_accuracy_array[indices] = accuracy_arr
+                current_mac_array[indices] = mac_array
+
+            # A change in the last level
+            else:
+                # Trick: We know that only the samples with the indices in the list "affected_indices" can be
+                # affected by the threshold level chance in the last level. We will only calculate the change in the
+                # accuracy caused by the affected indices, gaining speed.
+                accuracy_partial, mac_partial, new_accuracies, new_macs = self.get_metrics_v2(
+                    indices=affected_indices, thresholds=curr_thresholds)
+                total_valid_count = accuracy * len(indices)
+                total_mac_count = mean_mac * len(indices)
+
+                old_accuracies = current_accuracy_array[affected_indices]
+                old_macs = current_mac_array[affected_indices]
+
+                total_valid_count -= np.sum(old_accuracies)
+                total_mac_count -= np.sum(old_macs)
+
+                current_accuracy_array[affected_indices] = new_accuracies
+                current_mac_array[affected_indices] = new_macs
+
+                total_valid_count += np.sum(new_accuracies)
+                total_mac_count += np.sum(new_macs)
+
+                accuracy = total_valid_count / len(indices)
+                mean_mac = total_mac_count / len(indices)
+            last_combination = curr_thresholds
+
+            row = [run_id, original_run_id]
+            row.extend(curr_thresholds)
+            row.extend([-1.0 for _ in range(4 - self.routingBlocksCount)])
+            row.extend([accuracy, mean_mac])
+            rows.append(row)
+
+        return rows
 
     def apply_brute_force_solution(self, indices):
         if indices is None:
@@ -429,13 +354,21 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
         # Get all possible entropies, for every combination
         decision_arrays = [[0, 1] for _ in range(self.routingBlocksCount)]
         decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
+        last_level_entropies_to_samples_dict = {}
         for level in range(self.routingBlocksCount):
             entropies_per_level.append([])
             for decision in decision_combinations:
                 entropies = self.routingEntropies[decision][level][indices]
                 entropies_per_level[level].append(entropies)
+                if level == self.routingBlocksCount - 1:
+                    for ent, idx in zip(entropies, indices):
+                        if ent not in last_level_entropies_to_samples_dict:
+                            last_level_entropies_to_samples_dict[ent] = set()
+                        last_level_entropies_to_samples_dict[ent].add(idx)
             entropies_all_combinations = np.concatenate(entropies_per_level[level])
             entropies_set = set(entropies_all_combinations)
+            if level == self.routingBlocksCount - 1:
+                assert len(entropies_set) == len(last_level_entropies_to_samples_dict)
             entropies_set.add(max(entropies_set) * 10.0)
             entropies_set.add(-1.0)
             assert len(entropies_set) <= (2 ** level) * len(indices)
@@ -446,7 +379,15 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 e0 = entropies_per_level[level][idx]
                 e1 = entropies_per_level[level][idx + 1]
                 thresh = 0.5 * (e0 - e1) + e1
-                thresholds_arr.append(thresh)
+                if level == self.routingBlocksCount - 1:
+                    if idx > 0:
+                        assert e0 in last_level_entropies_to_samples_dict
+                        affected_samples = last_level_entropies_to_samples_dict[e0]
+                        thresholds_arr.append((thresh, np.array(list(affected_samples))))
+                    else:
+                        thresholds_arr.append((thresh, np.array([])))
+                else:
+                    thresholds_arr.append(thresh)
             entropy_thresholds_per_level.append(thresholds_arr)
 
         # Check the correctness of the entropy arrays
@@ -468,50 +409,25 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 for idx in range(len(arrs) - 1):
                     assert np.allclose(arrs[idx], arrs[idx + 1])
 
-        threshold_combinations = Utilities.get_cartesian_product(list_of_lists=entropy_thresholds_per_level)
-        for threshold_combination in threshold_combinations:
-            self.get_metrics_v2(indices=indices, thresholds=threshold_combination)
+            if level == self.routingBlocksCount - 1:
+                assert len([tpl for tpl in entropy_thresholds_per_level[level] if len(tpl[1]) == 0]) == 1
 
+        # threshold_combinations = Utilities.get_cartesian_product(list_of_lists=entropy_thresholds_per_level)
+        threshold_tpls = []
+        cartesian_gen = itertools.product(*entropy_thresholds_per_level)
+        for tpl in cartesian_gen:
+            threshold_tpls.append(tpl)
+            if len(threshold_tpls) >= 2000000:
+                rows = self.work_on_threshold_batch(run_id=self.runId,
+                                                    original_run_id=self.modelId, indices=indices,
+                                                    threshold_combinations=threshold_tpls)
+                threshold_tpls = []
+                DbLogger.write_into_table(rows=rows, table="threshold_search_2")
+                break
+        if len(threshold_tpls) > 0:
+            rows = self.work_on_threshold_batch(run_id=self.runId,
+                                                original_run_id=self.modelId, indices=indices,
+                                                threshold_combinations=threshold_tpls)
+            DbLogger.write_into_table(rows=rows, table="threshold_search_2")
 
         print("X")
-
-        # Calculate intervals
-
-        # # Step 0: Enumerate all possible configurations. A configuration (i_0, i_1, ..., i_(n-1)) means
-        # # when we have the scale of entropies at each level, we have just passed the i_0. bin at level 0, i_1. bin
-        # # at level 1 and etc. Note that when step to the next bin at level i_j, all bins at higher levels (j+1, j+2,
-        # # ..., n-1) do change.
-        # decision_arrays = [list(range(len(indices))) for _ in range(self.routingBlocksCount - 1)]
-        # decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
-        # # Step 1: A search status for every level
-        # search_status_list = []
-        # for idx in range(self.routingBlocksCount):
-        #     score, accuracy, mac = self.get_metrics(indices=indices, thresholds=[np.inf, np.inf])
-        #     score = np.asscalar(score)
-        #     accuracy = np.asscalar(accuracy)
-        #     mac = np.asscalar(mac)
-        #
-        #
-        #
-        #
-        #
-        #     search_status = SearchStatus(accuracy=accuracy, mac=mac, sample_count=len(indices),
-        #                                  sample_configurations=sample_configurations,
-        #                                  entropy_orderings=entropy_orderings)
-        #     search_status_list.append(search_status)
-
-        # for outer_index in range(len(indices)):
-        #     self.run_brute_force(first_block_index=outer_index, indices=indices)
-        #     # for inner_combination in decision_combinations:
-        #     #     routing_combination = tuple([outer_index, *inner_combination])
-        #
-        #     #     print("X")
-        #     #
-        #     # print("X")
-
-# @dataclass
-# class SearchStatus:
-#     accuracy: float
-#     mac: float
-#     sample_count: int
-#     sample_configurations: List[List[tuple]]
