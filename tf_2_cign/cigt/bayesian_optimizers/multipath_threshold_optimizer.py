@@ -371,7 +371,7 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 assert len(entropies_set) == len(last_level_entropies_to_samples_dict)
             entropies_set.add(max(entropies_set) * 10.0)
             entropies_set.add(-1.0)
-            assert len(entropies_set) <= (2 ** level) * len(indices)
+            assert len(entropies_set) <= (2 ** level) * len(indices) + 2
             entropies_ordered = sorted(list(entropies_set), reverse=True)
             entropies_per_level[level] = entropies_ordered
             thresholds_arr = []
