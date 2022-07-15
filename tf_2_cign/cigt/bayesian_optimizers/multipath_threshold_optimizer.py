@@ -413,22 +413,21 @@ class MultipathThresholdOptimizer(BayesianOptimizer):
                 assert len([tpl for tpl in entropy_thresholds_per_level[level] if len(tpl[1]) == 0]) == 1
 
         # threshold_combinations = Utilities.get_cartesian_product(list_of_lists=entropy_thresholds_per_level)
-        DbLogger.write_into_table(rows=[(self.runId, "Slow Search")], table=DbLogger.runMetaData)
+        DbLogger.write_into_table(rows=[(self.runId, "Fast Search")], table=DbLogger.runMetaData)
         threshold_tpls = []
         cartesian_gen = itertools.product(*entropy_thresholds_per_level)
         for tpl in cartesian_gen:
             threshold_tpls.append(tpl)
-            if len(threshold_tpls) >= 2000000:
-                rows = self.work_on_threshold_batch(run_id=self.runId,
-                                                    original_run_id=self.modelId, indices=indices,
-                                                    threshold_combinations=threshold_tpls)
+            if len(threshold_tpls) >= 1000000:
+                rows = self.work_on_threshold_batch_v2(run_id=self.runId,
+                                                       original_run_id=self.modelId, indices=indices,
+                                                       threshold_combinations=threshold_tpls)
                 threshold_tpls = []
-                DbLogger.write_into_table(rows=rows, table="threshold_search")
-                break
+                DbLogger.write_into_table(rows=rows, table="threshold_search_2")
         if len(threshold_tpls) > 0:
-            rows = self.work_on_threshold_batch(run_id=self.runId,
-                                                original_run_id=self.modelId, indices=indices,
-                                                threshold_combinations=threshold_tpls)
-            DbLogger.write_into_table(rows=rows, table="threshold_search")
+            rows = self.work_on_threshold_batch_v2(run_id=self.runId,
+                                                   original_run_id=self.modelId, indices=indices,
+                                                   threshold_combinations=threshold_tpls)
+            DbLogger.write_into_table(rows=rows, table="threshold_search_2")
 
         print("X")
