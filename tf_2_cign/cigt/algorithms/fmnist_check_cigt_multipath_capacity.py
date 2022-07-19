@@ -24,7 +24,7 @@ def calculate_entropies(prob_distributions):
     return entropies
 
 
-def run():
+def get_model(routing_method, model_id):
     X = 0.15
     Y = 3.7233209862205525  # kwargs["information_gain_balance_coefficient"]
     Z = 0.7564802988471849  # kwargs["decision_loss_coefficient"]
@@ -34,8 +34,6 @@ def run():
     FashionNetConstants.softmax_decay_coefficient = 0.9999
     FashionNetConstants.softmax_decay_period = 1
     FashionNetConstants.softmax_decay_min_limit = 0.1
-
-    fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
     softmax_decay_controller = StepWiseDecayAlgorithm(
         decay_name="Stepwise",
         initial_value=FashionNetConstants.softmax_decay_initial,
@@ -70,7 +68,7 @@ def run():
                                  path_counts=[2, 4],
                                  bn_momentum=0.9,
                                  warm_up_period=25,
-                                 routing_strategy_name="Enforced_Routing",
+                                 routing_strategy_name=routing_method,
                                  run_id=run_id,
                                  evaluation_period=10,
                                  measurement_start=25,
@@ -78,93 +76,121 @@ def run():
                                  optimizer_type="SGD",
                                  decision_non_linearity="Softmax",
                                  save_model=True,
-                                 model_definition="Enforced Routing")
-        model_id = 424
+                                 model_definition="Multipath Capacitiy with {0}".format(routing_method))
         weights_folder_path = os.path.join(os.path.dirname(__file__), "..", "saved_models",
                                            "weights_{0}".format(model_id))
         fashion_cigt.load_weights(filepath=os.path.join(weights_folder_path, "fully_trained_weights"))
         fashion_cigt.isInWarmUp = False
-        # Check that we have the correct accuracy
-        training_accuracy, training_info_gain_list = fashion_cigt.evaluate(
-            x=fashion_mnist.trainDataTf, epoch_id=0, dataset_type="training")
-        test_accuracy, test_info_gain_list = fashion_cigt.evaluate(
-            x=fashion_mnist.testDataTf, epoch_id=0, dataset_type="test")
-        # # 424
-        # assert np.isclose(training_accuracy, 0.9960416674613952)
-        # assert np.isclose(test_accuracy, 0.9217900037765503)
-        # # 562
-        # assert np.isclose(training_accuracy, 0.9954750001430511)
-        # assert np.isclose(test_accuracy, 0.922029995918274)
+        weights_folder_path = os.path.join(os.path.dirname(__file__), "..", "saved_models",
+                                           "weights_{0}".format(model_id))
+        fashion_cigt.load_weights(filepath=os.path.join(weights_folder_path, "fully_trained_weights"))
+        fashion_cigt.isInWarmUp = False
+        return fashion_cigt
 
-        decision_arrays = [[0, 1] for _ in range(len(fashion_cigt.pathCounts) - 1)]
-        decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
-        # decision_combinations = set([tuple(sorted(arr)) for arr in decision_combinations])
 
-        combinations_y_dict = {}
-        combinations_y_hat_dict = {}
-        combinations_routing_probabilities_dict = {}
-        combinations_routing_entropies_dict = {}
+def measure_model_accuracy(model, dataset):
+    training_accuracy, training_info_gain_list = model.evaluate(
+        x=dataset.trainDataTf, epoch_id=0, dataset_type="training")
+    test_accuracy, test_info_gain_list = model.evaluate(
+        x=dataset.testDataTf, epoch_id=0, dataset_type="test")
+    print("training_accuracy={0}".format(training_accuracy))
+    print("test_accuracy={0}".format(test_accuracy))
 
-        for decision_combination in decision_combinations:
-            enforced_decision_arr = np.zeros(shape=(fashion_cigt.batchSize, len(fashion_cigt.pathCounts) - 1),
-                                             dtype=np.int32)
-            combinations_y_dict[decision_combination] = []
-            combinations_y_hat_dict[decision_combination] = []
-            combinations_routing_probabilities_dict[decision_combination] = []
-            combinations_routing_entropies_dict[decision_combination] = []
 
-            for _ in range(len(fashion_cigt.pathCounts) - 1):
-                combinations_routing_probabilities_dict[decision_combination].append([])
+def run():
+    fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
+    fashion_cigt = get_model(routing_method="Enforced_Routing", model_id=424)
+    measure_model_accuracy(model=fashion_cigt, dataset=fashion_mnist)
+    # Check that we have the correct accuracy
+    training_accuracy, training_info_gain_list = fashion_cigt.evaluate(
+        x=fashion_mnist.trainDataTf, epoch_id=0, dataset_type="training")
+    test_accuracy, test_info_gain_list = fashion_cigt.evaluate(
+        x=fashion_mnist.testDataTf, epoch_id=0, dataset_type="test")
+    print("training_accuracy={0}".format(training_accuracy))
+    print("test_accuracy={0}".format(test_accuracy))
 
-            for idx, val in enumerate(decision_combination):
-                enforced_decision_arr[:, idx] = val
-            fashion_cigt.enforcedRoutingDecisions.assign(enforced_decision_arr)
-            for x_, y_ in fashion_mnist.testDataTf:
-                results_dict = fashion_cigt.call(inputs=[x_, y_,
-                                                         tf.convert_to_tensor(1.0),
-                                                         tf.convert_to_tensor(False)], training=False)
-                combinations_y_dict[decision_combination].append(y_.numpy())
-                combinations_y_hat_dict[decision_combination].append(results_dict["logits"].numpy())
-                for i_, arr in enumerate(results_dict["routing_probabilities"]):
-                    combinations_routing_probabilities_dict[decision_combination][i_].append(arr.numpy())
+    decision_arrays = [[0, 1] for _ in range(len(fashion_cigt.pathCounts) - 1)]
+    decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
+    # decision_combinations = set([tuple(sorted(arr)) for arr in decision_combinations])
 
-            combinations_y_dict[decision_combination] = np.concatenate(combinations_y_dict[decision_combination],
-                                                                       axis=0)
-            combinations_y_hat_dict[decision_combination] = np.concatenate(combinations_y_hat_dict[
-                                                                               decision_combination], axis=0)
-            for i_ in range(len(combinations_routing_probabilities_dict[decision_combination])):
-                combinations_routing_probabilities_dict[decision_combination][i_] = \
-                    np.concatenate(combinations_routing_probabilities_dict[decision_combination][i_], axis=0)
-                combinations_routing_entropies_dict[decision_combination].append(
-                    calculate_entropies(combinations_routing_probabilities_dict[decision_combination][i_])
-                )
+    combinations_y_dict = {}
+    combinations_y_hat_dict = {}
+    combinations_routing_probabilities_dict = {}
+    combinations_routing_entropies_dict = {}
 
-        y_matrix = np.stack(list(combinations_y_dict.values()), axis=1)
-        y_avg = np.mean(y_matrix, axis=1).astype(dtype=y_matrix.dtype)
-        y_diff = y_matrix - y_avg[:, np.newaxis]
-        assert np.all(y_diff == 0)
-        y_hat_matrix = np.stack(list(combinations_y_hat_dict.values()), axis=2)
-        y_hat_matrix = np.argmax(y_hat_matrix, axis=1)
-        equals_matrix = np.equal(y_hat_matrix, y_avg[:, np.newaxis])
-        correct_vec = np.sum(equals_matrix, axis=1)
-        best_accuracy = np.mean(correct_vec > 0.0)
-        print("best_accuracy={0}".format(best_accuracy))
+    for decision_combination in decision_combinations:
+        enforced_decision_arr = np.zeros(shape=(fashion_cigt.batchSize, len(fashion_cigt.pathCounts) - 1),
+                                         dtype=np.int32)
+        combinations_y_dict[decision_combination] = []
+        combinations_y_hat_dict[decision_combination] = []
+        combinations_routing_probabilities_dict[decision_combination] = []
+        combinations_routing_entropies_dict[decision_combination] = []
 
-        # Assert for consistency of routing distributions.
-        for block_id in range(len(fashion_cigt.pathCounts) - 1):
-            all_previous_combinations = Utilities.get_cartesian_product(
-                [[0, 1] for _ in range(block_id)])
-            for previous_combination in all_previous_combinations:
-                valid_combinations = []
-                for combination in decision_combinations:
-                    if combination[0:block_id] == previous_combination:
-                        valid_combinations.append(combination)
-                valid_arrays = []
-                for valid_combination in valid_combinations:
-                    arr = combinations_routing_probabilities_dict[valid_combination][block_id]
-                    valid_arrays.append(arr)
-                for i_ in range(len(valid_arrays) - 1):
-                    assert np.allclose(valid_arrays[i_], valid_arrays[i_ + 1])
+        for _ in range(len(fashion_cigt.pathCounts) - 1):
+            combinations_routing_probabilities_dict[decision_combination].append([])
+
+        for idx, val in enumerate(decision_combination):
+            enforced_decision_arr[:, idx] = val
+        fashion_cigt.enforcedRoutingDecisions.assign(enforced_decision_arr)
+        for x_, y_ in fashion_mnist.testDataTf:
+            results_dict = fashion_cigt.call(inputs=[x_, y_,
+                                                     tf.convert_to_tensor(1.0),
+                                                     tf.convert_to_tensor(False)], training=False)
+            combinations_y_dict[decision_combination].append(y_.numpy())
+            combinations_y_hat_dict[decision_combination].append(results_dict["logits"].numpy())
+            for i_, arr in enumerate(results_dict["routing_probabilities"]):
+                combinations_routing_probabilities_dict[decision_combination][i_].append(arr.numpy())
+
+        combinations_y_dict[decision_combination] = np.concatenate(combinations_y_dict[decision_combination],
+                                                                   axis=0)
+        combinations_y_hat_dict[decision_combination] = np.concatenate(combinations_y_hat_dict[
+                                                                           decision_combination], axis=0)
+        for i_ in range(len(combinations_routing_probabilities_dict[decision_combination])):
+            combinations_routing_probabilities_dict[decision_combination][i_] = \
+                np.concatenate(combinations_routing_probabilities_dict[decision_combination][i_], axis=0)
+            combinations_routing_entropies_dict[decision_combination].append(
+                calculate_entropies(combinations_routing_probabilities_dict[decision_combination][i_])
+            )
+
+    y_matrix = np.stack(list(combinations_y_dict.values()), axis=1)
+    y_avg = np.mean(y_matrix, axis=1).astype(dtype=y_matrix.dtype)
+    y_diff = y_matrix - y_avg[:, np.newaxis]
+    assert np.all(y_diff == 0)
+    y_hat_matrix = np.stack(list(combinations_y_hat_dict.values()), axis=2)
+    y_hat_matrix = np.argmax(y_hat_matrix, axis=1)
+    equals_matrix = np.equal(y_hat_matrix, y_avg[:, np.newaxis])
+    correct_vec = np.sum(equals_matrix, axis=1)
+    best_accuracy = np.mean(correct_vec > 0.0)
+    print("best_accuracy={0}".format(best_accuracy))
+
+    # Assert for consistency of routing distributions.
+    for block_id in range(len(fashion_cigt.pathCounts) - 1):
+        all_previous_combinations = Utilities.get_cartesian_product(
+            [[0, 1] for _ in range(block_id)])
+        for previous_combination in all_previous_combinations:
+            valid_combinations = []
+            for combination in decision_combinations:
+                if combination[0:block_id] == previous_combination:
+                    valid_combinations.append(combination)
+            valid_arrays = []
+            for valid_combination in valid_combinations:
+                arr = combinations_routing_probabilities_dict[valid_combination][block_id]
+                valid_arrays.append(arr)
+            for i_ in range(len(valid_arrays) - 1):
+                assert np.allclose(valid_arrays[i_], valid_arrays[i_ + 1])
+
+
+def run_probability_threshold_capacity_calculator():
+    fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
+    fashion_cigt = get_model(routing_method="Probability_Thresholds", model_id=424)
+    measure_model_accuracy(model=fashion_cigt, dataset=fashion_mnist)
+    # Check that we have the correct accuracy
+    training_accuracy, training_info_gain_list = fashion_cigt.evaluate(
+        x=fashion_mnist.trainDataTf, epoch_id=0, dataset_type="training")
+    test_accuracy, test_info_gain_list = fashion_cigt.evaluate(
+        x=fashion_mnist.testDataTf, epoch_id=0, dataset_type="test")
+    print("training_accuracy={0}".format(training_accuracy))
+    print("test_accuracy={0}".format(test_accuracy))
 
 
 if __name__ == "__main__":

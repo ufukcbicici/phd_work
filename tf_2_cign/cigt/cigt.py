@@ -14,6 +14,8 @@ from collections import Counter
 
 from tf_2_cign.cigt.routing_strategy.enforced_routing_strategy import EnforcedRoutingStrategy
 from tf_2_cign.cigt.routing_strategy.full_training_strategy import FullTrainingStrategy
+from tf_2_cign.cigt.routing_strategy.probability_thresholded_routing_strategy import \
+    ProbabilityThresholdedRoutingStrategy
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
 
 
@@ -46,6 +48,10 @@ class Cigt(tf.keras.Model):
         self.cigtBlocks = []
         self.enforcedRoutingDecisions = tf.Variable(
             tf.zeros(shape=(self.batchSize, len(self.pathCounts) - 1), dtype=tf.int32), trainable=False)
+        self.routingProbabilityThresholds = []
+        for path_count in self.pathCounts[1:]:
+            self.routingProbabilityThresholds.append(tf.Variable(tf.zeros(
+                shape=(1, path_count), dtype=tf.float32), trainable=False))
         self.rootNode = None
         self.decisionDropProbability = decision_drop_probability
         self.classificationDropProbability = classification_drop_probability
@@ -68,6 +74,9 @@ class Cigt(tf.keras.Model):
             self.routingStrategy = ApproximateTrainingStrategy()
         elif self.routingStrategyName == "Enforced_Routing":
             self.routingStrategy = EnforcedRoutingStrategy(enforced_decision_vectors=self.enforcedRoutingDecisions)
+        elif self.routingStrategyName == "Probability_Thresholds":
+            self.routingStrategy = ProbabilityThresholdedRoutingStrategy(probability_thresholds
+                                                                         =self.routingProbabilityThresholds)
         else:
             raise NotImplementedError()
         self.metricsDict = {}
