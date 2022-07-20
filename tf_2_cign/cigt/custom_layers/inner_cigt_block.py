@@ -46,7 +46,8 @@ class InnerCigtBlock(tf.keras.layers.Layer):
                                                                     straight_through=self.useStraightThrough,
                                                                     decision_non_linearity=self.decisionNonLinearity)
 
-        elif self.routingStrategy == "Approximate_Training" or self.routingStrategy == "Enforced_Routing":
+        elif self.routingStrategy == "Approximate_Training" or \
+                self.routingStrategy == "Enforced_Routing" or self.routingStrategy == "Probability_Thresholds":
             self.cigtDecisionLayer = CigtDecisionLayer(node=node,
                                                        decision_bn_momentum=self.bnMomentum,
                                                        next_block_path_count=next_block_path_count,

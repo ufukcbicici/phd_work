@@ -34,6 +34,7 @@ class Cigt(tf.keras.Model):
         self.batchSize = batch_size
         self.pathCounts = [1]
         self.pathCounts.extend(path_counts)
+        self.pathCountsTf = tf.Variable(tf.convert_to_tensor(self.pathCounts[1:]), trainable=False)
         self.classCount = class_count
         self.inputDims = input_dims
         self.learningRateSchedule = learning_rate_schedule
@@ -48,10 +49,12 @@ class Cigt(tf.keras.Model):
         self.cigtBlocks = []
         self.enforcedRoutingDecisions = tf.Variable(
             tf.zeros(shape=(self.batchSize, len(self.pathCounts) - 1), dtype=tf.int32), trainable=False)
-        self.routingProbabilityThresholds = []
-        for path_count in self.pathCounts[1:]:
-            self.routingProbabilityThresholds.append(tf.Variable(tf.zeros(
-                shape=(1, path_count), dtype=tf.float32), trainable=False))
+        self.routingProbabilityThresholds = tf.Variable(tf.zeros(
+            shape=(self.batchSize, sum(self.pathCounts[1:])), dtype=tf.float32), trainable=False)
+        # routing_thresholds_np = np.zeros(shape=(self.batchSize, sum(self.pathCounts[1:])), dtype=np.float)
+        # for idx in range(sum(self.pathCounts[1:])):
+        #     routing_thresholds_np[:, idx] = idx
+        # self.routingProbabilityThresholds.assign(value=routing_thresholds_np)
         self.rootNode = None
         self.decisionDropProbability = decision_drop_probability
         self.classificationDropProbability = classification_drop_probability
@@ -75,8 +78,8 @@ class Cigt(tf.keras.Model):
         elif self.routingStrategyName == "Enforced_Routing":
             self.routingStrategy = EnforcedRoutingStrategy(enforced_decision_vectors=self.enforcedRoutingDecisions)
         elif self.routingStrategyName == "Probability_Thresholds":
-            self.routingStrategy = ProbabilityThresholdedRoutingStrategy(probability_thresholds
-                                                                         =self.routingProbabilityThresholds)
+            self.routingStrategy = ProbabilityThresholdedRoutingStrategy(
+                path_counts=self.pathCountsTf, probability_thresholds=self.routingProbabilityThresholds)
         else:
             raise NotImplementedError()
         self.metricsDict = {}
@@ -522,7 +525,7 @@ class Cigt(tf.keras.Model):
         # Unfortunately, we need to call the network once with forward pass so that the weights are generated.
         # We run a dummy forward pass with the correct input size and types.
         dummy_x = tf.convert_to_tensor(np.random.uniform(size=(self.batchSize, *self.inputDims)))
-        dummy_y = tf.convert_to_tensor(np.random.randint(low=0, high=self.classCount, size=(self.batchSize, )))
+        dummy_y = tf.convert_to_tensor(np.random.randint(low=0, high=self.classCount, size=(self.batchSize,)))
         dummy_temperature = tf.convert_to_tensor(1.0)
         dummy_is_warm_up = tf.convert_to_tensor(False)
         self.call(inputs=[dummy_x, dummy_y, dummy_temperature, dummy_is_warm_up], training=False)
@@ -595,4 +598,3 @@ class Cigt(tf.keras.Model):
         for node in self.cigtNodes:
             assert node.macCost > 0 and len(node.opMacCostsDict) > 0
         self.totalMacCost = sum([node.macCost for node in self.cigtNodes])
-
