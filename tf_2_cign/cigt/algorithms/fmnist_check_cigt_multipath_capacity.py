@@ -183,6 +183,8 @@ def run_probability_threshold_capacity_calculator():
                 assert np.allclose(arr[i_], arr[i_ + 1])
         past_sum += route_count
 
+    multipath_info_obj.assess_accuracy()
+
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
