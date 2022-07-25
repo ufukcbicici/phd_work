@@ -156,6 +156,11 @@ def run_probability_threshold_capacity_calculator():
     decision_combinations_per_level = [tuple(np.concatenate(dc)) for dc in decision_combinations_per_level]
     multipath_info_obj = MultipathCombinationInfo(batch_size=fashion_cigt.batchSize,
                                                   path_counts=fashion_cigt.pathCounts)
+
+    # multipath_info_obj.measure_performance(cigt=fashion_cigt, list_of_entropy_intervals=[],
+    #                                        list_of_probability_thresholds=[], indices=
+    #                                        )
+
     for decision_combination in tqdm(decision_combinations_per_level):
         multipath_info_obj.add_new_combination(decision_combination=decision_combination)
 
@@ -186,9 +191,19 @@ def run_probability_threshold_capacity_calculator():
     multipath_info_obj.assess_accuracy()
 
 
+# def run_cross_entropy_method_optimization():
+#     fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
+#     fashion_cigt = get_model(routing_method="Probability_Thresholds", model_id=424)
+#     measure_model_accuracy(model=fashion_cigt, dataset=fashion_mnist)
+#     multipath_info_obj = MultipathCombinationInfo(batch_size=fashion_cigt.batchSize,
+#                                                   path_counts=fashion_cigt.pathCounts)
+#     # multipath_info_obj.measure_performance(cigt=fashion_cigt, list_of_entropy_intervals=[],
+#     #                                        list_of_probability_thresholds=[], indices=
+#     #                                        )
+
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
-    DbLogger.log_db_path = DbLogger.blackshark_desktop
+    DbLogger.log_db_path = DbLogger.home_asus
     run_probability_threshold_capacity_calculator()

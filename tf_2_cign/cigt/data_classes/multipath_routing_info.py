@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -23,6 +24,43 @@ class MultipathCombinationInfo(object):
         self.combinations_y_hat_dict = {}
         self.combinations_routing_probabilities_dict = {}
         self.combinations_routing_entropies_dict = {}
+        self.decisions_per_level = []
+        for path_count in path_counts[1:]:
+            decision_arrays = [[0, 1] for _ in range(path_count)]
+            decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
+            decision_combinations = [tpl for tpl in decision_combinations if sum(tpl) > 0]
+            self.decisions_per_level.append(decision_combinations)
+
+        self.decision_combinations_per_level = Utilities.get_cartesian_product(list_of_lists=self.decisions_per_level)
+        self.decision_combinations_per_level = [tuple(np.concatenate(dc))
+                                                for dc in self.decision_combinations_per_level]
+
+    def generate_routing_info(self, cigt, dataset):
+        for decision_combination in tqdm(self.decision_combinations_per_level):
+            self.add_new_combination(decision_combination=decision_combination)
+
+            thresholds_list = np.logical_not(np.array(decision_combination)).astype(np.float)
+            thresholds_list = 3.0 * thresholds_list - 1.5
+            prob_thresholds_arr = np.stack([thresholds_list] * cigt.batchSize, axis=0)
+            cigt.routingProbabilityThresholds.assign(prob_thresholds_arr)
+
+            self.fill_data_buffers_for_combination(cigt=cigt, dataset=dataset, decision_combination=decision_combination)
+
+    def assert_routing_validity(self, cigt):
+        # Assert routing probability integrities
+        past_sum = 0
+        for block_id, route_count in enumerate(cigt.pathCounts[1:]):
+            routing_probabilities_dict = {}
+            for decision_combination in tqdm(self.decision_combinations_per_level):
+                past_combination = decision_combination[0:past_sum]
+                if past_combination not in routing_probabilities_dict:
+                    routing_probabilities_dict[past_combination] = []
+                routing_probabilities_dict[past_combination].append(
+                    self.combinations_routing_probabilities_dict[decision_combination][block_id])
+            for k, arr in routing_probabilities_dict.items():
+                for i_ in range(len(arr) - 1):
+                    assert np.allclose(arr[i_], arr[i_ + 1])
+            past_sum += route_count
 
     def add_new_combination(self, decision_combination):
         # enforced_decision_arr = np.zeros(shape=(self.batchSize, len(self.pathCounts) - 1),  dtype=np.int32)
@@ -75,3 +113,51 @@ class MultipathCombinationInfo(object):
         correct_vec = np.sum(equals_matrix, axis=1)
         best_accuracy = np.mean(correct_vec > 0.0)
         print("best_accuracy={0}".format(best_accuracy))
+
+    # list_of_entropy_intervals: length is equal to the number of decision blocks. Each i. element of the list
+    # is a numpy array, which has the shape (number_of_entropy_intervals[i], 2).
+
+    # list_of_probability_thresholds: length is equal to the number of decision blocks. Each i. element of the list
+    # is a numpy array, which has the shape (number_of_entropy_intervals[i], route_count).
+
+    # indices: Indices to be used for this optimization calculation..
+
+    def measure_performance(self, cigt, list_of_entropy_intervals, list_of_probability_thresholds, indices):
+        sample_paths = []
+        for _ in indices:
+            sample_paths.append([])
+        past_num_of_routes = 0
+        for block_id, route_count in enumerate(cigt.pathCounts[1:]):
+            # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
+            # routing decisions.
+            dict_distinct_past_decisions = {}
+            for combination in self.decision_combinations_per_level:
+                past_route = combination[:past_num_of_routes]
+                if past_route not in dict_distinct_past_decisions:
+                    dict_distinct_past_decisions[past_route] = []
+                dict_distinct_past_decisions[past_route].append(combination)
+            print("X")
+
+
+
+
+            # Get routing probabilites for every sample, dependent on the route decisions taken by them so far.
+
+
+
+
+
+
+
+
+            # routing_probabilities_dict = {}
+            # for decision_combination in tqdm(decision_combinations_per_level):
+            #     past_combination = decision_combination[0:past_sum]
+            #     if past_combination not in routing_probabilities_dict:
+            #         routing_probabilities_dict[past_combination] = []
+            #     routing_probabilities_dict[past_combination].append(
+            #         multipath_info_obj.combinations_routing_probabilities_dict[decision_combination][block_id])
+            # for k, arr in routing_probabilities_dict.items():
+            #     for i_ in range(len(arr) - 1):
+            #         assert np.allclose(arr[i_], arr[i_ + 1])
+            # past_sum += route_count
