@@ -34,6 +34,8 @@ class MultipathCombinationInfo(object):
         self.decision_combinations_per_level = Utilities.get_cartesian_product(list_of_lists=self.decisions_per_level)
         self.decision_combinations_per_level = [tuple(np.concatenate(dc))
                                                 for dc in self.decision_combinations_per_level]
+        self.past_decisions_entropies_dict = {}
+        self.past_decisions_routing_probabilities_dict = {}
 
     def generate_routing_info(self, cigt, dataset):
         for decision_combination in tqdm(self.decision_combinations_per_level):
@@ -44,7 +46,35 @@ class MultipathCombinationInfo(object):
             prob_thresholds_arr = np.stack([thresholds_list] * cigt.batchSize, axis=0)
             cigt.routingProbabilityThresholds.assign(prob_thresholds_arr)
 
-            self.fill_data_buffers_for_combination(cigt=cigt, dataset=dataset, decision_combination=decision_combination)
+            self.fill_data_buffers_for_combination(cigt=cigt, dataset=dataset,
+                                                   decision_combination=decision_combination)
+
+        past_num_of_routes = 0
+        for block_id, route_count in enumerate(cigt.pathCounts[1:]):
+            # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
+            # routing decisions.
+            dict_distinct_past_decisions = {}
+            for combination in self.decision_combinations_per_level:
+                past_route = combination[:past_num_of_routes]
+                if past_route not in dict_distinct_past_decisions:
+                    dict_distinct_past_decisions[past_route] = []
+                dict_distinct_past_decisions[past_route].append(combination)
+
+            for k, v in dict_distinct_past_decisions.items():
+                all_entropies = np.stack([self.combinations_routing_entropies_dict[p_][block_id] for p_ in v], axis=-1)
+                mean_entropies = np.mean(all_entropies, axis=-1)
+                for p_ in v:
+                    assert np.allclose(mean_entropies, self.combinations_routing_entropies_dict[p_][block_id])
+                self.past_decisions_entropies_dict[k] = mean_entropies
+
+                all_routing_probabilities = np.stack(
+                    [self.combinations_routing_probabilities_dict[p_][block_id] for p_ in v], axis=-1)
+                mean_probabilities = np.mean(all_routing_probabilities, axis=-1)
+                for p_ in v:
+                    assert np.allclose(mean_probabilities, self.combinations_routing_probabilities_dict[p_][block_id])
+                self.past_decisions_routing_probabilities_dict[k] = mean_probabilities
+            past_num_of_routes += route_count
+        print("X")
 
     def assert_routing_validity(self, cigt):
         # Assert routing probability integrities
@@ -130,12 +160,12 @@ class MultipathCombinationInfo(object):
         for block_id, route_count in enumerate(cigt.pathCounts[1:]):
             # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
             # routing decisions.
-            dict_distinct_past_decisions = {}
-            for combination in self.decision_combinations_per_level:
-                past_route = combination[:past_num_of_routes]
-                if past_route not in dict_distinct_past_decisions:
-                    dict_distinct_past_decisions[past_route] = []
-                dict_distinct_past_decisions[past_route].append(combination)
+            # dict_distinct_past_decisions = {}
+            # for combination in self.decision_combinations_per_level:
+            #     past_route = combination[:past_num_of_routes]
+            #     if past_route not in dict_distinct_past_decisions:
+            #         dict_distinct_past_decisions[past_route] = []
+            #     dict_distinct_past_decisions[past_route].append(combination)
             print("X")
 
 
