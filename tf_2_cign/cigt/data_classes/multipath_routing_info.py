@@ -153,32 +153,32 @@ class MultipathCombinationInfo(object):
     # indices: Indices to be used for this optimization calculation..
 
     def measure_performance(self, cigt, list_of_entropy_intervals, list_of_probability_thresholds, indices):
-        sample_paths = []
-        for _ in indices:
-            sample_paths.append([])
+        sample_paths = np.zeros(shape=(len(indices), 1), dtype=np.int32)
+        sample_paths[:, 0] = indices
         past_num_of_routes = 0
         for block_id, route_count in enumerate(cigt.pathCounts[1:]):
             # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
             # routing decisions.
+
+            # 1) Get the entropy of each sample, based on the past decisions.
+            curr_sample_entropies = np.apply_along_axis(func1d=lambda row: self.past_decisions_entropies_dict[
+                tuple(row[:past_num_of_routes])][row[-1]], arr=sample_paths, axis=1)
+            # 2) Find the relevant entropy intervals for each sample
+
+
+            print("X")
+            past_num_of_routes += route_count
+
             # dict_distinct_past_decisions = {}
             # for combination in self.decision_combinations_per_level:
             #     past_route = combination[:past_num_of_routes]
             #     if past_route not in dict_distinct_past_decisions:
             #         dict_distinct_past_decisions[past_route] = []
             #     dict_distinct_past_decisions[past_route].append(combination)
-            print("X")
-
-
-
+            # print("X")
+            #
 
             # Get routing probabilites for every sample, dependent on the route decisions taken by them so far.
-
-
-
-
-
-
-
 
             # routing_probabilities_dict = {}
             # for decision_combination in tqdm(decision_combinations_per_level):
