@@ -157,6 +157,7 @@ class MultipathCombinationInfo(object):
         sample_paths = np.zeros(shape=(len(indices), 1), dtype=np.int32)
         sample_paths[:, 0] = indices
         past_num_of_routes = 0
+        time_intervals = []
         for block_id, route_count in enumerate(cigt.pathCounts[1:]):
             # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
             # routing decisions.
@@ -185,29 +186,12 @@ class MultipathCombinationInfo(object):
             t4 = time.time()
             route_selections = np.greater_equal(curr_sample_routing_probabilities,
                                                 probability_thresholds_per_sample).astype(sample_paths.dtype)
-            sample_paths = np.concatenate([sample_paths[:, :-1], route_selections, indices], axis=1)
-            print("X")
+            sample_paths = np.concatenate([sample_paths[:, :-1], route_selections,
+                                           np.expand_dims(indices, axis=1)], axis=1)
             past_num_of_routes += route_count
 
-            # dict_distinct_past_decisions = {}
-            # for combination in self.decision_combinations_per_level:
-            #     past_route = combination[:past_num_of_routes]
-            #     if past_route not in dict_distinct_past_decisions:
-            #         dict_distinct_past_decisions[past_route] = []
-            #     dict_distinct_past_decisions[past_route].append(combination)
-            # print("X")
-            #
+            print("Block:{0} t1-t0:{1}".format(block_id, t1 - t0))
+            print("Block:{0} t2-t1:{1}".format(block_id, t2 - t1))
+            print("Block:{0} t3-t2:{1}".format(block_id, t3 - t2))
+            print("Block:{0} t4-t3:{1}".format(block_id, t4 - t3))
 
-            # Get routing probabilites for every sample, dependent on the route decisions taken by them so far.
-
-            # routing_probabilities_dict = {}
-            # for decision_combination in tqdm(decision_combinations_per_level):
-            #     past_combination = decision_combination[0:past_sum]
-            #     if past_combination not in routing_probabilities_dict:
-            #         routing_probabilities_dict[past_combination] = []
-            #     routing_probabilities_dict[past_combination].append(
-            #         multipath_info_obj.combinations_routing_probabilities_dict[decision_combination][block_id])
-            # for k, arr in routing_probabilities_dict.items():
-            #     for i_ in range(len(arr) - 1):
-            #         assert np.allclose(arr[i_], arr[i_ + 1])
-            # past_sum += route_count
