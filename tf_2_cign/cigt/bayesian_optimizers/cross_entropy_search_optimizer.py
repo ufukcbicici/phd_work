@@ -92,7 +92,8 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
                                                          list_of_probability_thresholds=list_of_probability_thresholds,
                                                          list_of_entropy_intervals=list_of_entropy_thresholds,
                                                          indices=np.arange(self.totalSampleCount),
-                                                         use_numpy_approach=True)
+                                                         use_numpy_approach=True,
+                                                         balance_coeff=1.0)
             t1 = time.time()
             print("measure_performance time:{0}".format(t1 - t0))
 
@@ -103,7 +104,8 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
                                                          list_of_probability_thresholds=list_of_probability_thresholds,
                                                          list_of_entropy_intervals=list_of_entropy_thresholds,
                                                          indices=np.arange(self.totalSampleCount),
-                                                         use_numpy_approach=False)
+                                                         use_numpy_approach=False,
+                                                         balance_coeff=1.0)
             t1 = time.time()
             print("measure_performance time:{0}".format(t1 - t0))
 
