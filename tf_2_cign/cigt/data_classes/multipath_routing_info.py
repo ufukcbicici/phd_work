@@ -37,8 +37,10 @@ class MultipathCombinationInfo(object):
                                                 for dc in self.decision_combinations_per_level]
         self.past_decisions_entropies_dict = {}
         self.past_decisions_routing_probabilities_dict = {}
-        self.past_decisions_entropies_arr = []
-        self.past_decisions_routing_probabilities_arr = []
+        self.past_decisions_entropies_list = []
+        self.past_decisions_routing_probabilities_list = []
+        self.past_decisions_validity_array = None
+        self.past_decisions_mac_array = None
 
     def get_total_sample_count(self):
         total_sample_count = set()
@@ -68,7 +70,7 @@ class MultipathCombinationInfo(object):
             self.fill_data_buffers_for_combination(cigt=cigt, dataset=dataset,
                                                    decision_combination=decision_combination)
 
-        past_num_of_routes = 0
+        past_routes = [0]
         total_sample_count = self.get_total_sample_count()
         for block_id, route_count in enumerate(cigt.pathCounts[1:]):
             # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
@@ -76,7 +78,7 @@ class MultipathCombinationInfo(object):
             dict_distinct_past_decisions = {}
 
             for combination in self.decision_combinations_per_level:
-                past_route = combination[:past_num_of_routes]
+                past_route = combination[:sum(past_routes)]
                 if past_route not in dict_distinct_past_decisions:
                     dict_distinct_past_decisions[past_route] = []
                 dict_distinct_past_decisions[past_route].append(combination)
@@ -96,10 +98,51 @@ class MultipathCombinationInfo(object):
                 self.past_decisions_routing_probabilities_dict[k] = mean_probabilities
 
             past_decisions_entropies_arr_shape = np.concatenate([
-                [2 for _ in range(past_num_of_routes)], [total_sample_count]], dtype=np.int32)
+                np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
+                np.array([total_sample_count], dtype=np.int32)], dtype=np.int32)
             past_decisions_entropies_arr = np.zeros(shape=past_decisions_entropies_arr_shape, dtype=np.float)
+            self.past_decisions_entropies_list.append(past_decisions_entropies_arr)
+            for k, v in self.past_decisions_entropies_dict.items():
+                if len(k) == past_routes[block_id]:
+                    self.past_decisions_entropies_list[block_id][k] = v
 
-            past_num_of_routes += route_count
+            past_decisions_routing_probabilities_arr_shape = np.concatenate([
+                np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
+                np.array([total_sample_count, route_count], dtype=np.int32)], dtype=np.int32)
+            past_decisions_routing_probabilities_arr = np.zeros(shape=past_decisions_routing_probabilities_arr_shape,
+                                                                dtype=np.float)
+            self.past_decisions_routing_probabilities_list.append(past_decisions_routing_probabilities_arr)
+            for k, v in self.past_decisions_routing_probabilities_dict.items():
+                if len(k) == past_routes[block_id]:
+                    self.past_decisions_routing_probabilities_list[block_id][k] = v
+
+            past_routes.append(route_count)
+
+        past_decisions_validity_array_shape = np.concatenate([
+            np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
+            np.array([total_sample_count], dtype=np.int32)], dtype=np.int32)
+        self.past_decisions_validity_array = np.zeros(shape=past_decisions_validity_array_shape, dtype=np.float)
+        self.past_decisions_validity_array[:] = np.nan
+
+        for k in self.combinations_y_dict:
+            y_ = self.combinations_y_dict[k]
+            y_hat = np.argmax(self.combinations_y_hat_dict[k], axis=1)
+            validity_vector = (y_ == y_hat).astype(np.float)
+            self.past_decisions_validity_array[k] = validity_vector
+
+        self.past_decisions_mac_array = np.zeros(shape=past_decisions_validity_array_shape[:-1], dtype=np.float)
+        self.past_decisions_mac_array[:] = np.nan
+
+        for k in self.combinations_y_dict:
+            past_routes = [0]
+            total_cost = cigt.cigtNodes[0].macCost
+            for block_id, route_count in enumerate(cigt.pathCounts[1:]):
+                single_block_cost = cigt.cigtNodes[block_id + 1].macCost
+                num_of_used_nodes = k[sum(past_routes):sum(past_routes) + route_count]
+                num_of_used_nodes = sum(num_of_used_nodes)
+                total_cost += (num_of_used_nodes * single_block_cost)
+                past_routes.append(route_count)
+            self.past_decisions_mac_array[k] = total_cost
         print("X")
 
     def assert_routing_validity(self, cigt):
@@ -178,19 +221,30 @@ class MultipathCombinationInfo(object):
 
     # indices: Indices to be used for this optimization calculation..
 
-    def measure_performance(self, cigt, list_of_entropy_intervals, list_of_probability_thresholds, indices):
+    def measure_performance(self,
+                            cigt,
+                            list_of_entropy_intervals,
+                            list_of_probability_thresholds,
+                            indices,
+                            balance_coeff,
+                            use_numpy_approach=True):
         sample_paths = np.zeros(shape=(len(indices), 1), dtype=np.int32)
         sample_paths[:, 0] = indices
         past_num_of_routes = 0
         time_intervals = []
+
         for block_id, route_count in enumerate(cigt.pathCounts[1:]):
             # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
             # routing decisions.
 
             # 1) Get the entropy of each sample, based on the past decisions.
             t0 = time.time()
-            curr_sample_entropies = np.apply_along_axis(func1d=lambda row: self.past_decisions_entropies_dict[
-                tuple(row[:past_num_of_routes])][row[-1]], arr=sample_paths, axis=1)
+            index_arrays = tuple([sample_paths[:, idx] for idx in range(sample_paths.shape[1])])
+            if not use_numpy_approach:
+                curr_sample_entropies = np.apply_along_axis(func1d=lambda row: self.past_decisions_entropies_dict[
+                    tuple(row[:past_num_of_routes])][row[-1]], arr=sample_paths, axis=1)
+            else:
+                curr_sample_entropies = self.past_decisions_entropies_list[block_id][index_arrays]
             # 2) Find the relevant entropy intervals for each sample
             t1 = time.time()
             entropy_intervals = list_of_entropy_intervals[block_id]
@@ -203,9 +257,13 @@ class MultipathCombinationInfo(object):
             probability_thresholds_per_sample = probability_thresholds[interval_ids]
             # 4) Get the current routing probabilities of each sample, based on the paths taken so far.
             t3 = time.time()
-            curr_sample_routing_probabilities = np.apply_along_axis(
-                func1d=lambda row: self.past_decisions_routing_probabilities_dict[
-                    tuple(row[:past_num_of_routes])][row[-1]], arr=sample_paths, axis=1)
+            if not use_numpy_approach:
+                curr_sample_routing_probabilities = np.apply_along_axis(
+                    func1d=lambda row: self.past_decisions_routing_probabilities_dict[
+                        tuple(row[:past_num_of_routes])][row[-1]], arr=sample_paths, axis=1)
+            else:
+                curr_sample_routing_probabilities = self.past_decisions_routing_probabilities_list[
+                    block_id][index_arrays]
             assert curr_sample_routing_probabilities.shape == probability_thresholds_per_sample.shape
             # 5) Compare current routing probabilities to the thresholds, integrate new path selections
             t4 = time.time()
@@ -215,8 +273,33 @@ class MultipathCombinationInfo(object):
                                            np.expand_dims(indices, axis=1)], axis=1)
             past_num_of_routes += route_count
 
-            print("Block:{0} t1-t0:{1}".format(block_id, t1 - t0))
-            print("Block:{0} t2-t1:{1}".format(block_id, t2 - t1))
-            print("Block:{0} t3-t2:{1}".format(block_id, t3 - t2))
-            print("Block:{0} t4-t3:{1}".format(block_id, t4 - t3))
+            # print("Block:{0} t1-t0:{1}".format(block_id, t1 - t0))
+            # print("Block:{0} t2-t1:{1}".format(block_id, t2 - t1))
+            # print("Block:{0} t3-t2:{1}".format(block_id, t3 - t2))
+            # print("Block:{0} t4-t3:{1}".format(block_id, t4 - t3))
 
+        # Calculate accuracy and mac cost
+        base_mac = np.nanmin(self.past_decisions_mac_array)
+        if not use_numpy_approach:
+            validity_vector = np.apply_along_axis(
+                func1d=lambda row: self.combinations_y_dict[tuple(row[:past_num_of_routes])][row[-1]]
+                                   == np.argmax(self.combinations_y_hat_dict[tuple(row[:past_num_of_routes])][row[-1]]),
+                arr=sample_paths, axis=1)
+            mac_vector = np.apply_along_axis(
+                func1d=lambda row: self.past_decisions_mac_array[tuple(row[:past_num_of_routes])],
+                arr=sample_paths, axis=1)
+        else:
+            index_arrays = tuple([sample_paths[:, idx] for idx in range(sample_paths.shape[1])])
+            validity_vector = self.past_decisions_validity_array[index_arrays]
+            mac_vector = self.past_decisions_mac_array[index_arrays[:-1]]
+
+        dif_vector = mac_vector * (1.0 / base_mac)
+        dif_vector = dif_vector - 1.0
+
+        score_vector = balance_coeff * validity_vector - (1.0 - balance_coeff) * dif_vector
+
+        accuracy = np.mean(validity_vector)
+        mean_mac = np.mean(dif_vector)
+        score = np.mean(score_vector)
+        print("accuracy={0} mean_mac={1} score={2}".format(accuracy, mean_mac, score))
+        return accuracy, mean_mac, score
