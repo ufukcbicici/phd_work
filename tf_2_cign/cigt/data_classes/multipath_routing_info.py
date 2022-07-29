@@ -37,6 +37,24 @@ class MultipathCombinationInfo(object):
                                                 for dc in self.decision_combinations_per_level]
         self.past_decisions_entropies_dict = {}
         self.past_decisions_routing_probabilities_dict = {}
+        self.past_decisions_entropies_arr = []
+        self.past_decisions_routing_probabilities_arr = []
+
+    def get_total_sample_count(self):
+        total_sample_count = set()
+        for ll in self.combinations_routing_probabilities_dict.values():
+            for arr in ll:
+                total_sample_count.add(arr.shape[0])
+        for ll in self.combinations_routing_entropies_dict.values():
+            for arr in ll:
+                total_sample_count.add(arr.shape[0])
+        for arr in self.combinations_y_hat_dict.values():
+            total_sample_count.add(arr.shape[0])
+        for arr in self.combinations_y_dict.values():
+            total_sample_count.add(arr.shape[0])
+        assert len(total_sample_count) == 1
+        total_sample_count = list(total_sample_count)[0]
+        return total_sample_count
 
     def generate_routing_info(self, cigt, dataset):
         for decision_combination in tqdm(self.decision_combinations_per_level):
@@ -51,10 +69,12 @@ class MultipathCombinationInfo(object):
                                                    decision_combination=decision_combination)
 
         past_num_of_routes = 0
+        total_sample_count = self.get_total_sample_count()
         for block_id, route_count in enumerate(cigt.pathCounts[1:]):
             # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
             # routing decisions.
             dict_distinct_past_decisions = {}
+
             for combination in self.decision_combinations_per_level:
                 past_route = combination[:past_num_of_routes]
                 if past_route not in dict_distinct_past_decisions:
@@ -74,6 +94,11 @@ class MultipathCombinationInfo(object):
                 for p_ in v:
                     assert np.allclose(mean_probabilities, self.combinations_routing_probabilities_dict[p_][block_id])
                 self.past_decisions_routing_probabilities_dict[k] = mean_probabilities
+
+            past_decisions_entropies_arr_shape = np.concatenate([
+                [2 for _ in range(past_num_of_routes)], [total_sample_count]], dtype=np.int32)
+            past_decisions_entropies_arr = np.zeros(shape=past_decisions_entropies_arr_shape, dtype=np.float)
+
             past_num_of_routes += route_count
         print("X")
 
