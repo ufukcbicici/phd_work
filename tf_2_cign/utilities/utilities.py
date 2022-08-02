@@ -220,3 +220,13 @@ class Utilities:
         prob_log_prob = prob_distributions * log_prob
         entropies = -1.0 * np.sum(prob_log_prob, axis=1)
         return entropies
+
+    @staticmethod
+    def divide_array_into_chunks(arr, count):
+        chunk_size = len(arr) // count + 1
+        curr_index = 0
+        list_of_chunks = []
+        for idx in range(count):
+            list_of_chunks.append(arr[curr_index:curr_index + chunk_size])
+            curr_index += chunk_size
+        return list_of_chunks

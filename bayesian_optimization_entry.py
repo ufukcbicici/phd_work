@@ -33,7 +33,14 @@ if __name__ == "__main__":
     # bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
     #                        log_file_name="fmnist_multipath_optimization")
 
-    cross_entropy_optimizer = FashionMnistLenetCrossEntropySearch(init_points=300, n_iter=700,
-                                                                  xi=0.01, model_id=424,
-                                                                  val_ratio=0.25, accuracy_mac_balance_coeff=1.0)
-    cross_entropy_optimizer.run()
+    # cross_entropy_optimizer = FashionMnistLenetCrossEntropySearch(init_points=300, n_iter=700,
+    #                                                               xi=0.01, model_id=424,
+    #                                                               val_ratio=0.25, accuracy_mac_balance_coeff=1.0)
+    # cross_entropy_optimizer.run()
+
+    fmnist_cross_entropy_search = FashionMnistLenetCrossEntropySearch(init_points=300, n_iter=700,
+                                                                      xi=0.01, model_id=424, val_ratio=0.25,
+                                                                      entropy_interval_counts=[4, 4],
+                                                                      entropy_bins_count=50,
+                                                                      probability_bins_count=20,
+                                                                      accuracy_mac_balance_coeff=1.0)
