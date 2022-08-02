@@ -16,12 +16,13 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
     def __init__(self, xi, init_points, n_iter, accuracy_mac_balance_coeff, model_id, val_ratio,
                  entropy_interval_counts, entropy_bins_count, probability_bins_count):
         super().__init__(xi, init_points, n_iter, accuracy_mac_balance_coeff, model_id, val_ratio)
-        self.entropyIntervalCounts = entropy_interval_counts # [4, 5] -> For 4 for first block, 5 for second block
+        self.entropyIntervalCounts = entropy_interval_counts  # [4, 5] -> For 4 for first block, 5 for second block
         self.entropyBinsCount = entropy_bins_count
         self.probabilityBinsCounts = probability_bins_count
         assert len(self.entropyIntervalCounts) == self.routingBlocksCount
         # Prepare categorical distributions for each entropy level
         self.entropyIntervalDistributions = []
+        self.probabilityThresholdDistributions = []
         for block_id in range(self.routingBlocksCount):
             level_wise_entropy_intervals = []
             list_of_entropies = Utilities.divide_array_into_chunks(arr=self.entropiesPerLevelSorted[block_id],
@@ -34,32 +35,6 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
                 level_wise_entropy_intervals.append(categorical_distribution)
             self.entropyIntervalDistributions.append(level_wise_entropy_intervals)
         print("X")
-
-            # curr_index = 0
-            # category_count = len(self.entropiesPerLevelSorted[block_id]) // self.entropyIntervalCounts[block_id]
-            # category_count += 1
-            # for id_in_block in range(self.entropyIntervalCounts[block_id]):
-            #     start_index = curr_index
-            #     end_index = start_index + category_count
-
-
-
-
-
-
-            # for id_in_block in range(self.entropyIntervalCounts[block_id]):
-            #     self.entropiesPerLevelSorted
-            #     # CategoricalDistribution
-
-        #     ents = []
-        #     for list_of_entropies in self.multiPathInfoObject.combinations_routing_entropies_dict.values():
-        #         ents.extend(list_of_entropies[block_id].tolist())
-        #         # for arr in list_of_entropies[block_id]:
-        #         #     ents.add(arr)
-        #     ents = set(ents)
-        #     self.entropiesPerLevelSorted.append(sorted(list(ents)))
-        # print("X")
-
 
     def get_dataset(self):
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
