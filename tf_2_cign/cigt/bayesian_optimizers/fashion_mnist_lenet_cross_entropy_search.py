@@ -31,7 +31,9 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
                                                                              count=self.entropyBinsCount)
                 interval_end_points = sorted([intr_[-1] for intr_ in entropy_interval_chunks])
                 categorical_distribution = CategoricalDistribution(categories=interval_end_points)
-                print("X")
+                level_wise_entropy_intervals.append(categorical_distribution)
+            self.entropyIntervalDistributions.append(level_wise_entropy_intervals)
+        print("X")
 
             # curr_index = 0
             # category_count = len(self.entropiesPerLevelSorted[block_id]) // self.entropyIntervalCounts[block_id]
