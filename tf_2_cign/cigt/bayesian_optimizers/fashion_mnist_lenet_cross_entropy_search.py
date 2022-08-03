@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import tensorflow as tf
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
@@ -23,18 +24,54 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
         # Prepare categorical distributions for each entropy level
         self.entropyIntervalDistributions = []
         self.probabilityThresholdDistributions = []
+        probability_thresholds = list([(1.0 / self.probabilityBinsCounts) * idx
+                                       for idx in range(self.probabilityBinsCounts)])
         for block_id in range(self.routingBlocksCount):
-            level_wise_entropy_intervals = []
+            level_wise_entropy_distributions = []
             list_of_entropies = Utilities.divide_array_into_chunks(arr=self.entropiesPerLevelSorted[block_id],
                                                                    count=self.entropyIntervalCounts[block_id])
+            # Distributions for entropy levels
             for entropy_list in list_of_entropies:
                 entropy_interval_chunks = Utilities.divide_array_into_chunks(arr=entropy_list,
                                                                              count=self.entropyBinsCount)
                 interval_end_points = sorted([intr_[-1] for intr_ in entropy_interval_chunks])
                 categorical_distribution = CategoricalDistribution(categories=interval_end_points)
-                level_wise_entropy_intervals.append(categorical_distribution)
-            self.entropyIntervalDistributions.append(level_wise_entropy_intervals)
-        print("X")
+                level_wise_entropy_distributions.append(categorical_distribution)
+            # Distributions for probability threshold levels.
+            level_wise_prob_threshold_distributions = []
+            for prob_threshold_id in range(self.model.pathCounts[block_id + 1] * (len(list_of_entropies) + 1)):
+                categorical_distribution = CategoricalDistribution(categories=probability_thresholds)
+                level_wise_prob_threshold_distributions.append(categorical_distribution)
+            self.entropyIntervalDistributions.append(level_wise_entropy_distributions)
+            self.probabilityThresholdDistributions.append(level_wise_prob_threshold_distributions)
+
+    def sample_intervals(self):
+        list_of_entropy_thresholds = []
+        list_of_probability_thresholds = []
+        for block_id in range(self.routingBlocksCount):
+            # Sample entropy intervals
+            entropy_interval_higher_ends = []
+            for entropy_interval_id in range(len(self.entropyIntervalDistributions[block_id])):
+                entropy_threshold = \
+                    self.entropyIntervalDistributions[block_id][entropy_interval_id].sample(num_of_samples=1)[0]
+                entropy_interval_higher_ends.append(entropy_threshold)
+            entropy_interval_higher_ends.append(self.maxEntropies[block_id])
+            list_of_entropy_thresholds.append(np.array(entropy_interval_higher_ends))
+
+            # Sample probability thresholds
+            block_list_for_probs = []
+            for e_id in range(len(entropy_interval_higher_ends)):
+                probability_thresholds_for_e_id = []
+                for path_id in range(self.model.pathCounts[block_id + 1]):
+                    p_id = self.model.pathCounts[block_id + 1] * e_id + path_id
+                    probability_threshold = \
+                        self.probabilityThresholdDistributions[block_id][p_id].sample(num_of_samples=1)[0]
+                    probability_thresholds_for_e_id.append(probability_threshold)
+                probability_thresholds_for_e_id = np.array(probability_thresholds_for_e_id)
+                block_list_for_probs.append(probability_thresholds_for_e_id)
+            block_list_for_probs = np.stack(block_list_for_probs, axis=0)
+            list_of_probability_thresholds.append(block_list_for_probs)
+        return list_of_entropy_thresholds, list_of_probability_thresholds
 
     def get_dataset(self):
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)

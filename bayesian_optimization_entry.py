@@ -42,5 +42,6 @@ if __name__ == "__main__":
                                                                       xi=0.01, model_id=424, val_ratio=0.25,
                                                                       entropy_interval_counts=[4, 4],
                                                                       entropy_bins_count=50,
-                                                                      probability_bins_count=20,
+                                                                      probability_bins_count=50,
                                                                       accuracy_mac_balance_coeff=1.0)
+    e, p = fmnist_cross_entropy_search.sample_intervals()
