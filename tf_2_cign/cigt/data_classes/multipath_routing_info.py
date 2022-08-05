@@ -265,10 +265,21 @@ class MultipathCombinationInfo(object):
                 curr_sample_routing_probabilities = self.past_decisions_routing_probabilities_list[
                     block_id][index_arrays]
             assert curr_sample_routing_probabilities.shape == probability_thresholds_per_sample.shape
-            # 5) Compare current routing probabilities to the thresholds, integrate new path selections
+            # 5) Compare current routing probabilities to the thresholds
             t4 = time.time()
             route_selections = np.greater_equal(curr_sample_routing_probabilities,
                                                 probability_thresholds_per_sample).astype(sample_paths.dtype)
+            # 6) Get the maximum likely routing paths from the current routing probabilities
+            argmax_indices = np.argmax(curr_sample_routing_probabilities, axis=1)
+            ml_route_selections = np.zeros_like(route_selections)
+            ml_route_selections[np.arange(ml_route_selections.shape[0], ), argmax_indices] = 1
+            # 7) Detect degenerate cases where all routing probabilities are under routing thresholds and no path is
+            # valid to route into. We are going to use the ML routing in such cases instead.
+            num_of_selected_routes = np.sum(route_selections, axis=1)
+            final_selections = np.where(np.expand_dims(num_of_selected_routes > 0, axis=-1),
+                                        route_selections, ml_route_selections)
+            route_selections = final_selections
+            # 8) Integrate into the selected paths so far.
             sample_paths = np.concatenate([sample_paths[:, :-1], route_selections,
                                            np.expand_dims(indices, axis=1)], axis=1)
             past_num_of_routes += route_count
@@ -301,5 +312,5 @@ class MultipathCombinationInfo(object):
         accuracy = np.mean(validity_vector)
         mean_mac = np.mean(dif_vector)
         score = np.mean(score_vector)
-        print("accuracy={0} mean_mac={1} score={2}".format(accuracy, mean_mac, score))
+        # print("accuracy={0} mean_mac={1} score={2}".format(accuracy, mean_mac, score))
         return accuracy, mean_mac, score

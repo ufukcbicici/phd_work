@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
@@ -139,3 +140,24 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
             fashion_cigt.load_weights(filepath=os.path.join(weights_folder_path, "fully_trained_weights"))
             fashion_cigt.isInWarmUp = False
             return fashion_cigt
+
+    def run(self):
+        epoch_count = 1000
+        sample_count = 100000
+        smoothing_coeff = 0.85
+
+        for epoch_id in range(epoch_count):
+            samples_list = []
+            for sample_id in tqdm(range(sample_count)):
+                e, p = self.sample_intervals()
+                accuracy, mean_mac, score = self.multiPathInfoObject.measure_performance(
+                    cigt=self.model,
+                    list_of_probability_thresholds=p,
+                    list_of_entropy_intervals=e,
+                    indices=np.arange(
+                        self.totalSampleCount),
+                    use_numpy_approach=True,
+                    balance_coeff=1.0)
+                samples_list.append((sample_id, e, p, score))
+            print("X")
+
