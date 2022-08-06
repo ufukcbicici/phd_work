@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     fmnist_cross_entropy_search = FashionMnistLenetCrossEntropySearch(init_points=300, n_iter=700,
                                                                       xi=0.01, model_id=424, val_ratio=0.25,
-                                                                      entropy_interval_counts=[4, 4],
+                                                                      entropy_interval_counts=[10, 10],
                                                                       entropy_bins_count=50,
                                                                       probability_bins_count=50,
                                                                       accuracy_mac_balance_coeff=1.0)

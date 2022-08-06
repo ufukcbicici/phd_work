@@ -223,10 +223,13 @@ class Utilities:
 
     @staticmethod
     def divide_array_into_chunks(arr, count):
-        chunk_size = len(arr) // count + 1
+        chunk_size = len(arr) // count
         curr_index = 0
         list_of_chunks = []
         for idx in range(count):
-            list_of_chunks.append(arr[curr_index:curr_index + chunk_size])
+            if idx != count - 1:
+                list_of_chunks.append(arr[curr_index:curr_index + chunk_size])
+            else:
+                list_of_chunks.append(arr[curr_index:])
             curr_index += chunk_size
         return list_of_chunks

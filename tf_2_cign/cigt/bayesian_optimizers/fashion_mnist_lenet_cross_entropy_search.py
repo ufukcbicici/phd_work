@@ -145,19 +145,70 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
         epoch_count = 1000
         sample_count = 100000
         smoothing_coeff = 0.85
+        gamma = 0.01
 
+        percentile_count = int(gamma * sample_count)
         for epoch_id in range(epoch_count):
+            # Step 1: Sample N intervals with current weights
             samples_list = []
             for sample_id in tqdm(range(sample_count)):
                 e, p = self.sample_intervals()
-                accuracy, mean_mac, score = self.multiPathInfoObject.measure_performance(
+                val_accuracy, val_mean_mac, val_score = self.multiPathInfoObject.measure_performance(
                     cigt=self.model,
                     list_of_probability_thresholds=p,
                     list_of_entropy_intervals=e,
-                    indices=np.arange(
-                        self.totalSampleCount),
+                    indices=self.valIndices,
                     use_numpy_approach=True,
                     balance_coeff=1.0)
-                samples_list.append((sample_id, e, p, score))
+                test_accuracy, test_mean_mac, test_score = self.multiPathInfoObject.measure_performance(
+                    cigt=self.model,
+                    list_of_probability_thresholds=p,
+                    list_of_entropy_intervals=e,
+                    indices=self.testIndices,
+                    use_numpy_approach=True,
+                    balance_coeff=1.0)
+                sample_dict = {
+                    "sample_id": sample_id,
+                    "entropy_intervals": e,
+                    "probability_thresholds": p,
+                    "val_accuracy": val_accuracy,
+                    "val_mean_mac": val_mean_mac,
+                    "val_score": val_score,
+                    "test_accuracy": test_accuracy,
+                    "test_mean_mac": test_mean_mac,
+                    "test_score": test_score
+                }
+                samples_list.append(sample_dict)
+
+            samples_sorted = sorted(samples_list, key=lambda d_: d_["val_score"], reverse=True)
+            val_accuracies = [d_["val_accuracy"] for d_ in samples_sorted]
+            test_accuracies = [d_["test_accuracy"] for d_ in samples_sorted]
+            val_test_corr = np.corrcoef(val_accuracies, test_accuracies)[0, 1]
+            mean_val_acc = np.mean(val_accuracies)
+            mean_test_acc = np.mean(test_accuracies)
+            mean_val_mac = np.mean([d_["val_mean_mac"] for d_ in samples_sorted])
+            mean_test_mac = np.mean([d_["test_mean_mac"] for d_ in samples_sorted])
+
+            print("Epoch:{0} val_test_corr={1}".format(epoch_id, val_test_corr))
+            print("Epoch:{0} mean_val_acc={1}".format(epoch_id, mean_val_acc))
+            print("Epoch:{0} mean_test_acc={1}".format(epoch_id, mean_test_acc))
+            print("Epoch:{0} mean_val_mac={1}".format(epoch_id, mean_val_mac))
+            print("Epoch:{0} mean_test_mac={1}".format(epoch_id, mean_test_mac))
+
+            samples_gamma = samples_sorted[0:percentile_count]
+            val_accuracies_gamma = [d_["val_accuracy"] for d_ in samples_gamma]
+            test_accuracies_gamma = [d_["test_accuracy"] for d_ in samples_gamma]
+            val_test_gamma_corr = np.corrcoef(val_accuracies_gamma, test_accuracies_gamma)[0, 1]
+            mean_val_gamma_acc = np.mean(val_accuracies_gamma)
+            mean_test_gamma_acc = np.mean(test_accuracies_gamma)
+            mean_val_gamma_mac = np.mean([d_["val_mean_mac"] for d_ in samples_gamma])
+            mean_test_gamma_mac = np.mean([d_["test_mean_mac"] for d_ in samples_gamma])
+
+            print("Epoch:{0} val_test_gamma_corr={1}".format(epoch_id, val_test_gamma_corr))
+            print("Epoch:{0} mean_val_gamma_acc={1}".format(epoch_id, mean_val_gamma_acc))
+            print("Epoch:{0} mean_test_gamma_acc={1}".format(epoch_id, mean_test_gamma_acc))
+            print("Epoch:{0} mean_val_gamma_mac={1}".format(epoch_id, mean_val_gamma_mac))
+            print("Epoch:{0} mean_test_gamma_mac={1}".format(epoch_id, mean_test_gamma_mac))
+
             print("X")
 

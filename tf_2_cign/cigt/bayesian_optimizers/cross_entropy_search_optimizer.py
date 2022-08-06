@@ -36,7 +36,8 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
         for block_id in range(self.routingBlocksCount):
             ents = []
             for list_of_entropies in self.multiPathInfoObject.combinations_routing_entropies_dict.values():
-                ents.extend(list_of_entropies[block_id].tolist())
+                entropy_list = list_of_entropies[block_id][self.valIndices].tolist()
+                ents.extend(entropy_list)
                 # for arr in list_of_entropies[block_id]:
                 #     ents.add(arr)
             ents = set(ents)
