@@ -210,6 +210,52 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
         # print("accuracy={0} mean_mac={1} score={2}".format(accuracy, mean_mac, score))
         return accuracy, mean_mac, score
 
+    @staticmethod
+    def sample_from_search_parameters(shared_objects, sample_count):
+        multipath_routing_info_obj = shared_objects[0]
+        val_indices = shared_objects[1]
+        test_indices = shared_objects[2]
+        path_counts = shared_objects[3]
+        entropy_interval_distributions = shared_objects[4]
+        max_entropies = shared_objects[5]
+        probability_threshold_distributions = shared_objects[6]
+        samples_list = []
+        for sample_id in range(sample_count):
+            e, p = CrossEntropySearchOptimizer.sample_intervals(
+                path_counts=path_counts,
+                entropy_interval_distributions=entropy_interval_distributions,
+                max_entropies=max_entropies,
+                probability_threshold_distributions=probability_threshold_distributions
+            )
+            val_accuracy, val_mean_mac, val_score = CrossEntropySearchOptimizer.measure_performance(
+                path_counts=path_counts,
+                multipath_routing_info_obj=multipath_routing_info_obj,
+                list_of_probability_thresholds=p,
+                list_of_entropy_intervals=e,
+                indices=val_indices,
+                use_numpy_approach=True,
+                balance_coeff=1.0)
+            test_accuracy, test_mean_mac, test_score = CrossEntropySearchOptimizer.measure_performance(
+                path_counts=path_counts,
+                multipath_routing_info_obj=multipath_routing_info_obj,
+                list_of_probability_thresholds=p,
+                list_of_entropy_intervals=e,
+                indices=test_indices,
+                use_numpy_approach=True,
+                balance_coeff=1.0)
+            sample_dict = {
+                "sample_id": sample_id,
+                "entropy_intervals": e,
+                "probability_thresholds": p,
+                "val_accuracy": val_accuracy,
+                "val_mean_mac": val_mean_mac,
+                "val_score": val_score,
+                "test_accuracy": test_accuracy,
+                "test_mean_mac": test_mean_mac,
+                "test_score": test_score
+            }
+            samples_list.append(sample_dict)
+        return samples_list
 
     def run(self):
         list_of_entropy_thresholds = [

@@ -115,53 +115,6 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
             fashion_cigt.isInWarmUp = False
             return fashion_cigt
 
-    @staticmethod
-    def sample_from_search_parameters(shared_objects, sample_count):
-        multipath_routing_info_obj = shared_objects[0]
-        val_indices = shared_objects[1]
-        test_indices = shared_objects[2]
-        path_counts = shared_objects[3]
-        entropy_interval_distributions = shared_objects[4]
-        max_entropies = shared_objects[5]
-        probability_threshold_distributions = shared_objects[6]
-        samples_list = []
-        for sample_id in range(sample_count):
-            e, p = CrossEntropySearchOptimizer.sample_intervals(
-                path_counts=path_counts,
-                entropy_interval_distributions=entropy_interval_distributions,
-                max_entropies=max_entropies,
-                probability_threshold_distributions=probability_threshold_distributions
-            )
-            val_accuracy, val_mean_mac, val_score = CrossEntropySearchOptimizer.measure_performance(
-                path_counts=path_counts,
-                multipath_routing_info_obj=multipath_routing_info_obj,
-                list_of_probability_thresholds=p,
-                list_of_entropy_intervals=e,
-                indices=val_indices,
-                use_numpy_approach=True,
-                balance_coeff=1.0)
-            test_accuracy, test_mean_mac, test_score = CrossEntropySearchOptimizer.measure_performance(
-                path_counts=path_counts,
-                multipath_routing_info_obj=multipath_routing_info_obj,
-                list_of_probability_thresholds=p,
-                list_of_entropy_intervals=e,
-                indices=test_indices,
-                use_numpy_approach=True,
-                balance_coeff=1.0)
-            sample_dict = {
-                "sample_id": sample_id,
-                "entropy_intervals": e,
-                "probability_thresholds": p,
-                "val_accuracy": val_accuracy,
-                "val_mean_mac": val_mean_mac,
-                "val_score": val_score,
-                "test_accuracy": test_accuracy,
-                "test_mean_mac": test_mean_mac,
-                "test_score": test_score
-            }
-            samples_list.append(sample_dict)
-        return samples_list
-
     def run(self):
         epoch_count = 1000
         sample_count = 100000
@@ -192,40 +145,41 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
                           self.maxEntropies,
                           self.probabilityThresholdDistributions)
 
-        print("X")
+        for epoch_id in range(epoch_count):
+            samples_list = CrossEntropySearchOptimizer.sample_from_search_parameters(
+                shared_objects=shared_objects, sample_count=sample_count)
 
-        # for epoch_id in range(epoch_count):
-        #     # Step 1: Sample N intervals with current weights
-        #     samples_list = []
-        #     for sample_id in tqdm(range(sample_count)):
-        #         e, p = self.sample_intervals()
-        #         val_accuracy, val_mean_mac, val_score = self.multiPathInfoObject.measure_performance(
-        #             cigt=self.model,
-        #             list_of_probability_thresholds=p,
-        #             list_of_entropy_intervals=e,
-        #             indices=self.valIndices,
-        #             use_numpy_approach=True,
-        #             balance_coeff=1.0)
-        #         test_accuracy, test_mean_mac, test_score = self.multiPathInfoObject.measure_performance(
-        #             cigt=self.model,
-        #             list_of_probability_thresholds=p,
-        #             list_of_entropy_intervals=e,
-        #             indices=self.testIndices,
-        #             use_numpy_approach=True,
-        #             balance_coeff=1.0)
-        #         sample_dict = {
-        #             "sample_id": sample_id,
-        #             "entropy_intervals": e,
-        #             "probability_thresholds": p,
-        #             "val_accuracy": val_accuracy,
-        #             "val_mean_mac": val_mean_mac,
-        #             "val_score": val_score,
-        #             "test_accuracy": test_accuracy,
-        #             "test_mean_mac": test_mean_mac,
-        #             "test_score": test_score
-        #         }
-        #         samples_list.append(sample_dict)
-        #
+            # # Step 1: Sample N intervals with current weights
+            # samples_list = []
+            # for sample_id in tqdm(range(sample_count)):
+            #     e, p = self.sample_intervals()
+            #     val_accuracy, val_mean_mac, val_score = self.multiPathInfoObject.measure_performance(
+            #         cigt=self.model,
+            #         list_of_probability_thresholds=p,
+            #         list_of_entropy_intervals=e,
+            #         indices=self.valIndices,
+            #         use_numpy_approach=True,
+            #         balance_coeff=1.0)
+            #     test_accuracy, test_mean_mac, test_score = self.multiPathInfoObject.measure_performance(
+            #         cigt=self.model,
+            #         list_of_probability_thresholds=p,
+            #         list_of_entropy_intervals=e,
+            #         indices=self.testIndices,
+            #         use_numpy_approach=True,
+            #         balance_coeff=1.0)
+            #     sample_dict = {
+            #         "sample_id": sample_id,
+            #         "entropy_intervals": e,
+            #         "probability_thresholds": p,
+            #         "val_accuracy": val_accuracy,
+            #         "val_mean_mac": val_mean_mac,
+            #         "val_score": val_score,
+            #         "test_accuracy": test_accuracy,
+            #         "test_mean_mac": test_mean_mac,
+            #         "test_score": test_score
+            #     }
+            #     samples_list.append(sample_dict)
+
         # samples_sorted = sorted(samples_list, key=lambda d_: d_["val_score"], reverse=True)
         # val_accuracies = [d_["val_accuracy"] for d_ in samples_sorted]
         # test_accuracies = [d_["test_accuracy"] for d_ in samples_sorted]
@@ -255,5 +209,5 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
         # print("Epoch:{0} mean_test_gamma_acc={1}".format(epoch_id, mean_test_gamma_acc))
         # print("Epoch:{0} mean_val_gamma_mac={1}".format(epoch_id, mean_val_gamma_mac))
         # print("Epoch:{0} mean_test_gamma_mac={1}".format(epoch_id, mean_test_gamma_mac))
-
-        print("X")
+        #
+        # print("X")
