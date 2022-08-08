@@ -4,9 +4,11 @@ import tensorflow as tf
 from tqdm import tqdm
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
+from mpire import WorkerPool
 from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
 from tf_2_cign.cigt.bayesian_optimizers.cross_entropy_search_optimizer import CrossEntropySearchOptimizer
 from tf_2_cign.cigt.data_classes.categorical_distribution import CategoricalDistribution
+from tf_2_cign.cigt.data_classes.multipath_routing_info import MultipathCombinationInfo
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
@@ -45,34 +47,6 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
                 level_wise_prob_threshold_distributions.append(categorical_distribution)
             self.entropyIntervalDistributions.append(level_wise_entropy_distributions)
             self.probabilityThresholdDistributions.append(level_wise_prob_threshold_distributions)
-
-    def sample_intervals(self):
-        list_of_entropy_thresholds = []
-        list_of_probability_thresholds = []
-        for block_id in range(self.routingBlocksCount):
-            # Sample entropy intervals
-            entropy_interval_higher_ends = []
-            for entropy_interval_id in range(len(self.entropyIntervalDistributions[block_id])):
-                entropy_threshold = \
-                    self.entropyIntervalDistributions[block_id][entropy_interval_id].sample(num_of_samples=1)[0]
-                entropy_interval_higher_ends.append(entropy_threshold)
-            entropy_interval_higher_ends.append(self.maxEntropies[block_id])
-            list_of_entropy_thresholds.append(np.array(entropy_interval_higher_ends))
-
-            # Sample probability thresholds
-            block_list_for_probs = []
-            for e_id in range(len(entropy_interval_higher_ends)):
-                probability_thresholds_for_e_id = []
-                for path_id in range(self.model.pathCounts[block_id + 1]):
-                    p_id = self.model.pathCounts[block_id + 1] * e_id + path_id
-                    probability_threshold = \
-                        self.probabilityThresholdDistributions[block_id][p_id].sample(num_of_samples=1)[0]
-                    probability_thresholds_for_e_id.append(probability_threshold)
-                probability_thresholds_for_e_id = np.array(probability_thresholds_for_e_id)
-                block_list_for_probs.append(probability_thresholds_for_e_id)
-            block_list_for_probs = np.stack(block_list_for_probs, axis=0)
-            list_of_probability_thresholds.append(block_list_for_probs)
-        return list_of_entropy_thresholds, list_of_probability_thresholds
 
     def get_dataset(self):
         fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size, validation_size=0)
@@ -141,74 +115,145 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
             fashion_cigt.isInWarmUp = False
             return fashion_cigt
 
+    @staticmethod
+    def sample_from_search_parameters(shared_objects, sample_count):
+        multipath_routing_info_obj = shared_objects[0]
+        val_indices = shared_objects[1]
+        test_indices = shared_objects[2]
+        path_counts = shared_objects[3]
+        entropy_interval_distributions = shared_objects[4]
+        max_entropies = shared_objects[5]
+        probability_threshold_distributions = shared_objects[6]
+        samples_list = []
+        for sample_id in range(sample_count):
+            e, p = CrossEntropySearchOptimizer.sample_intervals(
+                path_counts=path_counts,
+                entropy_interval_distributions=entropy_interval_distributions,
+                max_entropies=max_entropies,
+                probability_threshold_distributions=probability_threshold_distributions
+            )
+            val_accuracy, val_mean_mac, val_score = CrossEntropySearchOptimizer.measure_performance(
+                path_counts=path_counts,
+                multipath_routing_info_obj=multipath_routing_info_obj,
+                list_of_probability_thresholds=p,
+                list_of_entropy_intervals=e,
+                indices=val_indices,
+                use_numpy_approach=True,
+                balance_coeff=1.0)
+            test_accuracy, test_mean_mac, test_score = CrossEntropySearchOptimizer.measure_performance(
+                path_counts=path_counts,
+                multipath_routing_info_obj=multipath_routing_info_obj,
+                list_of_probability_thresholds=p,
+                list_of_entropy_intervals=e,
+                indices=test_indices,
+                use_numpy_approach=True,
+                balance_coeff=1.0)
+            sample_dict = {
+                "sample_id": sample_id,
+                "entropy_intervals": e,
+                "probability_thresholds": p,
+                "val_accuracy": val_accuracy,
+                "val_mean_mac": val_mean_mac,
+                "val_score": val_score,
+                "test_accuracy": test_accuracy,
+                "test_mean_mac": test_mean_mac,
+                "test_score": test_score
+            }
+            samples_list.append(sample_dict)
+        return samples_list
+
     def run(self):
         epoch_count = 1000
         sample_count = 100000
         smoothing_coeff = 0.85
         gamma = 0.01
+        n_jobs = 5
+        sample_counts = [int(sample_count / n_jobs) for _ in range(n_jobs)]
 
-        percentile_count = int(gamma * sample_count)
-        for epoch_id in range(epoch_count):
-            # Step 1: Sample N intervals with current weights
-            samples_list = []
-            for sample_id in tqdm(range(sample_count)):
-                e, p = self.sample_intervals()
-                val_accuracy, val_mean_mac, val_score = self.multiPathInfoObject.measure_performance(
-                    cigt=self.model,
-                    list_of_probability_thresholds=p,
-                    list_of_entropy_intervals=e,
-                    indices=self.valIndices,
-                    use_numpy_approach=True,
-                    balance_coeff=1.0)
-                test_accuracy, test_mean_mac, test_score = self.multiPathInfoObject.measure_performance(
-                    cigt=self.model,
-                    list_of_probability_thresholds=p,
-                    list_of_entropy_intervals=e,
-                    indices=self.testIndices,
-                    use_numpy_approach=True,
-                    balance_coeff=1.0)
-                sample_dict = {
-                    "sample_id": sample_id,
-                    "entropy_intervals": e,
-                    "probability_thresholds": p,
-                    "val_accuracy": val_accuracy,
-                    "val_mean_mac": val_mean_mac,
-                    "val_score": val_score,
-                    "test_accuracy": test_accuracy,
-                    "test_mean_mac": test_mean_mac,
-                    "test_score": test_score
-                }
-                samples_list.append(sample_dict)
+        # percentile_count = int(gamma * sample_count)
+        # with WorkerPool(n_jobs=n_jobs, shared_objects=(self,)) as pool:
+        #     results = pool.map(FashionMnistLenetCrossEntropySearch.sample_from_search_parameters,
+        #                        sample_counts, progress_bar=True)
+        # print("X")
 
-            samples_sorted = sorted(samples_list, key=lambda d_: d_["val_score"], reverse=True)
-            val_accuracies = [d_["val_accuracy"] for d_ in samples_sorted]
-            test_accuracies = [d_["test_accuracy"] for d_ in samples_sorted]
-            val_test_corr = np.corrcoef(val_accuracies, test_accuracies)[0, 1]
-            mean_val_acc = np.mean(val_accuracies)
-            mean_test_acc = np.mean(test_accuracies)
-            mean_val_mac = np.mean([d_["val_mean_mac"] for d_ in samples_sorted])
-            mean_test_mac = np.mean([d_["test_mean_mac"] for d_ in samples_sorted])
+        # multipath_routing_info_obj = shared_objects[0]
+        # val_indices = shared_objects[1]
+        # test_indices = shared_objects[2]
+        # path_counts = shared_objects[3]
+        # entropy_interval_distributions = shared_objects[4]
+        # max_entropies = shared_objects[5]
+        # probability_threshold_distributions = shared_objects[6]
 
-            print("Epoch:{0} val_test_corr={1}".format(epoch_id, val_test_corr))
-            print("Epoch:{0} mean_val_acc={1}".format(epoch_id, mean_val_acc))
-            print("Epoch:{0} mean_test_acc={1}".format(epoch_id, mean_test_acc))
-            print("Epoch:{0} mean_val_mac={1}".format(epoch_id, mean_val_mac))
-            print("Epoch:{0} mean_test_mac={1}".format(epoch_id, mean_test_mac))
+        shared_objects = (self.multiPathInfoObject,
+                          self.valIndices,
+                          self.testIndices,
+                          self.pathCounts,
+                          self.entropyIntervalDistributions,
+                          self.maxEntropies,
+                          self.probabilityThresholdDistributions)
 
-            samples_gamma = samples_sorted[0:percentile_count]
-            val_accuracies_gamma = [d_["val_accuracy"] for d_ in samples_gamma]
-            test_accuracies_gamma = [d_["test_accuracy"] for d_ in samples_gamma]
-            val_test_gamma_corr = np.corrcoef(val_accuracies_gamma, test_accuracies_gamma)[0, 1]
-            mean_val_gamma_acc = np.mean(val_accuracies_gamma)
-            mean_test_gamma_acc = np.mean(test_accuracies_gamma)
-            mean_val_gamma_mac = np.mean([d_["val_mean_mac"] for d_ in samples_gamma])
-            mean_test_gamma_mac = np.mean([d_["test_mean_mac"] for d_ in samples_gamma])
+        print("X")
 
-            print("Epoch:{0} val_test_gamma_corr={1}".format(epoch_id, val_test_gamma_corr))
-            print("Epoch:{0} mean_val_gamma_acc={1}".format(epoch_id, mean_val_gamma_acc))
-            print("Epoch:{0} mean_test_gamma_acc={1}".format(epoch_id, mean_test_gamma_acc))
-            print("Epoch:{0} mean_val_gamma_mac={1}".format(epoch_id, mean_val_gamma_mac))
-            print("Epoch:{0} mean_test_gamma_mac={1}".format(epoch_id, mean_test_gamma_mac))
+        # for epoch_id in range(epoch_count):
+        #     # Step 1: Sample N intervals with current weights
+        #     samples_list = []
+        #     for sample_id in tqdm(range(sample_count)):
+        #         e, p = self.sample_intervals()
+        #         val_accuracy, val_mean_mac, val_score = self.multiPathInfoObject.measure_performance(
+        #             cigt=self.model,
+        #             list_of_probability_thresholds=p,
+        #             list_of_entropy_intervals=e,
+        #             indices=self.valIndices,
+        #             use_numpy_approach=True,
+        #             balance_coeff=1.0)
+        #         test_accuracy, test_mean_mac, test_score = self.multiPathInfoObject.measure_performance(
+        #             cigt=self.model,
+        #             list_of_probability_thresholds=p,
+        #             list_of_entropy_intervals=e,
+        #             indices=self.testIndices,
+        #             use_numpy_approach=True,
+        #             balance_coeff=1.0)
+        #         sample_dict = {
+        #             "sample_id": sample_id,
+        #             "entropy_intervals": e,
+        #             "probability_thresholds": p,
+        #             "val_accuracy": val_accuracy,
+        #             "val_mean_mac": val_mean_mac,
+        #             "val_score": val_score,
+        #             "test_accuracy": test_accuracy,
+        #             "test_mean_mac": test_mean_mac,
+        #             "test_score": test_score
+        #         }
+        #         samples_list.append(sample_dict)
+        #
+        # samples_sorted = sorted(samples_list, key=lambda d_: d_["val_score"], reverse=True)
+        # val_accuracies = [d_["val_accuracy"] for d_ in samples_sorted]
+        # test_accuracies = [d_["test_accuracy"] for d_ in samples_sorted]
+        # val_test_corr = np.corrcoef(val_accuracies, test_accuracies)[0, 1]
+        # mean_val_acc = np.mean(val_accuracies)
+        # mean_test_acc = np.mean(test_accuracies)
+        # mean_val_mac = np.mean([d_["val_mean_mac"] for d_ in samples_sorted])
+        # mean_test_mac = np.mean([d_["test_mean_mac"] for d_ in samples_sorted])
+        #
+        # print("Epoch:{0} val_test_corr={1}".format(epoch_id, val_test_corr))
+        # print("Epoch:{0} mean_val_acc={1}".format(epoch_id, mean_val_acc))
+        # print("Epoch:{0} mean_test_acc={1}".format(epoch_id, mean_test_acc))
+        # print("Epoch:{0} mean_val_mac={1}".format(epoch_id, mean_val_mac))
+        # print("Epoch:{0} mean_test_mac={1}".format(epoch_id, mean_test_mac))
+        #
+        # samples_gamma = samples_sorted[0:percentile_count]
+        # val_accuracies_gamma = [d_["val_accuracy"] for d_ in samples_gamma]
+        # test_accuracies_gamma = [d_["test_accuracy"] for d_ in samples_gamma]
+        # val_test_gamma_corr = np.corrcoef(val_accuracies_gamma, test_accuracies_gamma)[0, 1]
+        # mean_val_gamma_acc = np.mean(val_accuracies_gamma)
+        # mean_test_gamma_acc = np.mean(test_accuracies_gamma)
+        # mean_val_gamma_mac = np.mean([d_["val_mean_mac"] for d_ in samples_gamma])
+        # mean_test_gamma_mac = np.mean([d_["test_mean_mac"] for d_ in samples_gamma])
+        #
+        # print("Epoch:{0} val_test_gamma_corr={1}".format(epoch_id, val_test_gamma_corr))
+        # print("Epoch:{0} mean_val_gamma_acc={1}".format(epoch_id, mean_val_gamma_acc))
+        # print("Epoch:{0} mean_test_gamma_acc={1}".format(epoch_id, mean_test_gamma_acc))
+        # print("Epoch:{0} mean_val_gamma_mac={1}".format(epoch_id, mean_val_gamma_mac))
+        # print("Epoch:{0} mean_test_gamma_mac={1}".format(epoch_id, mean_test_gamma_mac))
 
-            print("X")
-
+        print("X")
