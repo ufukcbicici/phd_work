@@ -34,12 +34,16 @@ if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
-    sigmoid_normal = SigmoidNormalDistribution(mu=1.5, sigma=0.1)
+    sigmoid_normal = SigmoidNormalDistribution(mu=0.0, sigma=10.0)
+    sigmoid_normal.pdf(y=np.array([0.277]))
     y = np.arange(1.e-30, 1.0 - 1.e-6, 0.0001)
     pdf_y = sigmoid_normal.pdf(y=y)
 
     plt.plot(y, pdf_y)
     plt.show()
+
+    res = integrate.quadrature(sigmoid_normal.pdf, 0.0, 1.0, tol=0.0, maxiter=1000000)
+    assert np.isclose(res[0], 1.0)
 
     print("X")
 
