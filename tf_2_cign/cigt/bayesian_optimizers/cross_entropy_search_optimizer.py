@@ -258,37 +258,38 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
         return samples_list
 
     def run(self):
-        list_of_entropy_thresholds = [
-            [np.array([0.1, self.maxEntropies[0]])], [np.array([0.05, self.maxEntropies[1]])]]
-
-        list_of_probability_thresholds = [
-            np.stack(
-                [np.array([0.4, 0.2]), np.array([0.3, 0.1])], axis=0),
-            np.stack([0.85 * np.array([0.2, 0.3, 0.35, 0.15]), 0.85 * np.array([0.25, 0.05, 0.4, 0.3])], axis=0)]
-
-        print("Use Numpy")
-        for _ in range(10):
-            t0 = time.time()
-            self.multiPathInfoObject.measure_performance(cigt=self.model,
-                                                         list_of_probability_thresholds=list_of_probability_thresholds,
-                                                         list_of_entropy_intervals=list_of_entropy_thresholds,
-                                                         indices=np.arange(self.totalSampleCount),
-                                                         use_numpy_approach=True,
-                                                         balance_coeff=1.0)
-            t1 = time.time()
-            print("measure_performance time:{0}".format(t1 - t0))
-
-        print("Use Dict lookup")
-        for _ in range(10):
-            t0 = time.time()
-            self.multiPathInfoObject.measure_performance(cigt=self.model,
-                                                         list_of_probability_thresholds=list_of_probability_thresholds,
-                                                         list_of_entropy_intervals=list_of_entropy_thresholds,
-                                                         indices=np.arange(self.totalSampleCount),
-                                                         use_numpy_approach=False,
-                                                         balance_coeff=1.0)
-            t1 = time.time()
-            print("measure_performance time:{0}".format(t1 - t0))
+        pass
+        # list_of_entropy_thresholds = [
+        #     [np.array([0.1, self.maxEntropies[0]])], [np.array([0.05, self.maxEntropies[1]])]]
+        #
+        # list_of_probability_thresholds = [
+        #     np.stack(
+        #         [np.array([0.4, 0.2]), np.array([0.3, 0.1])], axis=0),
+        #     np.stack([0.85 * np.array([0.2, 0.3, 0.35, 0.15]), 0.85 * np.array([0.25, 0.05, 0.4, 0.3])], axis=0)]
+        #
+        # print("Use Numpy")
+        # for _ in range(10):
+        #     t0 = time.time()
+        #     self.multiPathInfoObject.measure_performance(cigt=self.model,
+        #                                                  list_of_probability_thresholds=list_of_probability_thresholds,
+        #                                                  list_of_entropy_intervals=list_of_entropy_thresholds,
+        #                                                  indices=np.arange(self.totalSampleCount),
+        #                                                  use_numpy_approach=True,
+        #                                                  balance_coeff=1.0)
+        #     t1 = time.time()
+        #     print("measure_performance time:{0}".format(t1 - t0))
+        #
+        # print("Use Dict lookup")
+        # for _ in range(10):
+        #     t0 = time.time()
+        #     self.multiPathInfoObject.measure_performance(cigt=self.model,
+        #                                                  list_of_probability_thresholds=list_of_probability_thresholds,
+        #                                                  list_of_entropy_intervals=list_of_entropy_thresholds,
+        #                                                  indices=np.arange(self.totalSampleCount),
+        #                                                  use_numpy_approach=False,
+        #                                                  balance_coeff=1.0)
+        #     t1 = time.time()
+        #     print("measure_performance time:{0}".format(t1 - t0))
 
 
         # self.routingProbabilities, self.routingEntropies, self.logits, self.groundTruths, self. \

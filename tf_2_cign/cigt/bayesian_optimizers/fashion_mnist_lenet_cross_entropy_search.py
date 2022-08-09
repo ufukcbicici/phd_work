@@ -1,14 +1,11 @@
 import os
 import numpy as np
 import tensorflow as tf
-from tqdm import tqdm
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from mpire import WorkerPool
-from tf_2_cign.cigt.bayesian_optimizers.bayesian_optimizer import BayesianOptimizer
 from tf_2_cign.cigt.bayesian_optimizers.cross_entropy_search_optimizer import CrossEntropySearchOptimizer
-from tf_2_cign.cigt.data_classes.categorical_distribution import CategoricalDistribution
-from tf_2_cign.cigt.data_classes.multipath_routing_info import MultipathCombinationInfo
+from tf_2_cign.cigt.algorithms.categorical_distribution import CategoricalDistribution
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
@@ -123,20 +120,6 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
         n_jobs = 5
         sample_counts = [int(sample_count / n_jobs) for _ in range(n_jobs)]
 
-        # percentile_count = int(gamma * sample_count)
-        # with WorkerPool(n_jobs=n_jobs, shared_objects=(self,)) as pool:
-        #     results = pool.map(FashionMnistLenetCrossEntropySearch.sample_from_search_parameters,
-        #                        sample_counts, progress_bar=True)
-        # print("X")
-
-        # multipath_routing_info_obj = shared_objects[0]
-        # val_indices = shared_objects[1]
-        # test_indices = shared_objects[2]
-        # path_counts = shared_objects[3]
-        # entropy_interval_distributions = shared_objects[4]
-        # max_entropies = shared_objects[5]
-        # probability_threshold_distributions = shared_objects[6]
-
         shared_objects = (self.multiPathInfoObject,
                           self.valIndices,
                           self.testIndices,
@@ -148,9 +131,12 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
         percentile_count = int(gamma * sample_count)
 
         for epoch_id in range(epoch_count):
-            with WorkerPool(n_jobs=n_jobs, shared_objects=shared_objects) as pool:
-                results = pool.map(FashionMnistLenetCrossEntropySearch.sample_from_search_parameters,
-                                   sample_counts, progress_bar=True)
+            # with WorkerPool(n_jobs=n_jobs, shared_objects=shared_objects) as pool:
+            #     results = pool.map(FashionMnistLenetCrossEntropySearch.sample_from_search_parameters,
+            #                        sample_counts, progress_bar=True)
+            results = FashionMnistLenetCrossEntropySearch.sample_from_search_parameters(
+                shared_objects=shared_objects, sample_count=100000
+            )
             print(results.__class__)
             print(len(results))
             samples_list = []
@@ -188,6 +174,42 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
             print("Epoch:{0} mean_test_gamma_mac={1}".format(epoch_id, mean_test_gamma_mac))
 
             print("X")
+            # Maximum Likelihood estimates for categorical distributions
+            routing_blocks_count = len(self.pathCounts) - 1
+            for block_id in range(routing_blocks_count):
+                # Entropy distributions
+                for entropy_interval_id in range(len(self.entropyIntervalDistributions[block_id])):
+                    pass
+
+
+
+
+            # list_of_entropy_thresholds = []
+            # list_of_probability_thresholds = []
+            # for block_id in range(routing_blocks_count):
+            #     # Sample entropy intervals
+            #     entropy_interval_higher_ends = []
+            #     for entropy_interval_id in range(len(entropy_interval_distributions[block_id])):
+            #         entropy_threshold = \
+            #             entropy_interval_distributions[block_id][entropy_interval_id].sample(num_of_samples=1)[0]
+            #         entropy_interval_higher_ends.append(entropy_threshold)
+            #     entropy_interval_higher_ends.append(max_entropies[block_id])
+            #     list_of_entropy_thresholds.append(np.array(entropy_interval_higher_ends))
+            #
+            #     # Sample probability thresholds
+            #     block_list_for_probs = []
+            #     for e_id in range(len(entropy_interval_higher_ends)):
+            #         probability_thresholds_for_e_id = []
+            #         for path_id in range(path_counts[block_id + 1]):
+            #             p_id = path_counts[block_id + 1] * e_id + path_id
+            #             probability_threshold = \
+            #                 probability_threshold_distributions[block_id][p_id].sample(num_of_samples=1)[0]
+            #             probability_thresholds_for_e_id.append(probability_threshold)
+            #         probability_thresholds_for_e_id = np.array(probability_thresholds_for_e_id)
+            #         block_list_for_probs.append(probability_thresholds_for_e_id)
+            #     block_list_for_probs = np.stack(block_list_for_probs, axis=0)
+            #     list_of_probability_thresholds.append(block_list_for_probs)
+            # return list_of_entropy_thresholds, list_of_probability_thresholds
 
         # for epoch_id in range(epoch_count):
         #     samples_list = CrossEntropySearchOptimizer.sample_from_search_parameters(
