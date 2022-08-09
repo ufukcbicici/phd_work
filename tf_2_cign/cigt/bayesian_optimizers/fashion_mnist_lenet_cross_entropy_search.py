@@ -131,17 +131,19 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
         percentile_count = int(gamma * sample_count)
 
         for epoch_id in range(epoch_count):
-            # with WorkerPool(n_jobs=n_jobs, shared_objects=shared_objects) as pool:
-            #     results = pool.map(FashionMnistLenetCrossEntropySearch.sample_from_search_parameters,
-            #                        sample_counts, progress_bar=True)
-            results = FashionMnistLenetCrossEntropySearch.sample_from_search_parameters(
-                shared_objects=shared_objects, sample_count=100000
-            )
+            with WorkerPool(n_jobs=n_jobs, shared_objects=shared_objects) as pool:
+                results = pool.map(FashionMnistLenetCrossEntropySearch.sample_from_search_parameters,
+                                   sample_counts, progress_bar=True)
             print(results.__class__)
             print(len(results))
             samples_list = []
             for res_arr in results:
                 samples_list.extend(res_arr)
+
+            # Single Thread
+            # results = FashionMnistLenetCrossEntropySearch.sample_from_search_parameters(
+            #     shared_objects=shared_objects, sample_count=100000
+            # )
 
             samples_sorted = sorted(samples_list, key=lambda d_: d_["val_score"], reverse=True)
             val_accuracies = [d_["val_accuracy"] for d_ in samples_sorted]
@@ -173,79 +175,30 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
             print("Epoch:{0} mean_val_gamma_mac={1}".format(epoch_id, mean_val_gamma_mac))
             print("Epoch:{0} mean_test_gamma_mac={1}".format(epoch_id, mean_test_gamma_mac))
 
-            print("X")
+            # print("X")
             # Maximum Likelihood estimates for categorical distributions
             routing_blocks_count = len(self.pathCounts) - 1
             for block_id in range(routing_blocks_count):
                 # Entropy distributions
                 for entropy_interval_id in range(len(self.entropyIntervalDistributions[block_id])):
-                    pass
-
-
-
-
-            # list_of_entropy_thresholds = []
-            # list_of_probability_thresholds = []
-            # for block_id in range(routing_blocks_count):
-            #     # Sample entropy intervals
-            #     entropy_interval_higher_ends = []
-            #     for entropy_interval_id in range(len(entropy_interval_distributions[block_id])):
-            #         entropy_threshold = \
-            #             entropy_interval_distributions[block_id][entropy_interval_id].sample(num_of_samples=1)[0]
-            #         entropy_interval_higher_ends.append(entropy_threshold)
-            #     entropy_interval_higher_ends.append(max_entropies[block_id])
-            #     list_of_entropy_thresholds.append(np.array(entropy_interval_higher_ends))
-            #
-            #     # Sample probability thresholds
-            #     block_list_for_probs = []
-            #     for e_id in range(len(entropy_interval_higher_ends)):
-            #         probability_thresholds_for_e_id = []
-            #         for path_id in range(path_counts[block_id + 1]):
-            #             p_id = path_counts[block_id + 1] * e_id + path_id
-            #             probability_threshold = \
-            #                 probability_threshold_distributions[block_id][p_id].sample(num_of_samples=1)[0]
-            #             probability_thresholds_for_e_id.append(probability_threshold)
-            #         probability_thresholds_for_e_id = np.array(probability_thresholds_for_e_id)
-            #         block_list_for_probs.append(probability_thresholds_for_e_id)
-            #     block_list_for_probs = np.stack(block_list_for_probs, axis=0)
-            #     list_of_probability_thresholds.append(block_list_for_probs)
-            # return list_of_entropy_thresholds, list_of_probability_thresholds
-
-        # for epoch_id in range(epoch_count):
-        #     samples_list = CrossEntropySearchOptimizer.sample_from_search_parameters(
-        #         shared_objects=shared_objects, sample_count=sample_count)
-
-        # # Step 1: Sample N intervals with current weights
-        # samples_list = []
-        # for sample_id in tqdm(range(sample_count)):
-        #     e, p = self.sample_intervals()
-        #     val_accuracy, val_mean_mac, val_score = self.multiPathInfoObject.measure_performance(
-        #         cigt=self.model,
-        #         list_of_probability_thresholds=p,
-        #         list_of_entropy_intervals=e,
-        #         indices=self.valIndices,
-        #         use_numpy_approach=True,
-        #         balance_coeff=1.0)
-        #     test_accuracy, test_mean_mac, test_score = self.multiPathInfoObject.measure_performance(
-        #         cigt=self.model,
-        #         list_of_probability_thresholds=p,
-        #         list_of_entropy_intervals=e,
-        #         indices=self.testIndices,
-        #         use_numpy_approach=True,
-        #         balance_coeff=1.0)
-        #     sample_dict = {
-        #         "sample_id": sample_id,
-        #         "entropy_intervals": e,
-        #         "probability_thresholds": p,
-        #         "val_accuracy": val_accuracy,
-        #         "val_mean_mac": val_mean_mac,
-        #         "val_score": val_score,
-        #         "test_accuracy": test_accuracy,
-        #         "test_mean_mac": test_mean_mac,
-        #         "test_score": test_score
-        #     }
-        #     samples_list.append(sample_dict)
-
-
-        #
-        # print("X")
+                    data = []
+                    for d_ in samples_gamma:
+                        assert len(d_["entropy_intervals"][block_id]) \
+                               == len(self.entropyIntervalDistributions[block_id]) + 1
+                        data.append(d_["entropy_intervals"][block_id][entropy_interval_id])
+                    self.entropyIntervalDistributions[block_id][entropy_interval_id].maximum_likelihood_estimate(
+                        data=data, alpha=smoothing_coeff)
+                # print("X")
+                # Probability distributions
+                for e_id in range(len(self.entropyIntervalDistributions[block_id]) + 1):
+                    for path_id in range(self.pathCounts[block_id + 1]):
+                        p_id = self.pathCounts[block_id + 1] * e_id + path_id
+                        data = []
+                        for d_ in samples_gamma:
+                            # assert len(d_["probability_thresholds"][block_id]) \
+                            #        == len(self.entropyIntervalDistributions[block_id]) + 1
+                            data.append(d_["probability_thresholds"][block_id][e_id, path_id])
+                        self.probabilityThresholdDistributions[block_id][p_id].maximum_likelihood_estimate(
+                            data=data, alpha=smoothing_coeff)
+            #     print("X")
+            # print("X")
