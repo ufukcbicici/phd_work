@@ -47,7 +47,7 @@ class SigmoidNormalDistribution:
         self.sigma = sigma_hat
 
     def plot_distribution(self, root_path):
-        samples = self.sample(num_of_samples=10000)
+        samples = self.sample(num_of_samples=1000000)
         y = np.arange(0.0, 1.0, 0.0001)
         pdf_y = self.pdf(y=y)
 
@@ -59,6 +59,7 @@ class SigmoidNormalDistribution:
         # plt.show()
         plt.tight_layout()
         plt.savefig(os.path.join(root_path, "{0}.png".format(self.name)), dpi=1000)
+        plt.close()
 
 
 def plot_and_integrate():
