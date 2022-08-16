@@ -73,4 +73,35 @@ class FashionMnistLenetSigmoidNormCeSearh(FashionMnistLenetCrossEntropySearch):
                 level_wise_prob_threshold_distributions.append(path_threshold_distributions)
             self.probabilityThresholdDistributions.append(level_wise_prob_threshold_distributions)
 
-        print("X")
+    @staticmethod
+    def sample_intervals(path_counts,
+                         entropy_interval_distributions,
+                         max_entropies,
+                         probability_threshold_distributions):
+        routing_blocks_count = len(path_counts) - 1
+        list_of_entropy_thresholds = []
+        list_of_probability_thresholds = []
+        for block_id in range(routing_blocks_count):
+            # Sample entropy intervals
+            entropy_interval_higher_ends = []
+            for entropy_interval_id in range(len(entropy_interval_distributions[block_id])):
+                entropy_threshold = \
+                    entropy_interval_distributions[block_id][entropy_interval_id].sample(num_of_samples=1)[0]
+                entropy_interval_higher_ends.append(entropy_threshold)
+            entropy_interval_higher_ends.append(max_entropies[block_id])
+            list_of_entropy_thresholds.append(np.array(entropy_interval_higher_ends))
+
+            # Sample probability thresholds
+            block_list_for_probs = []
+            for e_id in range(len(entropy_interval_higher_ends)):
+                probability_thresholds_for_e_id = []
+                for path_id in range(path_counts[block_id + 1]):
+                    p_id = path_counts[block_id + 1] * e_id + path_id
+                    probability_threshold = \
+                        probability_threshold_distributions[block_id][p_id].sample(num_of_samples=1)[0]
+                    probability_thresholds_for_e_id.append(probability_threshold)
+                probability_thresholds_for_e_id = np.array(probability_thresholds_for_e_id)
+                block_list_for_probs.append(probability_thresholds_for_e_id)
+            block_list_for_probs = np.stack(block_list_for_probs, axis=0)
+            list_of_probability_thresholds.append(block_list_for_probs)
+        return list_of_entropy_thresholds, list_of_probability_thresholds
