@@ -20,7 +20,11 @@ class SigmoidNormalDistribution:
         s = np.random.normal(loc=self.mu, scale=self.sigma, size=(num_of_samples, ))
         s2 = 1.0 + np.exp(-s)
         y = np.reciprocal(s2)
-        return y
+        # Convert into target interval
+        a = self.lowEnd
+        b = self.highEnd
+        y_hat = (b - a)*y + a
+        return y_hat
 
     def pdf(self, y):
         assert np.all(np.greater_equal(y, 0.0))
@@ -34,6 +38,10 @@ class SigmoidNormalDistribution:
         return res
 
     def maximum_likelihood_estimate(self, data):
+        # Convert data to the original scale
+        a = self.lowEnd
+        b = self.highEnd
+        data = (data - a) * (1.0 / (b - a))
         data = np.clip(a=data, a_min=0.0 + 1.0e-10, a_max=1.0 - 1.0e-10)
         y_hat = data / (1.0 - data)
         x = np.log(y_hat)
@@ -48,6 +56,8 @@ class SigmoidNormalDistribution:
 
     def plot_distribution(self, root_path):
         samples = self.sample(num_of_samples=1000000)
+        samples = (samples - self.lowEnd) / (self.highEnd - self.lowEnd)
+
         y = np.arange(0.0, 1.0, 0.0001)
         pdf_y = self.pdf(y=y)
 
