@@ -126,7 +126,8 @@ class FashionMnistLenetCrossEntropySearch(CrossEntropySearchOptimizer):
                           self.pathCounts,
                           self.entropyIntervalDistributions,
                           self.maxEntropies,
-                          self.probabilityThresholdDistributions)
+                          self.probabilityThresholdDistributions,
+                          self.accuracyMacBalanceCoeff)
 
         percentile_count = int(gamma * sample_count)
 

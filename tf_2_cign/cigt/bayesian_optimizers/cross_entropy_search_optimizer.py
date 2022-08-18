@@ -219,6 +219,7 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
         entropy_interval_distributions = shared_objects[4]
         max_entropies = shared_objects[5]
         probability_threshold_distributions = shared_objects[6]
+        balance_coeff = shared_objects[7]
         samples_list = []
         for sample_id in range(sample_count):
             e, p = CrossEntropySearchOptimizer.sample_intervals(
@@ -234,7 +235,7 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
                 list_of_entropy_intervals=e,
                 indices=val_indices,
                 use_numpy_approach=True,
-                balance_coeff=1.0)
+                balance_coeff=balance_coeff)
             test_accuracy, test_mean_mac, test_score = CrossEntropySearchOptimizer.measure_performance(
                 path_counts=path_counts,
                 multipath_routing_info_obj=multipath_routing_info_obj,
@@ -242,7 +243,7 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
                 list_of_entropy_intervals=e,
                 indices=test_indices,
                 use_numpy_approach=True,
-                balance_coeff=1.0)
+                balance_coeff=balance_coeff)
             sample_dict = {
                 "sample_id": sample_id,
                 "entropy_intervals": e,

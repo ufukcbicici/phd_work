@@ -37,7 +37,7 @@ class SigmoidNormalDistribution:
         res = pdf_x * a
         return res
 
-    def maximum_likelihood_estimate(self, data):
+    def maximum_likelihood_estimate(self, data, alpha):
         # Convert data to the original scale
         a = self.lowEnd
         b = self.highEnd
