@@ -73,8 +73,7 @@ class SigmoidNormalDistribution:
 
 
 def plot_and_integrate():
-    sigmoid_normal = SigmoidNormalDistribution(mu=0.0, sigma=10.0)
-    sigmoid_normal.pdf(y=np.array([0.277]))
+    sigmoid_normal = SigmoidNormalDistribution(mu=3.0, sigma=10.0)
     y = np.arange(1.e-30, 1.0 - 1.e-6, 0.0001)
     pdf_y = sigmoid_normal.pdf(y=y)
 
@@ -115,7 +114,7 @@ def check_mle():
         plt.show()
 
         sigmoid_normal_mle = SigmoidNormalDistribution(mu=0.0, sigma=1.0)
-        sigmoid_normal_mle.maximum_likelihood_estimate(data=samples)
+        sigmoid_normal_mle.maximum_likelihood_estimate(data=samples, alpha=None)
         print("mu_mle={0} sigma_mle={1}".format(sigmoid_normal_mle.mu,
                                                 sigmoid_normal_mle.sigma))
         a_ = sigmoid_normal_mle.mu
@@ -128,9 +127,9 @@ if __name__ == "__main__":
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
     # plot_samples()
-    check_mle()
+    # check_mle()
 
-    # plot_and_integrate()
+    plot_and_integrate()
     #
     #
     #
