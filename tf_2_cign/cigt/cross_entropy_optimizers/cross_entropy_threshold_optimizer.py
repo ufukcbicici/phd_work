@@ -28,6 +28,11 @@ class CrossEntropySearchOptimizer(object):
         self.multiPathInfoObject = MultipathCombinationInfo(batch_size=self.model.batchSize,
                                                             path_counts=self.pathCounts)
         self.totalSampleCount, self.valIndices, self.testIndices = None, None, None
+        self.listOfEntropiesSorted = []
+        self.entropyThresholdDistributions = []
+        self.probabilityThresholdDistributions = []
+        self.load_model_data()
+        self.get_sorted_entropy_lists()
 
     # Load routing information for the particular model
     def load_model_data(self):
@@ -36,6 +41,22 @@ class CrossEntropySearchOptimizer(object):
         self.multiPathInfoObject.assert_routing_validity(cigt=self.model)
         self.multiPathInfoObject.assess_accuracy()
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
+
+    def get_sorted_entropy_lists(self):
+        assert self.valIndices is not None
+        for block_id in range(len(self.pathCounts) - 1):
+            next_block_path_count = self.pathCounts[block_id + 1]
+            max_entropy = -np.log(1.0 / next_block_path_count)
+            ents = []
+            for list_of_entropies in self.multiPathInfoObject.combinations_routing_entropies_dict.values():
+                entropy_list = list_of_entropies[block_id][self.valIndices].tolist()
+                ents.extend(entropy_list)
+            ents.append(max_entropy)
+            entropies_sorted = sorted(ents)
+            self.listOfEntropiesSorted.append(entropies_sorted)
+
+    def init_probability_distributions(self):
+        pass
 
     def prepare_val_test_sets(self):
         total_sample_count = set()

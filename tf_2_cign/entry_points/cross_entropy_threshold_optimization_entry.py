@@ -1,6 +1,8 @@
 import os.path
 
 import tensorflow as tf
+import json
+import requests
 
 from auxillary.db_logger import DbLogger
 from tf_2_cign.cigt.bayesian_optimizers.fashion_mnist_lenet_cross_entropy_search import \
@@ -20,6 +22,9 @@ if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
+    # requests.post("http://65.21.32.250:5000/api/get_images", data=json.dumps(
+    #     {"name": ["foo", "poo", "koo"]}))
+
     DbLogger.log_db_path = DbLogger.home_asus
     output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                                "cigt", "image_outputs")
@@ -32,5 +37,4 @@ if __name__ == "__main__":
                                             val_ratio=0.25,
                                             image_output_path=output_path,
                                             entropy_interval_counts=[5, 5])
-    ce_search.load_model_data()
     print("X")
