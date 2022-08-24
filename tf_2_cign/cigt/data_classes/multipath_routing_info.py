@@ -213,6 +213,16 @@ class MultipathCombinationInfo(object):
         best_accuracy = np.mean(correct_vec > 0.0)
         print("best_accuracy={0}".format(best_accuracy))
 
+    def get_default_accuracy(self, cigt, indices):
+        routing_decisions_arr = np.zeros(shape=(len(indices), sum(cigt.pathCounts[1:])), dtype=np.int32)
+        curr_index = 0
+        for block_id in range(len(cigt.pathCounts) - 1):
+            pass
+
+        # for block_id in range(len(cigt.pathCounts) - 1):
+        #     self.combinations_routing_probabilities_dict
+
+
     # list_of_entropy_intervals: length is equal to the number of decision blocks. Each i. element of the list
     # is a numpy array, which has the shape (number_of_entropy_intervals[i], 2).
 
