@@ -15,13 +15,13 @@ from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 class CrossEntropySearchOptimizer(object):
     def __init__(self, num_of_epochs, accuracy_mac_balance_coeff, model_loader,
                  model_id, val_ratio,
-                 entropy_interval_counts, image_output_path):
+                 entropy_threshold_counts, image_output_path):
         self.numOfEpochs = num_of_epochs
         self.accuracyMacBalanceCoeff = accuracy_mac_balance_coeff
         self.modelLoader = model_loader
         self.modelId = model_id
         self.valRatio = val_ratio
-        self.entropyIntervalCounts = entropy_interval_counts
+        self.entropyThresholdCounts = entropy_threshold_counts
         self.imageOutputPath = image_output_path
         self.model, self.dataset = self.modelLoader.get_model(model_id=self.modelId)
         self.pathCounts = list(self.model.pathCounts)
@@ -33,6 +33,7 @@ class CrossEntropySearchOptimizer(object):
         self.probabilityThresholdDistributions = []
         self.load_model_data()
         self.get_sorted_entropy_lists()
+        self.init_probability_distributions()
 
     # Load routing information for the particular model
     def load_model_data(self):
@@ -52,6 +53,7 @@ class CrossEntropySearchOptimizer(object):
                 entropy_list = list_of_entropies[block_id][self.valIndices].tolist()
                 ents.extend(entropy_list)
             ents.append(max_entropy)
+            ents = list(set(ents))
             entropies_sorted = sorted(ents)
             self.listOfEntropiesSorted.append(entropies_sorted)
 
