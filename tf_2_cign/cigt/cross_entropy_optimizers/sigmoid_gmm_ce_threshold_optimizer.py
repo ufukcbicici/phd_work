@@ -17,10 +17,10 @@ from tf_2_cign.utilities.utilities import Utilities
 
 class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
     def __init__(self, num_of_epochs, accuracy_mac_balance_coeff, model_loader, model_id, val_ratio,
-                 entropy_threshold_counts, num_of_gmm_components_per_block, image_output_path):
+                 entropy_threshold_counts, num_of_gmm_components_per_block, image_output_path, random_seed):
         self.numOfGmmComponentsPerBlock = num_of_gmm_components_per_block
         super().__init__(num_of_epochs, accuracy_mac_balance_coeff, model_loader, model_id, val_ratio,
-                         entropy_threshold_counts, image_output_path)
+                         entropy_threshold_counts, image_output_path, random_seed)
 
     def init_probability_distributions(self):
         assert len(self.entropyThresholdCounts) == len(self.pathCounts) - 1

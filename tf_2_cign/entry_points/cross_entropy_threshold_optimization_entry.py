@@ -38,5 +38,7 @@ if __name__ == "__main__":
                                                val_ratio=0.25,
                                                image_output_path=output_path,
                                                entropy_threshold_counts=[5, 5],
-                                               num_of_gmm_components_per_block=[2, 2])
+                                               num_of_gmm_components_per_block=[2, 2],
+                                               random_seed=10)
+    ce_search.run()
     print("X")

@@ -14,20 +14,24 @@ class SigmoidMixtureOfGaussians:
         self.numOfComponents = num_of_components
         self.lowEnd = low_end
         self.highEnd = high_end
+        self.isFitted = False
         self.gaussianMixture = GaussianMixture(n_components=self.numOfComponents,
                                                tol=1e-6, max_iter=10000)
 
     # OK
     def sample(self, num_of_samples):
         # Sample from Gaussian Mixture first
-        s = self.gaussianMixture.sample(n_samples=num_of_samples)[0]
-        s = s[:, 0]
-        s2 = 1.0 + np.exp(-s)
-        y = np.reciprocal(s2)
-        # Convert into target interval
-        a = self.lowEnd
-        b = self.highEnd
-        y_hat = (b - a) * y + a
+        if self.isFitted:
+            s = self.gaussianMixture.sample(n_samples=num_of_samples)[0]
+            s = s[:, 0]
+            s2 = 1.0 + np.exp(-s)
+            y = np.reciprocal(s2)
+            # Convert into target interval
+            a = self.lowEnd
+            b = self.highEnd
+            y_hat = (b - a) * y + a
+        else:
+            y_hat = np.random.uniform(low=self.lowEnd, high=self.highEnd, size=(num_of_samples,))
         return y_hat
 
     # OK
@@ -61,6 +65,7 @@ class SigmoidMixtureOfGaussians:
         y_hat = data / (1.0 - data)
         x = np.log(y_hat)
         self.gaussianMixture.fit(X=np.expand_dims(x, axis=-1))
+        self.isFitted = True
 
     def plot_distribution(self, show_plot=True, root_path=None):
         samples = self.sample(num_of_samples=1000000)
