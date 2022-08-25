@@ -217,7 +217,11 @@ class MultipathCombinationInfo(object):
         routing_decisions_arr = np.zeros(shape=(len(indices), sum(cigt.pathCounts[1:])), dtype=np.int32)
         curr_index = 0
         for block_id in range(len(cigt.pathCounts) - 1):
-            pass
+            routing_decisions_so_far = routing_decisions_arr[:, :curr_index]
+            index_arrays = [routing_decisions_so_far[:, col] for col in range(routing_decisions_so_far.shape[1])]
+            index_arrays.append(indices)
+            routing_probabilities_for_block = self.past_decisions_routing_probabilities_list[block_id][index_arrays]
+            print("X")
 
         # for block_id in range(len(cigt.pathCounts) - 1):
         #     self.combinations_routing_probabilities_dict

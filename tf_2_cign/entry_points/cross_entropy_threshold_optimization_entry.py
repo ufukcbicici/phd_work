@@ -24,9 +24,9 @@ if __name__ == "__main__":
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
     # requests.post("http://65.21.32.250:5000/api/get_images", data=json.dumps(
-    #     {"name": ["foo", "poo", "koo"]}))
+    #     [3, 5, 15]))
 
-    DbLogger.log_db_path = DbLogger.blackshark_desktop
+    DbLogger.log_db_path = DbLogger.home_asus
     output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                                "cigt", "image_outputs")
 
