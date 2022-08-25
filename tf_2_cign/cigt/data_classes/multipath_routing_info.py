@@ -220,8 +220,18 @@ class MultipathCombinationInfo(object):
             routing_decisions_so_far = routing_decisions_arr[:, :curr_index]
             index_arrays = [routing_decisions_so_far[:, col] for col in range(routing_decisions_so_far.shape[1])]
             index_arrays.append(indices)
-            routing_probabilities_for_block = self.past_decisions_routing_probabilities_list[block_id][index_arrays]
-            print("X")
+            routing_probabilities_for_block = \
+                self.past_decisions_routing_probabilities_list[block_id][index_arrays]
+            decision_array = np.zeros(shape=routing_probabilities_for_block.shape, dtype=routing_decisions_so_far.dtype)
+            decision_array[np.arange(routing_probabilities_for_block.shape[0]),
+                           np.argmax(routing_probabilities_for_block, axis=1)] = 1
+            routing_decisions_arr[:, curr_index:curr_index + decision_array.shape[1]] = decision_array
+            curr_index += cigt.pathCounts[block_id + 1]
+        idx_arr = np.concatenate([routing_decisions_arr, np.expand_dims(indices, axis=1)], axis=1)
+        idx_arr = [idx_arr[:, col] for col in range(idx_arr.shape[1])]
+        validity_vec = self.past_decisions_validity_array[idx_arr]
+        accuracy = np.mean(validity_vec)
+        print("Accuracy:{0}".format(accuracy))
 
         # for block_id in range(len(cigt.pathCounts) - 1):
         #     self.combinations_routing_probabilities_dict

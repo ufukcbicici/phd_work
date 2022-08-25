@@ -259,6 +259,8 @@ class FashionMnistLenetSigmoidNormCeSearh(FashionMnistLenetCrossEntropySearch):
         gamma = 0.01
         n_jobs = 8
         sample_counts = [int(sample_count / n_jobs) for _ in range(n_jobs)]
+        self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.valIndices)
+        self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
 
         e, p = self.sample_intervals(path_counts=self.pathCounts,
                                      entropy_interval_distributions=self.entropyIntervalDistributions,

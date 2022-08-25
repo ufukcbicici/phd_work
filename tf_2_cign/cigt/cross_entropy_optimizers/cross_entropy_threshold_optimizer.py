@@ -34,6 +34,8 @@ class CrossEntropySearchOptimizer(object):
         self.load_model_data()
         self.get_sorted_entropy_lists()
         self.init_probability_distributions()
+        self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=np.arange(self.totalSampleCount))
+        self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.valIndices)
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
 
     # Load routing information for the particular model
