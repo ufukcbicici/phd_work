@@ -18,19 +18,20 @@ from tf_2_cign.utilities.utilities import Utilities
 class CrossEntropySearchOptimizer(object):
     intermediate_outputs_path = os.path.join(os.path.dirname(__file__), "..", "intermediate_outputs")
 
-    def __init__(self, num_of_epochs, accuracy_mac_balance_coeff, model_loader,
+    def __init__(self, num_of_epochs, accuracy_weight, mac_weight, model_loader,
                  model_id, val_ratio,
-                 entropy_threshold_counts, image_output_path, random_seed, meta_data=""):
+                 entropy_threshold_counts, are_entropy_thresholds_fixed,
+                 image_output_path, random_seed):
         self.runId = DbLogger.get_run_id()
-        self.explanationString = self.get_explanation_string()
-        DbLogger.write_into_table(rows=[(self.runId, self.explanationString)], table=DbLogger.runMetaData)
         self.numOfEpochs = num_of_epochs
         self.randomSeed = random_seed
-        self.accuracyMacBalanceCoeff = accuracy_mac_balance_coeff
+        self.accuracyWeight = accuracy_weight
+        self.macWeight = mac_weight
         self.modelLoader = model_loader
         self.modelId = model_id
         self.valRatio = val_ratio
         self.entropyThresholdCounts = entropy_threshold_counts
+        self.areEntropyThresholdsFixed = are_entropy_thresholds_fixed
         self.imageOutputPath = image_output_path
         self.model, self.dataset = self.modelLoader.get_model(model_id=self.modelId)
         self.pathCounts = list(self.model.pathCounts)
@@ -46,6 +47,8 @@ class CrossEntropySearchOptimizer(object):
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=np.arange(self.totalSampleCount))
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.valIndices)
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
+        self.explanationString = self.get_explanation_string()
+        DbLogger.write_into_table(rows=[(self.runId, self.explanationString)], table=DbLogger.runMetaData)
 
     def add_explanation(self, name_of_param, value, explanation, kv_rows):
         explanation += "{0}:{1}\n".format(name_of_param, value)
@@ -64,6 +67,9 @@ class CrossEntropySearchOptimizer(object):
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="entropy_threshold_counts",
                                            value=self.entropyThresholdCounts,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="areEntropyThresholdsFixed",
+                                           value=self.areEntropyThresholdsFixed,
                                            explanation=explanation, kv_rows=kv_rows)
         return explanation
 
@@ -89,7 +95,7 @@ class CrossEntropySearchOptimizer(object):
         assert self.valIndices is not None
         for block_id in range(len(self.pathCounts) - 1):
             next_block_path_count = self.pathCounts[block_id + 1]
-            max_entropy = -np.log(1.0 / next_block_path_count)
+            max_entropy = np.asscalar(-np.log(1.0 / next_block_path_count))
             ents = []
             for list_of_entropies in self.multiPathInfoObject.combinations_routing_entropies_dict.values():
                 entropy_list = list_of_entropies[block_id][self.valIndices].tolist()
@@ -161,7 +167,8 @@ class CrossEntropySearchOptimizer(object):
                             list_of_entropy_thresholds,
                             list_of_probability_thresholds,
                             indices,
-                            balance_coeff,
+                            accuracy_coeff,
+                            mac_coeff,
                             use_numpy_approach=True):
         sample_paths = np.zeros(shape=(len(indices), 1), dtype=np.int32)
         sample_paths[:, 0] = indices
@@ -246,7 +253,7 @@ class CrossEntropySearchOptimizer(object):
         dif_vector = mac_vector * (1.0 / base_mac)
         dif_vector = dif_vector - 1.0
 
-        score_vector = balance_coeff * validity_vector - (1.0 - balance_coeff) * dif_vector
+        score_vector = accuracy_coeff * validity_vector + mac_coeff * dif_vector
 
         accuracy = np.mean(validity_vector)
         mean_mac = np.mean(dif_vector)
@@ -263,7 +270,8 @@ class CrossEntropySearchOptimizer(object):
         entropy_threshold_distributions = shared_objects[4]
         max_entropies = shared_objects[5]
         probability_threshold_distributions = shared_objects[6]
-        balance_coeff = shared_objects[7]
+        accuracy_weight = shared_objects[7]
+        mac_weight = shared_objects[8]
         samples_list = []
         for sample_id in tqdm(range(sample_count)):
             e, p = CrossEntropySearchOptimizer.sample_parameters(
@@ -279,7 +287,8 @@ class CrossEntropySearchOptimizer(object):
                 list_of_entropy_thresholds=e,
                 indices=val_indices,
                 use_numpy_approach=True,
-                balance_coeff=balance_coeff)
+                accuracy_coeff=accuracy_weight,
+                mac_coeff=mac_weight)
             test_accuracy, test_mean_mac, test_score = CrossEntropySearchOptimizer.measure_performance(
                 path_counts=path_counts,
                 multipath_routing_info_obj=multipath_routing_info_obj,
@@ -287,7 +296,8 @@ class CrossEntropySearchOptimizer(object):
                 list_of_entropy_thresholds=e,
                 indices=test_indices,
                 use_numpy_approach=True,
-                balance_coeff=balance_coeff)
+                accuracy_coeff=accuracy_weight,
+                mac_coeff=mac_weight)
             sample_dict = {
                 "sample_id": sample_id,
                 "entropy_intervals": e,
@@ -304,7 +314,7 @@ class CrossEntropySearchOptimizer(object):
 
     def run(self):
         epoch_count = 1000
-        sample_count = 100000
+        sample_count = 10000
         smoothing_coeff = 0.85
         gamma = 0.01
         n_jobs = 8
@@ -316,7 +326,8 @@ class CrossEntropySearchOptimizer(object):
                           self.entropyThresholdDistributions,
                           self.maxEntropies,
                           self.probabilityThresholdDistributions,
-                          self.accuracyMacBalanceCoeff)
+                          self.accuracyWeight,
+                          self.macWeight)
 
         percentile_count = int(gamma * sample_count)
 
@@ -324,7 +335,7 @@ class CrossEntropySearchOptimizer(object):
             # Single Thread
             if n_jobs == 1:
                 samples_list = CrossEntropySearchOptimizer.sample_and_evaluate(
-                    shared_objects=shared_objects, sample_count=100000
+                    shared_objects=shared_objects, sample_count=sample_count
                 )
             else:
                 with WorkerPool(n_jobs=n_jobs, shared_objects=shared_objects) as pool:
@@ -344,12 +355,16 @@ class CrossEntropySearchOptimizer(object):
             mean_test_acc = np.mean(test_accuracies)
             mean_val_mac = np.mean([d_["val_mean_mac"] for d_ in samples_sorted])
             mean_test_mac = np.mean([d_["test_mean_mac"] for d_ in samples_sorted])
+            mean_val_score = np.mean([d_["val_score"] for d_ in samples_sorted])
+            mean_test_score = np.mean([d_["test_score"] for d_ in samples_sorted])
 
             print("Epoch:{0} val_test_corr={1}".format(epoch_id, val_test_corr))
             print("Epoch:{0} mean_val_acc={1}".format(epoch_id, mean_val_acc))
             print("Epoch:{0} mean_test_acc={1}".format(epoch_id, mean_test_acc))
             print("Epoch:{0} mean_val_mac={1}".format(epoch_id, mean_val_mac))
             print("Epoch:{0} mean_test_mac={1}".format(epoch_id, mean_test_mac))
+            print("Epoch:{0} mean_val_score={1}".format(epoch_id, mean_val_score))
+            print("Epoch:{0} mean_test_score={1}".format(epoch_id, mean_test_score))
 
             samples_gamma = samples_sorted[0:percentile_count]
             val_accuracies_gamma = [d_["val_accuracy"] for d_ in samples_gamma]
@@ -359,12 +374,16 @@ class CrossEntropySearchOptimizer(object):
             mean_test_gamma_acc = np.mean(test_accuracies_gamma)
             mean_val_gamma_mac = np.mean([d_["val_mean_mac"] for d_ in samples_gamma])
             mean_test_gamma_mac = np.mean([d_["test_mean_mac"] for d_ in samples_gamma])
+            mean_val_gamma_score = np.mean([d_["val_score"] for d_ in samples_gamma])
+            mean_test_gamma_score = np.mean([d_["test_score"] for d_ in samples_gamma])
 
             print("Epoch:{0} val_test_gamma_corr={1}".format(epoch_id, val_test_gamma_corr))
             print("Epoch:{0} mean_val_gamma_acc={1}".format(epoch_id, mean_val_gamma_acc))
             print("Epoch:{0} mean_test_gamma_acc={1}".format(epoch_id, mean_test_gamma_acc))
             print("Epoch:{0} mean_val_gamma_mac={1}".format(epoch_id, mean_val_gamma_mac))
             print("Epoch:{0} mean_test_gamma_mac={1}".format(epoch_id, mean_test_gamma_mac))
+            print("Epoch:{0} mean_val_gamma_score={1}".format(epoch_id, mean_val_gamma_score))
+            print("Epoch:{0} mean_test_gamma_score={1}".format(epoch_id, mean_test_gamma_score))
 
             DbLogger.write_into_table(rows=
                                       [(self.runId,
@@ -379,7 +398,11 @@ class CrossEntropySearchOptimizer(object):
                                         np.asscalar(mean_test_gamma_acc),
                                         np.asscalar(mean_val_gamma_mac),
                                         np.asscalar(mean_test_gamma_mac),
-                                        self.modelId
+                                        self.modelId,
+                                        np.asscalar(mean_val_score),
+                                        np.asscalar(mean_test_score),
+                                        np.asscalar(mean_val_gamma_score),
+                                        np.asscalar(mean_test_gamma_score)
                                         )], table="ce_logs_table")
 
             routing_blocks_count = len(self.pathCounts) - 1

@@ -17,12 +17,13 @@ from tf_2_cign.utilities.utilities import Utilities
 
 
 class CategoricalCeThresholdOptimizer(CrossEntropySearchOptimizer):
-    def __init__(self, num_of_epochs, accuracy_mac_balance_coeff, model_loader, model_id, val_ratio,
-                 entropy_threshold_counts, image_output_path, random_seed, entropy_bins_count, probability_bins_count):
+    def __init__(self, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
+                 entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed,
+                 entropy_bins_count, probability_bins_count):
+        super().__init__(num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
+                         entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed)
         self.entropyBinsCount = entropy_bins_count
         self.probabilityBinsCount = probability_bins_count
-        super().__init__(num_of_epochs, accuracy_mac_balance_coeff, model_loader, model_id, val_ratio,
-                         entropy_threshold_counts, image_output_path, random_seed)
 
     def get_explanation_string(self):
         kv_rows = []
@@ -43,8 +44,8 @@ class CategoricalCeThresholdOptimizer(CrossEntropySearchOptimizer):
         # Prepare categorical distributions for each entropy level
         self.entropyThresholdDistributions = []
         self.probabilityThresholdDistributions = []
-        probability_thresholds = list([(1.0 / self.probabilityBinsCounts) * idx
-                                       for idx in range(self.probabilityBinsCounts)])
+        probability_thresholds = list([(1.0 / self.probabilityBinsCount) * idx
+                                       for idx in range(self.probabilityBinsCount)])
         for block_id in range(len(self.pathCounts) - 1):
             list_of_lists_of_entropies = Utilities.divide_array_into_chunks(
                 arr=self.listOfEntropiesSorted[block_id],

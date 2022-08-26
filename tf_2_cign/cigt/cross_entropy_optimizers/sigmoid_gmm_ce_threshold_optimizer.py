@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 
 from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
+from tf_2_cign.cigt.algorithms.constant_distribution import ConstantDistribution
 from tf_2_cign.cigt.algorithms.sigmoid_mixture_of_gaussians import SigmoidMixtureOfGaussians
 from tf_2_cign.cigt.cross_entropy_optimizers.cross_entropy_threshold_optimizer import CrossEntropySearchOptimizer
 from tf_2_cign.cigt.data_classes.multipath_routing_info import MultipathCombinationInfo
@@ -16,11 +17,12 @@ from tf_2_cign.utilities.utilities import Utilities
 
 
 class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
-    def __init__(self, num_of_epochs, accuracy_mac_balance_coeff, model_loader, model_id, val_ratio,
-                 entropy_threshold_counts, num_of_gmm_components_per_block, image_output_path, random_seed):
+    def __init__(self, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
+                 entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed,
+                 num_of_gmm_components_per_block):
         self.numOfGmmComponentsPerBlock = num_of_gmm_components_per_block
-        super().__init__(num_of_epochs, accuracy_mac_balance_coeff, model_loader, model_id, val_ratio,
-                         entropy_threshold_counts, image_output_path, random_seed)
+        super().__init__(num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
+                         entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed)
 
     def get_explanation_string(self):
         kv_rows = []
@@ -37,24 +39,31 @@ class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
     def init_probability_distributions(self):
         assert len(self.entropyThresholdCounts) == len(self.pathCounts) - 1
         for block_id in range(len(self.pathCounts) - 1):
-            entropy_chunks = Utilities.divide_array_into_chunks(arr=self.listOfEntropiesSorted[block_id],
-                                                                count=self.entropyThresholdCounts[block_id])
             n_gmm_components = self.numOfGmmComponentsPerBlock[block_id]
-
-            # Entropy distributions
             n_entropy_thresholds = self.entropyThresholdCounts[block_id]
             block_entropy_distributions = []
-            curr_lower_bound = 0.0
-            for entropy_threshold_id in range(n_entropy_thresholds):
-                curr_upper_bound = entropy_chunks[entropy_threshold_id][-1]
-                distribution = SigmoidMixtureOfGaussians(num_of_components=n_gmm_components,
-                                                         low_end=curr_lower_bound,
-                                                         high_end=curr_upper_bound)
-                curr_lower_bound = curr_upper_bound
-                block_entropy_distributions.append(distribution)
+            if not self.areEntropyThresholdsFixed:
+                entropy_chunks = Utilities.divide_array_into_chunks(arr=self.listOfEntropiesSorted[block_id],
+                                                                    count=self.entropyThresholdCounts[block_id])
+                # Entropy distributions
+                curr_lower_bound = 0.0
+                for entropy_threshold_id in range(n_entropy_thresholds):
+                    curr_upper_bound = entropy_chunks[entropy_threshold_id][-1]
+                    distribution = SigmoidMixtureOfGaussians(num_of_components=n_gmm_components,
+                                                             low_end=curr_lower_bound,
+                                                             high_end=curr_upper_bound)
+                    curr_lower_bound = curr_upper_bound
+                    block_entropy_distributions.append(distribution)
+            else:
+                entropy_chunks = Utilities.divide_array_into_chunks(arr=self.listOfEntropiesSorted[block_id],
+                                                                    count=self.entropyThresholdCounts[block_id] + 1)
+                for entropy_threshold_id in range(n_entropy_thresholds):
+                    distribution = ConstantDistribution(value=entropy_chunks[entropy_threshold_id][-1])
+                    block_entropy_distributions.append(distribution)
+
             self.entropyThresholdDistributions.append(block_entropy_distributions)
 
-            # Probability Threshold Distributions
+            # # Probability Threshold Distributions
             block_probability_threshold_distributions = []
             for probability_interval_id in range(n_entropy_thresholds + 1):
                 # A separate threshold for every route
@@ -65,5 +74,3 @@ class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
                     interval_distributions.append(distribution)
                 block_probability_threshold_distributions.append(interval_distributions)
             self.probabilityThresholdDistributions.append(block_probability_threshold_distributions)
-
-
