@@ -61,6 +61,8 @@ class CrossEntropySearchOptimizer(BayesianOptimizer):
         total_sample_count = list(total_sample_count)[0]
         val_sample_count = int(total_sample_count * self.valRatio)
         indices = np.arange(total_sample_count)
+        np.random.seed(31415)
+
         val_indices, test_indices = train_test_split(indices, train_size=val_sample_count)
         return total_sample_count, val_indices, test_indices
 

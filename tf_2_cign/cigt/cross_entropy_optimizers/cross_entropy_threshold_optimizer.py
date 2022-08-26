@@ -22,7 +22,8 @@ class CrossEntropySearchOptimizer(object):
                  model_id, val_ratio,
                  entropy_threshold_counts, image_output_path, random_seed, meta_data=""):
         self.runId = DbLogger.get_run_id()
-        DbLogger.write_into_table(rows=[(self.runId, meta_data)], table=DbLogger.runMetaData)
+        self.explanationString = self.get_explanation_string()
+        DbLogger.write_into_table(rows=[(self.runId, self.explanationString)], table=DbLogger.runMetaData)
         self.numOfEpochs = num_of_epochs
         self.randomSeed = random_seed
         self.accuracyMacBalanceCoeff = accuracy_mac_balance_coeff
@@ -45,6 +46,26 @@ class CrossEntropySearchOptimizer(object):
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=np.arange(self.totalSampleCount))
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.valIndices)
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
+
+    def add_explanation(self, name_of_param, value, explanation, kv_rows):
+        explanation += "{0}:{1}\n".format(name_of_param, value)
+        kv_rows.append((self.runId, name_of_param, "{0}".format(value)))
+        return explanation
+
+    def get_explanation_string(self):
+        kv_rows = []
+        explanation = ""
+        explanation = self.add_explanation(name_of_param="Model Id",
+                                           value=self.modelId,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Run Id", value=self.runId,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="Val Ratio", value=self.valRatio,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="entropy_threshold_counts",
+                                           value=self.entropyThresholdCounts,
+                                           explanation=explanation, kv_rows=kv_rows)
+        return explanation
 
     # Load routing information for the particular model
     def load_multipath_info(self):
@@ -286,7 +307,7 @@ class CrossEntropySearchOptimizer(object):
         sample_count = 100000
         smoothing_coeff = 0.85
         gamma = 0.01
-        n_jobs = 5
+        n_jobs = 8
         sample_counts = [int(sample_count / n_jobs) for _ in range(n_jobs)]
         shared_objects = (self.multiPathInfoObject,
                           self.valIndices,
@@ -357,7 +378,8 @@ class CrossEntropySearchOptimizer(object):
                                         np.asscalar(mean_val_gamma_acc),
                                         np.asscalar(mean_test_gamma_acc),
                                         np.asscalar(mean_val_gamma_mac),
-                                        np.asscalar(mean_test_gamma_mac)
+                                        np.asscalar(mean_test_gamma_mac),
+                                        self.modelId
                                         )], table="ce_logs_table")
 
             routing_blocks_count = len(self.pathCounts) - 1

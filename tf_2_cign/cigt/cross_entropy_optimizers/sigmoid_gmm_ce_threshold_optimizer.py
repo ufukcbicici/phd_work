@@ -22,6 +22,18 @@ class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
         super().__init__(num_of_epochs, accuracy_mac_balance_coeff, model_loader, model_id, val_ratio,
                          entropy_threshold_counts, image_output_path, random_seed)
 
+    def get_explanation_string(self):
+        kv_rows = []
+        explanation = ""
+        explanation += super().get_explanation_string()
+        explanation = self.add_explanation(name_of_param="Search Method",
+                                           value="SigmoidGmmCeThresholdOptimizer",
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="numOfGmmComponentsPerBlock",
+                                           value=self.numOfGmmComponentsPerBlock,
+                                           explanation=explanation, kv_rows=kv_rows)
+        return explanation
+
     def init_probability_distributions(self):
         assert len(self.entropyThresholdCounts) == len(self.pathCounts) - 1
         for block_id in range(len(self.pathCounts) - 1):
