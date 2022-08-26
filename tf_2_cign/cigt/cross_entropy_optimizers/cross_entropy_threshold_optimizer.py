@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 import os
 import time
-
+from tqdm import tqdm
 from mpire import WorkerPool
 from sklearn.model_selection import train_test_split
 
@@ -244,7 +244,7 @@ class CrossEntropySearchOptimizer(object):
         probability_threshold_distributions = shared_objects[6]
         balance_coeff = shared_objects[7]
         samples_list = []
-        for sample_id in range(sample_count):
+        for sample_id in tqdm(range(sample_count)):
             e, p = CrossEntropySearchOptimizer.sample_parameters(
                 path_counts=path_counts,
                 entropy_threshold_distributions=entropy_threshold_distributions,
@@ -300,14 +300,20 @@ class CrossEntropySearchOptimizer(object):
         percentile_count = int(gamma * sample_count)
 
         for epoch_id in range(epoch_count):
-            with WorkerPool(n_jobs=n_jobs, shared_objects=shared_objects) as pool:
-                results = pool.map(CrossEntropySearchOptimizer.sample_and_evaluate,
-                                   sample_counts, progress_bar=True)
-            print(results.__class__)
-            print(len(results))
-            samples_list = []
-            for res_arr in results:
-                samples_list.extend(res_arr)
+            # Single Thread
+            if n_jobs == 1:
+                samples_list = CrossEntropySearchOptimizer.sample_and_evaluate(
+                    shared_objects=shared_objects, sample_count=100000
+                )
+            else:
+                with WorkerPool(n_jobs=n_jobs, shared_objects=shared_objects) as pool:
+                    results = pool.map(CrossEntropySearchOptimizer.sample_and_evaluate,
+                                       sample_counts, progress_bar=True)
+                print(results.__class__)
+                print(len(results))
+                samples_list = []
+                for res_arr in results:
+                    samples_list.extend(res_arr)
 
             samples_sorted = sorted(samples_list, key=lambda d_: d_["val_score"], reverse=True)
             val_accuracies = [d_["val_accuracy"] for d_ in samples_sorted]
@@ -339,26 +345,73 @@ class CrossEntropySearchOptimizer(object):
             print("Epoch:{0} mean_val_gamma_mac={1}".format(epoch_id, mean_val_gamma_mac))
             print("Epoch:{0} mean_test_gamma_mac={1}".format(epoch_id, mean_test_gamma_mac))
 
+            DbLogger.write_into_table(rows=
+                                      [(self.runId,
+                                        epoch_id,
+                                        np.asscalar(val_test_corr),
+                                        np.asscalar(mean_val_acc),
+                                        np.asscalar(mean_test_acc),
+                                        np.asscalar(mean_val_mac),
+                                        np.asscalar(mean_test_mac),
+                                        np.asscalar(val_test_gamma_corr),
+                                        np.asscalar(mean_val_gamma_acc),
+                                        np.asscalar(mean_test_gamma_acc),
+                                        np.asscalar(mean_val_gamma_mac),
+                                        np.asscalar(mean_test_gamma_mac)
+                                        )], table="ce_logs_table")
+
             routing_blocks_count = len(self.pathCounts) - 1
             for block_id in range(routing_blocks_count):
                 # Entropy distributions
                 for entropy_threshold_id in range(len(self.entropyThresholdDistributions[block_id])):
+                    print("ML Block:{0} Entropy:{1}".format(block_id, entropy_threshold_id))
                     data = []
                     for d_ in samples_gamma:
                         assert len(d_["entropy_intervals"][block_id]) \
                                == len(self.entropyThresholdDistributions[block_id]) + 1
                         data.append(d_["entropy_intervals"][block_id][entropy_threshold_id])
                     self.entropyThresholdDistributions[block_id][entropy_threshold_id].maximum_likelihood_estimate(
-                        data=data, alpha=smoothing_coeff)
+                        data=np.array(data), alpha=smoothing_coeff)
                 # print("X")
                 # Probability distributions
                 probability_thresholds_for_block = []
                 for interval_id in range(len(self.entropyThresholdDistributions[block_id]) + 1):
                     interval_threshold_distributions = self.probabilityThresholdDistributions[block_id][interval_id]
                     for path_id in range(len(interval_threshold_distributions)):
+                        print("ML Block:{0} Interval:{1} Path:{2}".format(block_id, interval_id, path_id))
                         data = []
                         for d_ in samples_gamma:
                             data.append(d_["probability_thresholds"][block_id][interval_id, path_id])
                         self.probabilityThresholdDistributions[block_id][
-                            interval_id, path_id].maximum_likelihood_estimate(data=data, alpha=smoothing_coeff)
+                            interval_id][path_id].maximum_likelihood_estimate(data=np.array(data),
+                                                                              alpha=smoothing_coeff)
         print("X")
+
+    # CREATE
+    # TABLE
+    # "ce_logs_table"(
+    #     "run_id"
+    # INTEGER,
+    # "epoch"
+    # INTEGER,
+    # "val_test_corr"
+    # NUMERIC,
+    # "mean_val_acc"
+    # NUMERIC,
+    # "mean_test_acc"
+    # NUMERIC,
+    # "mean_val_mac"
+    # NUMERIC,
+    # "mean_test_mac"
+    # NUMERIC,
+    # "val_test_gamma_corr"
+    # NUMERIC,
+    # "mean_val_gamma_acc"
+    # NUMERIC,
+    # "mean_test_gamma_acc"
+    # NUMERIC,
+    # "mean_val_gamma_mac"
+    # NUMERIC,
+    # "mean_test_gamma_mac"
+    # NUMERIC
+    # )
