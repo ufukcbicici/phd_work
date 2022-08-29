@@ -52,7 +52,7 @@ class CigtGumbelSoftmaxDecisionLayer(CigtDecisionLayer):
             y_hard = tf.one_hot(tf.argmax(y, axis=1), path_count, dtype=tf.float32)
             y = tf.stop_gradient(y_hard - y) + y
             routing_probabilities = y
-        return ig_value, z_expected, routing_probabilities
+        return ig_value, z_expected, routing_probabilities, activations
 
         # routing_probabilities = self.gsLayer([logits, temperature, 1], training=training)
         # routing_probabilities = tf.squeeze(routing_probabilities)

@@ -59,6 +59,6 @@ class LeNetCigtInnerBlock(InnerCigtBlock):
         h_net = self.decisionDropoutLayer(h_net)
 
         # Decision layer
-        ig_value, ig_activations_this, routing_probabilities = \
+        ig_value, ig_activations_this, routing_probabilities, raw_activations = \
             self.cigtDecisionLayer([h_net, labels, temperature], training=training)
-        return f_net, ig_value, ig_activations_this, routing_probabilities
+        return f_net, ig_value, ig_activations_this, routing_probabilities, raw_activations

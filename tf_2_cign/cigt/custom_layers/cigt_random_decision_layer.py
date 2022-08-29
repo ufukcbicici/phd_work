@@ -26,4 +26,4 @@ class CigtRandomDecisionLayer(CigtDecisionLayer):
         activations = self.decisionActivationsLayer(h_net_normed)
 
         random_activations = tf.random.uniform(shape=tf.shape(activations), dtype=activations.dtype)
-        return 0.0, random_activations, random_activations
+        return 0.0, random_activations, random_activations, random_activations

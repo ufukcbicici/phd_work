@@ -25,6 +25,7 @@ class MultipathCombinationInfo(object):
         self.combinations_y_hat_dict = {}
         self.combinations_routing_probabilities_dict = {}
         self.combinations_routing_entropies_dict = {}
+        self.combinations_routing_activations_dict = {}
         self.decisions_per_level = []
         for path_count in path_counts[1:]:
             decision_arrays = [[0, 1] for _ in range(path_count)]
@@ -37,8 +38,10 @@ class MultipathCombinationInfo(object):
                                                 for dc in self.decision_combinations_per_level]
         self.past_decisions_entropies_dict = {}
         self.past_decisions_routing_probabilities_dict = {}
+        self.past_decisions_routing_activations_dict = {}
         self.past_decisions_entropies_list = []
         self.past_decisions_routing_probabilities_list = []
+        self.past_decisions_routing_activations_list = []
         self.past_decisions_validity_array = None
         self.past_decisions_mac_array = None
 
@@ -97,6 +100,13 @@ class MultipathCombinationInfo(object):
                     assert np.allclose(mean_probabilities, self.combinations_routing_probabilities_dict[p_][block_id])
                 self.past_decisions_routing_probabilities_dict[k] = mean_probabilities
 
+                all_raw_activations = np.stack(
+                    [self.combinations_routing_activations_dict[p_][block_id] for p_ in v], axis=-1)
+                mean_activations = np.mean(all_raw_activations, axis=-1)
+                for p_ in v:
+                    assert np.allclose(mean_activations, self.combinations_routing_activations_dict[p_][block_id])
+                self.past_decisions_routing_activations_dict[k] = mean_activations
+
             past_decisions_entropies_arr_shape = np.concatenate([
                 np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
                 np.array([total_sample_count], dtype=np.int32)], dtype=np.int32)
@@ -115,6 +125,16 @@ class MultipathCombinationInfo(object):
             for k, v in self.past_decisions_routing_probabilities_dict.items():
                 if len(k) == past_routes[block_id]:
                     self.past_decisions_routing_probabilities_list[block_id][k] = v
+
+            past_decisions_raw_activations_arr_shape = np.concatenate([
+                np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
+                np.array([total_sample_count, route_count], dtype=np.int32)], dtype=np.int32)
+            past_decisions_raw_activations_arr = np.zeros(shape=past_decisions_raw_activations_arr_shape,
+                                                          dtype=np.float)
+            self.past_decisions_routing_activations_list.append(past_decisions_raw_activations_arr)
+            for k, v in self.past_decisions_routing_activations_dict.items():
+                if len(k) == past_routes[block_id]:
+                    self.past_decisions_routing_activations_list[block_id][k] = v
 
             past_routes.append(route_count)
 
@@ -166,15 +186,20 @@ class MultipathCombinationInfo(object):
         self.combinations_y_dict[decision_combination] = []
         self.combinations_y_hat_dict[decision_combination] = []
         self.combinations_routing_probabilities_dict[decision_combination] = []
+        self.combinations_routing_activations_dict[decision_combination] = []
         self.combinations_routing_entropies_dict[decision_combination] = []
         for _ in range(len(self.pathCounts) - 1):
             self.combinations_routing_probabilities_dict[decision_combination].append([])
+            self.combinations_routing_activations_dict[decision_combination].append([])
 
-    def add_network_outputs(self, decision_combination, y_np, logits_np, routing_probabilities_list):
+    def add_network_outputs(self, decision_combination, y_np, logits_np, routing_probabilities_list,
+                            raw_activations_list):
         self.combinations_y_dict[decision_combination].append(y_np)
         self.combinations_y_hat_dict[decision_combination].append(logits_np)
         for block_id, arr in enumerate(routing_probabilities_list):
             self.combinations_routing_probabilities_dict[decision_combination][block_id].append(arr.numpy())
+        for block_id, arr in enumerate(raw_activations_list):
+            self.combinations_routing_activations_dict[decision_combination][block_id].append(arr.numpy())
 
     def concat_data(self, decision_combination):
         self.combinations_y_dict[decision_combination] = np.concatenate(
@@ -189,6 +214,10 @@ class MultipathCombinationInfo(object):
                 Utilities.calculate_entropies(self.combinations_routing_probabilities_dict[
                                                   decision_combination][block_id]))
 
+        for block_id in range(len(self.combinations_routing_activations_dict[decision_combination])):
+            self.combinations_routing_activations_dict[decision_combination][block_id] = \
+                np.concatenate(self.combinations_routing_activations_dict[decision_combination][block_id], axis=0)
+
     def fill_data_buffers_for_combination(self, cigt, dataset, decision_combination):
         for x_, y_ in dataset:
             results_dict = cigt.call(inputs=[x_, y_,
@@ -197,7 +226,8 @@ class MultipathCombinationInfo(object):
             self.add_network_outputs(decision_combination=decision_combination,
                                      y_np=y_.numpy(),
                                      logits_np=results_dict["logits"].numpy(),
-                                     routing_probabilities_list=results_dict["routing_probabilities"])
+                                     routing_probabilities_list=results_dict["routing_probabilities"],
+                                     raw_activations_list=results_dict["list_of_pure_activations"])
         self.concat_data(decision_combination=decision_combination)
 
     def assess_accuracy(self):
