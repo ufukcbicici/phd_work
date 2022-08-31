@@ -138,6 +138,25 @@ class MultipathCombinationInfo(object):
 
             past_routes.append(route_count)
 
+        # Compare routing activations and routing probabilities; on which percentage they agree on.
+        # For Gumbel-Softmax this can be lower than %100 I presume.
+        assert set([k for k in self.past_decisions_routing_activations_dict.keys()]) \
+               == set([k for k in self.past_decisions_routing_probabilities_dict.keys()])
+        block_count_cumulative = 0
+        for block_id, route_count in enumerate(cigt.pathCounts[1:]):
+            for k in self.past_decisions_routing_activations_dict.keys():
+                if len(k) == block_count_cumulative:
+                    actv = self.past_decisions_routing_activations_list[block_id][k]
+                    prob = self.past_decisions_routing_probabilities_list[block_id][k]
+                    actv_route_ids = np.argmax(actv, axis=1)
+                    prob_route_ids = np.argmax(prob, axis=1)
+                    match_ratio = np.mean(actv_route_ids == prob_route_ids)
+                    is_close_check_arr = np.isclose(prob, np.exp(actv) / np.sum(np.exp(actv), axis=1)[:, np.newaxis])
+                    close_ratio = np.sum(is_close_check_arr) / np.prod(is_close_check_arr.shape)
+                    print("Block id:{0} Past decisions:{1} Match Ratio:{2}".format(block_id, k, match_ratio))
+                    print("Activations and Probabilities close ratio:{0}".format(close_ratio))
+            block_count_cumulative += route_count
+
         past_decisions_validity_array_shape = np.concatenate([
             np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
             np.array([total_sample_count], dtype=np.int32)], dtype=np.int32)
