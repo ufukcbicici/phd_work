@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -14,6 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 #     sample_count: int
 #     sample_configurations: Dict[int, tuple]
 #     entropy_orderings: List[List[tuple]]
+from tf_2_cign.cigt.algorithms.softmax_temperature_optimizer import SoftmaxTemperatureOptimizer
 from tf_2_cign.utilities.utilities import Utilities
 
 
@@ -27,6 +29,7 @@ class MultipathCombinationInfo(object):
         self.combinations_routing_entropies_dict = {}
         self.combinations_routing_activations_dict = {}
         self.decisions_per_level = []
+        self.maxEntropies = []
         for path_count in path_counts[1:]:
             decision_arrays = [[0, 1] for _ in range(path_count)]
             decision_combinations = Utilities.get_cartesian_product(list_of_lists=decision_arrays)
@@ -44,6 +47,81 @@ class MultipathCombinationInfo(object):
         self.past_decisions_routing_activations_list = []
         self.past_decisions_validity_array = None
         self.past_decisions_mac_array = None
+        self.softmaxTemperatureOptimizer = SoftmaxTemperatureOptimizer(multi_path_object=self)
+        self.optimalTemperatures = []
+        # self.sortedOriginalEntropies = self.get_sorted_entropy_lists()
+
+    def get_sorted_entropy_lists(self):
+        sorted_entropies_list = []
+        for block_id in range(len(self.pathCounts) - 1):
+            next_block_path_count = self.pathCounts[block_id + 1]
+            max_entropy = np.asscalar(-np.log(1.0 / next_block_path_count))
+            ents = []
+            for list_of_entropies in self.combinations_routing_entropies_dict.values():
+                entropy_list = list_of_entropies[block_id].tolist()
+                ents.extend(entropy_list)
+            ents.append(max_entropy)
+            self.maxEntropies.append(max_entropy)
+            ents = list(set(ents))
+            entropies_sorted = sorted(ents)
+            sorted_entropies_list.append(entropies_sorted)
+        return sorted_entropies_list
+
+    def optimize_temperatures(self):
+        optimal_temperatures = []
+        for block_id in range(len(self.pathCounts)-1):
+            # self.plot_entropy_histogram_current(block_id=block_id)
+            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1.0)
+            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=10.0)
+            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=100.0)
+            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1000.0)
+            optimal_temp = self.softmaxTemperatureOptimizer.run(block_id=0)
+            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=optimal_temp)
+            optimal_temperatures.append(optimal_temp)
+        return optimal_temperatures
+
+    def plot_entropy_histogram_with_temperature(self, temperature, block_id):
+        # routing_arrs_for_block = []
+        # n_past_decisions = sum(self.pathCounts[1:][:block_id])
+        # for k, v in self.past_decisions_routing_activations_dict.items():
+        #     if len(k) == n_past_decisions:
+        #         routing_arrs_for_block.append(v)
+
+        activations_dict = self.get_routing_activations_for_block(block_id)
+        routing_arrs_for_block = list(activations_dict.values())
+        routing_arrs_for_block = np.concatenate(routing_arrs_for_block, axis=0).astype(np.float64)
+        routing_arrs_for_block_tempered = routing_arrs_for_block / temperature
+        routing_probs = tf.nn.softmax(routing_arrs_for_block_tempered).numpy()
+        # routing_probs = np.exp(
+        #     routing_arrs_for_block_tempered) / np.sum(np.exp(routing_arrs_for_block_tempered), axis=1)[:, np.newaxis]
+        entropies = Utilities.calculate_entropies(routing_probs)
+        fig, ax = plt.subplots(1, 1)
+        ax.set_title("Block {0} entropy with temperature:{1}".format(block_id, temperature))
+        ax.hist(entropies, density=False, histtype='stepfilled', alpha=1.0, bins=100, range=(
+            0, self.maxEntropies[block_id]))
+        ax.legend(loc='best', frameon=False)
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+
+    def plot_entropy_histogram_current(self, block_id):
+        combinations_set = set()
+        for combination in self.decision_combinations_per_level:
+            combinations_set.add(combination[0:sum(self.pathCounts[1:][:block_id])])
+
+        entropies = []
+        for k in combinations_set:
+            entropies.append(self.past_decisions_entropies_list[block_id][k])
+        entropies = np.concatenate(entropies)
+
+        fig, ax = plt.subplots(1, 1)
+        ax.set_title("Block {0} entropy with current temperature".format(block_id))
+        ax.hist(entropies, density=False, histtype='stepfilled', alpha=1.0, bins=100, range=(
+            0, self.maxEntropies[block_id]))
+        ax.legend(loc='best', frameon=False)
+        plt.tight_layout()
+        plt.show()
+        plt.close()
 
     def get_total_sample_count(self):
         total_sample_count = set()
@@ -61,7 +139,29 @@ class MultipathCombinationInfo(object):
         total_sample_count = list(total_sample_count)[0]
         return total_sample_count
 
+    def get_routing_activations_for_block(self, block_id):
+        n_past_routes = sum(self.pathCounts[1:][:block_id])
+        dict_distinct_past_decisions = {}
+        activations_dict = {}
+
+        for combination in self.decision_combinations_per_level:
+            past_route = combination[:n_past_routes]
+            if past_route not in dict_distinct_past_decisions:
+                dict_distinct_past_decisions[past_route] = []
+            dict_distinct_past_decisions[past_route].append(combination)
+        for k, v in dict_distinct_past_decisions.items():
+            all_raw_activations = np.stack(
+                [self.combinations_routing_activations_dict[p_][block_id] for p_ in v], axis=-1)
+            mean_activations = np.mean(all_raw_activations, axis=-1)
+            for p_ in v:
+                assert np.allclose(mean_activations, self.combinations_routing_activations_dict[p_][block_id])
+            activations_dict[k] = mean_activations
+        return activations_dict
+
     def generate_routing_info(self, cigt, dataset):
+        for n_paths in self.pathCounts[1:]:
+            self.maxEntropies.append(np.asscalar(-np.log(1.0 / n_paths)))
+
         for decision_combination in tqdm(self.decision_combinations_per_level):
             self.add_new_combination(decision_combination=decision_combination)
 
@@ -72,6 +172,18 @@ class MultipathCombinationInfo(object):
 
             self.fill_data_buffers_for_combination(cigt=cigt, dataset=dataset,
                                                    decision_combination=decision_combination)
+        # Correct routing probabilities for the temperature if it has been provided:
+        self.optimalTemperatures = self.optimize_temperatures()
+
+        # Correction for correct activation temperatures
+        for decision_combination in tqdm(self.decision_combinations_per_level):
+            for block_id in range(len(self.combinations_routing_activations_dict[decision_combination])):
+                routing_activations = self.combinations_routing_activations_dict[decision_combination][block_id]
+                routing_arrs_for_block_tempered = routing_activations / self.optimalTemperatures[block_id]
+                routing_probs = tf.nn.softmax(routing_arrs_for_block_tempered).numpy()
+                self.combinations_routing_probabilities_dict[decision_combination][block_id] = routing_probs
+                self.combinations_routing_entropies_dict[decision_combination][block_id] = \
+                    Utilities.calculate_entropies(routing_probs)
 
         past_routes = [0]
         total_sample_count = self.get_total_sample_count()
@@ -218,7 +330,8 @@ class MultipathCombinationInfo(object):
         for block_id, arr in enumerate(routing_probabilities_list):
             self.combinations_routing_probabilities_dict[decision_combination][block_id].append(arr.numpy())
         for block_id, arr in enumerate(raw_activations_list):
-            self.combinations_routing_activations_dict[decision_combination][block_id].append(arr.numpy())
+            self.combinations_routing_activations_dict[decision_combination][block_id].append(
+                arr.numpy().astype(np.float64))
 
     def concat_data(self, decision_combination):
         self.combinations_y_dict[decision_combination] = np.concatenate(

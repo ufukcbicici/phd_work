@@ -42,8 +42,6 @@ class CrossEntropySearchOptimizer(object):
         self.entropyThresholdDistributions = []
         self.probabilityThresholdDistributions = []
         self.multiPathInfoObject = self.load_multipath_info()
-        self.softmaxTemperatureOptimizer = SoftmaxTemperatureOptimizer(multi_path_object=self.multiPathInfoObject)
-        self.softmaxTemperatureOptimizer.plot_entropy_histogram_with_temperature(temperature=1.0, block_id=0)
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
         self.get_sorted_entropy_lists()
         self.init_probability_distributions()
@@ -77,7 +75,7 @@ class CrossEntropySearchOptimizer(object):
         return explanation
 
     # Load routing information for the particular model
-    def load_multipath_info(self):
+    def load_multipath_info(self, temperature=None):
         object_folder_path = os.path.join(CrossEntropySearchOptimizer.intermediate_outputs_path,
                                           "{0}".format(self.modelId))
         object_path = os.path.join(object_folder_path, "multipath_info_object.pkl")
