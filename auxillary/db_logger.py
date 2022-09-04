@@ -40,6 +40,7 @@ class DbLogger:
     truba_sigma = "/truba/home/seberger/main/repo/phd_work/cigt_logger.db"
     paperspace = "/notebooks/cigt_logger.db"
     blackshark_desktop = "/home/ubicici/personal_stuff/phd_work/dblogger.db"
+    blackshark_laptop = "/home/ubicici/Desktop/phd_work/dblogger.db"
 
     log_db_path = None
 

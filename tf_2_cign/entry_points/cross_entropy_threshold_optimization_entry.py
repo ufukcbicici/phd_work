@@ -20,7 +20,7 @@ from tf_2_cign.cigt.cross_entropy_optimizers.cross_entropy_threshold_optimizer i
 from tf_2_cign.cigt.cross_entropy_optimizers.sigmoid_gmm_ce_threshold_optimizer import SigmoidGmmCeThresholdOptimizer
 from tf_2_cign.cigt.model_loaders.fmnist_lenet_pretrained_model_loader import FmnistLenetPretrainedModelLoader
 
-DbLogger.log_db_path = DbLogger.home_asus
+DbLogger.log_db_path = DbLogger.blackshark_laptop
 output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                            "cigt", "image_outputs")
 
@@ -46,7 +46,7 @@ def run_categorical_ce():
     model_loader = FmnistLenetPretrainedModelLoader()
     ce_search = CategoricalCeThresholdOptimizer(num_of_epochs=100,
                                                 accuracy_weight=1.0,
-                                                mac_weight=1.0,
+                                                mac_weight=0.0,
                                                 model_loader=model_loader,
                                                 model_id=424,
                                                 val_ratio=0.5,

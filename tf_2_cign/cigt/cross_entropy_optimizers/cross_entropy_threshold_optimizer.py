@@ -315,7 +315,7 @@ class CrossEntropySearchOptimizer(object):
 
     def run(self):
         epoch_count = 1000
-        sample_count = 10000
+        sample_count = 100000
         smoothing_coeff = 0.85
         gamma = 0.01
         n_jobs = 8

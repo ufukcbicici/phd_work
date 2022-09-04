@@ -20,10 +20,10 @@ class CategoricalCeThresholdOptimizer(CrossEntropySearchOptimizer):
     def __init__(self, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
                  entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed,
                  entropy_bins_count, probability_bins_count):
-        super().__init__(num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
-                         entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed)
         self.entropyBinsCount = entropy_bins_count
         self.probabilityBinsCount = probability_bins_count
+        super().__init__(num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
+                         entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed)
 
     def get_explanation_string(self):
         kv_rows = []

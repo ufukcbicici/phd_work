@@ -68,16 +68,18 @@ class MultipathCombinationInfo(object):
         return sorted_entropies_list
 
     def optimize_temperatures(self):
-        optimal_temperatures = []
-        for block_id in range(len(self.pathCounts)-1):
-            # self.plot_entropy_histogram_current(block_id=block_id)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1.0)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=10.0)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=100.0)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1000.0)
-            optimal_temp = self.softmaxTemperatureOptimizer.run(block_id=0)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=optimal_temp)
-            optimal_temperatures.append(optimal_temp)
+        optimal_temperatures = [1.0, 1.0]
+        # for block_id in range(len(self.pathCounts)-1):
+        #     # self.plot_entropy_histogram_current(block_id=block_id)
+        #     self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1.0)
+        #     self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=10.0)
+        #     self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=20.0)
+        #     self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=50.0)
+        #     self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=100.0)
+        #     self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1000.0)
+        #     optimal_temp = self.softmaxTemperatureOptimizer.run(block_id=block_id)
+        #     self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=optimal_temp)
+        #     optimal_temperatures.append(optimal_temp)
         return optimal_temperatures
 
     def plot_entropy_histogram_with_temperature(self, temperature, block_id):
@@ -172,18 +174,18 @@ class MultipathCombinationInfo(object):
 
             self.fill_data_buffers_for_combination(cigt=cigt, dataset=dataset,
                                                    decision_combination=decision_combination)
-        # Correct routing probabilities for the temperature if it has been provided:
-        self.optimalTemperatures = self.optimize_temperatures()
-
-        # Correction for correct activation temperatures
-        for decision_combination in tqdm(self.decision_combinations_per_level):
-            for block_id in range(len(self.combinations_routing_activations_dict[decision_combination])):
-                routing_activations = self.combinations_routing_activations_dict[decision_combination][block_id]
-                routing_arrs_for_block_tempered = routing_activations / self.optimalTemperatures[block_id]
-                routing_probs = tf.nn.softmax(routing_arrs_for_block_tempered).numpy()
-                self.combinations_routing_probabilities_dict[decision_combination][block_id] = routing_probs
-                self.combinations_routing_entropies_dict[decision_combination][block_id] = \
-                    Utilities.calculate_entropies(routing_probs)
+        # # Correct routing probabilities for the temperature if it has been provided:
+        # self.optimalTemperatures = self.optimize_temperatures()
+        #
+        # # Correction for correct activation temperatures
+        # for decision_combination in tqdm(self.decision_combinations_per_level):
+        #     for block_id in range(len(self.combinations_routing_activations_dict[decision_combination])):
+        #         routing_activations = self.combinations_routing_activations_dict[decision_combination][block_id]
+        #         routing_arrs_for_block_tempered = routing_activations / self.optimalTemperatures[block_id]
+        #         routing_probs = tf.nn.softmax(routing_arrs_for_block_tempered).numpy()
+        #         self.combinations_routing_probabilities_dict[decision_combination][block_id] = routing_probs
+        #         self.combinations_routing_entropies_dict[decision_combination][block_id] = \
+        #             Utilities.calculate_entropies(routing_probs)
 
         past_routes = [0]
         total_sample_count = self.get_total_sample_count()
