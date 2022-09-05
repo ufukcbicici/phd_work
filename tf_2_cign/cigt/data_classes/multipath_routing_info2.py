@@ -181,7 +181,7 @@ class MultipathCombinationInfo2(object):
                 routing_activations = self.combinations_routing_activations_dict[decision_combination][block_id]
                 routing_arrs_for_block_tempered = routing_activations / self.optimalTemperatures[block_id]
                 routing_probs = tf.nn.softmax(routing_arrs_for_block_tempered).numpy()
-                self.combinations_routing_probabilities_dict[decision_combination][block_id] = routing_probs
+                # self.combinations_routing_probabilities_dict[decision_combination][block_id] = routing_probs
                 self.combinations_routing_entropies_dict[decision_combination][block_id] = \
                     Utilities.calculate_entropies(routing_probs)
 

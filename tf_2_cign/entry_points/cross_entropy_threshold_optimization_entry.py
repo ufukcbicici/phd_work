@@ -21,7 +21,7 @@ from tf_2_cign.cigt.cross_entropy_optimizers.high_entropy_threshold_optimizer im
 from tf_2_cign.cigt.cross_entropy_optimizers.sigmoid_gmm_ce_threshold_optimizer import SigmoidGmmCeThresholdOptimizer
 from tf_2_cign.cigt.model_loaders.fmnist_lenet_pretrained_model_loader import FmnistLenetPretrainedModelLoader
 
-DbLogger.log_db_path = DbLogger.home_asus
+DbLogger.log_db_path = DbLogger.blackshark_desktop
 output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                            "cigt", "image_outputs")
 
@@ -82,4 +82,4 @@ if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
 
-    high_entropy_ce()
+    run_sigmoid_gmm_ce()

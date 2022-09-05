@@ -359,7 +359,7 @@ class CrossEntropySearchOptimizer(object):
         sample_count = 10000
         smoothing_coeff = 0.85
         gamma = 0.01
-        n_jobs = 1
+        n_jobs = 8
         sample_counts = [int(sample_count / n_jobs) for _ in range(n_jobs)]
         shared_objects = (self.multiPathInfoObject,
                           self.valIndices,
