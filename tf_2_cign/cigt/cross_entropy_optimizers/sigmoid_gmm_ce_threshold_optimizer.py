@@ -18,11 +18,14 @@ from tf_2_cign.utilities.utilities import Utilities
 
 class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
     def __init__(self, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
-                 entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed,
+                 entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed, n_jobs,
+                 apply_temperature_optimization_to_entropies, apply_temperature_optimization_to_routing_probabilities,
                  num_of_gmm_components_per_block):
         self.numOfGmmComponentsPerBlock = num_of_gmm_components_per_block
         super().__init__(num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
-                         entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed)
+                         entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed, n_jobs,
+                         apply_temperature_optimization_to_entropies,
+                         apply_temperature_optimization_to_routing_probabilities)
 
     def get_explanation_string(self):
         kv_rows = []
@@ -34,6 +37,7 @@ class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
         explanation = self.add_explanation(name_of_param="numOfGmmComponentsPerBlock",
                                            value=self.numOfGmmComponentsPerBlock,
                                            explanation=explanation, kv_rows=kv_rows)
+        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         return explanation
 
     def init_probability_distributions(self):

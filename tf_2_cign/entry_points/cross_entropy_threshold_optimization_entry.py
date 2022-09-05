@@ -1,5 +1,5 @@
 import os.path
-
+import numpy as np
 import tensorflow as tf
 import json
 import requests
@@ -26,6 +26,33 @@ output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "t
                            "cigt", "image_outputs")
 
 model_ids = [506, 86, 79, 113, 583, 751, 407, 166, 47, 610]
+entropy_threshold_counts = [1, 3, 5, 7, 9]
+gmm_mode_counts = [2, 3]
+
+
+def run_on_model(model_id, apply_temperature_to_routing):
+    run_count = 30
+    model_loader = FmnistLenetPretrainedModelLoader()
+    seeds = np.random.randint(low=0, high=1000000, size=(run_count,))
+    for seed in seeds:
+        for entropy_threshold_count in entropy_threshold_counts:
+            for gmm_mode_count in gmm_mode_counts:
+                ce_search = SigmoidGmmCeThresholdOptimizer(
+                    num_of_epochs=300,
+                    accuracy_weight=1.0,
+                    mac_weight=0.0,
+                    model_loader=model_loader,
+                    model_id=model_id,
+                    val_ratio=0.5,
+                    image_output_path=output_path,
+                    entropy_threshold_counts=[entropy_threshold_count, entropy_threshold_count],
+                    num_of_gmm_components_per_block=[gmm_mode_count, gmm_mode_count],
+                    random_seed=seed,
+                    are_entropy_thresholds_fixed=False,
+                    n_jobs=8,
+                    apply_temperature_optimization_to_routing_probabilities=apply_temperature_to_routing,
+                    apply_temperature_optimization_to_entropies=True)
+                ce_search.run()
 
 
 def high_entropy_ce():
@@ -48,17 +75,20 @@ def high_entropy_ce():
 
 def run_sigmoid_gmm_ce():
     model_loader = FmnistLenetPretrainedModelLoader()
-    ce_search = SigmoidGmmCeThresholdOptimizer(num_of_epochs=100,
+    ce_search = SigmoidGmmCeThresholdOptimizer(num_of_epochs=300,
                                                accuracy_weight=1.0,
                                                mac_weight=0.0,
                                                model_loader=model_loader,
-                                               model_id=424,
-                                               val_ratio=0.5,
+                                               model_id=610,
+                                               val_ratio=0.25,
                                                image_output_path=output_path,
-                                               entropy_threshold_counts=[5, 5],
+                                               entropy_threshold_counts=[2, 2],
                                                num_of_gmm_components_per_block=[2, 2],
-                                               random_seed=10,
-                                               are_entropy_thresholds_fixed=False)
+                                               random_seed=966,
+                                               are_entropy_thresholds_fixed=False,
+                                               n_jobs=8,
+                                               apply_temperature_optimization_to_routing_probabilities=False,
+                                               apply_temperature_optimization_to_entropies=True)
     ce_search.run()
     print("X")
 

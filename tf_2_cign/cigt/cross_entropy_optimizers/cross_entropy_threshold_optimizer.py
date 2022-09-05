@@ -23,10 +23,16 @@ class CrossEntropySearchOptimizer(object):
     def __init__(self, num_of_epochs, accuracy_weight, mac_weight, model_loader,
                  model_id, val_ratio,
                  entropy_threshold_counts, are_entropy_thresholds_fixed,
-                 image_output_path, random_seed):
+                 image_output_path, random_seed, n_jobs,
+                 apply_temperature_optimization_to_entropies,
+                 apply_temperature_optimization_to_routing_probabilities):
         self.runId = DbLogger.get_run_id()
         self.numOfEpochs = num_of_epochs
         self.randomSeed = random_seed
+        self.nJobs = n_jobs
+        self.applyTemperatureOptimizationToEntropies = apply_temperature_optimization_to_entropies
+        self.applyTemperatureOptimizationToRoutingProbabilities \
+            = apply_temperature_optimization_to_routing_probabilities
         self.accuracyWeight = accuracy_weight
         self.macWeight = mac_weight
         self.modelLoader = model_loader
@@ -49,9 +55,11 @@ class CrossEntropySearchOptimizer(object):
         self.get_sorted_entropy_lists()
         self.init_probability_distributions()
         self.high_entropy_error_analysis(indices=np.arange(self.totalSampleCount))
-        self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=np.arange(self.totalSampleCount))
-        self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.valIndices)
-        self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
+        self.totalAccuracy = self.multiPathInfoObject.get_default_accuracy(cigt=self.model,
+                                                                           indices=np.arange(self.totalSampleCount))
+        self.validationAccuracy = self.multiPathInfoObject.get_default_accuracy(cigt=self.model,
+                                                                                indices=self.valIndices)
+        self.testAccuracy = self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
         self.explanationString = self.get_explanation_string()
         DbLogger.write_into_table(rows=[(self.runId, self.explanationString)], table=DbLogger.runMetaData)
 
@@ -87,7 +95,6 @@ class CrossEntropySearchOptimizer(object):
             accuracy = np.mean(validity_vec)
             print("{0} Accuracy:{1}".format(kind, accuracy))
 
-
     def add_explanation(self, name_of_param, value, explanation, kv_rows):
         explanation += "{0}:{1}\n".format(name_of_param, value)
         kv_rows.append((self.runId, name_of_param, "{0}".format(value)))
@@ -109,17 +116,39 @@ class CrossEntropySearchOptimizer(object):
         explanation = self.add_explanation(name_of_param="areEntropyThresholdsFixed",
                                            value=self.areEntropyThresholdsFixed,
                                            explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="totalAccuracy",
+                                           value=self.totalAccuracy,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="validationAccuracy",
+                                           value=self.validationAccuracy,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="testAccuracy",
+                                           value=self.testAccuracy,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="applyTemperatureOptimizationToEntropies",
+                                           value=self.applyTemperatureOptimizationToEntropies,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="applyTemperatureOptimizationToRoutingProbabilities",
+                                           value=self.applyTemperatureOptimizationToRoutingProbabilities,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="randomSeed",
+                                           value=self.randomSeed,
+                                           explanation=explanation, kv_rows=kv_rows)
+        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         return explanation
 
     # Load routing information for the particular model
     def load_multipath_info(self):
         object_folder_path = os.path.join(CrossEntropySearchOptimizer.intermediate_outputs_path,
                                           "{0}".format(self.modelId))
-        object_path = os.path.join(object_folder_path, "multipath_info_object.pkl")
+        # object_path = os.path.join(object_folder_path, "multipath_info_object.pkl")
         multipath_info_object = MultipathCombinationInfo2(batch_size=self.model.batchSize,
                                                           path_counts=self.pathCounts)
-        multipath_info_object.generate_routing_info(cigt=self.model,
-                                                    dataset=self.dataset.testDataTf)
+        multipath_info_object.generate_routing_info(
+            cigt=self.model,
+            dataset=self.dataset.testDataTf,
+            apply_temperature_optimization_to_entropies=self.applyTemperatureOptimizationToEntropies,
+            apply_temperature_optimization_to_routing_probabilities=self.applyTemperatureOptimizationToRoutingProbabilities)
         # if not os.path.isdir(object_folder_path):
         #     os.mkdir(object_folder_path)
         #     multipath_info_object = MultipathCombinationInfo2(batch_size=self.model.batchSize,
@@ -355,11 +384,11 @@ class CrossEntropySearchOptimizer(object):
         return samples_list
 
     def run(self):
-        epoch_count = 1000
+        epoch_count = self.numOfEpochs
         sample_count = 10000
         smoothing_coeff = 0.85
         gamma = 0.01
-        n_jobs = 8
+        n_jobs = self.nJobs
         sample_counts = [int(sample_count / n_jobs) for _ in range(n_jobs)]
         shared_objects = (self.multiPathInfoObject,
                           self.valIndices,

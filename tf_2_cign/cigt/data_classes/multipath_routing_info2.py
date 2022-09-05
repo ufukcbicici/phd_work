@@ -71,12 +71,12 @@ class MultipathCombinationInfo2(object):
         optimal_temperatures = []
         for block_id in range(len(self.pathCounts)-1):
             # self.plot_entropy_histogram_current(block_id=block_id)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1.0)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=10.0)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=100.0)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1000.0)
+            # self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1.0)
+            # self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=10.0)
+            # self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=100.0)
+            # self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=1000.0)
             optimal_temp = self.softmaxTemperatureOptimizer.run(block_id=block_id)
-            self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=optimal_temp)
+            # self.plot_entropy_histogram_with_temperature(block_id=block_id, temperature=optimal_temp)
             optimal_temperatures.append(optimal_temp)
         return optimal_temperatures
 
@@ -158,13 +158,14 @@ class MultipathCombinationInfo2(object):
             activations_dict[k] = mean_activations
         return activations_dict
 
-    def generate_routing_info(self, cigt, dataset):
+    def generate_routing_info(self, cigt, dataset,
+                              apply_temperature_optimization_to_entropies,
+                              apply_temperature_optimization_to_routing_probabilities):
         for n_paths in self.pathCounts[1:]:
             self.maxEntropies.append(np.asscalar(-np.log(1.0 / n_paths)))
 
         for decision_combination in tqdm(self.decision_combinations_per_level):
             self.add_new_combination(decision_combination=decision_combination)
-
             thresholds_list = np.logical_not(np.array(decision_combination)).astype(np.float)
             thresholds_list = 3.0 * thresholds_list - 1.5
             prob_thresholds_arr = np.stack([thresholds_list] * cigt.batchSize, axis=0)
@@ -181,9 +182,11 @@ class MultipathCombinationInfo2(object):
                 routing_activations = self.combinations_routing_activations_dict[decision_combination][block_id]
                 routing_arrs_for_block_tempered = routing_activations / self.optimalTemperatures[block_id]
                 routing_probs = tf.nn.softmax(routing_arrs_for_block_tempered).numpy()
-                # self.combinations_routing_probabilities_dict[decision_combination][block_id] = routing_probs
-                self.combinations_routing_entropies_dict[decision_combination][block_id] = \
-                    Utilities.calculate_entropies(routing_probs)
+                if apply_temperature_optimization_to_routing_probabilities:
+                    self.combinations_routing_probabilities_dict[decision_combination][block_id] = routing_probs
+                if apply_temperature_optimization_to_entropies:
+                    self.combinations_routing_entropies_dict[decision_combination][block_id] = \
+                        Utilities.calculate_entropies(routing_probs)
 
         past_routes = [0]
         total_sample_count = self.get_total_sample_count()
@@ -394,6 +397,7 @@ class MultipathCombinationInfo2(object):
         validity_vec = self.past_decisions_validity_array[idx_arr]
         accuracy = np.mean(validity_vec)
         print("Accuracy:{0}".format(accuracy))
+        return accuracy
 
         # for block_id in range(len(cigt.pathCounts) - 1):
         #     self.combinations_routing_probabilities_dict
