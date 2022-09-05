@@ -25,6 +25,8 @@ DbLogger.log_db_path = DbLogger.blackshark_desktop
 output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                            "cigt", "image_outputs")
 
+model_ids = [506, 86, 79, 113, 583, 751, 407, 166, 47, 610]
+
 
 def high_entropy_ce():
     model_loader = FmnistLenetPretrainedModelLoader()
