@@ -10,6 +10,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cigt.algorithms.softmax_temperature_optimizer import SoftmaxTemperatureOptimizer
 from tf_2_cign.cigt.data_classes.multipath_routing_info import MultipathCombinationInfo
+from tf_2_cign.cigt.data_classes.multipath_routing_info2 import MultipathCombinationInfo2
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
 from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
@@ -47,11 +48,45 @@ class CrossEntropySearchOptimizer(object):
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
         self.get_sorted_entropy_lists()
         self.init_probability_distributions()
+        self.high_entropy_error_analysis(indices=np.arange(self.totalSampleCount))
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=np.arange(self.totalSampleCount))
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.valIndices)
         self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
         self.explanationString = self.get_explanation_string()
         DbLogger.write_into_table(rows=[(self.runId, self.explanationString)], table=DbLogger.runMetaData)
+
+    def high_entropy_error_analysis(self, indices, highest_percent=0.1):
+        critical_index_count = int(len(indices) * highest_percent)
+        routing_decisions_arr = np.zeros(shape=(len(indices),
+                                                sum(self.model.pathCounts[1:])), dtype=np.int32)
+        entropies_arr = np.zeros(shape=(len(indices), len(self.model.pathCounts[1:])), dtype=np.float32)
+        critical_indices_list = []
+        curr_index = 0
+        for block_id in range(len(self.model.pathCounts) - 1):
+            routing_decisions_so_far = routing_decisions_arr[:, :curr_index]
+            index_arrays = [routing_decisions_so_far[:, col] for col in range(routing_decisions_so_far.shape[1])]
+            index_arrays.append(indices)
+            routing_probabilities_for_block = \
+                self.multiPathInfoObject.past_decisions_routing_probabilities_list[block_id][index_arrays]
+            entropies_for_block = Utilities.calculate_entropies(prob_distributions=routing_probabilities_for_block)
+            critical_indices_list.append(np.argsort(entropies_for_block)[-critical_index_count:])
+            decision_array = np.zeros(shape=routing_probabilities_for_block.shape, dtype=routing_decisions_so_far.dtype)
+            decision_array[np.arange(routing_probabilities_for_block.shape[0]),
+                           np.argmax(routing_probabilities_for_block, axis=1)] = 1
+            routing_decisions_arr[:, curr_index:curr_index + decision_array.shape[1]] = decision_array
+            curr_index += self.model.pathCounts[block_id + 1]
+        all_critical_indices = set(np.concatenate(critical_indices_list))
+        non_critical_indices = set(indices).difference(all_critical_indices)
+        for index_set, kind in [(all_critical_indices, "high_entropy_indices"),
+                                (non_critical_indices, "low_entropy_indices")]:
+            index_list = np.array(list(index_set))
+            decision_arr = routing_decisions_arr[index_list, :]
+            idx_arr = np.concatenate([decision_arr, np.expand_dims(index_list, axis=1)], axis=1)
+            idx_arr = [idx_arr[:, col] for col in range(idx_arr.shape[1])]
+            validity_vec = self.multiPathInfoObject.past_decisions_validity_array[idx_arr]
+            accuracy = np.mean(validity_vec)
+            print("{0} Accuracy:{1}".format(kind, accuracy))
+
 
     def add_explanation(self, name_of_param, value, explanation, kv_rows):
         explanation += "{0}:{1}\n".format(name_of_param, value)
@@ -81,15 +116,19 @@ class CrossEntropySearchOptimizer(object):
         object_folder_path = os.path.join(CrossEntropySearchOptimizer.intermediate_outputs_path,
                                           "{0}".format(self.modelId))
         object_path = os.path.join(object_folder_path, "multipath_info_object.pkl")
-        if not os.path.isdir(object_folder_path):
-            os.mkdir(object_folder_path)
-            multipath_info_object = MultipathCombinationInfo(batch_size=self.model.batchSize,
-                                                             path_counts=self.pathCounts)
-            multipath_info_object.generate_routing_info(cigt=self.model,
-                                                        dataset=self.dataset.testDataTf)
-            Utilities.pickle_save_to_file(path=object_path, file_content=multipath_info_object)
-        else:
-            multipath_info_object = Utilities.pickle_load_from_file(path=object_path)
+        multipath_info_object = MultipathCombinationInfo2(batch_size=self.model.batchSize,
+                                                          path_counts=self.pathCounts)
+        multipath_info_object.generate_routing_info(cigt=self.model,
+                                                    dataset=self.dataset.testDataTf)
+        # if not os.path.isdir(object_folder_path):
+        #     os.mkdir(object_folder_path)
+        #     multipath_info_object = MultipathCombinationInfo2(batch_size=self.model.batchSize,
+        #                                                       path_counts=self.pathCounts)
+        #     multipath_info_object.generate_routing_info(cigt=self.model,
+        #                                                 dataset=self.dataset.testDataTf)
+        #     Utilities.pickle_save_to_file(path=object_path, file_content=multipath_info_object)
+        # else:
+        #     multipath_info_object = Utilities.pickle_load_from_file(path=object_path)
         multipath_info_object.assert_routing_validity(cigt=self.model)
         multipath_info_object.assess_accuracy()
         return multipath_info_object
@@ -320,7 +359,7 @@ class CrossEntropySearchOptimizer(object):
         sample_count = 10000
         smoothing_coeff = 0.85
         gamma = 0.01
-        n_jobs = 8
+        n_jobs = 1
         sample_counts = [int(sample_count / n_jobs) for _ in range(n_jobs)]
         shared_objects = (self.multiPathInfoObject,
                           self.valIndices,
