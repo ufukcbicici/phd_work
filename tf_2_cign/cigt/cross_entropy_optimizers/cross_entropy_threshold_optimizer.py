@@ -401,7 +401,8 @@ class CrossEntropySearchOptimizer(object):
                           self.macWeight)
 
         percentile_count = int(gamma * sample_count)
-
+        best_result = -1.0
+        no_op_iterations = 0
         for epoch_id in range(epoch_count):
             # Single Thread
             if n_jobs == 1:
@@ -447,6 +448,16 @@ class CrossEntropySearchOptimizer(object):
             mean_test_gamma_mac = np.mean([d_["test_mean_mac"] for d_ in samples_gamma])
             mean_val_gamma_score = np.mean([d_["val_score"] for d_ in samples_gamma])
             mean_test_gamma_score = np.mean([d_["test_score"] for d_ in samples_gamma])
+
+            max_test = max(mean_test_acc, mean_test_gamma_acc)
+            if max_test > best_result:
+                best_result = max_test
+                no_op_iterations = 0
+            else:
+                no_op_iterations += 1
+
+            if no_op_iterations == 100:
+                break
 
             print("Epoch:{0} val_test_gamma_corr={1}".format(epoch_id, val_test_gamma_corr))
             print("Epoch:{0} mean_val_gamma_acc={1}".format(epoch_id, mean_val_gamma_acc))

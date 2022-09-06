@@ -1916,3 +1916,11 @@ WHERE run_meta_data.Explanation LIKE "%Lenet CIGT - Gumbel Softmax with E[Z] bas
 AND logs_table.Epoch >= 115 AND F.Value = "True" AND G.Value = "Softmax"
 GROUP BY logs_table.RunId
 ORDER BY TestAccuracy DESC
+
+
+--Experiments: Cross Entropy Search - Model Id	47 Starts with RunId 895
+--Started at 6/9/2022
+--Started on: Blackshark Laptop - db_logger.db
+SELECT * FROM ce_logs_table clt WHERE run_id = 895
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 895
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 895
