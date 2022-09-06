@@ -23,7 +23,7 @@ from tf_2_cign.cigt.model_loaders.fmnist_lenet_pretrained_model_loader import Fm
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-DbLogger.log_db_path = DbLogger.tetam_cigt
+DbLogger.log_db_path = DbLogger.tetam_cigt_2
 output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                            "cigt", "image_outputs")
 
@@ -117,4 +117,4 @@ if __name__ == "__main__":
     # gpus = tf.config.list_physical_devices('GPU')
     # tf.config.experimental.set_memory_growth(gpus[0], True)
 
-    run_on_model(model_id=610, apply_temperature_to_routing=False)
+    run_on_model(model_id=166, apply_temperature_to_routing=False)
