@@ -21,7 +21,9 @@ from tf_2_cign.cigt.cross_entropy_optimizers.high_entropy_threshold_optimizer im
 from tf_2_cign.cigt.cross_entropy_optimizers.sigmoid_gmm_ce_threshold_optimizer import SigmoidGmmCeThresholdOptimizer
 from tf_2_cign.cigt.model_loaders.fmnist_lenet_pretrained_model_loader import FmnistLenetPretrainedModelLoader
 
-DbLogger.log_db_path = DbLogger.blackshark_laptop
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+DbLogger.log_db_path = DbLogger.tetam_cigt
 output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                            "cigt", "image_outputs")
 
@@ -37,22 +39,23 @@ def run_on_model(model_id, apply_temperature_to_routing):
     for seed in seeds:
         for entropy_threshold_count in entropy_threshold_counts:
             for gmm_mode_count in gmm_mode_counts:
-                ce_search = SigmoidGmmCeThresholdOptimizer(
-                    num_of_epochs=300,
-                    accuracy_weight=1.0,
-                    mac_weight=0.0,
-                    model_loader=model_loader,
-                    model_id=model_id,
-                    val_ratio=0.5,
-                    image_output_path=output_path,
-                    entropy_threshold_counts=[entropy_threshold_count, entropy_threshold_count],
-                    num_of_gmm_components_per_block=[gmm_mode_count, gmm_mode_count],
-                    random_seed=seed,
-                    are_entropy_thresholds_fixed=False,
-                    n_jobs=8,
-                    apply_temperature_optimization_to_routing_probabilities=apply_temperature_to_routing,
-                    apply_temperature_optimization_to_entropies=True)
-                ce_search.run()
+                with tf.device('/cpu:0'):
+                    ce_search = SigmoidGmmCeThresholdOptimizer(
+                        num_of_epochs=300,
+                        accuracy_weight=1.0,
+                        mac_weight=0.0,
+                        model_loader=model_loader,
+                        model_id=model_id,
+                        val_ratio=0.5,
+                        image_output_path=output_path,
+                        entropy_threshold_counts=[entropy_threshold_count, entropy_threshold_count],
+                        num_of_gmm_components_per_block=[gmm_mode_count, gmm_mode_count],
+                        random_seed=seed,
+                        are_entropy_thresholds_fixed=False,
+                        n_jobs=8,
+                        apply_temperature_optimization_to_routing_probabilities=apply_temperature_to_routing,
+                        apply_temperature_optimization_to_entropies=True)
+                    ce_search.run()
 
 
 def high_entropy_ce():
@@ -111,7 +114,7 @@ def run_categorical_ce():
 
 
 if __name__ == "__main__":
-    gpus = tf.config.list_physical_devices('GPU')
-    tf.config.experimental.set_memory_growth(gpus[0], True)
+    # gpus = tf.config.list_physical_devices('GPU')
+    # tf.config.experimental.set_memory_growth(gpus[0], True)
 
-    run_on_model(model_id=47, apply_temperature_to_routing=False)
+    run_on_model(model_id=610, apply_temperature_to_routing=False)

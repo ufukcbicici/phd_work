@@ -224,7 +224,7 @@ class MultipathCombinationInfo2(object):
 
             past_decisions_entropies_arr_shape = np.concatenate([
                 np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
-                np.array([total_sample_count], dtype=np.int32)], dtype=np.int32)
+                np.array([total_sample_count], dtype=np.int32)]).astype(dtype=np.int32)
             past_decisions_entropies_arr = np.zeros(shape=past_decisions_entropies_arr_shape, dtype=np.float)
             self.past_decisions_entropies_list.append(past_decisions_entropies_arr)
             for k, v in self.past_decisions_entropies_dict.items():
@@ -233,7 +233,7 @@ class MultipathCombinationInfo2(object):
 
             past_decisions_routing_probabilities_arr_shape = np.concatenate([
                 np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
-                np.array([total_sample_count, route_count], dtype=np.int32)], dtype=np.int32)
+                np.array([total_sample_count, route_count], dtype=np.int32)]).astype(dtype=np.int32)
             past_decisions_routing_probabilities_arr = np.zeros(shape=past_decisions_routing_probabilities_arr_shape,
                                                                 dtype=np.float)
             self.past_decisions_routing_probabilities_list.append(past_decisions_routing_probabilities_arr)
@@ -243,7 +243,7 @@ class MultipathCombinationInfo2(object):
 
             past_decisions_raw_activations_arr_shape = np.concatenate([
                 np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
-                np.array([total_sample_count, route_count], dtype=np.int32)], dtype=np.int32)
+                np.array([total_sample_count, route_count], dtype=np.int32)]).astype(dtype=np.int32)
             past_decisions_raw_activations_arr = np.zeros(shape=past_decisions_raw_activations_arr_shape,
                                                           dtype=np.float)
             self.past_decisions_routing_activations_list.append(past_decisions_raw_activations_arr)
@@ -274,7 +274,7 @@ class MultipathCombinationInfo2(object):
 
         past_decisions_validity_array_shape = np.concatenate([
             np.array([2 for _ in range(sum(past_routes))], dtype=np.int32),
-            np.array([total_sample_count], dtype=np.int32)], dtype=np.int32)
+            np.array([total_sample_count], dtype=np.int32)]).astype(dtype=np.int32)
         self.past_decisions_validity_array = np.zeros(shape=past_decisions_validity_array_shape, dtype=np.float)
         self.past_decisions_validity_array[:] = np.nan
 

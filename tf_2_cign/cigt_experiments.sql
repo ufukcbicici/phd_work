@@ -1924,3 +1924,12 @@ ORDER BY TestAccuracy DESC
 SELECT * FROM ce_logs_table clt WHERE run_id = 895
 SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 895
 SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 895
+
+
+
+--Experiments: Cross Entropy Search - Model Id	610 Starts with RunId 1839
+--Started at 6/9/2022
+--Started on: Tetam - cigt_logger.db
+SELECT * FROM ce_logs_table clt WHERE run_id = 1839
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 1839
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 1839
