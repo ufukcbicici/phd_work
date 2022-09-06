@@ -1937,6 +1937,22 @@ SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 1839
 --Experiments: Cross Entropy Search - Model Id	166 Starts with RunId 1839
 --Started at 6/9/2022
 --Started on: Tetam - cigt_logger2.db
+SELECT * FROM ce_logs_table clt WHERE run_id = 1839
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 1839
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 1839
+
+
+--Experiments: Cross Entropy Search - Model Id	407 Starts with RunId 1839
+--Started at 6/9/2022
+--Started on: Tetam Tuna - cigt_logger_tuna.db
+SELECT * FROM ce_logs_table clt WHERE run_id = 46
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 46
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 46
+
+
+--Experiments: Cross Entropy Search - Model Id	47 Starts with RunId 1839
+--Started at 6/9/2022
+--Started on: Tetam Tuna - cigt_logger_tuna2.db
 SELECT * FROM ce_logs_table clt WHERE run_id = 46
 SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 46
 SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 46
