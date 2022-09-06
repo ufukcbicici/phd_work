@@ -8,6 +8,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.cigt.algorithms.constant_distribution import ConstantDistribution
 from tf_2_cign.cigt.algorithms.sigmoid_mixture_of_gaussians import SigmoidMixtureOfGaussians
+from tf_2_cign.cigt.algorithms.sigmoid_normal_distribution import SigmoidNormalDistribution
 from tf_2_cign.cigt.cross_entropy_optimizers.cross_entropy_threshold_optimizer import CrossEntropySearchOptimizer
 from tf_2_cign.cigt.data_classes.multipath_routing_info import MultipathCombinationInfo
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
@@ -53,9 +54,13 @@ class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
                 curr_lower_bound = 0.0
                 for entropy_threshold_id in range(n_entropy_thresholds):
                     curr_upper_bound = entropy_chunks[entropy_threshold_id][-1]
-                    distribution = SigmoidMixtureOfGaussians(num_of_components=n_gmm_components,
-                                                             low_end=curr_lower_bound,
-                                                             high_end=curr_upper_bound)
+                    if n_gmm_components > 1:
+                        distribution = SigmoidMixtureOfGaussians(num_of_components=n_gmm_components,
+                                                                 low_end=curr_lower_bound,
+                                                                 high_end=curr_upper_bound)
+                    else:
+                        distribution = SigmoidNormalDistribution(low_end=curr_lower_bound,
+                                                                 high_end=curr_upper_bound)
                     curr_lower_bound = curr_upper_bound
                     block_entropy_distributions.append(distribution)
             else:
@@ -73,8 +78,11 @@ class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
                 # A separate threshold for every route
                 interval_distributions = []
                 for route_id in range(self.pathCounts[block_id + 1]):
-                    distribution = SigmoidMixtureOfGaussians(num_of_components=n_gmm_components,
-                                                             low_end=0.0, high_end=1.0)
+                    if n_gmm_components > 1:
+                        distribution = SigmoidMixtureOfGaussians(num_of_components=n_gmm_components,
+                                                                 low_end=0.0, high_end=1.0)
+                    else:
+                        distribution = SigmoidNormalDistribution(low_end=0.0, high_end=1.0)
                     interval_distributions.append(distribution)
                 block_probability_threshold_distributions.append(interval_distributions)
             self.probabilityThresholdDistributions.append(block_probability_threshold_distributions)

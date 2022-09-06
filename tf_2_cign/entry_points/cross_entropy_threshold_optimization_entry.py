@@ -27,7 +27,7 @@ output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "t
 
 model_ids = [506, 86, 79, 113, 583, 751, 407, 166, 47, 610]
 entropy_threshold_counts = [1, 3, 5, 7, 9]
-gmm_mode_counts = [2, 3]
+gmm_mode_counts = [1, 2, 3]
 
 
 def run_on_model(model_id, apply_temperature_to_routing):
