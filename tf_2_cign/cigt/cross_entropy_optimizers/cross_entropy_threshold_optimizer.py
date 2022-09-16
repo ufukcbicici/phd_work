@@ -60,7 +60,7 @@ class CrossEntropySearchOptimizer(object):
         self.validationAccuracy = self.multiPathInfoObject.get_default_accuracy(cigt=self.model,
                                                                                 indices=self.valIndices)
         self.testAccuracy = self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
-        self.explanationString = self.get_explanation_string()
+        self.kvRows, self.explanationString = self.get_explanation_string()
 
     def high_entropy_error_analysis(self, indices, highest_percent=0.1):
         critical_index_count = int(len(indices) * highest_percent)
@@ -133,7 +133,7 @@ class CrossEntropySearchOptimizer(object):
         explanation = self.add_explanation(name_of_param="randomSeed",
                                            value=self.randomSeed,
                                            explanation=explanation, kv_rows=kv_rows)
-        return explanation
+        return kv_rows, explanation
 
     # Load routing information for the particular model
     def load_multipath_info(self):

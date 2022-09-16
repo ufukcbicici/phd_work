@@ -18,16 +18,17 @@ class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
                          apply_temperature_optimization_to_routing_probabilities)
         
     def get_explanation_string(self):
-        kv_rows = []
-        explanation = ""
-        explanation += super().get_explanation_string()
+        # kv_rows = []
+        # explanation = ""
+        # explanation += super().get_explanation_string()
+        kv_rows, explanation = super().get_explanation_string()
         explanation = self.add_explanation(name_of_param="Search Method",
                                            value="SigmoidGmmCeThresholdOptimizer",
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="numOfGmmComponentsPerBlock",
                                            value=self.numOfGmmComponentsPerBlock,
                                            explanation=explanation, kv_rows=kv_rows)
-        return explanation
+        return kv_rows, explanation
 
     def init_probability_distributions(self):
         assert len(self.entropyThresholdCounts) == len(self.pathCounts) - 1

@@ -215,4 +215,32 @@ CREATE TABLE IF NOT EXISTS "run_parameters" (
 	"Parameter"	TEXT,
 	"Value"	TEXT
 );
+
+CREATE TABLE "ce_logs_table"(
+    "run_id"
+    INTEGER,
+    "epoch"
+    INTEGER,
+    "val_test_corr"
+    NUMERIC,
+    "mean_val_acc"
+    NUMERIC,
+    "mean_test_acc"
+    NUMERIC,
+    "mean_val_mac"
+    NUMERIC,
+    "mean_test_mac"
+    NUMERIC,
+    "val_test_gamma_corr"
+    NUMERIC,
+    "mean_val_gamma_acc"
+    NUMERIC,
+    "mean_test_gamma_acc"
+    NUMERIC,
+    "mean_val_gamma_mac"
+    NUMERIC,
+    "mean_test_gamma_mac"
+    NUMERIC,
+    modelId INTEGER, val_score INTEGER, test_score INTEGER, val_score_gamma INTEGER, test_score_gamma INTEGER);
+
 COMMIT;

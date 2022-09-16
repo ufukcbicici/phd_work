@@ -27,11 +27,13 @@ from tf_2_cign.utilities.utilities import Utilities
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-DbLogger.log_db_path = DbLogger.home_asus
+DbLogger.log_db_path = DbLogger.tetam_tuna_cigt_3
 output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                            "cigt", "image_outputs")
 
 model_ids = [506, 86, 79, 113, 583, 751, 407, 166, 47, 610]
+
+
 # entropy_threshold_counts = [1, 3, 5, 7, 9, 11]
 # gmm_mode_counts = [1]
 
@@ -94,29 +96,30 @@ model_ids = [506, 86, 79, 113, 583, 751, 407, 166, 47, 610]
 #     arr.append((job_id, 4, 5, 6))
 #     arr.append((job_id, 7, 8, 9))
 
+
 def run_search(run_id, model_id, random_seed, entropy_threshold_count, gmm_mode_count):
-    # model_loader = FmnistLenetPretrainedModelLoader()
-    ce_logs_table_rows = [(run_id, model_id, random_seed, entropy_threshold_count, gmm_mode_count)]
-    run_parameters_rows = [(run_id, model_id, random_seed)]
-    # with tf.device('/cpu:0'):
-    #     ce_search = SigmoidGmmCeThresholdOptimizer(
-    #         run_id=run_id,
-    #         num_of_epochs=10,
-    #         accuracy_weight=1.0,
-    #         mac_weight=0.0,
-    #         model_loader=model_loader,
-    #         model_id=model_id,
-    #         val_ratio=0.5,
-    #         image_output_path=output_path,
-    #         entropy_threshold_counts=[entropy_threshold_count, entropy_threshold_count],
-    #         num_of_gmm_components_per_block=[gmm_mode_count, gmm_mode_count],
-    #         random_seed=random_seed,
-    #         are_entropy_thresholds_fixed=False,
-    #         n_jobs=1,
-    #         apply_temperature_optimization_to_routing_probabilities=False,
-    #         apply_temperature_optimization_to_entropies=True)
-    #     ce_logs_table_rows, run_parameters_rows = ce_search.run()
-    return ce_logs_table_rows, run_parameters_rows
+    model_loader = FmnistLenetPretrainedModelLoader()
+    # ce_logs_table_rows = [(run_id, model_id, random_seed, entropy_threshold_count, gmm_mode_count)] * 5
+    # run_parameters_rows = [(run_id, model_id, random_seed)] * 5
+    with tf.device('/cpu:0'):
+        ce_search = SigmoidGmmCeThresholdOptimizer(
+            run_id=run_id,
+            num_of_epochs=300,
+            accuracy_weight=1.0,
+            mac_weight=0.0,
+            model_loader=model_loader,
+            model_id=model_id,
+            val_ratio=0.5,
+            image_output_path=output_path,
+            entropy_threshold_counts=[entropy_threshold_count, entropy_threshold_count],
+            num_of_gmm_components_per_block=[gmm_mode_count, gmm_mode_count],
+            random_seed=random_seed,
+            are_entropy_thresholds_fixed=False,
+            n_jobs=1,
+            apply_temperature_optimization_to_routing_probabilities=False,
+            apply_temperature_optimization_to_entropies=True)
+        ce_logs_table_rows, run_parameters_rows = ce_search.run()
+    return ce_logs_table_rows, run_parameters_rows, ce_search.kvRows, ce_search.explanationString
 
 
 def run_on_model_seed_wise_parallelism(model_id):
@@ -126,11 +129,13 @@ def run_on_model_seed_wise_parallelism(model_id):
     jsons_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "ce_process_outputs")
     if not os.path.isdir(jsons_path):
         os.mkdir(jsons_path)
-    seeds = np.random.randint(low=0, high=100000, size=(n_jobs * seed_count_per_process, )).tolist()
-    entropy_threshold_counts = [1, 3, 5, 7, 9, 11]
-    gmm_mode_counts = [1]
+    seeds = np.random.randint(low=0, high=100000, size=(n_jobs * seed_count_per_process,)).tolist()
+    entropy_threshold_counts = [1, 3, 5, 7, 9]
+    model_ids = [model_id]
+    gmm_mode_counts = [1, 2, 3]
     run_id = DbLogger.get_run_id()
-    cartesian_product = Utilities.get_cartesian_product(list_of_lists=[seeds,
+    cartesian_product = Utilities.get_cartesian_product(list_of_lists=[model_ids,
+                                                                       seeds,
                                                                        entropy_threshold_counts,
                                                                        gmm_mode_counts])
     ids_list = run_id + np.arange(len(cartesian_product))
@@ -138,105 +143,27 @@ def run_on_model_seed_wise_parallelism(model_id):
 
     for s_idx in range(0, len(training_tuples), n_jobs):
         params_chunk = training_tuples[s_idx:s_idx + n_jobs]
+        assert len(params_chunk) % n_jobs == 0
         with WorkerPool(n_jobs=n_jobs) as pool:
             results = pool.map(run_search, params_chunk, progress_bar=True)
-        print("X")
-
-
-
-
-
-        # print(s_idx)
-
-    print("X")
-
-    # for process_id in range(n_jobs)
-
-
-
-
-
-
-    # # run_id_min = DbLogger.get_run_id()
-    # # print("run_id_min:{0}".format(run_id_min))
-    # job_array = []
-    # for job_id in range(n_jobs):
-    #     job_array.append([])
-    #
-    # for job_id in range(n_jobs):
-    #     process = Process(target=experimental, args=(job_id, job_array[job_id]))
-    #     list_of_processes.append(process)
-    #     process.start()
-    #
-    # for process in list_of_processes:
-    #     process.join()
-    #
-    # print("X")
-
-    # for job_id in range(n_jobs):
-    #     run_id = run_id_min + job_id
-    #     seeds = np.random.randint(low=0, high=1000000, size=(15,))
-    #     process = Process(target=run_on_model_with_seeds, args=(run_id, model_id, seeds))
-    #     list_of_processes.append(process)
-    #     process.start()
-    #
-    # for process in list_of_processes:
-    #     process.join()
-
-
-# def high_entropy_ce():
-#     model_loader = FmnistLenetPretrainedModelLoader()
-#     ce_search = HighEntropyThresholdOptimizer(num_of_epochs=100,
-#                                               accuracy_weight=1.0,
-#                                               mac_weight=0.0,
-#                                               model_loader=model_loader,
-#                                               model_id=424,
-#                                               val_ratio=0.5,
-#                                               image_output_path=output_path,
-#                                               num_of_gmm_components_per_block=[2, 2],
-#                                               entropy_threshold_percentiles=[0.95, 0.95],
-#                                               entropy_threshold_counts_after_percentiles=[5, 5],
-#                                               random_seed=10,
-#                                               are_entropy_thresholds_fixed=True)
-#     ce_search.run()
-#     print("X")
-#
-#
-# def run_sigmoid_gmm_ce():
-#     model_loader = FmnistLenetPretrainedModelLoader()
-#     ce_search = SigmoidGmmCeThresholdOptimizer(num_of_epochs=300,
-#                                                accuracy_weight=1.0,
-#                                                mac_weight=0.0,
-#                                                model_loader=model_loader,
-#                                                model_id=610,
-#                                                val_ratio=0.25,
-#                                                image_output_path=output_path,
-#                                                entropy_threshold_counts=[2, 2],
-#                                                num_of_gmm_components_per_block=[2, 2],
-#                                                random_seed=966,
-#                                                are_entropy_thresholds_fixed=False,
-#                                                n_jobs=8,
-#                                                apply_temperature_optimization_to_routing_probabilities=False,
-#                                                apply_temperature_optimization_to_entropies=True)
-#     ce_search.run()
-#     print("X")
-
-
-# def run_categorical_ce():
-#     model_loader = FmnistLenetPretrainedModelLoader()
-#     ce_search = CategoricalCeThresholdOptimizer(num_of_epochs=100,
-#                                                 accuracy_weight=1.0,
-#                                                 mac_weight=1.0,
-#                                                 model_loader=model_loader,
-#                                                 model_id=424,
-#                                                 val_ratio=0.5,
-#                                                 image_output_path=output_path,
-#                                                 entropy_threshold_counts=[5, 5],
-#                                                 entropy_bins_count=50,
-#                                                 probability_bins_count=50, random_seed=10,
-#                                                 are_entropy_thresholds_fixed=False)
-#     ce_search.run()
-#     print("X")
+        # Write results into DB.
+        # ce_logs_table_rows, run_parameters_rows, ce_search.kvRows, ce_search.explanationString
+        for n_job_id in range(n_jobs):
+            params = params_chunk[n_job_id]
+            job_run_id = params[0]
+            # ce_logs_table_rows
+            ce_logs_table_rows = results[n_job_id][0]
+            DbLogger.write_into_table(rows=ce_logs_table_rows, table="ce_logs_table")
+            # run_parameters_rows
+            run_parameters_rows = results[n_job_id][1]
+            DbLogger.write_into_table(rows=run_parameters_rows, table="run_parameters")
+            # ce_search_kv_rows (from explanation string)
+            ce_search_kv_rows = results[n_job_id][2]
+            DbLogger.write_into_table(rows=ce_search_kv_rows, table="run_parameters")
+            # ce_search.explanationString
+            ce_search_explanation_string = results[n_job_id][3]
+            DbLogger.write_into_table(rows=[(job_run_id, ce_search_explanation_string)],
+                                      table="run_meta_data")
 
 
 if __name__ == "__main__":

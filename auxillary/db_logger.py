@@ -25,6 +25,7 @@ class DbLogger:
     tetam_cigt_2 = "/cta/users/ucbicici/phd_work/cigt_logger2.db"
     tetam_tuna_cigt = "/cta/users/hmeral/phd_work/cigt_logger_tuna.db"
     tetam_tuna_cigt_2 = "/cta/users/hmeral/phd_work/cigt_logger_tuna2.db"
+    tetam_tuna_cigt_3 = "/cta/users/hmeral/phd_work/cigt_logger_tuna3.db"
     tetam_1 = "/cta/users/ucbicici/phd_work/dblogger.db"
     tetam_2 = "/cta/users/ucbicici/phd_work/dblogger2.db"
     tetam_3 = "/cta/users/ucbicici/phd_work/dblogger3.db"
