@@ -1,33 +1,21 @@
-import numpy as np
-import tensorflow as tf
-import os
-
-from sklearn.model_selection import train_test_split
-
-from auxillary.db_logger import DbLogger
-from auxillary.parameters import DiscreteParameter
-from tf_2_cign.cigt.algorithms.constant_distribution import ConstantDistribution
-from tf_2_cign.cigt.algorithms.sigmoid_mixture_of_gaussians import SigmoidMixtureOfGaussians
-from tf_2_cign.cigt.algorithms.sigmoid_normal_distribution import SigmoidNormalDistribution
+from tf_2_cign.cigt.distributions.constant_distribution import ConstantDistribution
+from tf_2_cign.cigt.distributions.sigmoid_mixture_of_gaussians import SigmoidMixtureOfGaussians
 from tf_2_cign.cigt.cross_entropy_optimizers.cross_entropy_threshold_optimizer import CrossEntropySearchOptimizer
-from tf_2_cign.cigt.data_classes.multipath_routing_info import MultipathCombinationInfo
-from tf_2_cign.cigt.lenet_cigt import LenetCigt
-from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
-from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
-from tf_2_cign.utilities.utilities import Utilities
 
 
 class HighEntropyThresholdOptimizer(CrossEntropySearchOptimizer):
-    def __init__(self, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
-                 entropy_threshold_percentiles,
-                 entropy_threshold_counts_after_percentiles,
-                 are_entropy_thresholds_fixed, image_output_path, random_seed,
-                 num_of_gmm_components_per_block):
+    def __init__(self, run_id, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
+                 entropy_threshold_percentiles, entropy_threshold_counts_after_percentiles,
+                 are_entropy_thresholds_fixed, image_output_path, random_seed, num_of_gmm_components_per_block,
+                 entropy_threshold_counts, n_jobs, apply_temperature_optimization_to_entropies,
+                 apply_temperature_optimization_to_routing_probabilities):
+        super().__init__(run_id, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
+                         entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed, n_jobs,
+                         apply_temperature_optimization_to_entropies,
+                         apply_temperature_optimization_to_routing_probabilities)
         self.numOfGmmComponentsPerBlock = num_of_gmm_components_per_block
         self.entropyThresholdPercentiles = entropy_threshold_percentiles
         entropy_threshold_counts = [cnt + 1 for cnt in entropy_threshold_counts_after_percentiles]
-        super().__init__(num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
-                         entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed)
 
     def get_explanation_string(self):
         kv_rows = []

@@ -1,20 +1,12 @@
 import os
 import numpy as np
 from tqdm import tqdm
-import tensorflow as tf
 from auxillary.db_logger import DbLogger
-from auxillary.parameters import DiscreteParameter
 from mpire import WorkerPool
 
-from tf_2_cign.cigt.algorithms.sigmoid_normal_distribution import SigmoidNormalDistribution
-from tf_2_cign.cigt.bayesian_optimizers.cross_entropy_search_optimizer import CrossEntropySearchOptimizer
-from tf_2_cign.cigt.algorithms.categorical_distribution import CategoricalDistribution
+from tf_2_cign.cigt.distributions.sigmoid_normal_distribution import SigmoidNormalDistribution
 from tf_2_cign.cigt.bayesian_optimizers.fashion_mnist_lenet_cross_entropy_search import \
     FashionMnistLenetCrossEntropySearch
-from tf_2_cign.cigt.lenet_cigt import LenetCigt
-from tf_2_cign.data.fashion_mnist import FashionMnist
-from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
-from tf_2_cign.utilities.fashion_net_constants import FashionNetConstants
 from tf_2_cign.utilities.utilities import Utilities
 import time
 

@@ -1941,35 +1941,44 @@ SELECT * FROM ce_logs_table clt WHERE run_id = 1839
 SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 1839
 SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 1839
 
-
-SELECT Max(mean_test_acc), Avg(testAccuracy), randomSeed, entropy_threshold_counts, numOfGmmComponentsPerBlock, COUNT(1) AS CNT
+SELECT AVG(acc_gain) as avg_acc_gain,
+       entropy_threshold_counts, numOfGmmComponentsPerBlock,
+       max_model_id, min_model_id, COUNT(1) AS CNT
 FROM
 (
-	SELECT ce_logs_table.run_id, ce_logs_table.epoch, mean_val_acc, mean_test_acc, mean_val_gamma_acc, mean_test_gamma_acc,
-	A.Value AS model_id,
-	B.Value AS entropy_threshold_counts,
-	C.Value AS totalAccuracy,
-	D.Value AS testAccuracy,
-	E.Value AS validationAccuracy,
-	F.Value AS numOfGmmComponentsPerBlock,
-	G.Value AS randomSeed
-	FROM ce_logs_table
-	LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'Model Id') AS A ON
-	ce_logs_table.run_id == A.RunId
-	LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'entropy_threshold_counts') AS B ON
-	ce_logs_table.run_id == B.RunId
-	LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'totalAccuracy') AS C ON
-	ce_logs_table.run_id == C.RunId
-	LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'testAccuracy') AS D ON
-	ce_logs_table.run_id == D.RunId
-	LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'validationAccuracy') AS E ON
-	ce_logs_table.run_id == E.RunId
-	LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'numOfGmmComponentsPerBlock') AS F ON
-	ce_logs_table.run_id == F.RunId
-	LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'randomSeed') AS G ON
-	ce_logs_table.run_id == G.RunId
+    SELECT Max(mean_test_acc), Avg(testAccuracy), Max(mean_test_acc) - Avg(testAccuracy) AS acc_gain,
+       randomSeed, entropy_threshold_counts, numOfGmmComponentsPerBlock,
+       Max(model_id) as max_model_id, Min(model_id) as min_model_id,  COUNT(1) AS CNT
+    FROM
+    (
+        SELECT ce_logs_table.run_id, ce_logs_table.epoch, mean_val_acc, mean_test_acc, mean_val_gamma_acc, mean_test_gamma_acc,
+        A.Value AS model_id,
+        B.Value AS entropy_threshold_counts,
+        C.Value AS totalAccuracy,
+        D.Value AS testAccuracy,
+        E.Value AS validationAccuracy,
+        F.Value AS numOfGmmComponentsPerBlock,
+        G.Value AS randomSeed
+        FROM ce_logs_table
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'Model Id') AS A ON
+        ce_logs_table.run_id == A.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'entropy_threshold_counts') AS B ON
+        ce_logs_table.run_id == B.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'totalAccuracy') AS C ON
+        ce_logs_table.run_id == C.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'testAccuracy') AS D ON
+        ce_logs_table.run_id == D.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'validationAccuracy') AS E ON
+        ce_logs_table.run_id == E.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'numOfGmmComponentsPerBlock') AS F ON
+        ce_logs_table.run_id == F.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'randomSeed') AS G ON
+        ce_logs_table.run_id == G.RunId
+    )
+    GROUP BY randomSeed, entropy_threshold_counts, numOfGmmComponentsPerBlock
 )
-GROUP BY randomSeed, entropy_threshold_counts, numOfGmmComponentsPerBlock
+GROUP BY entropy_threshold_counts, numOfGmmComponentsPerBlock
+ORDER BY avg_acc_gain DESC
 
 
 --Experiments: Cross Entropy Search - Model Id	407 Starts with RunId 1839

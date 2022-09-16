@@ -20,13 +20,13 @@ from tf_2_cign.utilities.utilities import Utilities
 class CrossEntropySearchOptimizer(object):
     intermediate_outputs_path = os.path.join(os.path.dirname(__file__), "..", "intermediate_outputs")
 
-    def __init__(self, num_of_epochs, accuracy_weight, mac_weight, model_loader,
+    def __init__(self, run_id, num_of_epochs, accuracy_weight, mac_weight, model_loader,
                  model_id, val_ratio,
                  entropy_threshold_counts, are_entropy_thresholds_fixed,
                  image_output_path, random_seed, n_jobs,
                  apply_temperature_optimization_to_entropies,
                  apply_temperature_optimization_to_routing_probabilities):
-        self.runId = DbLogger.get_run_id()
+        self.runId = run_id
         self.numOfEpochs = num_of_epochs
         self.randomSeed = random_seed
         self.nJobs = n_jobs
@@ -61,7 +61,6 @@ class CrossEntropySearchOptimizer(object):
                                                                                 indices=self.valIndices)
         self.testAccuracy = self.multiPathInfoObject.get_default_accuracy(cigt=self.model, indices=self.testIndices)
         self.explanationString = self.get_explanation_string()
-        DbLogger.write_into_table(rows=[(self.runId, self.explanationString)], table=DbLogger.runMetaData)
 
     def high_entropy_error_analysis(self, indices, highest_percent=0.1):
         critical_index_count = int(len(indices) * highest_percent)
@@ -134,7 +133,6 @@ class CrossEntropySearchOptimizer(object):
         explanation = self.add_explanation(name_of_param="randomSeed",
                                            value=self.randomSeed,
                                            explanation=explanation, kv_rows=kv_rows)
-        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         return explanation
 
     # Load routing information for the particular model
@@ -229,6 +227,40 @@ class CrossEntropySearchOptimizer(object):
                 interval_thresholds = np.array(interval_thresholds)
                 probability_thresholds_for_block.append(interval_thresholds)
             probability_thresholds_for_block = np.stack(probability_thresholds_for_block, axis=0)
+            list_of_probability_thresholds.append(probability_thresholds_for_block)
+        return list_of_entropy_thresholds, list_of_probability_thresholds
+
+    @staticmethod
+    def sample_parameters_batch(path_counts,
+                                entropy_threshold_distributions,
+                                max_entropies,
+                                probability_threshold_distributions,
+                                batch_size):
+        routing_blocks_count = len(path_counts) - 1
+        list_of_entropy_thresholds = []
+        list_of_probability_thresholds = []
+        for block_id in range(routing_blocks_count):
+            # Sample entropy intervals
+            entropy_interval_higher_ends = []
+            for entropy_threshold_id in range(len(entropy_threshold_distributions[block_id])):
+                entropy_thresholds = \
+                    entropy_threshold_distributions[block_id][entropy_threshold_id].sample(num_of_samples=batch_size)
+                entropy_interval_higher_ends.append(entropy_thresholds)
+            entropy_interval_higher_ends.append(np.array([max_entropies[block_id]] * batch_size))
+            entropy_interval_higher_ends = np.stack(entropy_interval_higher_ends, axis=1)
+            list_of_entropy_thresholds.append(entropy_interval_higher_ends)
+
+            # Sample probability thresholds
+            probability_thresholds_for_block = []
+            for interval_id in range(len(entropy_threshold_distributions[block_id]) + 1):
+                interval_threshold_distributions = probability_threshold_distributions[block_id][interval_id]
+                interval_thresholds = []
+                for path_id in range(len(interval_threshold_distributions)):
+                    probability_thresholds = interval_threshold_distributions[path_id].sample(num_of_samples=batch_size)
+                    interval_thresholds.append(probability_thresholds)
+                interval_thresholds = np.stack(interval_thresholds, axis=1)
+                probability_thresholds_for_block.append(interval_thresholds)
+            probability_thresholds_for_block = np.stack(probability_thresholds_for_block, axis=1)
             list_of_probability_thresholds.append(probability_thresholds_for_block)
         return list_of_entropy_thresholds, list_of_probability_thresholds
 
@@ -333,6 +365,88 @@ class CrossEntropySearchOptimizer(object):
         return accuracy, mean_mac, score
 
     @staticmethod
+    def measure_performance_batches(multipath_routing_info_obj,
+                                    path_counts,
+                                    batch_size,
+                                    list_of_entropy_thresholds,
+                                    list_of_probability_thresholds,
+                                    indices,
+                                    accuracy_coeff,
+                                    mac_coeff,
+                                    use_numpy_approach=True):
+        indices_tiled = np.tile(indices, reps=batch_size)
+        sample_paths = np.expand_dims(indices_tiled, axis=1)
+        past_num_of_routes = 0
+        time_intervals = []
+        N_ = len(indices)
+        for block_id, route_count in enumerate(path_counts[1:]):
+            # Prepare all possible valid decisions that can be taken by samples in this stage of the CIGT, based on past
+            # routing decisions.
+            # B: Batch Size
+            # N: Sample Size
+            # T: Entropy Threshold Count for the Current Block
+            # Pi: Patch Count for the Current Block
+            # 1) Get the entropy of each sample, based on the past decisions.
+            t0 = time.time()
+            index_arrays = tuple([sample_paths[:, idx] for idx in range(sample_paths.shape[1])])
+            # curr_sample_entropies.shape = (B*N, )
+            curr_sample_entropies = multipath_routing_info_obj.past_decisions_entropies_list[block_id][index_arrays]
+            # 2) Find the relevant entropy intervals for each sample
+            entropy_intervals = list_of_entropy_thresholds[block_id]
+            # entropy_intervals.shape = (B, T + 1) -> (B*N, T + 1) by repeating
+            entropy_intervals = np.repeat(entropy_intervals, axis=0, repeats=N_)
+            interval_selections = \
+                np.less_equal(np.expand_dims(curr_sample_entropies, axis=-1), entropy_intervals)
+            interval_ids = np.argmax(interval_selections, axis=1)
+            # 3) Get the probability thresholds with respect to the selected entropy intervals.
+            probability_thresholds = list_of_probability_thresholds[block_id]
+            # probability_thresholds.shape = (B, T + 1, Pi) -> (B * N, T + 1, Pi)
+            probability_thresholds = np.repeat(probability_thresholds, axis=0, repeats=N_)
+            probability_thresholds_per_sample = probability_thresholds[np.arange(len(interval_ids)),
+                                                                       interval_ids]
+            # 4) Get the current routing probabilities of each sample, based on the paths taken so far.
+            curr_sample_routing_probabilities = \
+                multipath_routing_info_obj.past_decisions_routing_probabilities_list[
+                    block_id][index_arrays]
+            # 5) Compare current routing probabilities to the thresholds
+            t4 = time.time()
+            route_selections = np.greater_equal(curr_sample_routing_probabilities,
+                                                probability_thresholds_per_sample).astype(sample_paths.dtype)
+            # 6) Get the maximum likely routing paths from the current routing probabilities
+            argmax_indices = np.argmax(curr_sample_routing_probabilities, axis=1)
+            ml_route_selections = np.zeros_like(route_selections)
+            ml_route_selections[np.arange(ml_route_selections.shape[0], ), argmax_indices] = 1
+            # 7) Detect degenerate cases where all routing probabilities are under routing thresholds and no path is
+            # valid to route into. We are going to use the ML routing in such cases instead.
+            num_of_selected_routes = np.sum(route_selections, axis=1)
+            final_selections = np.where(np.expand_dims(num_of_selected_routes > 0, axis=-1),
+                                        route_selections, ml_route_selections)
+            route_selections = final_selections
+            # 8) Integrate into the selected paths so far.
+            sample_paths = np.concatenate([sample_paths[:, :-1], route_selections,
+                                           np.expand_dims(indices_tiled, axis=1)], axis=1)
+            past_num_of_routes += route_count
+        # Calculate accuracy and mac cost
+        base_mac = np.nanmin(multipath_routing_info_obj.past_decisions_mac_array)
+        index_arrays = tuple([sample_paths[:, idx] for idx in range(sample_paths.shape[1])])
+        validity_vector = multipath_routing_info_obj.past_decisions_validity_array[index_arrays]
+        mac_vector = multipath_routing_info_obj.past_decisions_mac_array[index_arrays[:-1]]
+
+        dif_vector = mac_vector * (1.0 / base_mac)
+        dif_vector = dif_vector - 1.0
+
+        score_vector = accuracy_coeff * validity_vector + mac_coeff * dif_vector
+        score_matrix = np.reshape(score_vector, newshape=(batch_size, N_))
+        scores_batch_vector = np.mean(score_matrix, axis=1)
+
+        accuracy_matrix = np.reshape(validity_vector, newshape=(batch_size, N_))
+        accuracy_batch_vector = np.mean(accuracy_matrix, axis=1)
+
+        dif_matrix = np.reshape(dif_vector, newshape=(batch_size, N_))
+        dif_batch_vector = np.mean(dif_matrix, axis=1)
+        return accuracy_batch_vector, dif_batch_vector, scores_batch_vector
+
+    @staticmethod
     def sample_and_evaluate(shared_objects, sample_count):
         multipath_routing_info_obj = shared_objects[0]
         val_indices = shared_objects[1]
@@ -344,13 +458,18 @@ class CrossEntropySearchOptimizer(object):
         accuracy_weight = shared_objects[7]
         mac_weight = shared_objects[8]
         samples_list = []
+        times_dict = {"sample_parameters": [],
+                      "measure_performance_val": [],
+                      "measure_performance_test": []}
         for sample_id in tqdm(range(sample_count)):
+            t0 = time.time()
             e, p = CrossEntropySearchOptimizer.sample_parameters(
                 path_counts=path_counts,
                 entropy_threshold_distributions=entropy_threshold_distributions,
                 max_entropies=max_entropies,
                 probability_threshold_distributions=probability_threshold_distributions
             )
+            t1 = time.time()
             val_accuracy, val_mean_mac, val_score = CrossEntropySearchOptimizer.measure_performance(
                 path_counts=path_counts,
                 multipath_routing_info_obj=multipath_routing_info_obj,
@@ -360,6 +479,7 @@ class CrossEntropySearchOptimizer(object):
                 use_numpy_approach=True,
                 accuracy_coeff=accuracy_weight,
                 mac_coeff=mac_weight)
+            t2 = time.time()
             test_accuracy, test_mean_mac, test_score = CrossEntropySearchOptimizer.measure_performance(
                 path_counts=path_counts,
                 multipath_routing_info_obj=multipath_routing_info_obj,
@@ -369,6 +489,7 @@ class CrossEntropySearchOptimizer(object):
                 use_numpy_approach=True,
                 accuracy_coeff=accuracy_weight,
                 mac_coeff=mac_weight)
+            t3 = time.time()
             sample_dict = {
                 "sample_id": sample_id,
                 "entropy_intervals": e,
@@ -381,6 +502,15 @@ class CrossEntropySearchOptimizer(object):
                 "test_score": test_score
             }
             samples_list.append(sample_dict)
+            times_dict["sample_parameters"].append(t1 - t0)
+            times_dict["measure_performance_val"].append(t2 - t1)
+            times_dict["measure_performance_test"].append(t3 - t2)
+        print("sample_parameters mean time:{0}".format(np.mean(times_dict["sample_parameters"])))
+        print("measure_performance_val mean time:{0}".format(np.mean(times_dict["measure_performance_val"])))
+        print("measure_performance_test mean time:{0}".format(np.mean(times_dict["measure_performance_test"])))
+        print("sample_parameters sum time:{0}".format(np.sum(times_dict["sample_parameters"])))
+        print("measure_performance_val sum time:{0}".format(np.sum(times_dict["measure_performance_val"])))
+        print("measure_performance_test sum time:{0}".format(np.sum(times_dict["measure_performance_test"])))
         return samples_list
 
     def run(self):
@@ -403,12 +533,15 @@ class CrossEntropySearchOptimizer(object):
         percentile_count = int(gamma * sample_count)
         best_result = -1.0
         no_op_iterations = 0
+        ce_logs_table_rows = []
+        run_parameters_rows = []
+
         for epoch_id in range(epoch_count):
             # Single Thread
+            t0 = time.time()
             if n_jobs == 1:
                 samples_list = CrossEntropySearchOptimizer.sample_and_evaluate(
-                    shared_objects=shared_objects, sample_count=sample_count
-                )
+                    shared_objects=shared_objects, sample_count=sample_count)
             else:
                 with WorkerPool(n_jobs=n_jobs, shared_objects=shared_objects) as pool:
                     results = pool.map(CrossEntropySearchOptimizer.sample_and_evaluate,
@@ -418,6 +551,11 @@ class CrossEntropySearchOptimizer(object):
                 samples_list = []
                 for res_arr in results:
                     samples_list.extend(res_arr)
+            t1 = time.time()
+            self.add_explanation(name_of_param="Sampling-Measuring Time Epoch{0}".format(epoch_id),
+                                 value=t1 - t0,
+                                 explanation="",
+                                 kv_rows=run_parameters_rows)
 
             samples_sorted = sorted(samples_list, key=lambda d_: d_["val_score"], reverse=True)
             val_accuracies = [d_["val_accuracy"] for d_ in samples_sorted]
@@ -467,26 +605,45 @@ class CrossEntropySearchOptimizer(object):
             print("Epoch:{0} mean_val_gamma_score={1}".format(epoch_id, mean_val_gamma_score))
             print("Epoch:{0} mean_test_gamma_score={1}".format(epoch_id, mean_test_gamma_score))
 
-            DbLogger.write_into_table(rows=
-                                      [(self.runId,
-                                        epoch_id,
-                                        np.asscalar(val_test_corr),
-                                        np.asscalar(mean_val_acc),
-                                        np.asscalar(mean_test_acc),
-                                        np.asscalar(mean_val_mac),
-                                        np.asscalar(mean_test_mac),
-                                        np.asscalar(val_test_gamma_corr),
-                                        np.asscalar(mean_val_gamma_acc),
-                                        np.asscalar(mean_test_gamma_acc),
-                                        np.asscalar(mean_val_gamma_mac),
-                                        np.asscalar(mean_test_gamma_mac),
-                                        self.modelId,
-                                        np.asscalar(mean_val_score),
-                                        np.asscalar(mean_test_score),
-                                        np.asscalar(mean_val_gamma_score),
-                                        np.asscalar(mean_test_gamma_score)
-                                        )], table="ce_logs_table")
+            # DbLogger.write_into_table(rows=
+            #                           [(self.runId,
+            #                             epoch_id,
+            #                             np.asscalar(val_test_corr),
+            #                             np.asscalar(mean_val_acc),
+            #                             np.asscalar(mean_test_acc),
+            #                             np.asscalar(mean_val_mac),
+            #                             np.asscalar(mean_test_mac),
+            #                             np.asscalar(val_test_gamma_corr),
+            #                             np.asscalar(mean_val_gamma_acc),
+            #                             np.asscalar(mean_test_gamma_acc),
+            #                             np.asscalar(mean_val_gamma_mac),
+            #                             np.asscalar(mean_test_gamma_mac),
+            #                             self.modelId,
+            #                             np.asscalar(mean_val_score),
+            #                             np.asscalar(mean_test_score),
+            #                             np.asscalar(mean_val_gamma_score),
+            #                             np.asscalar(mean_test_gamma_score)
+            #                             )], table="ce_logs_table")
+            ce_logs_table_rows.append((self.runId,
+                                       epoch_id,
+                                       np.asscalar(val_test_corr),
+                                       np.asscalar(mean_val_acc),
+                                       np.asscalar(mean_test_acc),
+                                       np.asscalar(mean_val_mac),
+                                       np.asscalar(mean_test_mac),
+                                       np.asscalar(val_test_gamma_corr),
+                                       np.asscalar(mean_val_gamma_acc),
+                                       np.asscalar(mean_test_gamma_acc),
+                                       np.asscalar(mean_val_gamma_mac),
+                                       np.asscalar(mean_test_gamma_mac),
+                                       self.modelId,
+                                       np.asscalar(mean_val_score),
+                                       np.asscalar(mean_test_score),
+                                       np.asscalar(mean_val_gamma_score),
+                                       np.asscalar(mean_test_gamma_score)
+                                       ))
 
+            t2 = time.time()
             routing_blocks_count = len(self.pathCounts) - 1
             for block_id in range(routing_blocks_count):
                 # Entropy distributions
@@ -512,33 +669,93 @@ class CrossEntropySearchOptimizer(object):
                         self.probabilityThresholdDistributions[block_id][
                             interval_id][path_id].maximum_likelihood_estimate(data=np.array(data),
                                                                               alpha=smoothing_coeff)
-        print("X")
+            t3 = time.time()
 
-    # CREATE
-    # TABLE
-    # "ce_logs_table"(
-    #     "run_id"
-    # INTEGER,
-    # "epoch"
-    # INTEGER,
-    # "val_test_corr"
-    # NUMERIC,
-    # "mean_val_acc"
-    # NUMERIC,
-    # "mean_test_acc"
-    # NUMERIC,
-    # "mean_val_mac"
-    # NUMERIC,
-    # "mean_test_mac"
-    # NUMERIC,
-    # "val_test_gamma_corr"
-    # NUMERIC,
-    # "mean_val_gamma_acc"
-    # NUMERIC,
-    # "mean_test_gamma_acc"
-    # NUMERIC,
-    # "mean_val_gamma_mac"
-    # NUMERIC,
-    # "mean_test_gamma_mac"
-    # NUMERIC
-    # )
+            self.add_explanation(name_of_param="ML Estimation Time Epoch{0}".format(epoch_id),
+                                 value=t3 - t2,
+                                 explanation="",
+                                 kv_rows=run_parameters_rows)
+            # DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
+        return ce_logs_table_rows, run_parameters_rows
+
+    def run_with_batches(self):
+        epoch_count = self.numOfEpochs
+        sample_count = 10000
+        smoothing_coeff = 0.85
+        gamma = 0.01
+        n_jobs = self.nJobs
+        sample_counts = [int(sample_count / n_jobs) for _ in range(n_jobs)]
+        shared_objects = (self.multiPathInfoObject,
+                          self.valIndices,
+                          self.testIndices,
+                          self.pathCounts,
+                          self.entropyThresholdDistributions,
+                          self.maxEntropies,
+                          self.probabilityThresholdDistributions,
+                          self.accuracyWeight,
+                          self.macWeight)
+
+        percentile_count = int(gamma * sample_count)
+        best_result = -1.0
+        no_op_iterations = 0
+        batch_size = 250
+        for epoch_id in range(epoch_count):
+            # e_, p_ = CrossEntropySearchOptimizer.sample_parameters(
+            #     path_counts=self.pathCounts,
+            #     entropy_threshold_distributions=self.entropyThresholdDistributions,
+            #     max_entropies=self.maxEntropies,
+            #     probability_threshold_distributions=self.probabilityThresholdDistributions
+            # )
+
+            e, p = CrossEntropySearchOptimizer.sample_parameters_batch(
+                path_counts=self.pathCounts,
+                entropy_threshold_distributions=self.entropyThresholdDistributions,
+                max_entropies=self.maxEntropies,
+                probability_threshold_distributions=self.probabilityThresholdDistributions,
+                batch_size=batch_size
+            )
+            t0 = time.time()
+            accuracy_batch_vector, mac_batch_vector, scores_batch_vector = \
+                CrossEntropySearchOptimizer.measure_performance_batches(
+                    multipath_routing_info_obj=self.multiPathInfoObject,
+                    path_counts=self.pathCounts,
+                    batch_size=batch_size,
+                    list_of_entropy_thresholds=e,
+                    list_of_probability_thresholds=p,
+                    indices=self.testIndices,
+                    use_numpy_approach=True,
+                    accuracy_coeff=self.accuracyWeight,
+                    mac_coeff=self.macWeight)
+            t1 = time.time()
+
+            accuracies = []
+            macs = []
+            scores = []
+
+            t2 = time.time()
+            for idx in range(batch_size):
+                e_single = [e[block_id][idx] for block_id in range(len(self.pathCounts) - 1)]
+                p_single = [p[block_id][idx] for block_id in range(len(self.pathCounts) - 1)]
+                acc, mac, score = \
+                    CrossEntropySearchOptimizer.measure_performance(
+                        multipath_routing_info_obj=self.multiPathInfoObject,
+                        path_counts=self.pathCounts,
+                        list_of_entropy_thresholds=e_single,
+                        list_of_probability_thresholds=p_single,
+                        indices=self.testIndices,
+                        use_numpy_approach=True,
+                        accuracy_coeff=self.accuracyWeight,
+                        mac_coeff=self.macWeight)
+                accuracies.append(acc)
+                macs.append(mac)
+                scores.append(score)
+            t3 = time.time()
+            accuracies = np.array(accuracies)
+            macs = np.array(macs)
+            scores = np.array(scores)
+            print("t1-t0:{0}".format(t1 - t0))
+            print("t3-t2:{0}".format(t3 - t2))
+            assert np.allclose(accuracy_batch_vector, accuracies)
+            assert np.allclose(mac_batch_vector, macs)
+            assert np.allclose(scores_batch_vector, scores)
+            print("Everything is correct!!!")

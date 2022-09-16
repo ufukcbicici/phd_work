@@ -5,7 +5,7 @@ from auxillary.db_logger import DbLogger
 from auxillary.parameters import DiscreteParameter
 from mpire import WorkerPool
 from tf_2_cign.cigt.bayesian_optimizers.cross_entropy_search_optimizer import CrossEntropySearchOptimizer
-from tf_2_cign.cigt.algorithms.categorical_distribution import CategoricalDistribution
+from tf_2_cign.cigt.distributions.categorical_distribution import CategoricalDistribution
 from tf_2_cign.cigt.lenet_cigt import LenetCigt
 from tf_2_cign.data.fashion_mnist import FashionMnist
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
