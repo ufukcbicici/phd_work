@@ -10,12 +10,12 @@ class SigmoidGmmCeThresholdOptimizer(CrossEntropySearchOptimizer):
     def __init__(self, run_id, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
                  entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed, n_jobs,
                  apply_temperature_optimization_to_entropies, apply_temperature_optimization_to_routing_probabilities,
-                 num_of_gmm_components_per_block):
+                 num_of_gmm_components_per_block, wait_period):
         self.numOfGmmComponentsPerBlock = num_of_gmm_components_per_block
         super().__init__(run_id, num_of_epochs, accuracy_weight, mac_weight, model_loader, model_id, val_ratio,
                          entropy_threshold_counts, are_entropy_thresholds_fixed, image_output_path, random_seed, n_jobs,
                          apply_temperature_optimization_to_entropies,
-                         apply_temperature_optimization_to_routing_probabilities)
+                         apply_temperature_optimization_to_routing_probabilities, wait_period)
         
     def get_explanation_string(self):
         # kv_rows = []

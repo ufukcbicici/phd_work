@@ -1917,29 +1917,51 @@ AND logs_table.Epoch >= 115 AND F.Value = "True" AND G.Value = "Softmax"
 GROUP BY logs_table.RunId
 ORDER BY TestAccuracy DESC
 
+--Experiments: Cross Entropy Search - Model Id	610.
+--Starts with RunId 1937
+--Started at 17/9/2022
+--Started on: Tetam - cigt_logger.db + Model 610 with new structure
 
---Experiments: Cross Entropy Search - Model Id	47 Starts with RunId 895
---Started at 6/9/2022
---Started on: Blackshark Laptop - db_logger.db
-SELECT * FROM ce_logs_table clt WHERE run_id = 895
-SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 895
-SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 895
-
-
---Experiments: Cross Entropy Search - Model Id	610 Starts with RunId 1839
---Started at 6/9/2022
---Started on: Tetam - cigt_logger.db
-SELECT * FROM ce_logs_table clt WHERE run_id = 1839
-SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 1839
-SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 1839
+SELECT * FROM ce_logs_table clt WHERE run_id = 1937
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 1937
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 1937
 
 
---Experiments: Cross Entropy Search - Model Id	166 Starts with RunId 1839
---Started at 6/9/2022
+--Experiments: Cross Entropy Search - Model Id	47.
+--Starts with RunId 70
+--Started at 17/9/2022
 --Started on: Tetam - cigt_logger2.db
-SELECT * FROM ce_logs_table clt WHERE run_id = 1839
-SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 1839
-SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 1839
+SELECT * FROM ce_logs_table clt WHERE run_id = 70
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 70
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 70
+
+
+--Experiments: Cross Entropy Search - Model Id 166.
+--Starts with RunId 2221
+--Started at 17/9/2022
+--Started on: Tetam Tuna - cigt_logger_tuna.db + Model 166 with new structure
+
+SELECT * FROM ce_logs_table clt WHERE run_id = 2221
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 2221
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 2221
+
+
+--Experiments: Cross Entropy Search - Model Id	407 Starts with RunId 1839
+--Started at 17/9/2022
+--Started on: Tetam Tuna - cigt_logger_tuna2.db
+
+SELECT * FROM ce_logs_table clt WHERE run_id = 46
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 46
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 46
+
+
+
+--Experiments: Cross Entropy Search - Model Id	166 Starts with RunId 62
+--Started at 17/9/2022
+--Started on: Tetam - cigt_logger2.db
+SELECT * FROM ce_logs_table clt WHERE run_id = 62
+SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 62
+SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 62
 
 SELECT AVG(acc_gain) as avg_acc_gain,
        entropy_threshold_counts, numOfGmmComponentsPerBlock,
@@ -1980,6 +2002,90 @@ FROM
 GROUP BY entropy_threshold_counts, numOfGmmComponentsPerBlock
 ORDER BY avg_acc_gain DESC
 
+    SELECT Max(mean_test_acc), Avg(testAccuracy), Max(mean_test_acc) - Avg(testAccuracy) AS acc_gain,
+       randomSeed, entropy_threshold_counts, numOfGmmComponentsPerBlock,
+       Max(model_id) as max_model_id, Min(model_id) as min_model_id,  COUNT(1) AS CNT
+    FROM
+    (
+        SELECT ce_logs_table.run_id, ce_logs_table.epoch, mean_val_acc, mean_test_acc, mean_val_gamma_acc, mean_test_gamma_acc,
+        A.Value AS model_id,
+        B.Value AS entropy_threshold_counts,
+        C.Value AS totalAccuracy,
+        D.Value AS testAccuracy,
+        E.Value AS validationAccuracy,
+        F.Value AS numOfGmmComponentsPerBlock,
+        G.Value AS randomSeed
+        FROM ce_logs_table
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'Model Id') AS A ON
+        ce_logs_table.run_id == A.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'entropy_threshold_counts') AS B ON
+        ce_logs_table.run_id == B.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'totalAccuracy') AS C ON
+        ce_logs_table.run_id == C.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'testAccuracy') AS D ON
+        ce_logs_table.run_id == D.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'validationAccuracy') AS E ON
+        ce_logs_table.run_id == E.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'numOfGmmComponentsPerBlock') AS F ON
+        ce_logs_table.run_id == F.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'randomSeed') AS G ON
+        ce_logs_table.run_id == G.RunId
+        WHERE ce_logs_table.run_id > 70
+    )
+    GROUP BY randomSeed, entropy_threshold_counts, numOfGmmComponentsPerBlock
+
+SELECT AVG(acc_gain) as avg_acc_gain, MAX(acc_gain) as max_acc_gain,
+       entropy_threshold_counts, numOfGmmComponentsPerBlock, COUNT(1) AS CNT
+FROM (SELECT Max(mean_test_acc),
+             Avg(testAccuracy),
+             Max(mean_test_acc) - Avg(testAccuracy) AS acc_gain,
+             randomSeed,
+             entropy_threshold_counts,
+             numOfGmmComponentsPerBlock,
+             Max(model_id)                          as max_model_id,
+             Min(model_id)                          as min_model_id,
+             COUNT(1)                               AS CNT
+      FROM (SELECT X.run_id,
+                   X.epoch,
+                   X.mean_val_acc,
+                   X.mean_test_acc,
+                   X.mean_val_gamma_acc,
+                   X.mean_test_gamma_acc,
+                   A.Value AS model_id,
+                   B.Value AS entropy_threshold_counts,
+                   C.Value AS totalAccuracy,
+                   D.Value AS testAccuracy,
+                   E.Value AS validationAccuracy,
+                   F.Value AS numOfGmmComponentsPerBlock,
+                   G.Value AS randomSeed
+            FROM (SELECT ce_logs_table.run_id,
+                         ce_logs_table.epoch,
+                         mean_val_acc,
+                         mean_test_acc,
+                         mean_val_gamma_acc,
+                         mean_test_gamma_acc
+                  FROM ce_logs_table
+                           LEFT JOIN run_meta_data
+                                     ON ce_logs_table.run_id = run_meta_data.RunId
+                  WHERE run_meta_data.Explanation LIKE '%Refactored_300%') AS X
+                     LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'Model Id') AS A ON
+                X.run_id == A.RunId
+        LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'entropy_threshold_counts') AS B
+            ON
+                X.run_id == B.RunId
+                LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'totalAccuracy') AS C ON
+                X.run_id == C.RunId
+                LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'testAccuracy') AS D ON
+                X.run_id == D.RunId
+                LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'validationAccuracy') AS E ON
+                X.run_id == E.RunId
+                LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'numOfGmmComponentsPerBlock') AS F ON
+                X.run_id == F.RunId
+                LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter == 'randomSeed') AS G ON
+                X.run_id == G.RunId)
+      GROUP BY randomSeed, entropy_threshold_counts, numOfGmmComponentsPerBlock)
+GROUP BY entropy_threshold_counts, numOfGmmComponentsPerBlock
+ORDER BY avg_acc_gain DESC
 
 --Experiments: Cross Entropy Search - Model Id	407 Starts with RunId 1839
 --Started at 6/9/2022

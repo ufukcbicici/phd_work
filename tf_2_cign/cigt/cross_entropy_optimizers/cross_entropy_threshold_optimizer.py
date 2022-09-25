@@ -25,7 +25,8 @@ class CrossEntropySearchOptimizer(object):
                  entropy_threshold_counts, are_entropy_thresholds_fixed,
                  image_output_path, random_seed, n_jobs,
                  apply_temperature_optimization_to_entropies,
-                 apply_temperature_optimization_to_routing_probabilities):
+                 apply_temperature_optimization_to_routing_probabilities,
+                 wait_period):
         self.runId = run_id
         self.numOfEpochs = num_of_epochs
         self.randomSeed = random_seed
@@ -38,6 +39,7 @@ class CrossEntropySearchOptimizer(object):
         self.modelLoader = model_loader
         self.modelId = model_id
         self.valRatio = val_ratio
+        self.waitPeriod = wait_period
         self.entropyThresholdCounts = entropy_threshold_counts
         self.areEntropyThresholdsFixed = are_entropy_thresholds_fixed
         self.imageOutputPath = image_output_path
@@ -132,6 +134,9 @@ class CrossEntropySearchOptimizer(object):
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="randomSeed",
                                            value=self.randomSeed,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="waitPeriod",
+                                           value=self.waitPeriod,
                                            explanation=explanation, kv_rows=kv_rows)
         return kv_rows, explanation
 
@@ -594,7 +599,7 @@ class CrossEntropySearchOptimizer(object):
             else:
                 no_op_iterations += 1
 
-            if no_op_iterations == 100:
+            if no_op_iterations == self.waitPeriod:
                 break
 
             print("Epoch:{0} val_test_gamma_corr={1}".format(epoch_id, val_test_gamma_corr))
