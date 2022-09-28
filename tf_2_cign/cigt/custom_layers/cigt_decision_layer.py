@@ -45,5 +45,5 @@ class CigtDecisionLayer(tf.keras.layers.Layer):
         ig_mask = tf.ones_like(labels)
         ig_value, routing_probabilities = \
             self.infoGainLayer([activations, labels, temperature, self.balanceCoeff, ig_mask])
-        return ig_value, activations, routing_probabilities, activations
+        return ig_value, activations, routing_probabilities, activations, h_net_normed
 

@@ -152,16 +152,18 @@ class Cigt(tf.keras.Model):
         list_of_routing_probabilities = []
         list_of_pure_activations = []
         list_of_routing_matrices = []
+        list_of_h_features = []
         logits = None
         posteriors = None
         classification_loss = None
         for block_id, block in enumerate(self.cigtBlocks):
             if block_id < len(self.cigtBlocks) - 1:
                 # Run the CIGT block
-                f_net, ig_value, ig_activations, routing_probabilities, pure_activations = \
+                f_net, ig_value, ig_activations, routing_probabilities, pure_activations, h_net_normed = \
                     block([f_net, routing_matrix, temperature, y], training=is_training)
                 list_of_pure_activations.append(pure_activations)
                 list_of_routing_probabilities.append(routing_probabilities)
+                list_of_h_features.append(h_net_normed)
                 # Keep track of the results.
                 information_gain_values.append(ig_value)
                 # Build the routing matrix for the next block
@@ -192,7 +194,8 @@ class Cigt(tf.keras.Model):
             "posteriors": posteriors,
             "routing_matrices": list_of_routing_matrices,
             "routing_probabilities": list_of_routing_probabilities,
-            "list_of_pure_activations": list_of_pure_activations
+            "list_of_pure_activations": list_of_pure_activations,
+            "list_of_h_features": list_of_h_features
         }
         return results_dict
 
