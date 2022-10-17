@@ -22,10 +22,11 @@ from tf_2_cign.cigt.cross_entropy_optimizers.cross_entropy_threshold_optimizer i
 from tf_2_cign.cigt.cross_entropy_optimizers.high_entropy_threshold_optimizer import HighEntropyThresholdOptimizer
 from tf_2_cign.cigt.cross_entropy_optimizers.sigmoid_gmm_ce_threshold_optimizer import SigmoidGmmCeThresholdOptimizer
 from tf_2_cign.cigt.model_loaders.fmnist_lenet_pretrained_model_loader import FmnistLenetPretrainedModelLoader
+from tf_2_cign.cigt.q_learning_based_post_processing.q_learning_based_post_processing import QLearningRoutingOptimizer
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-DbLogger.log_db_path = DbLogger.tetam_tuna_cigt_2
+DbLogger.log_db_path = DbLogger.blackshark_desktop
 output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                            "cigt", "image_outputs")
 
@@ -178,9 +179,25 @@ def run_categorical_ce():
     print("X")
 
 
+def run_q_net_based_post_processing(model_id):
+    model_loader = FmnistLenetPretrainedModelLoader()
+    # run_id, num_of_epochs, accuracy_weight, mac_weight, model_loader,
+    # model_id, val_ratio, random_seed
+    run_id = DbLogger.get_run_id()
+    q_learning_routing_optimizer = QLearningRoutingOptimizer(accuracy_weight=1.0,
+                                                             mac_weight=0.0,
+                                                             run_id=run_id,
+                                                             model_id=model_id,
+                                                             num_of_epochs=100,
+                                                             model_loader=model_loader,
+                                                             random_seed=5000,
+                                                             val_ratio=0.5)
+
+
 if __name__ == "__main__":
     # gpus = tf.config.list_physical_devices('GPU')
     # tf.config.experimental.set_memory_growth(gpus[0], True)
 
     # run_on_model(model_id=47, apply_temperature_to_routing=False)
-    run_on_model_seed_wise_parallelism(model_id=47)
+    # run_on_model_seed_wise_parallelism(model_id=47)
+    run_q_net_based_post_processing(model_id=47)
