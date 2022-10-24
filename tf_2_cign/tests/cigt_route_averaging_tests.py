@@ -111,4 +111,4 @@ class CigtRouteAveragingTests(unittest.TestCase):
 if __name__ == '__main__':
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
-    unittest.main()
+    # unittest.main()

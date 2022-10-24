@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 from tf_2_cign.cigt.data_classes.multipath_routing_info2 import MultipathCombinationInfo2
+from tf_2_cign.utilities.utilities import Utilities
 
 
 class QLearningRoutingOptimizer(object):
@@ -61,3 +62,21 @@ class QLearningRoutingOptimizer(object):
         val_indices, test_indices = train_test_split(indices, train_size=val_sample_count)
         return total_sample_count, val_indices, test_indices
 
+    def prepare_q_tables(self):
+        for block_id in range(len(self.model.pathCounts) - 2, -1, -1):
+            choice_count = block_id + 1
+            q_table_shape = np.concatenate([
+                np.array([2 for _ in range(choice_count)], dtype=np.int32),
+                np.array([self.totalSampleCount], dtype=np.int32)]).astype(dtype=np.int32)
+            q_table = np.zeros(shape=q_table_shape, dtype=np.float32)
+            choice_combinations = Utilities.get_cartesian_product(list_of_lists=[[0, 1] for _ in range(choice_count)])
+            # Last block
+            if block_id == len(self.model.pathCounts) - 2:
+                for choice_combination in choice_combinations:
+                    # Get routing probabilities for that block
+                    routing_probabilities = \
+                        self.multiPathInfoObject.past_decisions_routing_probabilities_list[block_id][choice_combination]
+                    print("X")
+
+
+            print(block_id)

@@ -26,7 +26,7 @@ from tf_2_cign.cigt.q_learning_based_post_processing.q_learning_based_post_proce
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-DbLogger.log_db_path = DbLogger.blackshark_desktop
+DbLogger.log_db_path = DbLogger.home_asus
 output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "..", "tf_2_cign",
                            "cigt", "image_outputs")
 
@@ -192,6 +192,7 @@ def run_q_net_based_post_processing(model_id):
                                                              model_loader=model_loader,
                                                              random_seed=5000,
                                                              val_ratio=0.5)
+    q_learning_routing_optimizer.prepare_q_tables()
 
 
 if __name__ == "__main__":

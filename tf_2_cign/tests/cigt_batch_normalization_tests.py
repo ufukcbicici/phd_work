@@ -14,7 +14,7 @@ gpus = tf.config.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(gpus[0], True)
 
 
-class CigtBatchNormTests(unittest.TestCase):
+class CigtBatchNormTests: #(unittest.TestCase):
     BATCH_SIZE = 125
     ROUTE_COUNT = None
     ABSOLUTE_ERROR_TOLERANCE = 1e-3
@@ -216,7 +216,7 @@ class CigtBatchNormTests(unittest.TestCase):
             conventional_vars[rid].assign(arr_route)
 
     # @unittest.skip
-    def test_cigt_batch_norm_layer(self):
+    def cigt_batch_norm_layer(self):
         with tf.device("GPU"):
             momentum = 0.9
             epsilon = 1e-5
@@ -399,7 +399,7 @@ class CigtBatchNormTests(unittest.TestCase):
             errors_dict[comparison_name] = (max_diff, elem_A, elem_B)
 
     # @unittest.skip
-    def test_joint_probability_calculation_and_probabilistic_cigt_batch_norm(self):
+    def joint_probability_calculation_and_probabilistic_cigt_batch_norm(self):
         with tf.device("GPU"):
             momentum = 0.9
             epsilon = 1e-5
@@ -524,4 +524,6 @@ class CigtBatchNormTests(unittest.TestCase):
 if __name__ == '__main__':
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
-    unittest.main()
+    # unittest.main()
+    tests = CigtBatchNormTests()
+    tests.cigt_batch_norm_layer()
