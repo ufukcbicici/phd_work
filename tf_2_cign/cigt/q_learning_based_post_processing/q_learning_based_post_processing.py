@@ -62,6 +62,29 @@ class QLearningRoutingOptimizer(object):
         val_indices, test_indices = train_test_split(indices, train_size=val_sample_count)
         return total_sample_count, val_indices, test_indices
 
+    def get_last_block_routing_decisions(self, q_choice_combination):
+        # Determine the corresponding routing choices for every sample
+        path_selections = np.arange(self.totalSampleCount)[:, np.newaxis]
+        for block_id, block_choice in enumerate(q_choice_combination):
+            path_indices = tuple([path_selections[:, idx] for idx in range(path_selections.shape[1])])
+            routing_probabilities = \
+                self.multiPathInfoObject.past_decisions_routing_probabilities_list[block_id][path_indices]
+            # Select the possible routing options
+            # If block_choice = 0 -> ig selection
+            ig_routings = Utilities.one_hot_numpy(arr=routing_probabilities)
+            # If block_choice = 1 -> all paths
+            all_paths_routings = np.ones(shape=ig_routings.shape, dtype=np.int32)
+            selected_paths_for_block = np.where(block_choice, all_paths_routings, ig_routings)
+            path_selections = np.concatenate([path_selections[:, :-1],
+                                              selected_paths_for_block,
+                                              np.arange(self.totalSampleCount)[:, np.newaxis]], axis=1)
+        # Accuracy vector of selections
+        path_indices = tuple([path_selections[:, idx] for idx in range(path_selections.shape[1])])
+        validity_vector = self.multiPathInfoObject.past_decisions_validity_array[path_indices]
+        mac_vector = self.multiPathInfoObject.past_decisions_mac_array[path_indices[:-1]]
+        q_values = self.accuracyWeight * validity_vector.astype(np.float) + self.macWeight * mac_vector
+        return q_values
+
     def prepare_q_tables(self):
         for block_id in range(len(self.model.pathCounts) - 2, -1, -1):
             choice_count = block_id + 1
@@ -73,10 +96,11 @@ class QLearningRoutingOptimizer(object):
             # Last block
             if block_id == len(self.model.pathCounts) - 2:
                 for choice_combination in choice_combinations:
-                    # Get routing probabilities for that block
-                    routing_probabilities = \
-                        self.multiPathInfoObject.past_decisions_routing_probabilities_list[block_id][choice_combination]
-                    print("X")
+                    self.get_last_block_routing_decisions(q_choice_combination=choice_combination)
 
+                    # # Get routing probabilities for that block
+                    # routing_probabilities = \
+                    #     self.multiPathInfoObject.past_decisions_routing_probabilities_list[block_id][choice_combination]
+                    # print("X")
 
             print(block_id)

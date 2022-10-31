@@ -233,3 +233,11 @@ class Utilities:
                 list_of_chunks.append(arr[curr_index:])
             curr_index += chunk_size
         return list_of_chunks
+
+    @staticmethod
+    def one_hot_numpy(arr):
+        assert len(arr.shape) == 2
+        arg_max_indices = np.argmax(arr, axis=1)
+        one_hot_matrix = np.zeros(shape=arr.shape, dtype=np.int32)
+        one_hot_matrix[np.arange(arr.shape[0]), arg_max_indices] = 1
+        return one_hot_matrix

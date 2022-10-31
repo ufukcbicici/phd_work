@@ -93,7 +93,6 @@ class LenetCigt(Cigt):
         leaf_node.opMacCostsDict[self.cigtBlocks[-1].lossLayer.opName] = routed_loss_layer_cost
         super(LenetCigt, self).calculate_total_macs()
 
-
     def get_explanation_string(self):
         kv_rows = []
         explanation = ""
