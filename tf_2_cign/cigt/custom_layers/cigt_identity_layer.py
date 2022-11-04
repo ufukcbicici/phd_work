@@ -10,6 +10,7 @@ class CigtIdentityLayer(tf.keras.layers.Layer):
         super().__init__()
 
     def call(self, inputs, **kwargs):
-        net = inputs
+        net = inputs[0]
+        routing_matrix = inputs[1]
         x = tf.identity(net)
         return x

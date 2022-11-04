@@ -4,6 +4,7 @@ from tf_2_cign.cigt.custom_layers.cigt_conv_batch_norm_composite_layer import Ci
 from tf_2_cign.cigt.custom_layers.cigt_identity_layer import CigtIdentityLayer
 
 
+# OK
 class BasicBlock(tf.keras.layers.Layer):
     expansion = 1
 
@@ -40,7 +41,7 @@ class BasicBlock(tf.keras.layers.Layer):
             node=node,
             activation=None,
             input_path_count=input_path_count,
-            output_path_count=input_path_count,
+            output_path_count=output_path_count,
             batch_norm_type=batch_norm_type,
             bn_momentum=bn_momentum,
             start_moving_averages_from_zero=start_moving_averages_from_zero,
@@ -56,7 +57,7 @@ class BasicBlock(tf.keras.layers.Layer):
                 node=node,
                 activation=None,
                 input_path_count=input_path_count,
-                output_path_count=input_path_count,
+                output_path_count=output_path_count,
                 batch_norm_type=batch_norm_type,
                 bn_momentum=bn_momentum,
                 start_moving_averages_from_zero=start_moving_averages_from_zero,
@@ -100,19 +101,3 @@ class BasicBlock(tf.keras.layers.Layer):
         x_hat = shortcut_result + x
         x_hat = tf.nn.relu(x_hat)
         return x_hat
-
-    # def forward(self, x, temperature=1):
-    #     # Compute relevance score
-    #     w = F.avg_pool2d(x, x.size(2))
-    #     w = F.relu(self.fc1bn(self.fc1(w)))
-    #     w = self.fc2(w)
-    #     # Sample from Gumble Module
-    #     w = self.gs(w, temp=temperature, force_hard=True)
-    #
-    #     out = F.relu(self.bn1(self.conv1(x)))
-    #     out = self.bn2(self.conv2(out))
-    #     out = self.shortcut(x) + out * w[:,1].unsqueeze(1)
-    #     out = F.relu(out)
-    #     # Return output of layer and the value of the gate
-    #     # The value of the gate will be used in the target rate loss
-    #     return out, w[:, 1]
