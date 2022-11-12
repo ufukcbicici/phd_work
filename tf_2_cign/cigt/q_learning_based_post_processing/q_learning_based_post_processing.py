@@ -86,21 +86,22 @@ class QLearningRoutingOptimizer(object):
         return q_values
 
     def prepare_q_tables(self):
+        q_tables = [np.zeros(shape=1)] * (len(self.model.pathCounts) - 1)
         for block_id in range(len(self.model.pathCounts) - 2, -1, -1):
-            choice_count = block_id + 1
-            q_table_shape = np.concatenate([
-                np.array([2 for _ in range(choice_count)], dtype=np.int32),
-                np.array([self.totalSampleCount], dtype=np.int32)]).astype(dtype=np.int32)
-            q_table = np.zeros(shape=q_table_shape, dtype=np.float32)
-            choice_combinations = Utilities.get_cartesian_product(list_of_lists=[[0, 1] for _ in range(choice_count)])
             # Last block
             if block_id == len(self.model.pathCounts) - 2:
+                choice_count = block_id + 1
+                q_table_shape = np.concatenate([
+                    np.array([2 for _ in range(choice_count)], dtype=np.int32),
+                    np.array([self.totalSampleCount], dtype=np.int32)]).astype(dtype=np.int32)
+                q_table = np.zeros(shape=q_table_shape, dtype=np.float32)
+                choice_combinations = Utilities.get_cartesian_product(
+                    list_of_lists=[[0, 1] for _ in range(choice_count)])
                 for choice_combination in choice_combinations:
-                    self.get_last_block_routing_decisions(q_choice_combination=choice_combination)
-
-                    # # Get routing probabilities for that block
-                    # routing_probabilities = \
-                    #     self.multiPathInfoObject.past_decisions_routing_probabilities_list[block_id][choice_combination]
-                    # print("X")
-
+                    q_values = self.get_last_block_routing_decisions(q_choice_combination=choice_combination)
+                    q_table[choice_combination] = q_values
+                q_tables[block_id] = q_table
+            else:
+                q_table = np.max(q_tables[block_id + 1], axis=-2)
+                q_tables[block_id] = q_table
             print(block_id)

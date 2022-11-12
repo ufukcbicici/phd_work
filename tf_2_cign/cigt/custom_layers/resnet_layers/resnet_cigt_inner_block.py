@@ -60,7 +60,18 @@ class ResnetCigtInnerBlock(InnerCigtBlock):
         else:
             self.firstConvBn = CigtIdentityLayer()
 
-        #
+        # block_params_object is a dictionary with required parameters stored in key-value format.
+        for block_params_object in self.blockParameters:
+            output_dim = block_params_object["output_dim"]
+            num_blocks = block_params_object["num_blocks"]
+            stride = block_params_object["stride"]
+
+
+
+
+
+
+
 
 
 
