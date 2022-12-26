@@ -241,3 +241,9 @@ class Utilities:
         one_hot_matrix = np.zeros(shape=arr.shape, dtype=np.int32)
         one_hot_matrix[np.arange(arr.shape[0]), arg_max_indices] = 1
         return one_hot_matrix
+
+    @staticmethod
+    def convert_trajectory_array_to_indices(trajectory_array):
+        path_indices = tuple([trajectory_array[:, idx] for idx in range(trajectory_array.shape[1])])
+        return path_indices
+

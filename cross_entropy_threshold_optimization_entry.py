@@ -191,8 +191,15 @@ def run_q_net_based_post_processing(model_id):
                                                              num_of_epochs=100,
                                                              model_loader=model_loader,
                                                              random_seed=5000,
-                                                             val_ratio=0.5)
+                                                             val_ratio=0.5,
+                                                             max_test_val_diff=0.0020)
     q_learning_routing_optimizer.prepare_q_tables()
+    q_learning_routing_optimizer.calibrate_test_and_val_sets()
+    q_learning_routing_optimizer.train(epoch_count=100,
+                                       batch_size=5000,
+                                       input_dimension=128,
+                                       lstm_layer_dimensions=[128],
+                                       dropout_ratio=0.0)
 
 
 if __name__ == "__main__":
