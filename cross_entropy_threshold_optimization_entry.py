@@ -22,6 +22,10 @@ from tf_2_cign.cigt.cross_entropy_optimizers.cross_entropy_threshold_optimizer i
 from tf_2_cign.cigt.cross_entropy_optimizers.high_entropy_threshold_optimizer import HighEntropyThresholdOptimizer
 from tf_2_cign.cigt.cross_entropy_optimizers.sigmoid_gmm_ce_threshold_optimizer import SigmoidGmmCeThresholdOptimizer
 from tf_2_cign.cigt.model_loaders.fmnist_lenet_pretrained_model_loader import FmnistLenetPretrainedModelLoader
+from tf_2_cign.cigt.q_learning_based_post_processing.q_learning_based_classification import \
+    QLearningBasedRoutingClassification
+from tf_2_cign.cigt.q_learning_based_post_processing.q_learning_based_combined_classification import \
+    QLearningBasedCombinedClassification
 from tf_2_cign.cigt.q_learning_based_post_processing.q_learning_based_post_processing import QLearningRoutingOptimizer
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -184,22 +188,32 @@ def run_q_net_based_post_processing(model_id):
     # run_id, num_of_epochs, accuracy_weight, mac_weight, model_loader,
     # model_id, val_ratio, random_seed
     run_id = DbLogger.get_run_id()
-    q_learning_routing_optimizer = QLearningRoutingOptimizer(accuracy_weight=1.0,
-                                                             mac_weight=0.0,
-                                                             run_id=run_id,
-                                                             model_id=model_id,
-                                                             num_of_epochs=100,
-                                                             model_loader=model_loader,
-                                                             random_seed=5000,
-                                                             val_ratio=0.5,
-                                                             max_test_val_diff=0.0020)
+    # q_learning_routing_optimizer = QLearningRoutingOptimizer(accuracy_weight=1.0,
+    #                                                          mac_weight=0.2,
+    #                                                          run_id=run_id,
+    #                                                          model_id=model_id,
+    #                                                          num_of_epochs=300,
+    #                                                          model_loader=model_loader,
+    #                                                          random_seed=5000,
+    #                                                          val_ratio=0.5,
+    #                                                          max_test_val_diff=0.0020)
+    q_learning_routing_optimizer = QLearningBasedCombinedClassification(accuracy_weight=1.0,
+                                                                        mac_weight=0.2,
+                                                                        run_id=run_id,
+                                                                        model_id=model_id,
+                                                                        num_of_epochs=300,
+                                                                        model_loader=model_loader,
+                                                                        random_seed=5000,
+                                                                        val_ratio=0.5,
+                                                                        max_test_val_diff=0.0020)
     q_learning_routing_optimizer.prepare_q_tables()
     q_learning_routing_optimizer.calibrate_test_and_val_sets()
-    q_learning_routing_optimizer.train(epoch_count=100,
-                                       batch_size=5000,
-                                       input_dimension=128,
-                                       lstm_layer_dimensions=[128],
-                                       dropout_ratio=0.0)
+    q_learning_routing_optimizer.train_with_resampling_techniques()
+    # q_learning_routing_optimizer.train(epoch_count=300,
+    #                                    batch_size=200,
+    #                                    input_dimension=512,
+    #                                    lstm_layer_dimensions=[1024],
+    #                                    dropout_ratio=0.2)
 
 
 if __name__ == "__main__":

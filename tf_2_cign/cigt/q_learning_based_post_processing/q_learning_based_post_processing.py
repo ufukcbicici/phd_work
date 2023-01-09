@@ -25,9 +25,9 @@ class QLearningRoutingOptimizer(object):
         self.lr = 0.001
         self.learningRateSchedule = DiscreteParameter(name="lr_calculator",
                                                       value=self.lr,
-                                                      schedule=[(15000 + 12000, (1.0 / 2.0) * self.lr),
-                                                                (30000 + 12000, (1.0 / 4.0) * self.lr),
-                                                                (40000 + 12000, (1.0 / 40.0) * self.lr)])
+                                                      schedule=[(1500, (1.0 / 2.0) * self.lr),
+                                                                (3000, (1.0 / 4.0) * self.lr),
+                                                                (4000, (1.0 / 40.0) * self.lr)])
         self.optimizer = self.get_optimizer()
         self.modelLoader = model_loader
         self.model, self.dataset = self.modelLoader.get_model(model_id=self.modelId)
@@ -37,6 +37,7 @@ class QLearningRoutingOptimizer(object):
         # self.softmaxTemperatureOptimizer = SoftmaxTemperatureOptimizer(multi_path_object=self.multiPathInfoObject)
         # self.softmaxTemperatureOptimizer.plot_entropy_histogram_with_temperature(temperature=1.0, block_id=0)
         self.totalSampleCount, self.valIndices, self.testIndices = self.prepare_val_test_sets()
+        self.kind = "regression"
         self.qTables = None
 
     # Load routing information for the particular model
@@ -93,7 +94,10 @@ class QLearningRoutingOptimizer(object):
         path_indices = tuple([path_selections[:, idx] for idx in range(path_selections.shape[1])])
         validity_vector = self.multiPathInfoObject.past_decisions_validity_array[path_indices]
         mac_vector = self.multiPathInfoObject.past_decisions_mac_array[path_indices[:-1]]
-        q_values = self.accuracyWeight * validity_vector.astype(np.float) + self.macWeight * mac_vector
+        min_mac = np.nanmin(self.multiPathInfoObject.past_decisions_mac_array)
+        vecA = self.accuracyWeight * validity_vector.astype(np.float)
+        vecB = self.macWeight * (mac_vector * (1.0 / min_mac) - 1.0)
+        q_values = vecA - vecB
         return q_values
 
     def prepare_q_tables(self):
@@ -114,7 +118,7 @@ class QLearningRoutingOptimizer(object):
                     q_values = self.get_last_block_routing_decisions(q_choice_combination=choice_combination)
                     # q_table[choice_combination] = q_values
                     q_table[(slice(None), *choice_combination)] = q_values
-                    assert np.array_equal(q_table_transpose[choice_combination], q_values)
+                    assert np.allclose(q_table_transpose[choice_combination], q_values)
                 self.qTables[block_id] = q_table
             else:
                 q_table = np.max(self.qTables[block_id + 1], axis=-1)
@@ -221,23 +225,40 @@ class QLearningRoutingOptimizer(object):
         q_tables_ground_truth = tf.convert_to_tensor(q_tables_ground_truth)
         return inputs, q_tables_ground_truth
 
+    def calculate_loss(self, lstm_q_model, inputs, q_tables_ground_truth):
+        q_tables_prediction = lstm_q_model(inputs, training=True)
+        q_tables_prediction = tf.stack(q_tables_prediction, axis=1)
+        mse_tensor = tf.square(q_tables_ground_truth - q_tables_prediction)
+        mse_loss = tf.reduce_mean(mse_tensor)
+        print("mse_loss:{0}".format(mse_loss))
+        return mse_loss
+
+    def predict_actions(self, lstm_q_model, inputs, time_step):
+        q_tables_prediction = lstm_q_model(inputs, training=False)
+        q_table_for_step_t = q_tables_prediction[time_step]
+        q_table_for_step_t = q_table_for_step_t.numpy()
+        predicted_a_t = np.argmax(q_table_for_step_t, axis=1)
+        return predicted_a_t
+
     def train(self, epoch_count, batch_size, input_dimension, lstm_layer_dimensions,
               dropout_ratio):
         # Create the lstm model
         lstm_q_model = LstmBasedQModel(path_counts=self.model.pathCounts,
                                        input_dimension=input_dimension,
                                        lstm_layer_dimensions=lstm_layer_dimensions,
-                                       dropout_ratio=dropout_ratio)
+                                       dropout_ratio=dropout_ratio,
+                                       kind=self.kind)
         step_count = len(self.model.pathCounts) - 1
         # Create the datasets
         datasets = {}
         for dataset_type, indices in [("validation", self.valIndices), ("test", self.testIndices)]:
             dataset_tf = tf.data.Dataset.from_tensor_slices((indices,)).shuffle(1000).batch(batch_size)
             datasets[dataset_type] = dataset_tf
-
+        iteration_num = 0
         features = self.multiPathInfoObject.past_decisions_h_features_list
         for epoch_id in range(epoch_count):
             for tpl in datasets["validation"]:
+                print("iteration_num:{0}".format(iteration_num))
                 train_idx = tpl[0].numpy()
                 path_selections = train_idx[:, np.newaxis]
                 q_table_selections = train_idx[:, np.newaxis]
@@ -249,21 +270,20 @@ class QLearningRoutingOptimizer(object):
                                                                                  actions=actions)
                 # Step 3: Transform h outputs from each block into Q table outputs.
                 with tf.GradientTape() as tape:
-                    q_tables_prediction = lstm_q_model(inputs, training=True)
-                    q_tables_prediction = tf.stack(q_tables_prediction, axis=1)
-                    mse_tensor = tf.square(q_tables_ground_truth - q_tables_prediction)
-                    mse_loss = tf.reduce_mean(mse_tensor)
-                    # mse_loss = tf.losses.mean_squared_error(q_tables_ground_truth, q_tables_prediction)
-                print("mse_loss:{0}".format(mse_loss))
-                grads = tape.gradient(mse_loss, lstm_q_model.trainable_variables)
+                    loss = self.calculate_loss(lstm_q_model=lstm_q_model, inputs=inputs,
+                                               q_tables_ground_truth=q_tables_ground_truth)
+                    # mse_loss = tf.with.mean_squared_error(q_tables_ground_truth, q_tables_prediction)
+                grads = tape.gradient(loss, lstm_q_model.trainable_variables)
                 self.optimizer.apply_gradients(zip(grads, lstm_q_model.trainable_variables))
+                print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
+                iteration_num += 1
 
             print("Validation Results")
-            self.evaluate(lstm_q_model=lstm_q_model, dataset=datasets["validation"])
+            self.evaluate(model=lstm_q_model, dataset=datasets["validation"])
             print("Test Results")
-            self.evaluate(lstm_q_model=lstm_q_model, dataset=datasets["test"])
+            self.evaluate(model=lstm_q_model, dataset=datasets["test"])
 
-    def evaluate(self, lstm_q_model, dataset):
+    def evaluate(self, model, dataset):
         step_count = len(self.model.pathCounts) - 1
         validity_vectors = []
         mac_vectors = []
@@ -286,10 +306,7 @@ class QLearningRoutingOptimizer(object):
             for t in range(step_count):
                 inputs, q_tables_ground_truth = self.get_inputs_outputs_from_rnn(sample_indices=sample_indices,
                                                                                  actions=actions)
-                q_tables_prediction = lstm_q_model(inputs, training=False)
-                q_table_for_step_t = q_tables_prediction[:, t, :]
-                q_table_for_step_t = q_table_for_step_t.numpy()
-                predicted_a_t = np.argmax(q_table_for_step_t, axis=1)
+                predicted_a_t = self.predict_actions(lstm_q_model=model, inputs=inputs, time_step=t)
                 actions[:, t] = predicted_a_t
 
                 routes_selected = self.convert_actions_to_routes(path_indices=path_indices,
@@ -310,10 +327,5 @@ class QLearningRoutingOptimizer(object):
         accuracy = np.mean(validity_vector_complete)
         mac = np.mean(mac_vector_complete)
         print("Accuracy:{0} Mac:{1}".format(accuracy, mac))
-
-
-
-
-
-
+        return accuracy
 

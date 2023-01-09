@@ -2,8 +2,10 @@ import tensorflow as tf
 
 
 class LstmBasedQModel(tf.keras.Model):
-    def __init__(self, path_counts, input_dimension, lstm_layer_dimensions, dropout_ratio, *args, **kwargs):
+    def __init__(self, path_counts, input_dimension, lstm_layer_dimensions, dropout_ratio, kind, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.kind = kind
+        self.outputDim = 2 if kind == "regression" else 1
         self.pathCounts = path_counts
         self.blockCount = len(self.pathCounts) - 1
         self.dropOutRatio = dropout_ratio
@@ -14,7 +16,7 @@ class LstmBasedQModel(tf.keras.Model):
         for block_id in range(self.blockCount):
             input_layer = tf.keras.layers.Dense(units=input_dimension, activation="relu")
             self.inputFullyConnectedLayers.append(input_layer)
-            output_layer = tf.keras.layers.Dense(units=2, activation=None)
+            output_layer = tf.keras.layers.Dense(units=self.outputDim, activation=None)
             self.outputFullyConnectedLayers.append(output_layer)
 
         for layer_id, lstm_dim in enumerate(self.lstmLayerDimensions):
@@ -33,12 +35,12 @@ class LstmBasedQModel(tf.keras.Model):
         for lstm_layer in self.lstmLayers:
             x = lstm_layer(x)
         # Convert the lstm outputs to regression outputs
-        regression_outputs = []
+        task_outputs = []
         for block_id in range(self.blockCount):
             lstm_output = x[:, block_id, :]
             lstm_output = self.outputFullyConnectedLayers[block_id](lstm_output)
-            regression_outputs.append(lstm_output)
-        return regression_outputs
+            task_outputs.append(lstm_output)
+        return task_outputs
 
 
 
