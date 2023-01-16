@@ -13,3 +13,6 @@ class ResnetCigt(Cigt):
                          routing_strategy_name, use_straight_through, warm_up_period, decision_drop_probability,
                          classification_drop_probability, decision_wd, classification_wd, evaluation_period,
                          measurement_start, save_model, model_definition, *args, **kwargs)
+
+
+

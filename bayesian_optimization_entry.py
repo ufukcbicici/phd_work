@@ -10,10 +10,11 @@ from tf_2_cign.cigt.bayesian_optimizers.fashion_mnist_lenet_sigmoid_norm_ce_sear
 from tf_2_cign.cigt.bayesian_optimizers.fashion_mnist_lenet_threshold_optimizer import \
     FashionMnistLenetThresholdOptimizer
 import numpy as np
+
 # from auxillary.db_logger import DbLogger
 # from auxillary.general_utility_funcs import UtilityFuncs
 # Hyper-parameters
-
+from tf_2_cign.cigt.bayesian_optimizers.resnet_cigt_weight_decay_optimizer import ResnetCigtWeightDecayOptimizer
 
 if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
@@ -26,7 +27,7 @@ if __name__ == "__main__":
     # bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
     #                        log_file_name="bo_gumbel_softmax_mean_z_only_dropout")
 
-    DbLogger.log_db_path = DbLogger.blackshark_desktop
+    # DbLogger.log_db_path = DbLogger.blackshark_desktop
     # bayesian_optimizer = FmnistGumbelSoftmaxVanillaOptimizer(init_points=100, n_iter=300, xi=0.01)
     # bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
     #                        log_file_name="bo_gumbel_softmax_mean_z_vanilla")
@@ -41,22 +42,34 @@ if __name__ == "__main__":
     #                                                               val_ratio=0.25, accuracy_mac_balance_coeff=1.0)
     # cross_entropy_optimizer.run()
 
-    search = FashionMnistLenetCrossEntropySearch(init_points=300, n_iter=700,
-                                                 xi=0.01, model_id=424, val_ratio=0.25,
-                                                 entropy_interval_counts=[5, 5],
-                                                 entropy_bins_count=50,
-                                                 probability_bins_count=50,
-                                                 accuracy_mac_balance_coeff=1.0)
-    search.run()
+    DbLogger.log_db_path = DbLogger.home_asus
+    bayesian_optimizer = ResnetCigtWeightDecayOptimizer(init_points=100,
+                                                        n_iter=300,
+                                                        xi=0.01,
+                                                        ig_balance_coeff=3.7233209862205525,
+                                                        d_loss_coeff=0.7564802988471849)
+    bayesian_optimizer.fit(log_file_root_path=os.path.split(os.path.abspath(__file__))[0],
+                           log_file_name="bo_gumbel_softmax_mean_z_only_dropout")
 
-    output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "tf_2_cign",
-                               "cigt", "image_outputs")
-    #
-    # search = FashionMnistLenetSigmoidNormCeSearh(init_points=300, n_iter=700,
+
+
+
+    # search = FashionMnistLenetCrossEntropySearch(init_points=300, n_iter=700,
     #                                              xi=0.01, model_id=424, val_ratio=0.25,
     #                                              entropy_interval_counts=[5, 5],
     #                                              entropy_bins_count=50,
     #                                              probability_bins_count=50,
-    #                                              accuracy_mac_balance_coeff=1.0,
-    #                                              root_path=output_path)
+    #                                              accuracy_mac_balance_coeff=1.0)
     # search.run()
+    #
+    # output_path = os.path.join(os.path.split(os.path.abspath(__file__))[0], "tf_2_cign",
+    #                            "cigt", "image_outputs")
+    # #
+    # # search = FashionMnistLenetSigmoidNormCeSearh(init_points=300, n_iter=700,
+    # #                                              xi=0.01, model_id=424, val_ratio=0.25,
+    # #                                              entropy_interval_counts=[5, 5],
+    # #                                              entropy_bins_count=50,
+    # #                                              probability_bins_count=50,
+    # #                                              accuracy_mac_balance_coeff=1.0,
+    # #                                              root_path=output_path)
+    # # search.run()

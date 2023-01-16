@@ -8,9 +8,17 @@ from tf_2_cign.cigt.custom_layers.cigt_identity_layer import CigtIdentityLayer
 class BasicBlock(tf.keras.layers.Layer):
     expansion = 1
 
-    def __init__(self, in_dimension, out_dimension, node, input_path_count, output_path_count,
-                 batch_norm_type, bn_momentum, start_moving_averages_from_zero,
-                 apply_mask_to_batch_norm, stride=1):
+    def __init__(self,
+                 in_dimension,
+                 out_dimension,
+                 node,
+                 input_path_count,
+                 output_path_count,
+                 batch_norm_type,
+                 bn_momentum,
+                 start_moving_averages_from_zero,
+                 apply_mask_to_batch_norm,
+                 stride):
         super(BasicBlock, self).__init__()
         self.inDimension = in_dimension
         self.outDimension = out_dimension
@@ -71,6 +79,7 @@ class BasicBlock(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         net = inputs[0]
         routing_matrix = inputs[1]
+        training = kwargs["training"]
 
         # Mask = 0, x < 0
         # Relu(Mask(x, 0)) = 0
@@ -90,14 +99,14 @@ class BasicBlock(tf.keras.layers.Layer):
 
         # First Conv - Bn pair:
         # self.bn1(self.conv1(x))
-        x = self.convBnLayer1([net, routing_matrix])
+        x = self.convBnLayer1([net, routing_matrix], training=training)
         # F.relu(x)
         x = tf.nn.relu(x)
 
         # Second Conv - Bn pair:
         # self.bn2(self.conv2(out))
-        x = self.convBnLayer2([x, routing_matrix])
-        shortcut_result = self.shortcut(net)
+        x = self.convBnLayer2([x, routing_matrix], training=training)
+        shortcut_result = self.shortcut([net, routing_matrix], training=training)
         x_hat = shortcut_result + x
         x_hat = tf.nn.relu(x_hat)
         return x_hat

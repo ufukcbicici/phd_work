@@ -87,36 +87,3 @@ class LeNetCigtLeafBlock(tf.keras.layers.Layer):
         classification_loss = tf.reduce_mean(cross_entropy_loss_tensor)
 
         return logits, posteriors, classification_loss
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

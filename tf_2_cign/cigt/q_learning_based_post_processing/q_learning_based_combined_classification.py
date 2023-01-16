@@ -266,10 +266,11 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
         test_dataset = tf.data.Dataset.from_tensor_slices((test_indices,)).shuffle(1000).batch(batch_size)
 
         score_list = []
-        for params in params_list:
+        for param_id, params in enumerate(params_list):
+            print("Process Id:{0} Param Id:{1}".format(process_id, param_id))
             standard_scaler = StandardScaler()
             pca = PCA()
-            mlp = MLPClassifier(verbose=True)
+            mlp = MLPClassifier(verbose=False)
             pipe = Pipeline(steps=[("scaler", standard_scaler),
                                    ('pca', pca),
                                    ('mlp', mlp)])
@@ -318,6 +319,7 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
             DbLogger.write_into_table(table="cigt_q_learning", rows=[(
                 run_id,
                 model_id,
+                process_id,
                 val_accuracy,
                 test_accuracy,
                 val_mac,
@@ -375,7 +377,7 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
             param_grid["mlp__n_iter_no_change"]
         ])
 
-        number_of_jobs = 1
+        number_of_jobs = 2
         chunks = Utilities.divide_array_into_chunks(param_grid, count=number_of_jobs)
         list_of_processes = []
         for process_id in range(number_of_jobs):

@@ -60,10 +60,11 @@ class CigtConvBatchNormCompositeLayer(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         net = inputs[0]
         routing_matrix = inputs[1]
+        training = kwargs["training"]
 
         # F ops
         x = self.conv([net, routing_matrix])
-        x = self.batchNorm([x, routing_matrix])
+        x = self.batchNorm([x, routing_matrix], training=training)
         if self.applyMaskToBatchNorm:
             x = self.cigtMaskingLayer([x, routing_matrix])
         return x

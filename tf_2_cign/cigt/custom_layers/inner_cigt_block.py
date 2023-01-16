@@ -35,7 +35,7 @@ class InnerCigtBlock(tf.keras.layers.Layer):
                                               activation="relu",
                                               node=node,
                                               use_bias=True,
-                                              name="Lenet_Cigt_Node_{0}_fc_op_decision".format(self.node.index))
+                                              name="Cigt_Node_{0}_fc_op_decision".format(self.node.index))
         self.decisionDropoutLayer = tf.keras.layers.Dropout(rate=self.decisionDropProbability)
         if self.routingStrategy == "Full_Training":
             self.cigtDecisionLayer = CigtGumbelSoftmaxDecisionLayer(node=node,

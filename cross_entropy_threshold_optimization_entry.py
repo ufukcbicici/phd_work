@@ -188,6 +188,7 @@ def run_q_net_based_post_processing(model_id):
     # run_id, num_of_epochs, accuracy_weight, mac_weight, model_loader,
     # model_id, val_ratio, random_seed
     run_id = DbLogger.get_run_id()
+    DbLogger.write_into_table(rows=[(run_id, "Combined Q-Net Based Routing")], table=DbLogger.runMetaData)
     # q_learning_routing_optimizer = QLearningRoutingOptimizer(accuracy_weight=1.0,
     #                                                          mac_weight=0.2,
     #                                                          run_id=run_id,
