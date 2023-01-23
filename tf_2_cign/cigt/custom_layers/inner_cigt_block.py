@@ -10,7 +10,7 @@ from tf_2_cign.custom_layers.info_gain_layer import InfoGainLayer
 
 
 class InnerCigtBlock(tf.keras.layers.Layer):
-    def __init__(self, node, routing_strategy,
+    def __init__(self, node, routing_strategy_name,
                  decision_drop_probability, decision_dim, bn_momentum,
                  prev_block_path_count,
                  this_block_path_count,
@@ -19,7 +19,7 @@ class InnerCigtBlock(tf.keras.layers.Layer):
         super().__init__()
         self.node = node
         self.bnMomentum = bn_momentum
-        self.routingStrategy = routing_strategy
+        self.routingStrategyName = routing_strategy_name
         self.useStraightThrough = use_straight_through
         self.decisionNonLinearity = decision_non_linearity
         self.prevBlockPathCount = prev_block_path_count
@@ -37,7 +37,7 @@ class InnerCigtBlock(tf.keras.layers.Layer):
                                               use_bias=True,
                                               name="Cigt_Node_{0}_fc_op_decision".format(self.node.index))
         self.decisionDropoutLayer = tf.keras.layers.Dropout(rate=self.decisionDropProbability)
-        if self.routingStrategy == "Full_Training":
+        if self.routingStrategyName == "Full_Training":
             self.cigtDecisionLayer = CigtGumbelSoftmaxDecisionLayer(node=node,
                                                                     decision_bn_momentum=self.bnMomentum,
                                                                     next_block_path_count=next_block_path_count,
@@ -46,15 +46,15 @@ class InnerCigtBlock(tf.keras.layers.Layer):
                                                                     straight_through=self.useStraightThrough,
                                                                     decision_non_linearity=self.decisionNonLinearity)
 
-        elif self.routingStrategy == "Approximate_Training" or \
-                self.routingStrategy == "Enforced_Routing" or self.routingStrategy == "Probability_Thresholds":
+        elif self.routingStrategyName == "Approximate_Training" or \
+                self.routingStrategyName == "Enforced_Routing" or self.routingStrategyName == "Probability_Thresholds":
             self.cigtDecisionLayer = CigtDecisionLayer(node=node,
                                                        decision_bn_momentum=self.bnMomentum,
                                                        next_block_path_count=next_block_path_count,
                                                        class_count=class_count,
                                                        ig_balance_coefficient=ig_balance_coefficient,
                                                        from_logits=True)
-        elif self.routingStrategy == "Random_Routing":
+        elif self.routingStrategyName == "Random_Routing":
             self.cigtDecisionLayer = CigtRandomDecisionLayer(node=node,
                                                              decision_bn_momentum=self.bnMomentum,
                                                              next_block_path_count=next_block_path_count,

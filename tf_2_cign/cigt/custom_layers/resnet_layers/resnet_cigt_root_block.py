@@ -31,7 +31,7 @@ class ResnetCigtRootBlock(ResnetCigtInnerBlock):
                  next_block_path_count,
                  class_count,
                  ig_balance_coefficient,
-                 routing_strategy,
+                 routing_strategy_name,
                  use_straight_through,
                  decision_non_linearity):
         self.firstConvKernelSize = first_conv_kernel_size
@@ -43,19 +43,19 @@ class ResnetCigtRootBlock(ResnetCigtInnerBlock):
             strides=self.firstConvStride,
             node=node,
             activation=None,
-            input_path_count=self.prevBlockPathCount,
-            output_path_count=self.thisBlockPathCount,
-            batch_norm_type=self.batchNormType,
-            bn_momentum=self.bnMomentum,
-            start_moving_averages_from_zero=self.startMovingAveragesFromZero,
-            apply_mask_to_batch_norm=self.applyMaskToBatchNorm,
+            input_path_count=prev_block_path_count,
+            output_path_count=this_block_path_count,
+            batch_norm_type=batch_norm_type,
+            bn_momentum=bn_momentum,
+            start_moving_averages_from_zero=start_moving_averages_from_zero,
+            apply_mask_to_batch_norm=apply_mask_to_batch_norm,
             use_bias=False,
             padding="same")
 
         super().__init__(node, block_parameters, batch_norm_type, start_moving_averages_from_zero,
                          apply_mask_to_batch_norm, decision_drop_probability, decision_average_pooling_stride,
                          decision_dim, bn_momentum, prev_block_path_count, this_block_path_count, next_block_path_count,
-                         class_count, ig_balance_coefficient, routing_strategy, use_straight_through,
+                         class_count, ig_balance_coefficient, routing_strategy_name, use_straight_through,
                          decision_non_linearity)
 
     def call(self, inputs, **kwargs):

@@ -27,10 +27,10 @@ class ResnetCigtInnerBlock(InnerCigtBlock):
                  next_block_path_count,
                  class_count,
                  ig_balance_coefficient,
-                 routing_strategy,
+                 routing_strategy_name,
                  use_straight_through,
                  decision_non_linearity):
-        super().__init__(node, routing_strategy, decision_drop_probability, decision_dim, bn_momentum,
+        super().__init__(node, routing_strategy_name, decision_drop_probability, decision_dim, bn_momentum,
                          prev_block_path_count,
                          this_block_path_count,
                          next_block_path_count,

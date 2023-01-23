@@ -58,7 +58,7 @@ class LenetCigt(Cigt):
                                             next_block_path_count=self.pathCounts[block_id + 1],
                                             ig_balance_coefficient=self.informationGainBalanceCoeff,
                                             class_count=self.classCount,
-                                            routing_strategy=self.routingStrategyName,
+                                            routing_strategy_name=self.routingStrategyName,
                                             use_straight_through=self.useStraightThrough,
                                             decision_non_linearity=self.decisionNonLinearity)
             else:

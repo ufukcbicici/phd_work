@@ -72,13 +72,13 @@ class Cigt(tf.keras.Model):
         self.routingStrategyName = routing_strategy_name
         self.useStraightThrough = use_straight_through
         if self.routingStrategyName == "Full_Training":
-            self.routingStrategy = FullTrainingStrategy()
+            self.routingStrategyLayer = FullTrainingStrategy()
         elif self.routingStrategyName == "Approximate_Training" or self.routingStrategyName == "Random_Routing":
-            self.routingStrategy = ApproximateTrainingStrategy()
+            self.routingStrategyLayer = ApproximateTrainingStrategy()
         elif self.routingStrategyName == "Enforced_Routing":
-            self.routingStrategy = EnforcedRoutingStrategy(enforced_decision_vectors=self.enforcedRoutingDecisions)
+            self.routingStrategyLayer = EnforcedRoutingStrategy(enforced_decision_vectors=self.enforcedRoutingDecisions)
         elif self.routingStrategyName == "Probability_Thresholds":
-            self.routingStrategy = ProbabilityThresholdedRoutingStrategy(
+            self.routingStrategyLayer = ProbabilityThresholdedRoutingStrategy(
                 path_counts=self.pathCountsTf, probability_thresholds=self.routingProbabilityThresholds)
         else:
             raise NotImplementedError()
@@ -167,8 +167,8 @@ class Cigt(tf.keras.Model):
                 # Keep track of the results.
                 information_gain_values.append(ig_value)
                 # Build the routing matrix for the next block
-                routing_matrix = self.routingStrategy([routing_probabilities, is_warm_up, block_id],
-                                                      training=is_training)
+                routing_matrix = self.routingStrategyLayer([routing_probabilities, is_warm_up, block_id],
+                                                           training=is_training)
                 list_of_routing_matrices.append(routing_matrix)
                 # Last block
             else:
@@ -329,7 +329,7 @@ class Cigt(tf.keras.Model):
             use_multiprocessing=False):
 
         # Enforced routing is not defined for training.
-        assert self.routingStrategy != "Enforced_Routing"
+        assert self.routingStrategyName != "Enforced_Routing"
         self.numOfTrainingIterations = 0
         self.numOfTrainingEpochs = 0
         scoring_start_epoch = epochs - self.measurementStart

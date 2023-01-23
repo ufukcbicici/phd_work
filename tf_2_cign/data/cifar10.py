@@ -5,17 +5,18 @@ from sklearn.model_selection import train_test_split
 
 class Cifar10(object):
     CIFAR_SIZE = 32
-    TF_RNG = tf.random.Generator.from_seed(123, alg='philox')
+    TF_RNG = None
+    # tf.random.Generator.from_seed(123, alg='philox')
 
     @staticmethod
-    def augment_training_image_fn_with_seed(image):
+    def augment_training_image_fn_with_seed(image, label):
         seed = Cifar10.TF_RNG.make_seeds(2)[0]
         image_normalized = Cifar10.augment_training_image_fn(image=image, seed=seed)
-        return image_normalized
+        return image_normalized, label
 
     @staticmethod
     def augment_training_image_fn(image, seed):
-        # print(image.__class__)
+        # assert len(image.shape) == 3
         image = tf.image.resize_with_crop_or_pad(image, Cifar10.CIFAR_SIZE + 8, Cifar10.CIFAR_SIZE + 8)
         image = tf.image.stateless_random_crop(image, [Cifar10.CIFAR_SIZE, Cifar10.CIFAR_SIZE, 3], seed)
         image = tf.image.stateless_random_flip_left_right(image, seed)
@@ -28,22 +29,22 @@ class Cifar10(object):
         return image_normalized
 
     @staticmethod
-    def augment_test_image_fn(image):
+    def augment_test_image_fn(image, label):
         image = (tf.cast(image, dtype=tf.float32) / 255.0)
         mean = tf.convert_to_tensor((0.4914, 0.4822, 0.4465))
         std = tf.convert_to_tensor((0.2023, 0.1994, 0.2010))
         mean = tf.expand_dims(tf.expand_dims(mean, axis=0), axis=0)
         std = tf.expand_dims(tf.expand_dims(std, axis=0), axis=0)
         image_normalized = (image - mean) / std
-        return image_normalized
+        return image_normalized, label
 
     def __init__(self, batch_size, validation_size=0, validation_source="test"):
         np.random.seed(67)
         self.trainData, self.testData = tf.keras.datasets.cifar10.load_data()
         self.trainX, self.trainY = self.trainData[0], self.trainData[1]
         self.testX, self.testY = self.testData[0], self.testData[1]
-        self.trainX = np.expand_dims(self.trainX, axis=-1)
-        self.testX = np.expand_dims(self.testX, axis=-1)
+        # self.trainX = np.expand_dims(self.trainX, axis=-1)
+        # self.testX = np.expand_dims(self.testX, axis=-1)
         self.valX, self.valY = None, None
         self.batchSize = batch_size
         if validation_size > 0:

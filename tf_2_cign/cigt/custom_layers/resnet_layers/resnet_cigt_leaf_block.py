@@ -62,11 +62,11 @@ class ResnetCigtLeafBlock(tf.keras.layers.Layer):
                                         use_bias=True,
                                         name="loss_layer")
         # Amend the cost for routing
-        cost = self.node.opMacCostsDict[self.lossLayer.opName]
-        self.node.macCost -= cost
-        routed_cost = cost / self.thisBlockPathCount
-        self.node.opMacCostsDict[self.lossLayer.opName] = routed_cost
-        self.node.macCost += routed_cost
+        # cost = self.node.opMacCostsDict[self.lossLayer.opName]
+        # self.node.macCost -= cost
+        # routed_cost = cost / self.thisBlockPathCount
+        # self.node.opMacCostsDict[self.lossLayer.opName] = routed_cost
+        # self.node.macCost += routed_cost
 
     def call(self, inputs, **kwargs):
         f_input = inputs[0]
