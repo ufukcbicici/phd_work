@@ -9,7 +9,7 @@ class ResnetCigtConstants:
     input_dims = (32, 32, 3)
     class_count = 10
     batch_size = 256
-    epoch_count = 125
+    epoch_count = 350
     classification_wd = 0.0
     decision_wd = 0.0
     softmax_decay_initial = 25.0
@@ -29,7 +29,8 @@ class ResnetCigtConstants:
     bn_momentum = 0.9
     evaluation_period = 10
     measurement_start = 11
-    decision_dimensions = [128, 128]
+    decision_dimensions = [-1]  # [128, 128]
+    decision_average_pooling_strides = [-1]  # [4, 2]
     initial_lr = 0.1
     iteration_count_per_epoch = ceil(50000 / batch_size) + 1 if 50000 % batch_size != 0 else 50000 / batch_size
     learning_rate_calculator = DiscreteParameter(name="lr_calculator",
@@ -38,7 +39,6 @@ class ResnetCigtConstants:
                                                      (iteration_count_per_epoch * 150, initial_lr * 0.1),
                                                      (iteration_count_per_epoch * 250, initial_lr * 0.01)])
     decision_loss_coeff = 1.0
-    decision_average_pooling_strides = [4, 4]
     optimizer_type = "SGD"
     decision_non_linearity = "Softmax"
     save_model = False
@@ -49,9 +49,15 @@ class ResnetCigtConstants:
     first_conv_output_dim = 16
     first_conv_stride = 1
     resnet_config_list = [
-        {"path_count": 1, "layer_structure": [{"layer_count": 18, "feature_map_count": 16}]},
-        {"path_count": 2, "layer_structure": [{"layer_count": 18, "feature_map_count": 32}]},
-        {"path_count": 4, "layer_structure": [{"layer_count": 18, "feature_map_count": 64}]}]
+        {"path_count": 1,
+         "layer_structure": [{"layer_count": 18, "feature_map_count": 16},
+                             {"layer_count": 18, "feature_map_count": 32},
+                             {"layer_count": 18, "feature_map_count": 64}]}]
+
+    # resnet_config_list = [
+    #     {"path_count": 1, "layer_structure": [{"layer_count": 18, "feature_map_count": 16}]},
+    #     {"path_count": 2, "layer_structure": [{"layer_count": 18, "feature_map_count": 32}]},
+    #     {"path_count": 4, "layer_structure": [{"layer_count": 18, "feature_map_count": 64}]}]
     double_stride_layers = {18, 36}
 
     softmax_decay_controller = StepWiseDecayAlgorithm(

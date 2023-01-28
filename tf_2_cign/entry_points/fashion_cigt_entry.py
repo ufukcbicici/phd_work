@@ -21,6 +21,9 @@ if __name__ == "__main__":
 
     fashion_mnist = FashionMnist(batch_size=FashionNetConstants.batch_size,
                                  validation_size=0)
+    for x, y in fashion_mnist.trainDataTf:
+        print("X")
+
     softmax_decay_controller = StepWiseDecayAlgorithm(decay_name="Stepwise",
                                                       initial_value=FashionNetConstants.softmax_decay_initial,
                                                       decay_coefficient=FashionNetConstants.softmax_decay_coefficient,

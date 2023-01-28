@@ -2,7 +2,9 @@ import tensorflow as tf
 
 from tf_2_cign.cigt.custom_layers.cigt_conv_layer import CigtConvLayer
 from tf_2_cign.cigt.custom_layers.cigt_dense_layer import CigtDenseLayer
+from tf_2_cign.cigt.custom_layers.cigt_identity_layer import CigtIdentityLayer
 from tf_2_cign.cigt.custom_layers.resnet_layers.basic_block import BasicBlock
+from tf_2_cign.cigt.custom_layers.resnet_layers.resnet_input_transformation_layer import ResnetInputTransformationLayer
 from tf_2_cign.custom_layers.cign_conv_layer import CignConvLayer
 from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 
@@ -10,6 +12,9 @@ from tf_2_cign.custom_layers.cign_dense_layer import CignDenseLayer
 class ResnetCigtLeafBlock(tf.keras.layers.Layer):
     def __init__(self,
                  node,
+                 first_conv_kernel_size,
+                 first_conv_output_dim,
+                 first_conv_stride,
                  block_parameters,
                  batch_norm_type,
                  start_moving_averages_from_zero,
@@ -19,6 +24,26 @@ class ResnetCigtLeafBlock(tf.keras.layers.Layer):
                  this_block_path_count,
                  class_count):
         super().__init__()
+        self.firstConvKernelSize = first_conv_kernel_size
+        self.firstConvOutputDim = first_conv_output_dim
+        self.firstConvStride = first_conv_stride
+        if self.firstConvKernelSize > 0 and \
+                self.firstConvOutputDim > 0 and \
+                self.firstConvStride > 0:
+            self.inputTransformationLayer = ResnetInputTransformationLayer(
+                node=node,
+                prev_block_path_count=prev_block_path_count,
+                this_block_path_count=this_block_path_count,
+                batch_norm_type=batch_norm_type,
+                bn_momentum=bn_momentum,
+                start_moving_averages_from_zero=start_moving_averages_from_zero,
+                apply_mask_to_batch_norm=apply_mask_to_batch_norm,
+                first_conv_kernel_size=self.firstConvKernelSize,
+                first_conv_output_dim=self.firstConvOutputDim,
+                first_conv_stride=self.firstConvStride)
+        else:
+            self.inputTransformationLayer = CigtIdentityLayer()
+
         self.node = node
         self.prevBlockPathCount = prev_block_path_count
         self.thisBlockPathCount = this_block_path_count
@@ -77,9 +102,14 @@ class ResnetCigtLeafBlock(tf.keras.layers.Layer):
 
         # F ops
         f_net = f_input
+        # Input transformation
+        f_net = self.inputTransformationLayer([f_net, routing_matrix], training=training)
+        # Basic blocks
         for block in self.blockList:
             f_net = block([f_net, routing_matrix], training=training)
 
+        f_net = self.avgPoolingLayer(f_net)
+        f_net = tf.squeeze(f_net)
         # Loss layer
         logits = self.lossLayer(f_net)
         posteriors = tf.nn.softmax(logits)

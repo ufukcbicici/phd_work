@@ -26,6 +26,7 @@ class Cifar10(object):
         mean = tf.expand_dims(tf.expand_dims(mean, axis=0), axis=0)
         std = tf.expand_dims(tf.expand_dims(std, axis=0), axis=0)
         image_normalized = (image - mean) / std
+        image_normalized = tf.cast(image_normalized, tf.float64)
         return image_normalized
 
     @staticmethod
@@ -43,6 +44,8 @@ class Cifar10(object):
         self.trainData, self.testData = tf.keras.datasets.cifar10.load_data()
         self.trainX, self.trainY = self.trainData[0], self.trainData[1]
         self.testX, self.testY = self.testData[0], self.testData[1]
+        self.trainY = np.squeeze(self.trainY).astype(np.int32)
+        self.testY = np.squeeze(self.testY).astype(np.int32)
         # self.trainX = np.expand_dims(self.trainX, axis=-1)
         # self.testX = np.expand_dims(self.testX, axis=-1)
         self.valX, self.valY = None, None

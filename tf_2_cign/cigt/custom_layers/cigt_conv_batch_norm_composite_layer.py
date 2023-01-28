@@ -26,6 +26,7 @@ class CigtConvBatchNormCompositeLayer(tf.keras.layers.Layer):
         assert batch_norm_type in {"StandardBatchNormalization",
                                    "CigtBatchNormalization",
                                    "CigtProbabilisticBatchNormalization"}
+        assert isinstance(strides, tuple)
         self.node = node
         self.batchNormMomentum = bn_momentum
         self.startMovingAverageFromZero = start_moving_averages_from_zero

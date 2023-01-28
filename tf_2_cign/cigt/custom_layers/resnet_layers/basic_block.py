@@ -20,6 +20,7 @@ class BasicBlock(tf.keras.layers.Layer):
                  apply_mask_to_batch_norm,
                  stride):
         super(BasicBlock, self).__init__()
+        assert isinstance(stride, int)
         self.inDimension = in_dimension
         self.outDimension = out_dimension
         self.node = node
@@ -30,7 +31,7 @@ class BasicBlock(tf.keras.layers.Layer):
         self.convBnLayer1 = CigtConvBatchNormCompositeLayer(
             kernel_size=3,
             num_of_filters=out_dimension,
-            strides=stride,
+            strides=(stride, stride),
             node=node,
             activation=None,
             input_path_count=input_path_count,
@@ -45,7 +46,7 @@ class BasicBlock(tf.keras.layers.Layer):
         self.convBnLayer2 = CigtConvBatchNormCompositeLayer(
             kernel_size=3,
             num_of_filters=out_dimension,
-            strides=1,
+            strides=(1, 1),
             node=node,
             activation=None,
             input_path_count=output_path_count,
@@ -61,7 +62,7 @@ class BasicBlock(tf.keras.layers.Layer):
             self.shortcut = CigtConvBatchNormCompositeLayer(
                 kernel_size=1,
                 num_of_filters=out_dimension,
-                strides=stride,
+                strides=(stride, stride),
                 node=node,
                 activation=None,
                 input_path_count=input_path_count,

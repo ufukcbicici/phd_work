@@ -3,7 +3,6 @@ import json
 
 from tf_2_cign.cigt.custom_layers.resnet_layers.resnet_cigt_inner_block import ResnetCigtInnerBlock
 from tf_2_cign.cigt.custom_layers.resnet_layers.resnet_cigt_leaf_block import ResnetCigtLeafBlock
-from tf_2_cign.cigt.custom_layers.resnet_layers.resnet_cigt_root_block import ResnetCigtRootBlock
 from tf_2_cign.utilities.resnet_cigt_constants import ResnetCigtConstants
 
 
@@ -61,34 +60,32 @@ class ResnetCigt(Cigt):
         self.cigtBlocks = []
         super(ResnetCigt, self).build_network()
         curr_node = self.rootNode
-        assert len(self.pathCounts) == len(self.blockParametersDict)
-        assert len(self.pathCounts) == len(self.decisionDimensions) + 1
-        assert len(self.pathCounts) == len(self.decisionAveragePoolingStrides) + 1
+
+        if len(self.pathCounts) > 1:
+            assert len(self.pathCounts) == len(self.blockParametersDict)
+            assert len(self.pathCounts) == len(self.decisionDimensions) + 1
+            assert len(self.pathCounts) == len(self.decisionAveragePoolingStrides) + 1
+        elif len(self.pathCounts) == 1:
+            assert self.pathCounts[0] == 1
+            assert len(self.decisionDimensions) == 1 and self.decisionDimensions[0] == -1
+            assert len(self.decisionAveragePoolingStrides) == 1 and self.decisionAveragePoolingStrides[0] == -1
+        else:
+            raise ValueError("0 length self.pathCounts is not valid.")
+
         for block_id, path_count in enumerate(self.pathCounts):
             prev_block_path_count = 1 if block_id == 0 else self.pathCounts[block_id - 1]
+            # Is this the root node? If so, use the initial conv layer as the transformation.
             if block_id == 0:
-                cigt_block = ResnetCigtRootBlock(
-                    node=curr_node,
-                    first_conv_kernel_size=self.firstConvKernelSize,
-                    first_conv_output_dim=self.firstConvOutputDim,
-                    first_conv_stride=self.firstConvStride,
-                    block_parameters=self.blockParametersDict[block_id],
-                    bn_momentum=self.bnMomentum,
-                    batch_norm_type=self.batchNormType,
-                    apply_mask_to_batch_norm=self.applyMaskToBatchNorm,
-                    start_moving_averages_from_zero=self.startMovingAveragesFromZero,
-                    class_count=self.classCount,
-                    routing_strategy_name=self.routingStrategyName,
-                    decision_drop_probability=self.decisionDropProbability,
-                    decision_average_pooling_stride=self.decisionAveragePoolingStrides[block_id],
-                    decision_dim=self.decisionDimensions[block_id],
-                    decision_non_linearity=self.decisionNonLinearity,
-                    ig_balance_coefficient=self.informationGainBalanceCoeff,
-                    prev_block_path_count=prev_block_path_count,
-                    this_block_path_count=self.pathCounts[block_id],
-                    next_block_path_count=self.pathCounts[block_id + 1],
-                    use_straight_through=self.useStraightThrough)
-            elif 0 < block_id < len(self.pathCounts) - 1:
+                first_conv_kernel_size = self.firstConvKernelSize
+                first_conv_output_dim = self.firstConvOutputDim
+                first_conv_stride = self.firstConvStride
+            else:
+                first_conv_kernel_size = -1
+                first_conv_output_dim = -1
+                first_conv_stride = -1
+
+            # Inner block
+            if block_id < len(self.pathCounts) - 1:
                 cigt_block = ResnetCigtInnerBlock(
                     node=curr_node,
                     block_parameters=self.blockParametersDict[block_id],
@@ -106,8 +103,11 @@ class ResnetCigt(Cigt):
                     prev_block_path_count=prev_block_path_count,
                     this_block_path_count=self.pathCounts[block_id],
                     next_block_path_count=self.pathCounts[block_id + 1],
-                    use_straight_through=self.useStraightThrough)
-            elif block_id == len(self.pathCounts) - 1:
+                    use_straight_through=self.useStraightThrough,
+                    first_conv_kernel_size=first_conv_kernel_size,
+                    first_conv_output_dim=first_conv_output_dim,
+                    first_conv_stride=first_conv_stride)
+            else:
                 cigt_block = ResnetCigtLeafBlock(
                     node=curr_node,
                     block_parameters=self.blockParametersDict[block_id],
@@ -117,10 +117,11 @@ class ResnetCigt(Cigt):
                     start_moving_averages_from_zero=self.startMovingAveragesFromZero,
                     class_count=self.classCount,
                     prev_block_path_count=prev_block_path_count,
-                    this_block_path_count=self.pathCounts[block_id])
-            else:
-                ValueError("Unexpected block_id:{0}".format(block_id))
-                return
+                    this_block_path_count=self.pathCounts[block_id],
+                    first_conv_kernel_size=first_conv_kernel_size,
+                    first_conv_output_dim=first_conv_output_dim,
+                    first_conv_stride=first_conv_stride)
+
             self.cigtBlocks.append(cigt_block)
             if curr_node.isLeaf:
                 curr_node = self.dagObject.children(node=curr_node)
@@ -138,9 +139,6 @@ class ResnetCigt(Cigt):
         leaf_node.macCost += routed_loss_layer_cost
         leaf_node.opMacCostsDict[self.cigtBlocks[-1].lossLayer.opName] = routed_loss_layer_cost
         super(ResnetCigt, self).calculate_total_macs()
-
-
-
 
         # for block_id, path_count in enumerate(self.pathCounts):
         #     prev_block_path_count = 1 if block_id == 0 else self.pathCounts[block_id - 1]
