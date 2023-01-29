@@ -28,14 +28,16 @@ if __name__ == "__main__":
 
     cifar10 = Cifar10(batch_size=ResnetCigtConstants.batch_size, validation_size=0)
 
-    with tf.device("CPU"):
+    with tf.device("GPU"):
         run_id = DbLogger.get_run_id()
         resnet_cigt = ResnetCigt(run_id=run_id, model_definition="Resnet-110 Cigt")
 
         explanation = resnet_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
+
         # training_accuracy, training_info_gain_list = resnet_cigt.evaluate(
         #     x=cifar10.trainDataset, epoch_id=0, dataset_type="training")
+
         resnet_cigt.fit(x=cifar10.trainDataset,
                         validation_data=cifar10.testDataset,
                         epochs=ResnetCigtConstants.epoch_count)

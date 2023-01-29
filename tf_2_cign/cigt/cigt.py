@@ -148,7 +148,7 @@ class Cigt(tf.keras.Model):
         f_net = x
         # ig_activations = tf.ones(shape=(batch_size, 1), dtype=tf.float32)
         routing_matrix = tf.ones(shape=(batch_size, 1), dtype=tf.int32)
-        information_gain_values = []
+        information_gain_values = [0.0]
         list_of_routing_probabilities = []
         list_of_pure_activations = []
         list_of_routing_matrices = []

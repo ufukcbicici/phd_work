@@ -1,3 +1,4 @@
+from auxillary.db_logger import DbLogger
 from tf_2_cign.cigt.cigt import Cigt
 import json
 
@@ -140,51 +141,6 @@ class ResnetCigt(Cigt):
         leaf_node.opMacCostsDict[self.cigtBlocks[-1].lossLayer.opName] = routed_loss_layer_cost
         super(ResnetCigt, self).calculate_total_macs()
 
-        # for block_id, path_count in enumerate(self.pathCounts):
-        #     prev_block_path_count = 1 if block_id == 0 else self.pathCounts[block_id - 1]
-        #     if block_id < len(self.pathCounts) - 1:
-        #         block = LeNetCigtInnerBlock(node=curr_node,
-        #                                     kernel_size=self.kernelSizes[block_id],
-        #                                     num_of_filters=self.filterCounts[block_id],
-        #                                     strides=(1, 1),
-        #                                     activation="relu",
-        #                                     use_bias=True,
-        #                                     padding="same",
-        #                                     decision_drop_probability=self.decisionDropProbability,
-        #                                     decision_dim=self.decisionDimensions[block_id],
-        #                                     bn_momentum=self.bnMomentum,
-        #                                     prev_block_path_count=prev_block_path_count,
-        #                                     this_block_path_count=self.pathCounts[block_id],
-        #                                     next_block_path_count=self.pathCounts[block_id + 1],
-        #                                     ig_balance_coefficient=self.informationGainBalanceCoeff,
-        #                                     class_count=self.classCount,
-        #                                     routing_strategy=self.routingStrategyName,
-        #                                     use_straight_through=self.useStraightThrough,
-        #                                     decision_non_linearity=self.decisionNonLinearity)
-        #     else:
-        #         block = LeNetCigtLeafBlock(node=curr_node,
-        #                                    kernel_size=self.kernelSizes[block_id],
-        #                                    num_of_filters=self.filterCounts[block_id],
-        #                                    activation="relu",
-        #                                    hidden_layer_dims=self.hiddenLayers,
-        #                                    classification_dropout_prob=self.classificationDropProbability,
-        #                                    use_bias=True,
-        #                                    padding="same",
-        #                                    strides=(1, 1),
-        #                                    class_count=self.classCount,
-        #                                    prev_block_path_count=prev_block_path_count,
-        #                                    this_block_path_count=self.pathCounts[block_id])
-        #     self.cigtBlocks.append(block)
-        #     if curr_node.isLeaf:
-        #         curr_node = self.dagObject.children(node=curr_node)
-        #         assert len(curr_node) == 0
-        #     else:
-        #         curr_node = self.dagObject.children(node=curr_node)
-        #         assert len(curr_node) == 1
-        #         curr_node = curr_node[0]
-        # # self.build(input_shape=[(self.batchSize, *self.inputDims), (self.batchSize, )])
-        #
-
     def interpret_config_list(self):
         block_list = []
         # Unravel the configuration information into a complete block by block list.
@@ -256,3 +212,68 @@ class ResnetCigt(Cigt):
         # Writing to sample.json
         with open("resnet_cigt_layer_config.json", "w") as outfile:
             outfile.write(json_object)
+
+    def get_explanation_string(self):
+        kv_rows = []
+        explanation = ""
+        explanation += super().get_explanation_string()
+        explanation = self.add_explanation(name_of_param="firstConvKernelSize", value=self.firstConvKernelSize,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="firstConvStride", value=self.firstConvStride,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="firstConvOutputDim", value=self.firstConvOutputDim,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="decisionAveragePoolingStrides",
+                                           value=self.decisionAveragePoolingStrides,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="decisionDimensions", value=self.decisionDimensions,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="applyMaskToBatchNorm", value=self.applyMaskToBatchNorm,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="startMovingAveragesFromZero",
+                                           value=self.startMovingAveragesFromZero,
+                                           explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="batchNormType", value=self.batchNormType,
+                                           explanation=explanation, kv_rows=kv_rows)
+        # Explanation for block configurations
+        block_params = [(block_id, block_config_list)
+                        for block_id, block_config_list in self.blockParametersDict.items()]
+        block_params = sorted(block_params, key=lambda tpl: tpl[0])
+
+        # def add_explanation(self, name_of_param, value, explanation, kv_rows):
+        #     explanation += "{0}:{1}\n".format(name_of_param, value)
+        #     kv_rows.append((self.runId, name_of_param, "{0}".format(value)))
+        #     return explanation
+
+        layer_id = 0
+        for t_ in block_params:
+            block_id = t_[0]
+            block_config_list = t_[1]
+            for block_config_dict in block_config_list:
+                explanation = self.add_explanation(name_of_param="BasicBlock_{0} in_dimension".format(layer_id),
+                                                   value=block_config_dict["in_dimension"],
+                                                   explanation=explanation, kv_rows=kv_rows)
+                explanation = self.add_explanation(name_of_param="BasicBlock_{0} input_path_count".format(layer_id),
+                                                   value=block_config_dict["input_path_count"],
+                                                   explanation=explanation, kv_rows=kv_rows)
+                explanation = self.add_explanation(name_of_param="BasicBlock_{0} layer_id".format(layer_id),
+                                                   value=layer_id,
+                                                   explanation=explanation, kv_rows=kv_rows)
+                assert block_id == block_config_dict["block_id"]
+                explanation = self.add_explanation(name_of_param="BasicBlock_{0} block_id".format(layer_id),
+                                                   value=block_config_dict["block_id"],
+                                                   explanation=explanation, kv_rows=kv_rows)
+                explanation = self.add_explanation(name_of_param="BasicBlock_{0} out_dimension".format(layer_id),
+                                                   value=block_config_dict["out_dimension"],
+                                                   explanation=explanation, kv_rows=kv_rows)
+                explanation = self.add_explanation(name_of_param="BasicBlock_{0} output_path_count".format(layer_id),
+                                                   value=block_config_dict["output_path_count"],
+                                                   explanation=explanation, kv_rows=kv_rows)
+                explanation = self.add_explanation(name_of_param="BasicBlock_{0} stride".format(layer_id),
+                                                   value=block_config_dict["stride"],
+                                                   explanation=explanation, kv_rows=kv_rows)
+
+                layer_id += 1
+
+        DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
+        return explanation
