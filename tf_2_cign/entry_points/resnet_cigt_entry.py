@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     with tf.device("GPU"):
         run_id = DbLogger.get_run_id()
-        resnet_cigt = ResnetCigt(run_id=run_id, model_definition="Resnet-110 Cigt")
+        resnet_cigt = ResnetCigt(run_id=run_id, model_definition="Resnet-110 Cigt Thick Baseline")
 
         explanation = resnet_cigt.get_explanation_string()
         DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)

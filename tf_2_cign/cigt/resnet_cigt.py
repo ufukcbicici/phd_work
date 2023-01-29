@@ -19,6 +19,7 @@ class ResnetCigt(Cigt):
         path_counts = [d_["path_count"] for d_ in self.resnetConfigList][1:]
         self.blockParametersDict = self.interpret_config_list()
         # self.bnMomentum = ResnetCigtConstants.bn_momentum
+        self.doubleStrideLayers = ResnetCigtConstants.double_stride_layers
         self.decisionAveragePoolingStrides = ResnetCigtConstants.decision_average_pooling_strides
         self.decisionDimensions = ResnetCigtConstants.decision_dimensions
         self.startMovingAveragesFromZero = ResnetCigtConstants.start_moving_averages_from_zero
@@ -170,7 +171,7 @@ class ResnetCigt(Cigt):
             block_options["block_id"] = block_id
             block_options["out_dimension"] = feature_map_count
             block_options["output_path_count"] = path_count
-            if layer_id in ResnetCigtConstants.double_stride_layers:
+            if layer_id in self.doubleStrideLayers:
                 block_options["stride"] = 2
             else:
                 block_options["stride"] = 1
@@ -235,15 +236,12 @@ class ResnetCigt(Cigt):
                                            explanation=explanation, kv_rows=kv_rows)
         explanation = self.add_explanation(name_of_param="batchNormType", value=self.batchNormType,
                                            explanation=explanation, kv_rows=kv_rows)
+        explanation = self.add_explanation(name_of_param="doubleStrideLayers", value=self.doubleStrideLayers,
+                                           explanation=explanation, kv_rows=kv_rows)
         # Explanation for block configurations
         block_params = [(block_id, block_config_list)
                         for block_id, block_config_list in self.blockParametersDict.items()]
         block_params = sorted(block_params, key=lambda tpl: tpl[0])
-
-        # def add_explanation(self, name_of_param, value, explanation, kv_rows):
-        #     explanation += "{0}:{1}\n".format(name_of_param, value)
-        #     kv_rows.append((self.runId, name_of_param, "{0}".format(value)))
-        #     return explanation
 
         layer_id = 0
         for t_ in block_params:
