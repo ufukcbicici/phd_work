@@ -16,10 +16,10 @@ class ResnetCigt(Cigt):
         self.bnMomentum = ResnetCigtConstants.bn_momentum
         self.batchNormType = ResnetCigtConstants.batch_norm_type
         self.applyMaskToBatchNorm = ResnetCigtConstants.apply_mask_to_batch_norm
+        self.doubleStrideLayers = ResnetCigtConstants.double_stride_layers
         path_counts = [d_["path_count"] for d_ in self.resnetConfigList][1:]
         self.blockParametersDict = self.interpret_config_list()
         # self.bnMomentum = ResnetCigtConstants.bn_momentum
-        self.doubleStrideLayers = ResnetCigtConstants.double_stride_layers
         self.decisionAveragePoolingStrides = ResnetCigtConstants.decision_average_pooling_strides
         self.decisionDimensions = ResnetCigtConstants.decision_dimensions
         self.startMovingAveragesFromZero = ResnetCigtConstants.start_moving_averages_from_zero
@@ -270,8 +270,8 @@ class ResnetCigt(Cigt):
                 explanation = self.add_explanation(name_of_param="BasicBlock_{0} stride".format(layer_id),
                                                    value=block_config_dict["stride"],
                                                    explanation=explanation, kv_rows=kv_rows)
-
                 layer_id += 1
 
         DbLogger.write_into_table(rows=kv_rows, table="run_parameters")
         return explanation
+

@@ -1,5 +1,5 @@
 import os.path
-
+import sys
 import tensorflow as tf
 import numpy as np
 import time
@@ -126,7 +126,7 @@ class Cigt(tf.keras.Model):
             last_block = node
             self.cigtNodes.append(node)
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, **kwargs):
         x = inputs[0]
         y = inputs[1]
@@ -258,6 +258,7 @@ class Cigt(tf.keras.Model):
         print("Lr:{0}".format(self.optimizer._decayed_lr(tf.float32).numpy()))
         print("Temperature:{0}".format(self.softmaxDecayController.get_value()))
         print("Accuracy:{0}".format(self.metricsDict["accuracy_metric"].result().numpy()))
+        sys.stdout.flush()
 
     def is_decision_variable(self, variable):
         if "scale" in variable.name or "shift" in variable.name or "hyperplane" in variable.name or \

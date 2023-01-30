@@ -23,24 +23,32 @@ if __name__ == "__main__":
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0], True)
     Cifar10.TF_RNG = tf.random.Generator.from_seed(123, alg='philox')
-    DbLogger.log_db_path = DbLogger.home_asus
+    DbLogger.log_db_path = DbLogger.tetam_cigt_2
+    # 5e-4,
+    # 0.0005
+    weight_decay = 10 * [0.0, 0.00001, 0.00005, 0.0001, 0.0005, 0.001]
+    weight_decay = sorted(weight_decay)
+    param_grid = Utilities.get_cartesian_product(list_of_lists=[weight_decay])
+
+    for param_tpl in param_grid:
+        ResnetCigtConstants.classification_wd = param_tpl[0]
+        cifar10 = Cifar10(batch_size=ResnetCigtConstants.batch_size, validation_size=0)
+
+        with tf.device("GPU"):
+            run_id = DbLogger.get_run_id()
+            resnet_cigt = ResnetCigt(run_id=run_id, model_definition="Resnet-110 Cigt Thin Baseline Grid Search")
+
+            explanation = resnet_cigt.get_explanation_string()
+            DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
+
+            resnet_cigt.fit(x=cifar10.trainDataset,
+                            validation_data=cifar10.testDataset,
+                            epochs=ResnetCigtConstants.epoch_count)
+
+
+
+
+
     # ResnetCigt.create_default_config_json()
     # print("X")
-    cifar10 = Cifar10(batch_size=ResnetCigtConstants.batch_size, validation_size=0)
 
-    with tf.device("CPU"):
-        run_id = DbLogger.get_run_id()
-
-        print("Entering ResnetCigt", flush=True)
-        resnet_cigt = ResnetCigt(run_id=run_id, model_definition="Resnet-110 Cigt Thick Baseline")
-
-        explanation = resnet_cigt.get_explanation_string()
-        DbLogger.write_into_table(rows=[(run_id, explanation)], table=DbLogger.runMetaData)
-
-        # training_accuracy, training_info_gain_list = resnet_cigt.evaluate(
-        #     x=cifar10.testDataset, epoch_id=0, dataset_type="test")
-
-        print("Entering resnet_cigt.fit", flush=True)
-        resnet_cigt.fit(x=cifar10.trainDataset,
-                        validation_data=cifar10.testDataset,
-                        epochs=ResnetCigtConstants.epoch_count)

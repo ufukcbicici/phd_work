@@ -1,4 +1,4 @@
-from math import ceil
+from math import ceil, floor
 
 from auxillary.parameters import DiscreteParameter
 from tf_2_cign.softmax_decay_algorithms.step_wise_decay_algorithm import StepWiseDecayAlgorithm
@@ -10,7 +10,7 @@ class ResnetCigtConstants:
     class_count = 10
     batch_size = 256
     epoch_count = 350
-    classification_wd = 0.0
+    classification_wd = 0.0005
     decision_wd = 0.0
     softmax_decay_initial = 25.0
     softmax_decay_coefficient = 0.9999
@@ -27,12 +27,12 @@ class ResnetCigtConstants:
     #                            "CigtBatchNormalization",
     #                            "CigtProbabilisticBatchNormalization"}
     bn_momentum = 0.9
-    evaluation_period = 10
-    measurement_start = 11
+    evaluation_period = 1
+    measurement_start = 0
     decision_dimensions = [-1]  # [128, 128]
     decision_average_pooling_strides = [-1]  # [4, 2]
     initial_lr = 0.1
-    iteration_count_per_epoch = ceil(50000 / batch_size) + 1 if 50000 % batch_size != 0 else 50000 / batch_size
+    iteration_count_per_epoch = floor(50000 / batch_size) + 1 if 50000 % batch_size != 0 else 50000 / batch_size
     learning_rate_calculator = DiscreteParameter(name="lr_calculator",
                                                  value=initial_lr,
                                                  schedule=[
@@ -48,16 +48,21 @@ class ResnetCigtConstants:
     first_conv_kernel_size = 3
     first_conv_output_dim = 16
     first_conv_stride = 1
+    # Thick Baseline
+    # resnet_config_list = [
+    #     {"path_count": 1,
+    #      "layer_structure": [{"layer_count": 18, "feature_map_count": 16},
+    #                          {"layer_count": 18, "feature_map_count": 32},
+    #                          {"layer_count": 18, "feature_map_count": 64}]}]
+
+    # Think Baseline
     resnet_config_list = [
         {"path_count": 1,
-         "layer_structure": [{"layer_count": 18, "feature_map_count": 16},
-                             {"layer_count": 18, "feature_map_count": 32},
-                             {"layer_count": 18, "feature_map_count": 64}]}]
+         "layer_structure": [{"layer_count": 9, "feature_map_count": 16},
+                             {"layer_count": 9, "feature_map_count": 12},
+                             {"layer_count": 18, "feature_map_count": 16},
+                             {"layer_count": 18, "feature_map_count": 16}]}]
 
-    # resnet_config_list = [
-    #     {"path_count": 1, "layer_structure": [{"layer_count": 18, "feature_map_count": 16}]},
-    #     {"path_count": 2, "layer_structure": [{"layer_count": 18, "feature_map_count": 32}]},
-    #     {"path_count": 4, "layer_structure": [{"layer_count": 18, "feature_map_count": 64}]}]
     double_stride_layers = {18, 36}
 
     softmax_decay_controller = StepWiseDecayAlgorithm(

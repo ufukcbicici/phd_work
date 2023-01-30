@@ -2101,3 +2101,21 @@ SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 46
 SELECT * FROM ce_logs_table clt WHERE run_id = 46
 SELECT MAX(mean_test_acc) FROM ce_logs_table clt WHERE run_id = 46
 SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 46
+
+-- ********************** RESNET CIFAR-10 EXPERIMENTS **********************
+
+--Experiments: Resnet-110 Cigt Thick Baseline Grid Search
+--weight_decay = 10 * [0.0005]
+--param_grid = Utilities.get_cartesian_product(list_of_lists=[weight_decay])
+--Started at 30/1/2023
+--Started on: Tetam - /cta/users/ucbicici/phd_work/cigt_logger.db
+
+
+--Experiments: Resnet-110 Cigt Thin Baseline Grid Search
+--weight_decay = 10 * [0.0, 0.00001, 0.00005, 0.0001, 0.0005, 0.001]
+--weight_decay = sorted(weight_decay)
+--param_grid = Utilities.get_cartesian_product(list_of_lists=[weight_decay])
+--Started at 30/1/2023
+--Started on: Tetam - /cta/users/ucbicici/phd_work/cigt_logger2.db
+
+-- ********************** RESNET CIFAR-10 EXPERIMENTS **********************

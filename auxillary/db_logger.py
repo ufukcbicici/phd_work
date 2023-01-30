@@ -202,6 +202,8 @@ class DbLogger:
 
     @staticmethod
     def write_into_table(rows, table, col_count=None):
+        if len(rows) == 0:
+            return
         print("Enter write_into_table")
         DbLogger.lock.acquire()
         rows_as_tuple = tuple(rows)
