@@ -27,8 +27,8 @@ class ResnetCigtConstants:
     #                            "CigtBatchNormalization",
     #                            "CigtProbabilisticBatchNormalization"}
     bn_momentum = 0.9
-    evaluation_period = 1
-    measurement_start = 0
+    evaluation_period = 10
+    measurement_start = 11
     decision_dimensions = [-1]  # [128, 128]
     decision_average_pooling_strides = [-1]  # [4, 2]
     initial_lr = 0.1

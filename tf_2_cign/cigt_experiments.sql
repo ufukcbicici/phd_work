@@ -2110,6 +2110,20 @@ SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 46
 --Started at 30/1/2023
 --Started on: Tetam - /cta/users/ucbicici/phd_work/cigt_logger.db
 
+SELECT AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       A.Value AS ClassificationWd,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Wd") AS A ON
+    logs_table.RunID = A.RunID
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_meta_data ON
+logs_table.RunId = run_meta_data.RunId
+WHERE run_meta_data.Explanation LIKE "%Resnet-110 Cigt Thick Baseline Grid Search%") AND logs_table.Epoch >= 340
+GROUP BY ClassificationWd
+
+
 
 --Experiments: Resnet-110 Cigt Thin Baseline Grid Search
 --weight_decay = 10 * [0.0, 0.00001, 0.00005, 0.0001, 0.0005, 0.001]
@@ -2119,3 +2133,16 @@ SELECT MAX(mean_test_gamma_acc) FROM ce_logs_table clt WHERE run_id = 46
 --Started on: Tetam - /cta/users/ucbicici/phd_work/cigt_logger2.db
 
 -- ********************** RESNET CIFAR-10 EXPERIMENTS **********************
+
+SELECT AVG(TrainingAccuracy) AS TrainingAccuracy,
+       AVG(TestAccuracy) AS TestAccuracy,
+       A.Value AS ClassificationWd,
+       COUNT(1) AS CNT
+FROM logs_table
+    LEFT JOIN (SELECT * FROM run_parameters WHERE run_parameters.Parameter = "Classification Wd") AS A ON
+    logs_table.RunID = A.RunID
+WHERE logs_table.RunID IN
+(SELECT logs_table.RunId FROM logs_table LEFT JOIN run_meta_data ON
+logs_table.RunId = run_meta_data.RunId
+WHERE run_meta_data.Explanation LIKE "%Resnet-110 Cigt Thin Baseline Grid Search%") AND logs_table.Epoch >= 340
+GROUP BY ClassificationWd

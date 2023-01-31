@@ -154,7 +154,7 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
         return predicted_a_t
 
     @staticmethod
-    def evaluate_multipath_accuracy(model, dataset, multipath_object):
+    def evaluate_multipath_accuracy(model, dataset, multipath_object, threshold):
         step_count = len(multipath_object.pathCounts) - 1
         validity_vectors = []
         mac_vectors = []
@@ -258,6 +258,10 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
         # return accuracy
 
     @staticmethod
+    def to_labels(pos_, threshold):
+        return (pos_ >= threshold).astype('int')
+
+    @staticmethod
     def train_with_params(process_id, X_val_resampled, y_val_resampled,
                           X_val, y_val, X_test, y_test, params_list, multipath_object, val_indices,
                           test_indices, batch_size, run_id, model_id):
@@ -311,6 +315,14 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
             test_accuracy, test_mac = QLearningBasedCombinedClassification.evaluate_multipath_accuracy(
                 model=pipe, dataset=test_dataset, multipath_object=multipath_object)
 
+            # Threshold optimization
+            thresholds = np.arange(0, 1, 0.001)
+            y_probs = pipe.predict_proba(X_test)
+            pos_probs = y_probs[:, 1]
+
+            scores = [(t, f1_score(y_true=y_test,
+                                   y_pred=QLearningBasedCombinedClassification.to_labels(pos_probs, t),
+                                   average='macro')) for t in thresholds]
             params_kv_list = sorted([(k, v) for k, v in param_dict.items()], key=lambda tpl: tpl[0])
             params_string = ""
             for tpl in params_kv_list:
@@ -353,14 +365,26 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
         counter2 = Counter(y_val_resampled)
         print(counter2)
 
+        # param_grid = \
+        #     {
+        #         "pca__n_components": [2, 8, 32, 64, 128],
+        #         "mlp__hidden_layer_sizes": [(16,), (32,), (128,), (16, 8), (32, 16, 8), (512, 256, 128)],
+        #         "mlp__activation": ["relu"],
+        #         "mlp__solver": ["adam"],
+        #         # "mlp__learning_rate": ["adaptive"],
+        #         "mlp__alpha": [0.0, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01],
+        #         "mlp__max_iter": [10000],
+        #         "mlp__early_stopping": [True],
+        #         "mlp__n_iter_no_change": [100]
+        #     }
         param_grid = \
             {
-                "pca__n_components": [2, 8, 32, 64, 128],
-                "mlp__hidden_layer_sizes": [(16,), (32,), (128,), (16, 8), (32, 16, 8), (512, 256, 128)],
+                "pca__n_components": [128],
+                "mlp__hidden_layer_sizes": [(128,)],
                 "mlp__activation": ["relu"],
                 "mlp__solver": ["adam"],
                 # "mlp__learning_rate": ["adaptive"],
-                "mlp__alpha": [0.0, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01],
+                "mlp__alpha": [0.00001],
                 "mlp__max_iter": [10000],
                 "mlp__early_stopping": [True],
                 "mlp__n_iter_no_change": [100]
@@ -377,7 +401,7 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
             param_grid["mlp__n_iter_no_change"]
         ])
 
-        number_of_jobs = 2
+        number_of_jobs = 1
         chunks = Utilities.divide_array_into_chunks(param_grid, count=number_of_jobs)
         list_of_processes = []
         for process_id in range(number_of_jobs):
@@ -391,3 +415,5 @@ class QLearningBasedCombinedClassification(QLearningBasedRoutingClassification):
 
         for process in list_of_processes:
             process.join()
+
+        print("X")
